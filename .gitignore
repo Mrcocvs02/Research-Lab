@@ -1,0 +1,14 @@
+node_modules/
+dist/
+out/
+release/
+coverage/
+*.log
+.vite/
+.turbo/
+playwright-report/
+test-results/
+tools/generality.local.json
+.env
+.env.*
+*.local.json

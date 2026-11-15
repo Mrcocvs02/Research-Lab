@@ -305,4 +305,34 @@ describe('legacy importer (synthetic index)', () => {
     ctl.abort();
     await expect(run({ signal: ctl.signal })).rejects.toMatchObject({ code: 'CANCELLED' });
   });
+
+  it('updates library.json through the updateConfig callback when given, never writing it itself', async () => {
+    const store = createLibraryStore({ rootPath: root, dataDir, deviceId: 'd' });
+    await store.init();
+    const calls: number[] = [];
+    let current = await store.readConfig();
+    await createLegacyImporter({
+      now: () => new Date('2026-02-01T00:00:00Z'),
+      updateConfig: async (fn) => {
+        calls.push(1);
+        current = await fn(current);
+      },
+    }).run({ sourceDir: root, libraryRoot: root, dataDir, deviceId: 'device-1' });
+    expect(calls).toEqual([1]);
+    expect(current.scan).toEqual({ extensions: ['pdf', 'txt'], nameOnlyExtensions: ['png'], pruneDeletedDays: 90 });
+    // The importer's own store instance is separate; what matters is that library.json on disk still has the defaults,
+    // because the caller owns the write.
+    expect((await createLibraryStore({ rootPath: root, dataDir, deviceId: 'd' }).readConfig()).scan.extensions).toEqual(['pdf']);
+  });
+
+  it('leaves a library.json that the user already changed alone, with or without updateConfig', async () => {
+    const store = createLibraryStore({ rootPath: root, dataDir, deviceId: 'd' });
+    await store.init();
+    const custom = { ...(await store.readConfig()), scan: { extensions: ['md'], nameOnlyExtensions: [] as string[], pruneDeletedDays: 5 } };
+    await store.writeConfig(custom);
+    let current = custom;
+    await createLegacyImporter({ updateConfig: async (fn) => void (current = await fn(current)) }).run({ sourceDir: root, libraryRoot: root, dataDir, deviceId: 'device-1' });
+    expect(current.scan).toEqual(custom.scan);
+    expect((await store.readConfig()).scan).toEqual(custom.scan);
+  });
 });

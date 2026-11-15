@@ -18,7 +18,7 @@ export interface ManagerDeps {
   /** Starts the worker thread of a library (the manager disposes it when the library closes). */
   spawnWorker(): LibraryWorker;
   watch?: RuntimeDeps['watch'];
-  runtime?: Pick<RuntimeDeps, 'progressIntervalMs' | 'watchDebounceMs' | 'now'>;
+  runtime?: Pick<RuntimeDeps, 'progressIntervalMs' | 'now'>;
 }
 
 /**
@@ -100,6 +100,8 @@ export class RuntimeManager {
       return await LibraryRuntime.open({
         libraryId,
         rootPath: profile.rootPath,
+        dataDir,
+        deviceId,
         store: this.d.createStore({ rootPath: profile.rootPath, dataDir, deviceId }),
         index: this.d.createIndex(),
         worker,

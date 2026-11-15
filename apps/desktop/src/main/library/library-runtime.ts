@@ -1,6 +1,7 @@
 import path from 'node:path';
 import {
   AppError,
+  defaultLibraryConfig,
   type DocumentId,
   type DocumentListQuery,
   type DocumentRecord,
@@ -16,8 +17,8 @@ import {
   type SearchResultPage,
   type TaxonomyFile,
 } from '@rl/core';
+import { enrichFromExtraction } from './enrich.js';
 import { buildIndexable, makeTaxonomyLookup, type TaxonomyLookup } from './indexable.js';
-import { enrichFromExtraction, ingestScan } from './ingest.js';
 import type { ExtractResult, IndexJob, LibraryWorker } from './worker-protocol.js';
 
 /** Where the machine-local, rebuildable files of a library live (never in the library folder). */
@@ -32,9 +33,13 @@ export interface FileWatcher {
   close(): void | Promise<void>;
 }
 
+type ScanConfig = Pick<LibraryConfig, 'excludedFolders' | 'scan'>;
+
 export interface RuntimeDeps {
   libraryId: string;
   rootPath: string;
+  dataDir: string;
+  deviceId: string;
   store: LibraryStore;
   /** Reading connection of the main process; the worker owns the writing one. */
   index: SearchIndex;
@@ -44,21 +49,26 @@ export interface RuntimeDeps {
   log: Logger;
   /** Called with every status change (progress is throttled). */
   onStatus(status: ScanStatus): void;
-  /** Copies the data folder aside before the first write of this session (rule 1). */
+  /** Copies the data folder aside before the scanner writes into an existing library (rule 1). */
   backup(): Promise<void>;
   /**
-   * Starts watching the library root; `onChange` is called (debounced here) when files appear, change or go.
-   * TODO(integration): bind `createWatcher` from `@rl/data` in `runtime-manager.ts`; until then there is no live watching.
+   * Starts watching the library root (bound to `createWatcher` from `@rl/data` in main/index.ts); each batch of
+   * changed paths becomes a targeted scan, an overflow a full one.
    */
-  watch?(rootPath: string, onChange: () => void): FileWatcher | Promise<FileWatcher>;
+  watch?(options: {
+    rootPath: string;
+    dataDir: string;
+    config: () => ScanConfig;
+    onBatch(batch: { paths: string[]; overflow: boolean }): void;
+    onError(error: Error): void;
+  }): FileWatcher | Promise<FileWatcher>;
   now?(): Date;
   /** Minimum ms between two progress events (default 150). */
   progressIntervalMs?: number;
-  /** Debounce of watcher events before a scan starts (default 2000). */
-  watchDebounceMs?: number;
 }
 
 const emptySummary = (): ScanSummary => ({ added: 0, changed: 0, moved: 0, missing: 0, unchanged: 0, extracted: 0, failed: 0 });
+const abortError = () => Object.assign(new Error('aborted'), { name: 'AbortError' });
 const isAbort = (e: unknown) => e instanceof Error && e.name === 'AbortError';
 
 /** Serial queue: tasks run one after the other; errors are collected, not thrown into the caller of `add`. */
@@ -75,6 +85,12 @@ class SerialQueue {
   }
 }
 
+interface ScanRequest {
+  full: boolean;
+  /** Targeted scan of these paths; null: the whole root. */
+  paths: string[] | null;
+}
+
 /**
  * Everything the main process runs for the ACTIVE library: its store, the search index (read here, written
  * by the worker thread), the background scan and the watcher. The heavy work happens in the worker; this class
@@ -85,7 +101,9 @@ export class LibraryRuntime {
   private job: { controller: AbortController; done: Promise<void> } | null = null;
   private closed = false;
   private lastEmit = 0;
-  private pendingScan: NodeJS.Timeout | null = null;
+  /** Watcher batches that arrived while a scan was running. */
+  private queued: { full: boolean; paths: Set<string> } | null = null;
+  private scanConfig: ScanConfig = defaultLibraryConfig();
   private watcher: FileWatcher | null = null;
   private backedUp = false;
   private taxonomyCache: { at: number; lookup: TaxonomyLookup } | null = null;
@@ -102,9 +120,16 @@ export class LibraryRuntime {
     if (deps.index.needsRebuild) deps.log.info('search index is new or has another schema version: it will be refilled', { libraryId: deps.libraryId });
     const rt = new LibraryRuntime(deps);
     rt.current = { ...rt.current, indexed: await deps.index.count() };
+    rt.scanConfig = await deps.store.readConfig().catch(() => rt.scanConfig);
     if (deps.watch) {
       try {
-        rt.watcher = await deps.watch(deps.rootPath, () => rt.scheduleScan());
+        rt.watcher = await deps.watch({
+          rootPath: deps.rootPath,
+          dataDir: deps.dataDir,
+          config: () => rt.scanConfig,
+          onBatch: (b) => rt.onWatch(b),
+          onError: (e) => deps.log.warn('file watcher error', { error: e }),
+        });
       } catch (e) {
         deps.log.warn('file watcher could not start', { error: e });
       }
@@ -133,30 +158,40 @@ export class LibraryRuntime {
   }
 
   /** Starts an incremental scan unless one is running (then returns the running status). */
-  startScan(options: { full?: boolean } = {}): ScanStatus {
+  startScan(options: { full?: boolean; paths?: string[] } = {}): ScanStatus {
     if (this.closed) throw new AppError('LIBRARY_NOT_ACTIVE', 'The library was closed');
     if (this.job) return this.current;
+    const request: ScanRequest = { full: Boolean(options.full), paths: options.paths ?? null };
     const controller = new AbortController();
-    const done = this.run(Boolean(options.full), controller.signal).finally(() => {
-      this.job = null;
-    });
+    const done = this.run(request, controller.signal)
+      .finally(() => {
+        this.job = null;
+      })
+      .then(() => {
+        // Changes seen while scanning: one more pass.
+        const q = this.queued;
+        this.queued = null;
+        if (q && !this.closed) this.startScan(q.full ? {} : { paths: [...q.paths] });
+      });
     this.job = { controller, done };
     return this.current;
   }
 
-  /** Resolves when the running scan (if any) has finished. */
+  /** Resolves when the running scan (if any, and the one queued behind it) has finished. */
   async whenIdle(): Promise<ScanStatus> {
-    await this.job?.done;
+    while (this.job) await this.job.done;
     return this.current;
   }
 
   cancel(): ScanStatus {
+    this.queued = null;
     this.job?.controller.abort();
     return this.current;
   }
 
   /** Drops the index and refills it from the library data and the text cache. */
   async rebuild(): Promise<ScanStatus> {
+    this.queued = null;
     if (this.job) {
       this.job.controller.abort();
       await this.job.done;
@@ -166,13 +201,15 @@ export class LibraryRuntime {
     return this.startScan();
   }
 
-  private scheduleScan(): void {
+  private onWatch(batch: { paths: string[]; overflow: boolean }): void {
     if (this.closed) return;
-    if (this.pendingScan) clearTimeout(this.pendingScan);
-    this.pendingScan = setTimeout(() => {
-      this.pendingScan = null;
-      if (!this.closed) this.startScan();
-    }, this.d.watchDebounceMs ?? 2000);
+    if (!this.job) {
+      this.startScan(batch.overflow ? {} : { paths: batch.paths });
+      return;
+    }
+    this.queued ??= { full: false, paths: new Set() };
+    if (batch.overflow) this.queued.full = true;
+    for (const p of batch.paths) this.queued.paths.add(p);
   }
 
   private async taxonomy(): Promise<TaxonomyLookup> {
@@ -189,13 +226,7 @@ export class LibraryRuntime {
     return lookup;
   }
 
-  private async backupOnce(): Promise<void> {
-    if (this.backedUp) return;
-    await this.d.backup();
-    this.backedUp = true;
-  }
-
-  private async run(full: boolean, signal: AbortSignal): Promise<void> {
+  private async run(request: ScanRequest, signal: AbortSignal): Promise<void> {
     const { store, worker, index, log } = this.d;
     const summary = emptySummary();
     const queue = new SerialQueue();
@@ -211,10 +242,22 @@ export class LibraryRuntime {
       finishedAt: undefined,
     });
     try {
-      const config: LibraryConfig = await store.readConfig();
-      const known = await store.documents.list();
+      this.scanConfig = await store.readConfig();
+      const known = await store.documents.listIds();
+      // Rule 1: a copy of the data folder before the scanner writes into a library that already has records.
+      if (known.length > 0 && !this.backedUp) {
+        await this.d.backup();
+        this.backedUp = true;
+      }
       const result = await worker.scan(
-        { rootPath: this.d.rootPath, config: { excludedFolders: config.excludedFolders, scan: config.scan }, known },
+        {
+          rootPath: this.d.rootPath,
+          dataDir: this.d.dataDir,
+          deviceId: this.d.deviceId,
+          config: { excludedFolders: this.scanConfig.excludedFolders, scan: this.scanConfig.scan },
+          paths: request.paths ?? undefined,
+          markInbox: known.length > 0,
+        },
         {
           signal,
           onEvent: (p) => this.update({ phase: p.phase === 'walking' ? 'walking' : 'hashing', seen: p.seen, total: p.total, processed: 0 }, false),
@@ -225,21 +268,16 @@ export class LibraryRuntime {
       summary.moved = result.moved.length;
       summary.missing = result.missing.length;
       summary.unchanged = result.unchanged;
-
-      if (result.added.length + result.changed.length + result.moved.length + result.missing.length > 0) {
-        await this.backupOnce();
-        const outcome = await ingestScan(store, result, () => this.nowIso());
-        if (outcome.skipped > 0) log.warn('scanner reported files without a hash', { count: outcome.skipped });
-      }
-      if (signal.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+      if (result.errors.length > 0) log.warn('some files or folders could not be scanned', { count: result.errors.length });
+      if (signal.aborted || result.cancelled) throw abortError();
 
       const records = await store.documents.list();
       const indexed = await index.indexedState();
       const taxonomy = await this.taxonomy();
       const done = new Set<string>();
 
-      // Phase: text extraction (cached by file hash), indexing each document as soon as its text is ready.
-      const needText = records.filter((r) => !r.missing && (full || indexed.get(r.id)?.textHash !== r.hash));
+      // Text extraction (the extractor caches by file hash), indexing each document as soon as its text is ready.
+      const needText = records.filter((r) => !r.missing && (request.full || indexed.get(r.id)?.textHash !== r.hash));
       this.update({ phase: 'extracting', total: needText.length, processed: 0 });
       const byKey = new Map(needText.map((r) => [`${r.path}\n${r.hash}`, r]));
       let processed = 0;
@@ -249,18 +287,22 @@ export class LibraryRuntime {
         if (!res.ok) log.warn('text extraction failed', { error: res.error });
         const meta = res.ok ? res.meta : undefined;
         const before = (await store.documents.get(rec.id)) ?? rec;
-        const current = enrichFromExtraction(before, meta)
+        const current: DocumentRecord = enrichFromExtraction(before, meta)
           ? await store.documents.update(rec.id, (c) => enrichFromExtraction(c ?? before, meta) ?? c ?? before)
           : before;
-        const doc = await buildIndexable(store, taxonomy, current);
-        await worker.index({ cacheDir: this.d.textCacheDir, jobs: [{ doc, text: res.ok ? 'cache' : 'empty' }] });
+        const doc = await buildIndexable(store, taxonomy, current, meta?.abstract);
+        await worker.index({
+          rootPath: this.d.rootPath,
+          cacheDir: this.d.textCacheDir,
+          jobs: [{ doc, text: res.ok ? 'cache' : 'empty' }],
+        });
         done.add(rec.id);
         if (res.ok && !res.cached) summary.extracted++;
         if (!res.ok) summary.failed++;
       };
       if (needText.length > 0) {
         await worker.extract(
-          { rootPath: this.d.rootPath, cacheDir: this.d.textCacheDir, items: needText.map((r) => ({ path: r.path, hash: r.hash })), force: full },
+          { rootPath: this.d.rootPath, cacheDir: this.d.textCacheDir, items: needText.map((r) => ({ path: r.path, hash: r.hash })) },
           {
             signal,
             onEvent: (res) => {
@@ -274,7 +316,7 @@ export class LibraryRuntime {
         if (queue.errors.length > 0) throw queue.errors[0];
       }
 
-      // Phase: documents whose record changed (tags, moves, flags) or that are not in the index yet.
+      // Documents whose record changed (tags, moves, flags) or that are not in the index yet.
       const stale = (await store.documents.list()).filter((r) => {
         if (done.has(r.id)) return false;
         const st = indexed.get(r.id);
@@ -282,17 +324,15 @@ export class LibraryRuntime {
       });
       this.update({ phase: 'indexing', total: stale.length, processed: 0 });
       for (let i = 0; i < stale.length; i += 25) {
-        if (signal.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+        if (signal.aborted) throw abortError();
         const jobs: IndexJob[] = [];
-        for (const r of stale.slice(i, i + 25)) {
-          jobs.push({ doc: await buildIndexable(store, taxonomy, r), text: indexed.get(r.id) ? 'keep' : 'cache' });
-        }
-        await worker.index({ cacheDir: this.d.textCacheDir, jobs });
+        for (const r of stale.slice(i, i + 25)) jobs.push({ doc: await buildIndexable(store, taxonomy, r), text: 'keep' });
+        await worker.index({ rootPath: this.d.rootPath, cacheDir: this.d.textCacheDir, jobs });
         this.update({ processed: Math.min(stale.length, i + 25) }, false);
       }
 
       // Documents that are gone from the data folder leave the index.
-      const live = new Set((await store.documents.listIds()) as string[]);
+      const live = new Set<string>(await store.documents.listIds());
       const vanished = [...indexed.keys()].filter((id) => !live.has(id));
       if (vanished.length > 0) await worker.remove(vanished);
 
@@ -324,7 +364,7 @@ export class LibraryRuntime {
     }
     this.taxonomyCache = null;
     const doc = await buildIndexable(this.d.store, await this.taxonomy(), rec);
-    await this.d.worker.index({ cacheDir: this.d.textCacheDir, jobs: [{ doc, text: 'keep' }] });
+    await this.d.worker.index({ rootPath: this.d.rootPath, cacheDir: this.d.textCacheDir, jobs: [{ doc, text: 'keep' }] });
   }
 
   async search(query: SearchQuery): Promise<SearchResultPage> {
@@ -353,7 +393,7 @@ export class LibraryRuntime {
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
-    if (this.pendingScan) clearTimeout(this.pendingScan);
+    this.queued = null;
     this.job?.controller.abort();
     await this.job?.done.catch(() => {});
     await Promise.resolve(this.watcher?.close()).catch(() => {});

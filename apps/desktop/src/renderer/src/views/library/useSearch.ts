@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import type { SearchFilters } from '@rl/core';
+import type { Channels, ResponseOf, SearchFilters } from '@rl/core';
 import { rl } from '../../lib/rl';
 
-type Query = Awaited<ReturnType<typeof rl.invoke<'search:query'>>>;
-type Facets = Awaited<ReturnType<typeof rl.invoke<'search:facets'>>>;
+export type SearchResults = ResponseOf<Channels, 'search:query'>;
+export type SearchFacetsData = ResponseOf<Channels, 'search:facets'>;
 
 export interface SearchState {
   text: string;
@@ -13,8 +13,8 @@ export interface SearchState {
 }
 
 export interface SearchResultState {
-  results: Query | null;
-  facets: Facets | null;
+  results: SearchResults | null;
+  facets: SearchFacetsData | null;
   loading: boolean;
   error: unknown;
 }

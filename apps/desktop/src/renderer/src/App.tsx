@@ -4,6 +4,7 @@ import { NoticeBanner } from './components/NoticeBanner';
 import { ErrorNote } from './components/ui';
 import { errorMessage } from './lib/errors';
 import { Settings } from './settings/Settings';
+import { LibraryView } from './views/library/LibraryView';
 import { Shell, type SectionId } from './shell/Shell';
 import { AppProvider, useApp } from './state/app-context';
 import { Wizard } from './wizard/Wizard';
@@ -53,7 +54,13 @@ function Root() {
     <>
       <NoticeBanner />
       <Shell section={section} onSection={setSection} onNewLibrary={() => setWizardOpen(true)}>
-        {section === 'settings' ? <Settings onNewLibrary={() => setWizardOpen(true)} /> : <Placeholder section={section} />}
+        {section === 'settings' ? (
+          <Settings onNewLibrary={() => setWizardOpen(true)} />
+        ) : section === 'library' && app.activeProfile && !showWizard ? (
+          <LibraryView key={app.activeProfile.id} />
+        ) : (
+          <Placeholder section={section} />
+        )}
       </Shell>
       {showWizard && <Wizard key={wizardOpen ? 'new' : 'first'} onFinished={() => void finished()} onCancel={hasLibraries ? () => setWizardOpen(false) : undefined} />}
     </>

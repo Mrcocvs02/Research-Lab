@@ -1,4 +1,4 @@
-import type { LegacyImporter, Logger, SecretStore } from '@rl/core';
+import type { LegacyImporter, LibraryConfig, Logger, SecretStore } from '@rl/core';
 import type { ApprovedPaths } from '../../approved-paths.js';
 import type { RuntimeManager } from '../../library/runtime-manager.js';
 import type { LibraryService } from '../../library-service.js';
@@ -24,7 +24,7 @@ export interface MainServices {
   pickFile(purpose: 'taxonomy-file', title?: string): Promise<string | null>;
   appInfo(): { name: string; version: string; platform: string; electron: string };
   /** Factory so a missing implementation only fails when the feature is used. */
-  createImporter(): LegacyImporter;
+  createImporter(options?: { updateConfig?: (fn: (current: LibraryConfig) => LibraryConfig | Promise<LibraryConfig>) => Promise<unknown> }): LegacyImporter;
   /**
    * Copies an existing data folder into the local (non-synced) backup area before a bulk write.
    * Resolves null when the data folder does not exist yet.

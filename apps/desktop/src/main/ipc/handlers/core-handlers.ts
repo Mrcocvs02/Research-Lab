@@ -110,7 +110,8 @@ export const importHandlers = (s: MainServices): DomainHandlers<'import'> => {
         const settings = await s.settings.get();
         let importer;
         try {
-          importer = s.createImporter();
+          // library.json is only written through LibraryService's serialised queue (D-020, D-044).
+          importer = s.createImporter({ updateConfig: (fn) => s.libraries.updateConfig(fn, libraryId) });
         } catch {
           throw new AppError('NOT_IMPLEMENTED', 'The importer is not available yet');
         }
@@ -121,9 +122,6 @@ export const importHandlers = (s: MainServices): DomainHandlers<'import'> => {
           .backupDataDir(libraryId, dataDir)
           .then((backup) => {
             if (backup) s.log.info('data folder backed up before import', { files: backup.files });
-            // TODO(integration): pass `updateConfig: (fn) => s.libraries.updateConfig(fn, libraryId)` once the importer
-            // accepts it (data-engineer, scanner wave): library.json must only be written through LibraryService's
-            // serialised queue (D-020).
             return importer.run({
               sourceDir: source,
               libraryRoot: profile.rootPath,

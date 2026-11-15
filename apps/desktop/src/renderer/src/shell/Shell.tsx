@@ -2,6 +2,8 @@ import { useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalFlag } from '../lib/useLocalFlag';
 import { useApp } from '../state/app-context';
+import { scanText } from '../views/library/ScanStatusText';
+import { useScanStatus } from '../views/library/useScanStatus';
 
 export const SECTIONS = ['library', 'projects', 'network', 'inbox', 'settings'] as const;
 export type SectionId = (typeof SECTIONS)[number];
@@ -115,11 +117,17 @@ function StatusBar() {
   const { t } = useTranslation();
   const app = useApp();
   const aiCount = app.config?.aiEnabledFolders.length ?? 0;
+  const { status: scan } = useScanStatus();
   return (
     <footer className="statusbar" data-testid="statusbar">
       <span data-testid="status-library">{app.activeProfile ? t('status.library', { name: app.activeProfile.name }) : t('status.noLibrary')}</span>
       {app.config && <span>{t('status.docLanguage', { language: t(`languages.${app.config.language}`) })}</span>}
       {app.config && <span data-testid="status-ai">{aiCount === 0 ? t('status.aiNone') : t('status.aiFolders', { count: aiCount })}</span>}
+      {scan && (
+        <span data-testid="scan-status" data-state={scan.state} data-phase={scan.phase} role="status" aria-label={t('scan.label')}>
+          {scanText(scan, t)}
+        </span>
+      )}
       <span className="spacer" />
       {app.version && <span>{t('status.version', { version: app.version })}</span>}
     </footer>

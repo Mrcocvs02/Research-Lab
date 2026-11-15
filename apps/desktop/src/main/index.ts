@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron';
 import path from 'node:path';
-import { backupDataDir, createLegacyImporter, createLibraryStore } from '@rl/data';
+import { backupDataDir, createLegacyImporter, createLibraryStore, createWatcher } from '@rl/data';
 import { createSearchIndex } from '@rl/search';
 import {
   AppError,
@@ -75,7 +75,7 @@ async function main(): Promise<void> {
     createStore: ({ rootPath, dataDir, deviceId }) => createLibraryStore({ rootPath, dataDir, deviceId, logger: log }),
     createIndex: createSearchIndex,
     spawnWorker: () => spawnScanWorker(path.join(import.meta.dirname, 'scan-worker.js')),
-    // TODO(integration): `watch: (root, onChange) => createWatcher(...)` from @rl/data, so changes are indexed while the app runs.
+    watch: (o) => createWatcher({ rootPath: o.rootPath, dataDir: o.dataDir, config: o.config, onBatch: o.onBatch, onError: o.onError }),
   });
   const services: MainServices = {
     log,
@@ -108,7 +108,7 @@ async function main(): Promise<void> {
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
     appInfo: () => ({ name: APP_NAME, version: app.getVersion(), platform: process.platform, electron: process.versions.electron ?? '' }),
-    createImporter: () => createLegacyImporter(),
+    createImporter: (options) => createLegacyImporter(options),
     backupDataDir: backupLibraryData,
   };
 

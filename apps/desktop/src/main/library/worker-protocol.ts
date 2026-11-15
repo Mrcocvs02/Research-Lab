@@ -1,4 +1,4 @@
-import type { DocumentRecord, ExtractedText, IndexableDocument, ScanOptions, ScanProgress, ScanResult } from '@rl/core';
+import type { ExtractedMeta, IndexableDocument, ScanOptions, ScanProgress, ScanResult } from '@rl/core';
 
 /**
  * The heavy work of a library (walking and hashing the files, extracting PDF text, writing the search
@@ -9,8 +9,14 @@ import type { DocumentRecord, ExtractedText, IndexableDocument, ScanOptions, Sca
 
 export interface ScanArgs {
   rootPath: string;
+  /** The worker opens its own store: the scanner writes the records (`documents.update`), only inside the data dir. */
+  dataDir: string;
+  deviceId: string;
   config: ScanOptions['config'];
-  known: DocumentRecord[];
+  /** Scan only these paths (watcher batches); default the whole root. */
+  paths?: string[];
+  /** False for the first scan of a library, so that nothing lands in the inbox. */
+  markInbox: boolean;
 }
 
 export interface ExtractItem {
@@ -22,10 +28,9 @@ export interface ExtractItem {
 
 export interface ExtractArgs {
   rootPath: string;
+  /** Text cache (`<localData>/cache/text`), managed by the extractor. */
   cacheDir: string;
   items: ExtractItem[];
-  /** Extract again even when the cache has an entry. */
-  force?: boolean;
 }
 
 export interface ExtractResult {
@@ -34,15 +39,15 @@ export interface ExtractResult {
   ok: boolean;
   /** The cache already had it. */
   cached: boolean;
-  meta?: ExtractedText['meta'];
-  noTextLayer?: boolean;
+  meta?: ExtractedMeta;
+  hasText?: boolean;
   /** Short message, never document text. */
   error?: string;
 }
 
 /** What to do with the text of a document when indexing it. */
 export type TextMode =
-  /** Read the pages from the cache (by `record.hash`); when absent keep what is indexed. */
+  /** Get the pages from the extractor (served by its cache, by `record.hash`); when that fails keep what is indexed. */
   | 'cache'
   /** The text could not be had (failed extraction, no text layer): index the metadata and remember it. */
   | 'empty'
@@ -66,7 +71,7 @@ export interface LibraryWorker {
   scan(args: ScanArgs, hooks?: WorkerHooks<ScanProgress>): Promise<ScanResult>;
   /** Extracts the text of each item into the cache, reporting each one as it finishes. */
   extract(args: ExtractArgs, hooks?: WorkerHooks<ExtractResult>): Promise<void>;
-  index(args: { cacheDir: string; jobs: IndexJob[] }): Promise<void>;
+  index(args: { rootPath: string; cacheDir: string; jobs: IndexJob[] }): Promise<void>;
   remove(docIds: string[]): Promise<void>;
   dispose(): Promise<void>;
 }

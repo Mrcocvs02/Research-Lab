@@ -37,13 +37,14 @@ type Source = Pick<LibraryStore, 'notes' | 'annotations'>;
  * in `record.ai`, the index just reads them). Notes or annotations that cannot be read are left out of
  * the update (the index keeps what it has).
  */
-export async function buildIndexable(src: Source, taxonomy: TaxonomyLookup, record: DocumentRecord): Promise<Omit<IndexableDocument, 'pages'>> {
+export async function buildIndexable(src: Source, taxonomy: TaxonomyLookup, record: DocumentRecord, extractedAbstract?: string): Promise<Omit<IndexableDocument, 'pages'>> {
   const out: Omit<IndexableDocument, 'pages'> = {
     record,
     tagTerms: taxonomy.tagTerms(record.tags),
     typeLabel: taxonomy.typeLabel(record.type),
     venueName: taxonomy.venueName(record.ref.venueId),
-    abstract: [usable(record.ai.summary), usable(record.ai.description)].filter(Boolean).join('\n\n'),
+    // Empty means "nothing known here": the index then keeps the abstract it has (found in the file's text).
+    abstract: [usable(record.ai.summary), usable(record.ai.description)].filter(Boolean).join('\n\n') || extractedAbstract || undefined,
     keywords: [...(usable(record.ai.keywords) ?? []), ...(usable(record.ai.synonyms) ?? [])],
   };
   try {

@@ -25,6 +25,7 @@ import {
   type LegacyFileRecord,
   type LegacyImporter,
   type LegacyTaxonomy,
+  type LibraryConfig,
   type Logger,
   type TaxonomyNode,
   type Venue,
@@ -62,6 +63,11 @@ export interface LegacyImporterOptions {
   retry?: RetryOptions;
   /** Hash function, for tests (default: streamed SHA-256). */
   hashFile?: (file: string) => Promise<string>;
+  /**
+   * Serialised update of `library.json` (the main process passes the one of `LibraryService`, so import and
+   * settings never overwrite each other, D-020). Without it the importer reads and writes the file itself.
+   */
+  updateConfig?: (fn: (current: LibraryConfig) => LibraryConfig | Promise<LibraryConfig>) => Promise<unknown>;
 }
 
 const OLD_INDEX_DIR = '.phd_index';
@@ -794,7 +800,7 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
         if (n % 5 === 0) progress('finalizing', n, order.length + 1);
       }
 
-      await applyScanSettings(store, legacyTax);
+      await applyScanSettings(store, legacyTax, options.updateConfig);
 
       const byLevelSource = new Map(tb.nodes.map((n) => [n.id, n] as const));
       const nodesByLevel: Record<string, number> = {};
@@ -915,17 +921,27 @@ async function describeFile(libraryRoot: string, relPath: string, rec: LegacyFil
 }
 
 /** Carries the old scan settings into library.json, only while the scan config is still untouched. */
-async function applyScanSettings(store: ReturnType<typeof createLibraryStore>, tax: LegacyTaxonomy): Promise<void> {
+async function applyScanSettings(
+  store: ReturnType<typeof createLibraryStore>,
+  tax: LegacyTaxonomy,
+  updateConfig?: LegacyImporterOptions['updateConfig'],
+): Promise<void> {
   const s = tax.settings;
   if (!s) return;
-  const config = await store.readConfig();
-  const pristine = JSON.stringify(config.scan) === JSON.stringify(scanConfigSchema.parse({}));
-  if (!pristine) return;
+  const compute = (config: LibraryConfig): LibraryConfig => {
+    const pristine = JSON.stringify(config.scan) === JSON.stringify(scanConfigSchema.parse({}));
+    if (!pristine) return config;
+    return libraryConfigSchema.parse({ ...config, scan: scanFromLegacy(s) });
+  };
+  if (updateConfig) await updateConfig(compute);
+  else await store.writeConfig(compute(await store.readConfig()));
+}
+
+function scanFromLegacy(s: NonNullable<LegacyTaxonomy['settings']>) {
   const clean = (xs: string[] | undefined) => (xs ?? []).map((x) => x.replace(/^\./, '').toLowerCase()).filter(Boolean);
-  const scan = scanConfigSchema.parse({
+  return scanConfigSchema.parse({
     ...(clean(s.extensions).length ? { extensions: clean(s.extensions) } : {}),
     ...(s.name_only_extensions ? { nameOnlyExtensions: clean(s.name_only_extensions) } : {}),
     ...(typeof s.prune_deleted_days === 'number' && s.prune_deleted_days >= 0 ? { pruneDeletedDays: Math.round(s.prune_deleted_days) } : {}),
   });
-  await store.writeConfig(libraryConfigSchema.parse({ ...config, scan }));
 }

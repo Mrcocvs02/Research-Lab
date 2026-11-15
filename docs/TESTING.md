@@ -7,6 +7,7 @@ Tutti i comandi si lanciano dalla radice del repository (in Git Bash: `export PA
 | `npm run typecheck` | `tsc` sui quattro progetti (radice, main, renderer, e2e) |
 | `npm test` | Vitest: `packages/*/src`, `apps/*/src`, `tools/**` |
 | `npm run test:e2e` | compila l'app e lancia Playwright per Electron (`e2e/`) |
+| `npm run test:phase1` | compila e lancia i quattro spec del criterio della fase 1 (vedi sotto) |
 | `npm run check:generality` | cerca percorsi utente, cartelle di sincronizzazione, e-mail reali, nomi dell'elenco locale |
 | `npm run check:nondestructive -- <radice> ...` | salva e confronta lo snapshot SHA-256 di una cartella |
 
@@ -81,3 +82,27 @@ In PowerShell: `$env:RL_FIXTURE_LIBRARY = "<cartella>"; npm run test:e2e`. La ca
 ## Variabili `RL_*`
 
 `RL_E2E`, `RL_E2E_DIALOG_PATH`, `RL_USER_DATA_DIR`, `RL_LOCAL_DATA_DIR` ed `ELECTRON_RENDERER_URL` valgono solo per l'app non impacchettata (sviluppo e test); l'app installata le ignora (D-014, D-015).
+
+## Criterio della fase 1 (scansione, ricerca, osservatore)
+
+`npm run test:phase1` compila l'app e lancia `qa-offline`, `qa-scan-nondestructive`, `qa-search-perf`, `qa-watcher` (in `e2e/`). Un singolo spec: `npx playwright test -c e2e/playwright.config.ts qa-watcher` (dopo `npm run build`). I tempi (scansione, mediana/p95/massimo delle query) escono nel log come righe `[perf]` e nelle annotazioni del test (`scan-ms`, `search-p95-ms`).
+
+| Spec | Cosa verifica |
+| --- | --- |
+| `qa-offline.spec.ts` | app con `offline: true` su un corpus sintetico da 40 documenti; libreria creata dalla procedura guidata (override del dialog), attesa della scansione, ricerca di una parola sentinella del titolo e di una del corpo di un PDF (documento giusto e pagina giusta), `blockedRequests()` vuoto, nessun file fuori da `.lab` cambiato |
+| `qa-scan-nondestructive.spec.ts` | libreria `full` (accenti, percorso oltre 260 caratteri, PDF ostile, PDF solo immagine) e, se c'è `RL_FIXTURE_LIBRARY`, copia di quella reale: dopo la scansione nulla fuori da `.lab` è aggiunto, rimosso, modificato o toccato (mtime); `.lab/documents` ha un file `<id>.json` per documento, senza file temporanei né percorsi assoluti |
+| `qa-search-perf.spec.ts` | corpus da 1000 documenti su disco; scansione cronometrata (nessuna soglia); 20 query tipiche via `search:query` dal renderer: p95 sotto 200 ms; le query con risposta certa devono dare risultati |
+| `qa-watcher.spec.ts` | file aggiunto alla radice con l'app aperta: compare nella ricerca; rinominato: stesso id (`documents:get`) e nessun duplicato; modificato: stesso id; gli originali presenti all'avvio restano identici |
+
+**Salto pulito.** Ogni canale viene chiamato con un payload non valido (`42`, mai un'azione); se non esiste (`UNKNOWN_CHANNEL`) o non ha un gestore (`NOT_IMPLEMENTED`) il test è saltato con il messaggio "phase 1 runtime not merged yet: missing IPC channel(s) ...". Con il runtime unito i test girano per intero.
+
+**Dipendenze dai contratti.** Gli spec usano i test id `search-input`, `search-result`, `scan-status` e i canali `scan:start`, `search:query` (payload `{ text, limit }`), `documents:list` (`{ limit }`, poi `{}`), `documents:get` (`{ id }`, poi `{ docId }`). Le risposte si leggono in modo tollerante (un array, o un oggetto che ne contiene uno; id da `docId`/`id`, titolo, pagina): se il runtime sceglie altre forme basta adattare `e2e/helpers/phase1.ts`. La fine della scansione è decisa dal numero di documenti e, per librerie di dimensione ignota, dalla sua stabilità.
+
+Helper in `e2e/helpers/phase1.ts`: `ipc`/`ipcData` (chiamata dal renderer con `window.rlBridge.invokeRaw`), `skipUnlessChannels`, `createLibraryViaWizard`, `waitForScan`, `waitForScanSettled`, `searchViaUi`, `searchHits`, `getDocument`, `percentile`. `launchApp` accetta anche `library: { corpus: N, options }` (generato da `generateCorpus`; manifest in `app.library.corpus`).
+
+### Generatore di corpus (`@rl/testkit`)
+
+- `generateCorpus(n, opts)` → `{ root, manifest, cleanup }`: `n` documenti (almeno 6) in una cartella temporanea, per lo più Markdown e testo, quota `pdfShare` di PDF piccoli (default 5%), cartelle e sottocartelle, vocabolario inventato (termini scientifici, sigle, parole italiane con accenti), contenuto unico per documento (ogni file ha il suo id). Stesso `seed`, stesso corpus. Mille documenti in circa 1,3 s.
+- Parole sentinella (`SENTINEL_WORDS`, una sola occorrenza in tutto il corpus): `zorquantel` nel titolo, `velmarixon` nell'abstract, `quillanbrox` nel corpo di un PDF a pagina `sentinelPage` (default 3), `drivostenal` nel corpo di un Markdown, `ménagèrix` (con accenti) in un titolo. `manifest.sentinel('title' | 'abstract' | 'body', formato?)` dà parola, forma senza accenti (`folded`), pagina, percorso e titolo.
+- `manifest.files[]` (titolo, autori, abstract, pagine, hash, `topicTerm` presente solo in quel documento), `manifest.queries` (20 query tipiche: termini rari, coppie, parole comuni, sigle, accenti, sentinelle; `expectRelPath` quando la risposta è certa), `manifest.get(relPath)`.
+- `generateIndexableDocuments(n, opts)` → `{ documents: IndexableDocument[], manifest }`: gli stessi documenti come oggetti per benchmark dell'indice, senza disco. `generateCorpusManifest(n, opts)` dà solo il manifest.

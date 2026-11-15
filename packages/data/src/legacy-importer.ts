@@ -1,4 +1,5 @@
-import { readFile, stat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
   AppError,
@@ -17,6 +18,10 @@ import {
   type DocumentType,
   type ImportJobStatus,
   type ImportReport,
+  type ImportReportExtras,
+  type ImportSkippedFile,
+  type ImportSkipReason,
+  DOCUMENT_LIMITS,
   type LegacyFileRecord,
   type LegacyImporter,
   type LegacyTaxonomy,
@@ -26,16 +31,53 @@ import {
 } from '@rl/core';
 import { normalizeRelativePath, resolveInRoot, sha256File, sha256Of } from '@rl/core/node';
 import { NameIndex, normalizeName, slugify, uniqueId } from './normalize.js';
+import { withRetry, type RetryOptions } from './retry.js';
 import { createLibraryStore } from './store.js';
+
+/** Ceilings that keep a hostile or corrupt old index from exhausting memory or disk. */
+export interface ImportLimits {
+  /** Size of `files.jsonl` (default 256 MiB). */
+  maxFilesBytes: number;
+  /** Size of `taxonomy.json` (default 32 MiB). */
+  maxTaxonomyBytes: number;
+  /** Longest accepted line of `files.jsonl`; longer lines are skipped (default 1 MiB). */
+  maxLineBytes: number;
+  /** Most non-empty lines of `files.jsonl`; more is an error (default 500 000). */
+  maxRecords: number;
+}
+
+export const DEFAULT_IMPORT_LIMITS: ImportLimits = {
+  maxFilesBytes: 256 * 1024 * 1024,
+  maxTaxonomyBytes: 32 * 1024 * 1024,
+  maxLineBytes: 1024 * 1024,
+  maxRecords: 500_000,
+};
 
 export interface LegacyImporterOptions {
   logger?: Logger;
   /** Clock, for tests. */
   now?: () => Date;
+  limits?: Partial<ImportLimits>;
+  /** Retry policy for locked files (cloud sync, antivirus). */
+  retry?: RetryOptions;
+  /** Hash function, for tests (default: streamed SHA-256). */
+  hashFile?: (file: string) => Promise<string>;
 }
 
 const OLD_INDEX_DIR = '.phd_index';
 const MAX_WARNINGS = 100;
+const MAX_SKIPPED_LISTED = 500;
+const MAX_LABEL = 300;
+const MAX_NAMES = 50;
+const L = DOCUMENT_LIMITS;
+
+const clip = (v: string | null, n: number): string | null => (v === null || v.length <= n ? v : v.slice(0, n));
+const clean = (v: string): string => v.trim().slice(0, MAX_LABEL);
+const cleanList = (xs: readonly string[] | undefined): string[] =>
+  (xs ?? [])
+    .filter((x): x is string => typeof x === 'string')
+    .map(clean)
+    .filter(Boolean);
 
 type Json = Record<string, unknown>;
 
@@ -64,7 +106,10 @@ function asYear(value: unknown): number | null {
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
-function mapNodeStatus(raw: string | undefined): { status: TaxonomyNode['status']; unknown: boolean } {
+function mapNodeStatus(raw: string | undefined): {
+  status: TaxonomyNode['status'];
+  unknown: boolean;
+} {
   switch ((raw ?? 'confirmed').toLowerCase()) {
     case 'confirmed':
     case 'active':
@@ -88,14 +133,96 @@ function mapPubStatus(raw: string | null): DocumentRecord['publication']['status
   return v === 'published' || v === 'preprint' || v === 'withdrawn' ? v : 'unknown';
 }
 
-async function readText(file: string): Promise<string | null> {
-  try {
-    const raw = await readFile(file, 'utf8');
-    return raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
-  } catch (e) {
+async function checkedSize(file: string, maxBytes: number, what: string): Promise<boolean> {
+  const st = await stat(file).catch((e: unknown) => {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw new AppError('IO_ERROR', 'Cannot read the old index', { code: (e as NodeJS.ErrnoException).code ?? 'unknown' });
+    throw new AppError('IO_ERROR', 'Cannot read the old index', {
+      code: (e as NodeJS.ErrnoException).code ?? 'unknown',
+    });
+  });
+  if (st === null) return false;
+  if (st.size > maxBytes) throw new AppError('INVALID_REQUEST', `The old index file ${what} is too large to import`, { file: what, maxBytes });
+  return true;
+}
+
+/** Whole-file read for the (small) taxonomy file, with a size ceiling. */
+async function readText(file: string, maxBytes: number): Promise<string | null> {
+  if (!(await checkedSize(file, maxBytes, path.basename(file)))) return null;
+  const chunks: Buffer[] = [];
+  let total = 0;
+  try {
+    for await (const chunk of createReadStream(file)) {
+      total += (chunk as Buffer).length;
+      if (total > maxBytes) throw new AppError('INVALID_REQUEST', `The old index file ${path.basename(file)} is too large to import`, { maxBytes });
+      chunks.push(chunk as Buffer);
+    }
+  } catch (e) {
+    if (e instanceof AppError) throw e;
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw new AppError('IO_ERROR', 'Cannot read the old index', {
+      code: (e as NodeJS.ErrnoException).code ?? 'unknown',
+    });
   }
+  const raw = Buffer.concat(chunks).toString('utf8');
+  return raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
+}
+
+interface IndexLine {
+  /** 1-based, counting blank lines. */
+  line: number;
+  /** Null when the line exceeded the length ceiling (its content was discarded, never buffered). */
+  text: string | null;
+}
+
+/** Streams the non-blank lines of a file; a line longer than `maxLineBytes` is dropped while being read. */
+async function* readIndexLines(file: string, maxLineBytes: number): AsyncGenerator<IndexLine> {
+  let parts: Buffer[] = [];
+  let len = 0;
+  let over = false;
+  let line = 1;
+  let first = true;
+  const flush = function* (): Generator<IndexLine> {
+    if (over) yield { line, text: null };
+    else if (len > 0) {
+      let text = Buffer.concat(parts).toString('utf8');
+      if (first && text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+      if (text.trim()) yield { line, text };
+    }
+    first = false;
+    parts = [];
+    len = 0;
+    over = false;
+    line++;
+  };
+  try {
+    for await (const raw of createReadStream(file)) {
+      const chunk = raw as Buffer;
+      let start = 0;
+      for (;;) {
+        const nl = chunk.indexOf(0x0a, start);
+        const end = nl === -1 ? chunk.length : nl;
+        if (!over) {
+          const piece = chunk.subarray(start, end);
+          if (len + piece.length > maxLineBytes) {
+            over = true;
+            parts = [];
+          } else {
+            parts.push(piece);
+            len += piece.length;
+          }
+        }
+        if (nl === -1) break;
+        yield* flush();
+        start = nl + 1;
+      }
+    }
+  } catch (e) {
+    if (e instanceof AppError) throw e;
+    throw new AppError('IO_ERROR', 'Cannot read the old index', {
+      code: (e as NodeJS.ErrnoException).code ?? 'unknown',
+    });
+  }
+  yield* flush();
 }
 
 async function locateIndexDir(sourceDir: string): Promise<string> {
@@ -111,7 +238,11 @@ class TaxonomyBuilder {
   readonly nodes: TaxonomyNode[];
   readonly types: DocumentType[];
   readonly venues: Venue[];
-  readonly created = { nodes: [] as TaxonomyNode[], types: [] as DocumentType[], venues: [] as Venue[] };
+  readonly created = {
+    nodes: [] as TaxonomyNode[],
+    types: [] as DocumentType[],
+    venues: [] as Venue[],
+  };
   readonly nodeIndex = new NameIndex();
   readonly typeIndex = new NameIndex();
   readonly venueIndex = new NameIndex();
@@ -120,7 +251,11 @@ class TaxonomyBuilder {
   private readonly venueIds = new Set<string>();
 
   constructor(
-    existing: { nodes: TaxonomyNode[]; documentTypes: DocumentType[]; venues: Venue[] },
+    existing: {
+      nodes: TaxonomyNode[];
+      documentTypes: DocumentType[];
+      venues: Venue[];
+    },
     private readonly warn: (m: string) => void,
     private readonly now: string,
   ) {
@@ -131,7 +266,6 @@ class TaxonomyBuilder {
     for (const t of this.types) {
       this.typeIds.add(t.id);
       this.typeIndex.add(t.label, t.id);
-      this.typeIndex.add(t.id, t.id);
       for (const a of t.aliases) this.typeIndex.add(a, t.id);
     }
     for (const v of this.venues) {
@@ -144,23 +278,29 @@ class TaxonomyBuilder {
   private registerNode(n: TaxonomyNode): void {
     this.nodeIds.add(n.id);
     this.nodeIndex.add(n.label, n.id);
+    // The name the old index used, so that a node the user renamed later is still recognised on a new import.
+    const importName = n.legacy?.['importName'];
+    if (typeof importName === 'string') this.nodeIndex.add(importName, n.id);
     for (const a of n.aliases) {
       if (!this.nodeIndex.add(a, n.id)) this.warn(`Alias "${a}" of "${n.label}" is already used by another tag`);
     }
   }
 
-  /** Adds a node unless one with the same (normalised) name or alias exists; returns the id either way. */
-  addNode(label: string, fields: Partial<TaxonomyNode>): string {
+  /**
+   * Adds a node unless one with the same (normalised) name, alias or original import name exists; returns the id
+   * either way. Two different names that share a slug ("C++", "C#") stay two nodes with distinct ids.
+   */
+  addNode(rawLabel: string, fields: Partial<TaxonomyNode>): string {
+    const label = clean(rawLabel);
     const known = this.nodeIndex.resolve(label);
     if (known !== undefined) return known;
-    // Same id as an earlier import: the user may have renamed the node since; it is still the same node.
-    if (this.nodeIds.has(slugify(label))) return slugify(label);
     const node = taxonomyNodeShape({
       id: uniqueId(slugify(label), this.nodeIds),
-      label: label.trim(),
+      label,
       origin: 'import',
       createdAt: this.now,
       ...fields,
+      legacy: { ...(fields.legacy ?? {}), importName: label },
     });
     this.nodes.push(node);
     this.created.nodes.push(node);
@@ -168,22 +308,31 @@ class TaxonomyBuilder {
     return node.id;
   }
 
-  addType(label: string): string {
+  addType(rawLabel: string): string {
+    const label = clean(rawLabel);
     const known = this.typeIndex.resolve(label);
     if (known !== undefined) return known;
-    if (this.typeIds.has(slugify(label))) return slugify(label);
-    const type: DocumentType = { id: uniqueId(slugify(label), this.typeIds), label: label.trim(), aliases: [] };
+    const type: DocumentType = {
+      id: uniqueId(slugify(label), this.typeIds),
+      label,
+      aliases: [],
+    };
     this.types.push(type);
     this.created.types.push(type);
     this.typeIndex.add(type.label, type.id);
     return type.id;
   }
 
-  addVenue(name: string, aliases: string[]): string {
+  addVenue(rawName: string, rawAliases: string[]): string {
+    const name = clean(rawName);
     const known = this.venueIndex.resolve(name);
     if (known !== undefined) return known;
-    if (this.venueIds.has(slugify(name))) return slugify(name);
-    const venue: Venue = { id: uniqueId(slugify(name), this.venueIds), name: name.trim(), aliases };
+    const aliases = cleanList(rawAliases);
+    const venue: Venue = {
+      id: uniqueId(slugify(name), this.venueIds),
+      name,
+      aliases,
+    };
     this.venues.push(venue);
     this.created.venues.push(venue);
     this.venueIndex.add(venue.name, venue.id);
@@ -197,7 +346,14 @@ class TaxonomyBuilder {
 }
 
 function taxonomyNodeShape(n: Partial<TaxonomyNode> & { id: string; label: string }): TaxonomyNode {
-  return { parents: [], aliases: [], implies: [], status: 'active', origin: 'user', ...n };
+  return {
+    parents: [],
+    aliases: [],
+    implies: [],
+    status: 'active',
+    origin: 'user',
+    ...n,
+  };
 }
 
 /** Depth of each node: 1 = no parents, else 1 + deepest parent. Cycles are cut. */
@@ -238,12 +394,20 @@ interface Candidate {
 }
 
 /** One-shot importer of the old index. Read-only on the old index and on the documents. */
-export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): LegacyImporter {
+/** The core contract plus the extra report fields (`skippedFiles`, `selfNames`). */
+export interface LegacyImporterWithExtras extends LegacyImporter {
+  run(options: Parameters<LegacyImporter['run']>[0]): Promise<ImportReport & ImportReportExtras>;
+}
+
+export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): LegacyImporterWithExtras {
   const log = options.logger ?? noopLogger;
   const clock = options.now ?? (() => new Date());
+  const limits: ImportLimits = { ...DEFAULT_IMPORT_LIMITS, ...options.limits };
+  const retry = options.retry ?? {};
+  const hashFile = options.hashFile ?? ((file: string) => sha256File(file));
 
   return {
-    async run({ sourceDir, libraryRoot, dataDir, deviceId, onProgress, signal }): Promise<ImportReport> {
+    async run({ sourceDir, libraryRoot, dataDir, deviceId, onProgress, signal }): Promise<ImportReport & ImportReportExtras> {
       const jobId = 'legacy-import';
       const nowIso = clock().toISOString();
       const warnings: string[] = [];
@@ -253,8 +417,27 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
         if (warnings.length < MAX_WARNINGS) warnings.push(m);
         log.warn(m);
       };
+      const skippedFiles: ImportSkippedFile[] = [];
+      let skipped = 0;
+      /** Records a skipped index record: counted, listed (capped) in the report with path and reason, and warned. */
+      const skip = (rawPath: string, reason: ImportSkipReason, message: string, line?: number) => {
+        skipped++;
+        if (skippedFiles.length < MAX_SKIPPED_LISTED)
+          skippedFiles.push({
+            path: rawPath.slice(0, 300),
+            reason,
+            ...(line !== undefined ? { line } : {}),
+          });
+        warn(message);
+      };
       const progress = (phase: NonNullable<ImportJobStatus['phase']>, processed = 0, total?: number) =>
-        onProgress?.({ jobId, state: 'running', phase, processed, ...(total !== undefined ? { total } : {}) });
+        onProgress?.({
+          jobId,
+          state: 'running',
+          phase,
+          processed,
+          ...(total !== undefined ? { total } : {}),
+        });
       const checkAbort = () => {
         if (signal?.aborted) throw new AppError('CANCELLED', 'Import cancelled');
       };
@@ -263,7 +446,7 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
       progress('reading');
       const indexDir = await locateIndexDir(sourceDir);
 
-      const taxonomyRaw = await readText(path.join(indexDir, 'taxonomy.json'));
+      const taxonomyRaw = await readText(path.join(indexDir, 'taxonomy.json'), limits.maxTaxonomyBytes);
       let legacyTax: LegacyTaxonomy = {};
       if (taxonomyRaw === null) warn('taxonomy.json not found in the old index; importing documents only');
       else {
@@ -278,19 +461,25 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
         legacyTax = parsed.data;
       }
 
-      const records: LegacyFileRecord[] = [];
-      let skipped = 0;
-      const filesRaw = (await readText(path.join(indexDir, 'files.jsonl'))) ?? '';
-      for (const [i, line] of filesRaw.split('\n').entries()) {
-        if (!line.trim()) continue;
-        try {
-          const parsed = legacyFileRecordSchema.safeParse(JSON.parse(line));
-          if (parsed.success) records.push(parsed.data);
-          else throw new Error('shape');
-        } catch {
-          skipped++;
-          warn(`files.jsonl line ${i + 1} skipped: not a valid record`);
+      const records: { rec: LegacyFileRecord; line: number }[] = [];
+      const filesFile = path.join(indexDir, 'files.jsonl');
+      await checkedSize(filesFile, limits.maxFilesBytes, 'files.jsonl');
+      let lineCount = 0;
+      for await (const { line, text } of readIndexLines(filesFile, limits.maxLineBytes)) {
+        if (++lineCount > limits.maxRecords) throw new AppError('INVALID_REQUEST', 'The old index has too many records to import', { maxRecords: limits.maxRecords });
+        if (lineCount % 1000 === 0) checkAbort();
+        if (text === null) {
+          skip('', 'line-too-long', `files.jsonl line ${line} skipped: line too long`, line);
+          continue;
         }
+        let parsed: ReturnType<typeof legacyFileRecordSchema.safeParse> | undefined;
+        try {
+          parsed = legacyFileRecordSchema.safeParse(JSON.parse(text));
+        } catch {
+          /* not JSON */
+        }
+        if (parsed?.success) records.push({ rec: parsed.data, line });
+        else skip('', 'invalid-line', `files.jsonl line ${line} skipped: not a valid record`, line);
       }
       checkAbort();
 
@@ -309,11 +498,16 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
       const existingTax = await store.readTaxonomy(); // throws if the file is corrupt: never overwrite it
       const tb = new TaxonomyBuilder(existingTax, warn, nowIso);
 
+      const selfNames = [...new Set(cleanList(legacyTax.settings?.self_names))].slice(0, MAX_NAMES);
       for (const name of legacyTax.types ?? []) tb.addType(name);
       for (const [name, v] of Object.entries(legacyTax.venues ?? {})) tb.addVenue(name, v.aliases ?? []);
 
       for (const [name, m] of Object.entries(legacyTax.macro ?? {})) {
-        tb.addNode(name, { aliases: m.aliases ?? [], group: 'macro', legacy: compact(rest(m, ['aliases'])) });
+        tb.addNode(name, {
+          aliases: m.aliases ?? [],
+          group: 'macro',
+          legacy: compact(rest(m, ['aliases'])),
+        });
       }
       const microIds: [string, string][] = [];
       let mergedExtras = 0;
@@ -330,7 +524,10 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
           aliases: m.aliases ?? [],
           status: st.status,
           group: 'micro',
-          legacy: compact({ ...rest(m, ['macro', 'aliases', 'status', 'implies']), ...(st.unknown ? { status: m.status } : {}) }),
+          legacy: compact({
+            ...rest(m, ['macro', 'aliases', 'status', 'implies']),
+            ...(st.unknown ? { status: m.status } : {}),
+          }),
         });
         microIds.push([name, id]);
       }
@@ -345,7 +542,10 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
           else if (tid !== id && !node.implies.includes(tid)) node.implies.push(tid);
         }
         if (unresolved.length) {
-          node.legacy = { ...(node.legacy ?? {}), unresolvedImplies: unresolved };
+          node.legacy = {
+            ...(node.legacy ?? {}),
+            unresolvedImplies: unresolved,
+          };
           warn(`Tag "${name}" implies unknown tags: ${unresolved.join(', ')}`);
         }
       }
@@ -356,7 +556,18 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
           const target = tb.created.nodes.find((n) => n.id === same);
           if (target) {
             const prev = (target.legacy?.['mergedExtra'] as unknown[] | undefined) ?? [];
-            target.legacy = { ...(target.legacy ?? {}), mergedExtra: [...prev, compact({ name, group: e.group, source: e.source, added: e.added })] };
+            target.legacy = {
+              ...(target.legacy ?? {}),
+              mergedExtra: [
+                ...prev,
+                compact({
+                  name,
+                  group: e.group,
+                  source: e.source,
+                  added: e.added,
+                }),
+              ],
+            };
             mergedExtras++;
           }
           continue;
@@ -364,7 +575,12 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
         tb.addNode(name, {
           group: e.group ? `extra:${e.group}` : 'extra',
           ...(toIso(e.added) ? { createdAt: toIso(e.added) as string } : {}),
-          legacy: compact({ group: e.group, source: e.source, added: e.added, ...rest(e, ['group', 'source', 'added']) }),
+          legacy: compact({
+            group: e.group,
+            source: e.source,
+            added: e.added,
+            ...rest(e, ['group', 'source', 'added']),
+          }),
         });
       }
       if (mergedExtras > 0) warn(`${mergedExtras} extra tag(s) have the same name as a taxonomy tag or alias and were merged into it`);
@@ -374,7 +590,7 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
       progress('documents', 0, records.length);
       const existingDocs = await store.documents.list();
       const knownIds = new Set(existingDocs.map((d) => d.id));
-      const knownPaths = new Set(existingDocs.map((d) => d.path));
+      const knownPaths = new Set(existingDocs.flatMap((d) => [d.path, ...d.aliasPaths]));
 
       const byId = new Map<string, DocumentRecord>();
       const order: string[] = [];
@@ -397,8 +613,9 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
 
       const resolveTags = (names: readonly string[], kind: 'macro' | 'micro' | 'extra' | 'manual'): string[] => {
         const ids: string[] = [];
-        for (const raw of names) {
-          if (typeof raw !== 'string' || !raw.trim()) continue;
+        for (const full of names) {
+          if (typeof full !== 'string' || !full.trim()) continue;
+          const raw = clean(full);
           let id = tb.nodeIndex.resolve(raw);
           if (id === undefined) {
             warnOnce(`${kind}:${normalizeName(raw)}`, `Tag "${raw}" (${kind}) is not in the old taxonomy; created as a new tag`);
@@ -413,16 +630,15 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
         return ids;
       };
 
-      for (const [i, rec] of records.entries()) {
+      for (const [i, { rec, line }] of records.entries()) {
         checkAbort();
         if (i % 5 === 0) progress('documents', i, records.length);
         let relPath: string;
         try {
           relPath = normalizeRelativePath(rec.p);
-          if (!relPath) throw new Error('empty');
+          if (!relPath || relPath.length > L.paths) throw new Error('unusable');
         } catch {
-          skipped++;
-          warn(`Record ${i + 1} skipped: unusable path`);
+          skip(rec.p, 'unsafe-path', `Record on line ${line} skipped: unusable path`, line);
           continue;
         }
         if (knownPaths.has(relPath)) {
@@ -430,11 +646,13 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
           continue;
         }
 
-        const cand = await describeFile(libraryRoot, relPath, rec, warn);
-        if (!cand) {
-          skipped++;
-          continue;
-        }
+        const cand = await describeFile(libraryRoot, relPath, rec, {
+          warn,
+          skip: (p, r, m) => skip(p, r, m, line),
+          hashFile,
+          retry,
+        });
+        if (!cand) continue;
         if (knownIds.has(documentIdFromHash(cand.hash))) {
           skipped++;
           continue;
@@ -442,14 +660,7 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
 
         const tags = rec.tags ?? {};
         const xt = Array.isArray((rec as Json)['xt']) ? ((rec as Json)['xt'] as unknown[]).filter((x): x is string => typeof x === 'string') : [];
-        const tagIds = [
-          ...new Set([
-            ...resolveTags(tags.macro ?? [], 'macro'),
-            ...resolveTags(tags.micro ?? [], 'micro'),
-            ...resolveTags(tags.extra ?? [], 'extra'),
-            ...resolveTags(xt, 'manual'),
-          ]),
-        ];
+        const tagIds = [...new Set([...resolveTags(tags.macro ?? [], 'macro'), ...resolveTags(tags.micro ?? [], 'micro'), ...resolveTags(tags.extra ?? [], 'extra'), ...resolveTags(xt, 'manual')])];
         refreshNodeMap();
 
         const id = documentIdFromHash(cand.hash);
@@ -457,7 +668,9 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
         if (prior) {
           // Same content under another path: one record, more paths (see report).
           duplicates++;
-          prior.tags = [...new Set([...prior.tags, ...tagIds])];
+          prior.tags = [...new Set([...prior.tags, ...tagIds])].slice(0, L.tags);
+          // The other path is a first-class field, so that a later scan recognises the copy (D-032).
+          if (!prior.aliasPaths.includes(relPath) && prior.aliasPaths.length < L.paths) prior.aliasPaths.push(relPath);
           const lg = prior.legacy ?? {};
           lg['duplicates'] = [...((lg['duplicates'] as unknown[] | undefined) ?? []), rec];
           prior.legacy = lg;
@@ -490,43 +703,60 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
         const pubStatus = str(tags.pub_status);
         const pubChecked = toIso(tags.pub_checked);
         const summary = str(tags.summary);
-        const keywords = (tags.keywords ?? []).filter((k) => typeof k === 'string' && k.trim());
+        const keywords = cleanList(tags.keywords).slice(0, L.aiList);
 
-        const doc: DocumentRecord = documentRecordSchema.parse({
-          schemaVersion: SCHEMA_VERSION,
-          id,
-          hash: cand.hash,
-          previousHashes: [],
-          path: relPath,
-          size: cand.size,
-          mtimeMs: cand.mtimeMs,
-          missing: cand.missing,
-          type: typeId,
-          title: str(tags.title),
-          authors: (tags.authors ?? []).filter((a) => typeof a === 'string' && a.trim()),
-          year,
-          lang: str(tags.lang),
-          ref: compact({ venue: venueName ?? undefined, venueId, venueRef: str(tags.venue_ref) ?? undefined }),
-          doi: str(tags.doi),
-          arxivId: str(tags.arxiv),
-          publication: compact({ status: mapPubStatus(pubStatus), source: str(tags.pub_source) ?? undefined, checkedAt: pubChecked }),
-          tags: tagIds,
-          ai: compact({
-            summary: summary ? legacyAi(summary, nowIso) : undefined,
-            keywords: keywords.length ? legacyAi(keywords, nowIso) : undefined,
-          }),
-          addedAt: toIso(rec.first) ?? nowIso,
-          updatedAt: nowIso,
-          legacy: compact({
-            index: compact(rest(rec as Json, ['tags', 'xt'])),
-            tags: compact({
-              ...rest(tags as Json, ['title', 'authors', 'type', 'macro', 'micro', 'extra', 'keywords', 'year', 'lang', 'summary', 'venue', 'venue_ref', 'doi', 'arxiv', 'pub_source']),
-              pub_checked: pubChecked ? undefined : tags.pub_checked,
-              year: year === null ? tags.year : undefined,
-              xt,
+        let doc: DocumentRecord;
+        try {
+          doc = documentRecordSchema.parse({
+            schemaVersion: SCHEMA_VERSION,
+            id,
+            hash: cand.hash,
+            previousHashes: [],
+            path: relPath,
+            size: cand.size,
+            mtimeMs: cand.mtimeMs,
+            missing: cand.missing,
+            type: typeId,
+            title: clip(str(tags.title), L.title),
+            authors: (tags.authors ?? [])
+              .filter((a) => typeof a === 'string' && a.trim())
+              .slice(0, L.authors)
+              .map((a) => a.trim().slice(0, L.author)),
+            year,
+            lang: clip(str(tags.lang), L.shortText),
+            ref: compact({
+              venue: clip(venueName, L.venue) ?? undefined,
+              venueId,
+              venueRef: clip(str(tags.venue_ref), L.venueRef) ?? undefined,
             }),
-          }),
-        });
+            doi: clip(str(tags.doi), L.identifier),
+            arxivId: clip(str(tags.arxiv), L.identifier),
+            publication: compact({
+              status: mapPubStatus(pubStatus),
+              source: clip(str(tags.pub_source), L.venueRef) ?? undefined,
+              checkedAt: pubChecked,
+            }),
+            tags: tagIds.slice(0, L.tags),
+            ai: compact({
+              summary: summary ? legacyAi(summary.slice(0, L.aiText), nowIso) : undefined,
+              keywords: keywords.length ? legacyAi(keywords, nowIso) : undefined,
+            }),
+            addedAt: toIso(rec.first) ?? nowIso,
+            updatedAt: nowIso,
+            legacy: compact({
+              index: compact(rest(rec as Json, ['tags', 'xt'])),
+              tags: compact({
+                ...rest(tags as Json, ['title', 'authors', 'type', 'macro', 'micro', 'extra', 'keywords', 'year', 'lang', 'summary', 'venue', 'venue_ref', 'doi', 'arxiv', 'pub_source']),
+                pub_checked: pubChecked ? undefined : tags.pub_checked,
+                year: year === null ? tags.year : undefined,
+                xt,
+              }),
+            }),
+          });
+        } catch {
+          skip(relPath, 'invalid-record', `Record on line ${line} skipped: its data does not fit the document model`, line);
+          continue;
+        }
         tagTotal += doc.tags.length;
         if (cand.missing) missingCount++;
         if (cand.hashUnknown) doc.legacy = { ...(doc.legacy ?? {}), hashUnknown: true };
@@ -539,6 +769,7 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
 
       /* ---------------------------- writing ---------------------------- */
       progress('finalizing', 0, order.length + 1);
+      // Fails with a revision conflict if someone else changed the taxonomy while the import was running.
       await store.writeTaxonomy(
         taxonomyFileSchema.parse({
           schemaVersion: SCHEMA_VERSION,
@@ -546,8 +777,16 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
           nodes: tb.nodes,
           documentTypes: tb.types,
           venues: tb.venues,
-          legacy: existingTax.legacy ?? compact({ source: 'phd_index', version: legacyTax.version, settings: legacyTax.settings, imports_done: legacyTax.imports_done }),
+          legacy:
+            existingTax.legacy ??
+            compact({
+              source: 'phd_index',
+              version: legacyTax.version,
+              settings: legacyTax.settings,
+              imports_done: legacyTax.imports_done,
+            }),
         }),
+        { expectedRevision: existingTax.revision },
       );
       // Recount tag totals now that unresolved tags may have grown the node list.
       for (const [n, id] of order.entries()) {
@@ -564,7 +803,7 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
         nodesByLevel[lvl] = (nodesByLevel[lvl] ?? 0) + 1;
       }
 
-      const report: ImportReport = {
+      const report: ImportReport & ImportReportExtras = {
         documents: order.length,
         taxonomyNodes: tb.created.nodes.length,
         skipped,
@@ -574,6 +813,8 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
         documentTypes: tb.created.types.length,
         missing: missingCount,
         duplicates,
+        skippedFiles,
+        selfNames,
         warnings: warningCount > warnings.length ? [...warnings, `...and ${warningCount - warnings.length} more warnings`] : warnings,
       };
       await store.appendLog({
@@ -584,10 +825,22 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
         target: { kind: 'document' },
         action: 'import.legacy',
         before: null,
-        after: { documentIds: order, counts: { ...report, warnings: undefined } },
+        after: {
+          documentIds: order,
+          counts: {
+            ...report,
+            warnings: undefined,
+            skippedFiles: undefined,
+            selfNames: undefined,
+          },
+        },
       });
       progress('finalizing', order.length + 1, order.length + 1);
-      log.info('legacy import done', { documents: report.documents, nodes: report.taxonomyNodes, skipped });
+      log.info('legacy import done', {
+        documents: report.documents,
+        nodes: report.taxonomyNodes,
+        skipped,
+      });
       return report;
     },
   };
@@ -597,18 +850,30 @@ function legacyAi<T>(value: T, date: string): AiField<T> {
   return {
     value,
     // The old index was filled in by an AI assistant; model and exact provider were not recorded.
-    meta: { model: 'unknown', provider: 'legacy-import', date, source: 'legacy-import' },
+    meta: {
+      model: 'unknown',
+      provider: 'legacy-import',
+      date,
+      source: 'legacy-import',
+    },
     review: { status: 'accepted', at: date },
   };
 }
 
-/** Hash and stat of one indexed file (read-only). Null when the file is present but unreadable. */
-async function describeFile(libraryRoot: string, relPath: string, rec: LegacyFileRecord, warn: (m: string) => void): Promise<Candidate | null> {
+interface DescribeEnv {
+  warn: (m: string) => void;
+  skip: (rawPath: string, reason: ImportSkipReason, message: string) => void;
+  hashFile: (file: string) => Promise<string>;
+  retry: RetryOptions;
+}
+
+/** Hash and stat of one indexed file (read-only). Null when the file is present but unusable (reported through `skip`). */
+async function describeFile(libraryRoot: string, relPath: string, rec: LegacyFileRecord, env: DescribeEnv): Promise<Candidate | null> {
   let abs: string;
   try {
     abs = await resolveInRoot(libraryRoot, relPath);
   } catch {
-    warn(`"${relPath}" skipped: outside the library root`);
+    env.skip(relPath, 'outside-root', `"${relPath}" skipped: outside the library root`);
     return null;
   }
   const legacyMtime = typeof rec.mt === 'number' ? rec.mt : Date.parse(String(rec.mt ?? ''));
@@ -616,19 +881,28 @@ async function describeFile(libraryRoot: string, relPath: string, rec: LegacyFil
   const st = await stat(abs).catch(() => null);
   if (st?.isFile()) {
     try {
-      const hash = await sha256File(abs);
-      return { rec, relPath, hash, hashUnknown: false, missing: false, size: st.size, mtimeMs: st.mtimeMs };
+      // A file briefly locked by cloud sync or an antivirus is retried before giving up.
+      const hash = await withRetry(() => env.hashFile(abs), env.retry);
+      return {
+        rec,
+        relPath,
+        hash,
+        hashUnknown: false,
+        missing: false,
+        size: st.size,
+        mtimeMs: st.mtimeMs,
+      };
     } catch (e) {
-      warn(`"${relPath}" skipped: cannot read the file (${AppError.from(e).code})`);
+      env.skip(relPath, 'unreadable', `"${relPath}" skipped: cannot read the file (${AppError.from(e).code})`);
       return null;
     }
   }
   if (st) {
-    warn(`"${relPath}" skipped: not a regular file`);
+    env.skip(relPath, 'not-a-file', `"${relPath}" skipped: not a regular file`);
     return null;
   }
   // The file no longer exists: keep the record, flagged as missing.
-  warn(`"${relPath}" is in the old index but no longer on disk; imported as missing`);
+  env.warn(`"${relPath}" is in the old index but no longer on disk; imported as missing`);
   return {
     rec,
     relPath,

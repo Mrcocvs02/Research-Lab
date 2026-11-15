@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readdir, readFile, unlink } from 'node:fs/promises';
+import { appendFile, mkdir, open, readdir, readFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type { z } from 'zod';
 import {
@@ -32,7 +32,9 @@ import {
   type Logger,
   type Note,
   type NoteRepository,
+  type PutOptions,
   type Project,
+  RevisionConflictError,
   type TaxonomyFile,
   type WatchFile,
 } from '@rl/core';
@@ -71,6 +73,30 @@ export interface FileLibraryStore extends LibraryStore {
   withActor(actor: ChangeEntry['actor']): FileLibraryStore;
 }
 
+/** In-process serialisation: tasks with the same key run one after the other; a failure does not block the next. */
+class KeyedQueue {
+  private readonly tails = new Map<string, Promise<unknown>>();
+
+  run<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.tails.get(key) ?? Promise.resolve();
+    const result = prev.then(fn, fn);
+    const tail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    this.tails.set(key, tail);
+    void tail.then(() => {
+      if (this.tails.get(key) === tail) this.tails.delete(key);
+    });
+    return result;
+  }
+}
+
+interface SharedState {
+  issues: LoadIssue[];
+  queue: KeyedQueue;
+}
+
 const DEVICE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 function frontmatterOf(note: Note): string {
@@ -93,13 +119,36 @@ function parseNote(raw: string): Note {
     const value = line.slice(i + 1).trim();
     data[key] = key === 'page' ? Number(value) : value;
   }
-  const parsed = noteSchema.safeParse({ frontmatter: data, body: text.slice(m[0].length) });
+  const parsed = noteSchema.safeParse({
+    frontmatter: data,
+    body: text.slice(m[0].length),
+  });
   if (!parsed.success) {
     throw new AppError('SCHEMA_INVALID', 'Note does not match its schema', {
       issues: parsed.error.issues.slice(0, 10).map((i) => ({ path: i.path.join('.'), message: i.message })),
     });
   }
   return parsed.data;
+}
+
+/** True when the file exists, is not empty and its last byte is not a line feed. */
+async function endsWithoutNewline(file: string): Promise<boolean> {
+  let handle;
+  try {
+    handle = await open(file, 'r');
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw e;
+  }
+  try {
+    const { size } = await handle.stat();
+    if (size === 0) return false;
+    const buf = Buffer.alloc(1);
+    await handle.read(buf, 0, 1, size - 1);
+    return buf[0] !== 0x0a;
+  } finally {
+    await handle.close();
+  }
 }
 
 function sameTags(a: readonly string[], b: readonly string[]): boolean {
@@ -116,9 +165,10 @@ class FileStore implements FileLibraryStore {
   private readonly atomic: AtomicWriteOptions;
   private readonly retry: RetryOptions;
   private readonly loadIssues: LoadIssue[];
+  private readonly queue: KeyedQueue;
   private readonly options: LibraryStoreOptions;
 
-  constructor(options: LibraryStoreOptions, shared?: LoadIssue[]) {
+  constructor(options: LibraryStoreOptions, shared?: SharedState) {
     if (!path.isAbsolute(options.rootPath)) throw new AppError('INVALID_PATH', 'Library root must be absolute');
     if (!DEVICE_ID.test(options.deviceId)) throw new AppError('INVALID_REQUEST', 'Invalid device id');
     this.options = options;
@@ -130,7 +180,8 @@ class FileStore implements FileLibraryStore {
     this.log = options.logger ?? noopLogger;
     this.atomic = options.atomic ?? {};
     this.retry = options.retry ?? {};
-    this.loadIssues = shared ?? [];
+    this.loadIssues = shared?.issues ?? [];
+    this.queue = shared?.queue ?? new KeyedQueue();
   }
 
   issues(): LoadIssue[] {
@@ -138,7 +189,7 @@ class FileStore implements FileLibraryStore {
   }
 
   withActor(actor: ChangeEntry['actor']): FileLibraryStore {
-    return new FileStore({ ...this.options, actor }, this.loadIssues);
+    return new FileStore({ ...this.options, actor }, { issues: this.loadIssues, queue: this.queue });
   }
 
   /* ---------------------------- low level ---------------------------- */
@@ -147,6 +198,11 @@ class FileStore implements FileLibraryStore {
   private async abs(rel: string, create = false): Promise<string> {
     if (create) await mkdir(this.dataDir, { recursive: true });
     return resolveInRoot(this.dataDir, rel);
+  }
+
+  /** Runs `fn` after every earlier task on the same data file (same store family, same process). */
+  private locked<T>(rel: string, fn: () => Promise<T>): Promise<T> {
+    return this.queue.run(rel, fn);
   }
 
   /** Validated read; null when the file (or the data dir) does not exist. Corrupt -> SCHEMA_INVALID. */
@@ -201,7 +257,10 @@ class FileStore implements FileLibraryStore {
   private noteIssue(rel: string, e: unknown): void {
     const err = AppError.from(e);
     this.loadIssues.push({ file: rel, code: err.code, message: err.message });
-    this.log.warn('skipping unreadable data file', { file: rel, code: err.code });
+    this.log.warn('skipping unreadable data file', {
+      file: rel,
+      code: err.code,
+    });
   }
 
   /* ------------------------------ layout ----------------------------- */
@@ -230,6 +289,8 @@ class FileStore implements FileLibraryStore {
     idOf: (item: T) => Id;
     onPut?: (before: T | null, after: T) => Promise<void>;
     onRemove?: (before: T) => Promise<void>;
+    /** Items that carry a revision: the store bumps it at each write and checks `expectedRevision`. */
+    revision?: { get: (item: T) => number; set: (item: T, n: number) => T };
   }): ItemRepository<T, Id> {
     const parseId = (id: string): Id => {
       const r = spec.idSchema.safeParse(id);
@@ -252,6 +313,24 @@ class FileStore implements FileLibraryStore {
       }
       return ids.sort();
     };
+    const putLocked = async (item: T, options?: PutOptions, known?: T | null): Promise<T> => {
+      const id = spec.idOf(item);
+      if (options?.expectedRevision !== undefined && !spec.revision) throw new AppError('INVALID_REQUEST', 'This kind of item has no revision');
+      const needBefore = spec.onPut !== undefined || spec.revision !== undefined;
+      let before: T | null = known ?? null;
+      if (known === undefined && needBefore) before = options?.expectedRevision !== undefined ? await get(id) : await get(id).catch(() => null);
+      let toWrite = item;
+      if (spec.revision) {
+        const actual = before === null ? null : spec.revision.get(before);
+        if (options?.expectedRevision !== undefined && actual !== options.expectedRevision) {
+          throw new RevisionConflictError(spec.file(id), options.expectedRevision, actual);
+        }
+        toWrite = spec.revision.set(item, actual === null ? spec.revision.get(item) : actual + 1);
+      }
+      const written = await this.writeJson(spec.file(id), spec.schema, toWrite);
+      await spec.onPut?.(before, written);
+      return written;
+    };
     return {
       get,
       listIds,
@@ -273,17 +352,18 @@ class FileStore implements FileLibraryStore {
         }
         return out;
       },
-      put: async (item) => {
-        const id = spec.idOf(item);
-        const before = spec.onPut ? await get(id).catch(() => null) : null;
-        const written = await this.writeJson(spec.file(id), spec.schema, item);
-        await spec.onPut?.(before, written);
-      },
-      remove: async (id) => {
-        const before = spec.onRemove ? await get(parseId(id)).catch(() => null) : null;
-        await this.removeFile(spec.file(parseId(id)));
-        if (before) await spec.onRemove?.(before);
-      },
+      put: (item, options) => this.locked(spec.file(spec.idOf(item)), () => putLocked(item, options)),
+      update: (id, fn) =>
+        this.locked(spec.file(parseId(id)), async () => {
+          const current = await get(parseId(id));
+          return putLocked(await fn(current), undefined, current);
+        }),
+      remove: (id) =>
+        this.locked(spec.file(parseId(id)), async () => {
+          const before = spec.onRemove ? await get(parseId(id)).catch(() => null) : null;
+          await this.removeFile(spec.file(parseId(id)));
+          if (before) await spec.onRemove?.(before);
+        }),
     };
   }
 
@@ -307,9 +387,16 @@ class FileStore implements FileLibraryStore {
     schema: documentRecordSchema,
     idSchema: documentIdSchema,
     idOf: (d) => d.id,
+    revision: {
+      get: (d) => d.revision,
+      set: (d, n) => ({ ...d, revision: n }),
+    },
     onPut: async (before, after) => {
       if (before === null) {
-        if (after.tags.length > 0) await this.logDocument(after.id, 'document.create', null, { tags: after.tags });
+        if (after.tags.length > 0)
+          await this.logDocument(after.id, 'document.create', null, {
+            tags: after.tags,
+          });
       } else if (!sameTags(before.tags, after.tags)) {
         await this.logDocument(after.id, 'tags.update', { tags: before.tags }, { tags: after.tags });
       }
@@ -340,16 +427,26 @@ class FileStore implements FileLibraryStore {
       if (file !== null && file.docId !== id) throw new AppError('SCHEMA_INVALID', 'File content does not match its file name');
       return file;
     },
-    put: async (file: AnnotationFile): Promise<void> => {
-      await this.writeJson(dataPath.annotations(file.docId), annotationFileSchema, file);
+    put: (file: AnnotationFile): Promise<void> =>
+      this.locked(dataPath.annotations(file.docId), async () => {
+        await this.writeJson(dataPath.annotations(file.docId), annotationFileSchema, file);
+      }),
+    update: (docId: DocumentId, fn: (current: AnnotationFile | null) => AnnotationFile | Promise<AnnotationFile>): Promise<AnnotationFile> => {
+      const id = documentIdSchema.parse(docId);
+      return this.locked(dataPath.annotations(id), async () => {
+        const current = await this.annotations.get(id);
+        return this.writeJson(dataPath.annotations(id), annotationFileSchema, await fn(current));
+      });
     },
     upsert: async (docId: DocumentId, annotation: Annotation): Promise<void> => {
-      const existing = (await this.annotations.get(docId)) ?? annotationFileSchema.parse({ docId });
-      const i = existing.annotations.findIndex((a) => a.id === annotation.id);
-      const next = [...existing.annotations];
-      if (i >= 0) next[i] = annotation;
-      else next.push(annotation);
-      await this.annotations.put({ ...existing, annotations: next });
+      await this.annotations.update(docId, (current) => {
+        const existing = current ?? annotationFileSchema.parse({ docId });
+        const i = existing.annotations.findIndex((a) => a.id === annotation.id);
+        const next = [...existing.annotations];
+        if (i >= 0) next[i] = annotation;
+        else next.push(annotation);
+        return { ...existing, annotations: next };
+      });
     },
   };
 
@@ -408,14 +505,31 @@ class FileStore implements FileLibraryStore {
     return (await this.readOptional(dataPath.taxonomy, taxonomyFileSchema)) ?? taxonomyFileSchema.parse({});
   }
 
-  async writeTaxonomy(taxonomy: TaxonomyFile): Promise<void> {
+  writeTaxonomy(taxonomy: TaxonomyFile, options: PutOptions = {}): Promise<void> {
+    return this.locked(dataPath.taxonomy, () => this.writeTaxonomyLocked(taxonomy, options));
+  }
+
+  updateTaxonomy(fn: (current: TaxonomyFile) => TaxonomyFile | Promise<TaxonomyFile>): Promise<void> {
+    return this.locked(dataPath.taxonomy, async () => {
+      const current = await this.readTaxonomy();
+      await this.writeTaxonomyLocked(await fn(current), {});
+    });
+  }
+
+  private async writeTaxonomyLocked(taxonomy: TaxonomyFile, options: PutOptions): Promise<void> {
     const valid = taxonomyFileSchema.parse(taxonomy);
     // A corrupt existing file must not be silently replaced.
     const before = await this.readOptional(dataPath.taxonomy, taxonomyFileSchema);
+    if (options.expectedRevision !== undefined && (before?.revision ?? 0) !== options.expectedRevision) {
+      throw new RevisionConflictError(dataPath.taxonomy, options.expectedRevision, before?.revision ?? null);
+    }
     const diff = diffTaxonomy(before ?? taxonomyFileSchema.parse({}), valid);
     if (before !== null && diff === null) return;
     const revision = Math.max(before?.revision ?? -1, valid.revision) + 1;
-    await this.writeJson(dataPath.taxonomy, taxonomyFileSchema, { ...valid, revision });
+    await this.writeJson(dataPath.taxonomy, taxonomyFileSchema, {
+      ...valid,
+      revision,
+    });
     if (diff !== null) {
       await this.appendLog({
         type: 'change',
@@ -435,7 +549,9 @@ class FileStore implements FileLibraryStore {
   }
 
   async writeWatch(watch: WatchFile): Promise<void> {
-    await this.writeJson(dataPath.watch, watchFileSchema, watch);
+    await this.locked(dataPath.watch, async () => {
+      await this.writeJson(dataPath.watch, watchFileSchema, watch);
+    });
   }
 
   async appendLog(entry: LogEntry): Promise<void> {
@@ -444,7 +560,13 @@ class FileStore implements FileLibraryStore {
     const rel = dataPath.logFile(valid.type === 'change' ? 'changes' : 'ai-sends', this.deviceId, month);
     const file = await this.abs(rel, true);
     await mkdir(path.dirname(file), { recursive: true });
-    await withRetry(() => appendFile(file, `${JSON.stringify(valid)}\n`, 'utf8'), this.retry).catch((e: unknown) => {
+    await this.locked(rel, () =>
+      withRetry(async () => {
+        // A process that died mid-line leaves a fragment: start on a fresh line so that the new entry stays readable.
+        const prefix = (await endsWithoutNewline(file)) ? '\n' : '';
+        await appendFile(file, `${prefix}${JSON.stringify(valid)}\n`, 'utf8');
+      }, this.retry),
+    ).catch((e: unknown) => {
       throw e instanceof AppError ? e : new AppError('IO_ERROR', 'Cannot append to the log', { code: (e as NodeJS.ErrnoException).code ?? 'unknown' }, { cause: e });
     });
   }
@@ -461,14 +583,27 @@ class FileStore implements FileLibraryStore {
         this.noteIssue(`log/${name}`, e);
         continue;
       }
+      let invalid = 0;
       for (const line of raw.split('\n')) {
         if (!line.trim()) continue;
         try {
           const parsed = logEntrySchema.safeParse(JSON.parse(line));
           if (parsed.success) entries.push(parsed.data);
+          else invalid++;
         } catch {
-          /* a torn last line must not hide the rest */
+          invalid++; // a torn line must not hide the rest
         }
+      }
+      if (invalid > 0) {
+        this.loadIssues.push({
+          file: `log/${name}`,
+          code: 'LOG_LINES_SKIPPED',
+          message: `${invalid} unreadable line(s) skipped`,
+        });
+        this.log.warn('skipping unreadable log lines', {
+          file: `log/${name}`,
+          count: invalid,
+        });
       }
     }
     let result = entries.filter((e) => (query.type === undefined || e.type === query.type) && (query.since === undefined || e.at >= query.since));

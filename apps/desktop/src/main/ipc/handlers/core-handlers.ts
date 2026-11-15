@@ -27,8 +27,16 @@ export const settingsHandlers = (s: MainServices): DomainHandlers<'settings'> =>
 export const libraryHandlers = (s: MainServices): DomainHandlers<'library'> => ({
   'library:create': (req) => s.libraries.create(req),
   'library:list': () => s.libraries.list(),
-  'library:setActive': async ({ libraryId }) => ({ activeLibraryId: await s.libraries.setActive(libraryId) }),
-  'library:forget': async ({ libraryId }) => ({ activeLibraryId: await s.libraries.forget(libraryId) }),
+  'library:setActive': async ({ libraryId }) => {
+    const activeLibraryId = await s.libraries.setActive(libraryId);
+    await s.runtime.sync({ autoScan: true });
+    return { activeLibraryId };
+  },
+  'library:forget': async ({ libraryId }) => {
+    const activeLibraryId = await s.libraries.forget(libraryId);
+    await s.runtime.sync({ autoScan: true });
+    return { activeLibraryId };
+  },
   'library:rename': ({ libraryId, name }) => s.libraries.rename(libraryId, name),
   'library:listFolders': async ({ rootPath, libraryId, parent }) => ({
     folders: await s.libraries.listFolders({ rootPath, libraryId }, parent),
@@ -86,6 +94,8 @@ export const importHandlers = (s: MainServices): DomainHandlers<'import'> => {
       // Claim the library synchronously, before any await, so two concurrent starts cannot both pass.
       if (running.has(libraryId)) throw new AppError('ALREADY_EXISTS', 'An import is already running for this library');
       running.add(libraryId);
+      // No scan of this library while the importer writes its records (released when the job ends).
+      const releaseScan = s.runtime.hold(libraryId);
       let started = false;
       try {
         const profile = await s.libraries.profile(libraryId);
@@ -100,7 +110,8 @@ export const importHandlers = (s: MainServices): DomainHandlers<'import'> => {
         const settings = await s.settings.get();
         let importer;
         try {
-          importer = s.createImporter();
+          // library.json is only written through LibraryService's serialised queue (D-020, D-044).
+          importer = s.createImporter({ updateConfig: (fn) => s.libraries.updateConfig(fn, libraryId) });
         } catch {
           throw new AppError('NOT_IMPLEMENTED', 'The importer is not available yet');
         }
@@ -124,10 +135,16 @@ export const importHandlers = (s: MainServices): DomainHandlers<'import'> => {
             s.log.error('legacy import failed', { error: e });
             publish({ jobId, state: 'failed', processed: 0, error: AppError.from(e).toJSON() });
           })
-          .finally(() => running.delete(libraryId));
+          .finally(() => {
+            running.delete(libraryId);
+            releaseScan();
+          });
         return { jobId };
       } finally {
-        if (!started) running.delete(libraryId);
+        if (!started) {
+          running.delete(libraryId);
+          releaseScan();
+        }
       }
     },
     'import:status': ({ jobId }) => {

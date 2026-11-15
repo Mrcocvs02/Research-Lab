@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron';
 import path from 'node:path';
-import { backupDataDir, createLegacyImporter } from '@rl/data';
+import { backupDataDir, createLegacyImporter, createLibraryStore, createWatcher } from '@rl/data';
+import { createSearchIndex } from '@rl/search';
 import {
   AppError,
   createDispatcher,
@@ -16,6 +17,8 @@ import { ApprovedPaths } from './approved-paths.js';
 import { e2eDialogOverride } from './dialog-override.js';
 import { resolveAppDirs } from './dirs.js';
 import { buildHandlers, type MainServices } from './ipc/handlers/index.js';
+import { RuntimeManager } from './library/runtime-manager.js';
+import { spawnScanWorker } from './library/worker-host.js';
 import { LibraryService } from './library-service.js';
 import { configureRuntime, resolveRuntimeConfig } from './runtime.js';
 import { FileSecretStore } from './secret-store.js';
@@ -59,12 +62,28 @@ async function main(): Promise<void> {
     encrypt: (plain) => safeStorage.encryptString(plain),
     decrypt: (data) => safeStorage.decryptString(data),
   });
+  const libraries = new LibraryService(settings, approved, secrets);
+  const backupLibraryData = (libraryId: string, dataDir: string) => backupDataDir(dataDir, path.join(dirs.localData, 'backups', libraryId));
+  // Scan, text extraction and index writes run in a worker thread (bundled next to this file, see electron.vite.config.ts).
+  const runtimeManager = new RuntimeManager({
+    libraries,
+    settings,
+    localDataDir: dirs.localData,
+    log,
+    emit: (status) => emit('scan:progress', status),
+    backupDataDir: backupLibraryData,
+    createStore: ({ rootPath, dataDir, deviceId }) => createLibraryStore({ rootPath, dataDir, deviceId, logger: log }),
+    createIndex: createSearchIndex,
+    spawnWorker: () => spawnScanWorker(path.join(import.meta.dirname, 'scan-worker.js')),
+    watch: (o) => createWatcher({ rootPath: o.rootPath, dataDir: o.dataDir, config: o.config, onBatch: o.onBatch, onError: o.onError }),
+  });
   const services: MainServices = {
     log,
     emit,
     settings,
     approved,
-    libraries: new LibraryService(settings, approved, secrets),
+    runtime: runtimeManager,
+    libraries,
     secrets,
     async pickFolder(purpose, title) {
       // Test hook: only in a development run with RL_E2E=1 (see runtime.ts, dialog-override.ts).
@@ -89,8 +108,8 @@ async function main(): Promise<void> {
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
     appInfo: () => ({ name: APP_NAME, version: app.getVersion(), platform: process.platform, electron: process.versions.electron ?? '' }),
-    createImporter: () => createLegacyImporter(),
-    backupDataDir: (libraryId, dataDir) => backupDataDir(dataDir, path.join(dirs.localData, 'backups', libraryId)),
+    createImporter: (options) => createLegacyImporter(options),
+    backupDataDir: backupLibraryData,
   };
 
   const dispatch = createDispatcher(channels, buildHandlers(services), log);
@@ -110,6 +129,15 @@ async function main(): Promise<void> {
   // The renderer also pulls `app:notices` on start; the event covers a window that is already listening.
   win.webContents.once('did-finish-load', () => {
     for (const notice of settings.notices()) emit('app:notice', notice);
+  });
+  // Open the active library: index, worker thread and the first incremental scan, off the main thread.
+  void runtimeManager.sync({ autoScan: true });
+  let quitting = false;
+  app.on('before-quit', (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    quitting = true;
+    void runtimeManager.closeAll().finally(() => app.quit());
   });
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();

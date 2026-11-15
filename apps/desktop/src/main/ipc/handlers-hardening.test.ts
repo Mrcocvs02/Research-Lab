@@ -8,6 +8,7 @@ import { LibraryService } from '../library-service.js';
 import { FileSecretStore, type Cipher } from '../secret-store.js';
 import { SettingsStore } from '../settings-store.js';
 import { probeLegacyIndex } from './handlers/core-handlers.js';
+import { noRuntime } from './no-runtime.js';
 import { buildHandlers, type MainServices } from './handlers/index.js';
 
 let tmp: string;
@@ -30,6 +31,7 @@ function setup(options: { cipher?: Cipher } = {}) {
     emit: () => {},
     settings,
     approved,
+    runtime: noRuntime,
     libraries: new LibraryService(settings, approved, secrets),
     secrets,
     pickFolder: async () => picked,

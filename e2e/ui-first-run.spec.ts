@@ -20,10 +20,11 @@ const scenarios: Scenario[] = [
 
 async function launchWith(base: string, root: string): Promise<LaunchedApp> {
   return launchApp({
-    RL_E2E: '1',
-    RL_E2E_DIALOG_PATH: root,
-    RL_USER_DATA_DIR: path.join(base, 'user'),
-    RL_LOCAL_DATA_DIR: path.join(base, 'local'),
+    dialogPath: root,
+    env: {
+      RL_USER_DATA_DIR: path.join(base, 'user'),
+      RL_LOCAL_DATA_DIR: path.join(base, 'local'),
+    },
   });
 }
 

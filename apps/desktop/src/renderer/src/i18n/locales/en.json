@@ -1,6 +1,266 @@
 {
   "app": { "title": "Research Lab", "tagline": "Organize and study your research" },
-  "shell": { "empty": "No library is open. The guided first run is coming soon.", "language": "Interface language" },
   "languages": { "it": "Italiano", "en": "English" },
-  "errors": { "generic": "Something went wrong." }
+  "common": {
+    "loading": "Loading…",
+    "retry": "Try again",
+    "save": "Save",
+    "saved": "Saved",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "no": "No",
+    "fixErrors": "Fix the highlighted fields to save."
+  },
+  "errors": {
+    "INVALID_REQUEST": "Some values are not valid. Check the fields and try again.",
+    "INVALID_RESPONSE": "The app received an unexpected answer. Try again.",
+    "UNKNOWN_CHANNEL": "The app tried to do something it does not support.",
+    "NOT_FOUND": "The requested item or folder was not found.",
+    "ALREADY_EXISTS": "This already exists, for example a library on the same folder.",
+    "INVALID_PATH": "This folder or file name is not valid.",
+    "PATH_OUTSIDE_ROOT": "This location is outside the library folder and was refused.",
+    "IO_ERROR": "The file could not be read or written. Check that the folder is available.",
+    "SCHEMA_INVALID": "A data file is not in the expected format.",
+    "NOT_IMPLEMENTED": "This feature is not available yet.",
+    "PERMISSION_DENIED": "Not allowed. Choose the folder or file again with the picker.",
+    "LIBRARY_NOT_ACTIVE": "No library is active.",
+    "FOLDER_NOT_AI_ENABLED": "This folder is not enabled for sending to Claude.",
+    "AI_BUDGET_EXCEEDED": "The usage cap has been reached.",
+    "AI_PROVIDER_ERROR": "The AI provider returned an error.",
+    "SECRET_UNAVAILABLE": "Secure storage is not available on this computer, so keys cannot be saved.",
+    "CANCELLED": "The operation was cancelled.",
+    "INTERNAL": "Something went wrong."
+  },
+  "validation": {
+    "invalid": "This value is not valid.",
+    "name": "Enter a name (up to 120 characters).",
+    "email": "Enter a valid email address or leave it empty.",
+    "orcid": "Use the format 0000-0000-0000-0000.",
+    "openAlexId": "Use the format A followed by digits, for example A1234567890.",
+    "dataDirName": "Use a plain folder name, without slashes or special characters.",
+    "models": "Keep at least one model.",
+    "id": "Enter a model id.",
+    "label": "Enter a label.",
+    "defaultModel": "Choose one of the models in the list.",
+    "monthlyUsd": "Enter a positive amount or leave it empty for no cap.",
+    "confirmBatchAboveUsd": "Enter an amount of zero or more.",
+    "citedDepth": "Enter a whole number from 0 to 3."
+  },
+  "sections": {
+    "library": "Library",
+    "projects": "Projects",
+    "network": "Network",
+    "inbox": "Inbox",
+    "settings": "Settings"
+  },
+  "placeholders": {
+    "library": "Browse and search your documents here. This section arrives in a later phase.",
+    "libraryActive": "The library \"{{name}}\" is active.",
+    "projects": "Group documents from different folders into projects. This section arrives in a later phase.",
+    "network": "Explore documents, authors and topics as a network. This section arrives in a later phase.",
+    "inbox": "New papers wait here for your review. This section arrives in a later phase."
+  },
+  "shell": {
+    "skip": "Skip to main content",
+    "sidebar": "Sidebar",
+    "navigation": "Sections",
+    "activeLibrary": "Active library",
+    "noLibrary": "No library"
+  },
+  "chat": {
+    "title": "Chat",
+    "collapse": "Collapse chat panel",
+    "expand": "Expand chat panel",
+    "placeholder": "The chat with Claude will appear here.",
+    "note": "Available after connecting Claude."
+  },
+  "status": {
+    "library": "Library: {{name}}",
+    "noLibrary": "No library open",
+    "docLanguage": "Documents: {{language}}",
+    "aiNone": "Sending to Claude: no folders enabled",
+    "aiFolders_one": "Sending to Claude: {{count}} folder enabled",
+    "aiFolders_other": "Sending to Claude: {{count}} folders enabled",
+    "version": "Version {{version}}"
+  },
+  "folders": {
+    "empty": "No sub-folders.",
+    "toggle": "Show or hide the contents of {{name}}"
+  },
+  "profile": {
+    "name": "Name",
+    "namePlaceholder": "Jane Doe",
+    "variants": "Names as they appear among authors",
+    "variantsHint": "One per line. Used to recognise your own papers.",
+    "variantsPlaceholder": "Doe, J.\nDoe, Jane",
+    "email": "Email",
+    "orcid": "ORCID",
+    "openAlexId": "OpenAlex author id"
+  },
+  "library": {
+    "new": "New library",
+    "name": "Library name",
+    "language": "Language of the documents",
+    "languageHint": "Used for tags, summaries and answers about this library.",
+    "dataDirName": "Data folder name",
+    "dataDirNameHint": "Created inside the library folder. Notes and metadata are stored here; your documents are never modified."
+  },
+  "wizard": {
+    "title": "New library",
+    "progress": "Step {{current}} of {{total}}",
+    "back": "Back",
+    "next": "Next",
+    "create": "Create library",
+    "creating": "Creating…",
+    "cancel": "Cancel",
+    "steps": {
+      "language": "Welcome",
+      "profile": "About you",
+      "folder": "Library folder",
+      "details": "Library details",
+      "legacy": "Existing index found",
+      "taxonomy": "Starting taxonomy",
+      "aiFolders": "Folders enabled for Claude",
+      "summary": "Summary"
+    },
+    "language": {
+      "intro": "Welcome to Research Lab. Choose the language of the interface. You can change it later in the settings.",
+      "label": "Interface language"
+    },
+    "profile": {
+      "intro": "These details help the app recognise your own papers and query citation services. Everything here is optional.",
+      "optional": "You can leave all fields empty and fill them in later from the settings."
+    },
+    "folder": {
+      "intro": "Choose the folder that holds your documents. It can be any folder, including one that a cloud service already synchronises.",
+      "choose": "Choose folder…",
+      "change": "Choose another folder…",
+      "dialogTitle": "Choose the library folder",
+      "safe": "Your documents are never modified, moved or deleted. The app only writes inside its own data folder."
+    },
+    "legacy": {
+      "intro": "An index created by the previous tool was found in this folder. You can import it once.",
+      "documents_one": "{{count}} document",
+      "documents_other": "{{count}} documents",
+      "taxonomy_one": "{{count}} taxonomy entry",
+      "taxonomy_other": "{{count}} taxonomy entries",
+      "import": "Import this index into the new library",
+      "readOnly": "The old index is only read, never changed. It can stay as a backup."
+    },
+    "import": {
+      "runningTitle": "Importing the index",
+      "running": "Importing the existing index. This may take a moment.",
+      "progressLabel": "Import progress",
+      "counts": "{{done}} of {{total}}",
+      "countsUnknown": "{{done}} processed",
+      "failedHint": "The library was created. You can continue without the import and try it again later.",
+      "continueWithout": "Continue without importing",
+      "done": "Import complete: {{documents}} documents and {{nodes}} taxonomy entries.",
+      "warnings_one": "{{count}} warning was recorded.",
+      "warnings_other": "{{count}} warnings were recorded.",
+      "open": "Open the library"
+    },
+    "taxonomy": {
+      "intro": "A taxonomy is the list of topics used to tag documents. Choose how to start.",
+      "fromImport": "The taxonomy comes from the imported index, so this choice is not needed.",
+      "legend": "Starting taxonomy",
+      "empty": "Empty, I will build it myself",
+      "file": "From a JSON file",
+      "chooseFile": "Choose file…",
+      "changeFile": "Choose another file…",
+      "dialogTitle": "Choose a taxonomy file",
+      "claude": "Proposed by Claude from the first documents",
+      "claudeNote": "Available after connecting Claude."
+    },
+    "ai": {
+      "intro": "Documents are sent to Claude only from the folders you enable here. By default no folder is enabled.",
+      "why": "Why: some material may be confidential. Sending is enabled folder by folder, and every send shows a preview first and is recorded in a log. Check the data terms of your Claude plan before enabling folders with non-public material.",
+      "treeLabel": "Folders in the library",
+      "noneSelected": "No folder enabled: nothing will be sent to Claude.",
+      "selected_one": "{{count}} folder enabled, including its sub-folders.",
+      "selected_other": "{{count}} folders enabled, including their sub-folders.",
+      "confirmNone": "I understand that nothing will be sent to Claude for now",
+      "confirmSome_one": "I confirm that documents in the {{count}} selected folder may be sent to Claude",
+      "confirmSome_other": "I confirm that documents in the {{count}} selected folders may be sent to Claude"
+    },
+    "summary": {
+      "intro": "Check the details and create the library.",
+      "folder": "Folder",
+      "import": "Import of the old index",
+      "importYes": "Yes ({{count}} documents)",
+      "taxonomy": "Starting taxonomy",
+      "taxonomyImport": "From the imported index",
+      "ai": "Folders enabled for Claude",
+      "aiNone": "None"
+    }
+  },
+  "settings": {
+    "needsLibrary": "Create or activate a library to use this section.",
+    "profile": { "title": "You and the interface" },
+    "language": { "label": "Interface language", "hint": "Applies immediately." },
+    "libraries": {
+      "title": "Libraries",
+      "empty": "No libraries yet.",
+      "active": "Active",
+      "activate": "Activate",
+      "rename": "Rename",
+      "forget": "Remove from list",
+      "forgetTitle": "Remove library from the list",
+      "forgetBody": "\"{{name}}\" will be removed from this list. No file or folder is deleted, and you can add the folder again later.",
+      "forgetConfirm": "Remove from list"
+    },
+    "library": {
+      "title": "Library settings: {{name}}",
+      "unreadable": "The settings of this library could not be read.",
+      "general": "General",
+      "excluded": "Excluded folders",
+      "excludedHint": "These folders are not scanned or indexed.",
+      "aiFolders": "Folders enabled for Claude",
+      "aiFoldersHint": "Only documents in these folders (and their sub-folders) may be sent to Claude.",
+      "confirmBeforeSend": "Ask for confirmation, with a preview, before every send",
+      "models": "Models",
+      "modelId": "Model id",
+      "modelLabel": "Label",
+      "addModel": "Add model",
+      "removeModel": "Remove model {{name}}",
+      "defaultModel": "Default model",
+      "reasoning": "Default reasoning level",
+      "reasoningLow": "Low",
+      "reasoningMedium": "Medium",
+      "reasoningHigh": "High",
+      "monthlyCap": "Monthly usage cap (USD)",
+      "monthlyCapHint": "Leave empty for no cap.",
+      "batchConfirm": "Confirm batch jobs above (USD)",
+      "batchConfirmHint": "Larger jobs show an estimate and ask first.",
+      "mcp": "MCP server",
+      "mcpHint": "Lets Claude Code query this library. It listens only on this computer and needs a token.",
+      "mcpEnabled": "Enable the MCP server",
+      "mcpWrite": "Allow writing",
+      "mcpWriteHint": "Off by default: the server is read-only.",
+      "presets": "Export presets",
+      "presetsEmpty": "No presets yet.",
+      "presetName": "Preset name",
+      "presetSources": "Source documents",
+      "sourcesNone": "Not included",
+      "sourcesPaths": "Links to the files",
+      "sourcesCopies": "Copies",
+      "presetDepth": "Depth of cited papers",
+      "presetCited": "Include cited papers",
+      "presetNotes": "Include notes",
+      "presetAnnotations": "Include annotations",
+      "presetDefaultName": "Preset {{n}}",
+      "addPreset": "Add preset"
+    },
+    "secrets": {
+      "title": "API keys",
+      "intro": "Keys for the library \"{{name}}\". They are stored encrypted in the system's secure storage. Once saved they cannot be viewed again, only replaced or deleted.",
+      "storage": "Keys are never written to the library folder or to any synchronised file.",
+      "names": { "anthropic-api-key": "Anthropic API key", "gemini-api-key": "Gemini API key" },
+      "set": "Set",
+      "notSet": "Not set",
+      "placeholder": "Paste the key",
+      "replacePlaceholder": "Paste a new key to replace it",
+      "delete": "Delete"
+    }
+  }
 }

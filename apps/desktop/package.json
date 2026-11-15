@@ -10,25 +10,28 @@
     "preview": "electron-vite preview"
   },
   "dependencies": {
-    "@rl/core": "*",
-    "@rl/data": "*",
-    "@rl/search": "*",
     "@rl/ai": "*",
     "@rl/citations": "*",
-    "@rl/graph": "*",
+    "@rl/core": "*",
+    "@rl/data": "*",
     "@rl/export": "*",
+    "@rl/graph": "*",
     "@rl/mcp": "*",
+    "@rl/search": "*",
     "i18next": "27.1.2",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-i18next": "18.0.1"
   },
   "devDependencies": {
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",
     "electron": "45.3.2",
     "electron-vite": "6.0.0",
+    "happy-dom": "21.0.4",
     "vite": "8.3.8"
   }
 }

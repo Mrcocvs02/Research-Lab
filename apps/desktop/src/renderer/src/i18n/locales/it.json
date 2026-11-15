@@ -1,6 +1,266 @@
 {
   "app": { "title": "Research Lab", "tagline": "Organizza e studia la tua ricerca" },
-  "shell": { "empty": "Nessuna libreria aperta. La prima apertura guidata arriverà presto.", "language": "Lingua dell'interfaccia" },
   "languages": { "it": "Italiano", "en": "English" },
-  "errors": { "generic": "Qualcosa è andato storto." }
+  "common": {
+    "loading": "Caricamento…",
+    "retry": "Riprova",
+    "save": "Salva",
+    "saved": "Salvato",
+    "cancel": "Annulla",
+    "remove": "Rimuovi",
+    "no": "No",
+    "fixErrors": "Correggi i campi evidenziati per salvare."
+  },
+  "errors": {
+    "INVALID_REQUEST": "Alcuni valori non sono validi. Controlla i campi e riprova.",
+    "INVALID_RESPONSE": "L'app ha ricevuto una risposta inattesa. Riprova.",
+    "UNKNOWN_CHANNEL": "L'app ha provato a fare qualcosa che non supporta.",
+    "NOT_FOUND": "L'elemento o la cartella richiesti non sono stati trovati.",
+    "ALREADY_EXISTS": "Esiste già, per esempio una libreria sulla stessa cartella.",
+    "INVALID_PATH": "Questo nome di cartella o di file non è valido.",
+    "PATH_OUTSIDE_ROOT": "Questa posizione è fuori dalla cartella della libreria ed è stata rifiutata.",
+    "IO_ERROR": "Non è stato possibile leggere o scrivere il file. Controlla che la cartella sia disponibile.",
+    "SCHEMA_INVALID": "Un file di dati non ha il formato previsto.",
+    "NOT_IMPLEMENTED": "Questa funzione non è ancora disponibile.",
+    "PERMISSION_DENIED": "Operazione non consentita. Scegli di nuovo la cartella o il file con il selettore.",
+    "LIBRARY_NOT_ACTIVE": "Nessuna libreria è attiva.",
+    "FOLDER_NOT_AI_ENABLED": "Questa cartella non è abilitata all'invio a Claude.",
+    "AI_BUDGET_EXCEEDED": "Il tetto di utilizzo è stato raggiunto.",
+    "AI_PROVIDER_ERROR": "Il fornitore AI ha restituito un errore.",
+    "SECRET_UNAVAILABLE": "L'archivio sicuro non è disponibile su questo computer: le chiavi non si possono salvare.",
+    "CANCELLED": "L'operazione è stata annullata.",
+    "INTERNAL": "Qualcosa è andato storto."
+  },
+  "validation": {
+    "invalid": "Questo valore non è valido.",
+    "name": "Inserisci un nome (al massimo 120 caratteri).",
+    "email": "Inserisci un indirizzo email valido oppure lascia vuoto.",
+    "orcid": "Usa il formato 0000-0000-0000-0000.",
+    "openAlexId": "Usa il formato A seguita da cifre, per esempio A1234567890.",
+    "dataDirName": "Usa un semplice nome di cartella, senza barre o caratteri speciali.",
+    "models": "Tieni almeno un modello.",
+    "id": "Inserisci l'id del modello.",
+    "label": "Inserisci un'etichetta.",
+    "defaultModel": "Scegli uno dei modelli dell'elenco.",
+    "monthlyUsd": "Inserisci un importo positivo oppure lascia vuoto per nessun tetto.",
+    "confirmBatchAboveUsd": "Inserisci un importo pari a zero o maggiore.",
+    "citedDepth": "Inserisci un numero intero da 0 a 3."
+  },
+  "sections": {
+    "library": "Libreria",
+    "projects": "Progetti",
+    "network": "Rete",
+    "inbox": "Arrivi",
+    "settings": "Impostazioni"
+  },
+  "placeholders": {
+    "library": "Qui sfoglierai e cercherai i tuoi documenti. Questa sezione arriverà in una fase successiva.",
+    "libraryActive": "La libreria \"{{name}}\" è attiva.",
+    "projects": "Raccogli in progetti documenti di cartelle diverse. Questa sezione arriverà in una fase successiva.",
+    "network": "Esplora documenti, autori e temi come una rete. Questa sezione arriverà in una fase successiva.",
+    "inbox": "I paper nuovi aspettano qui la tua revisione. Questa sezione arriverà in una fase successiva."
+  },
+  "shell": {
+    "skip": "Vai al contenuto principale",
+    "sidebar": "Barra laterale",
+    "navigation": "Sezioni",
+    "activeLibrary": "Libreria attiva",
+    "noLibrary": "Nessuna libreria"
+  },
+  "chat": {
+    "title": "Chat",
+    "collapse": "Comprimi il pannello della chat",
+    "expand": "Espandi il pannello della chat",
+    "placeholder": "Qui comparirà la chat con Claude.",
+    "note": "Disponibile dopo aver collegato Claude."
+  },
+  "status": {
+    "library": "Libreria: {{name}}",
+    "noLibrary": "Nessuna libreria aperta",
+    "docLanguage": "Documenti: {{language}}",
+    "aiNone": "Invio a Claude: nessuna cartella abilitata",
+    "aiFolders_one": "Invio a Claude: {{count}} cartella abilitata",
+    "aiFolders_other": "Invio a Claude: {{count}} cartelle abilitate",
+    "version": "Versione {{version}}"
+  },
+  "folders": {
+    "empty": "Nessuna sottocartella.",
+    "toggle": "Mostra o nascondi il contenuto di {{name}}"
+  },
+  "profile": {
+    "name": "Nome",
+    "namePlaceholder": "Maria Rossi",
+    "variants": "Nomi con cui compari tra gli autori",
+    "variantsHint": "Uno per riga. Servono a riconoscere i tuoi paper.",
+    "variantsPlaceholder": "Rossi, M.\nRossi, Maria",
+    "email": "Email",
+    "orcid": "ORCID",
+    "openAlexId": "Id autore OpenAlex"
+  },
+  "library": {
+    "new": "Nuova libreria",
+    "name": "Nome della libreria",
+    "language": "Lingua dei documenti",
+    "languageHint": "Usata per tag, riassunti e risposte su questa libreria.",
+    "dataDirName": "Nome della cartella dati",
+    "dataDirNameHint": "Viene creata dentro la cartella della libreria. Qui stanno note e metadati; i tuoi documenti non vengono mai modificati."
+  },
+  "wizard": {
+    "title": "Nuova libreria",
+    "progress": "Passo {{current}} di {{total}}",
+    "back": "Indietro",
+    "next": "Avanti",
+    "create": "Crea la libreria",
+    "creating": "Creazione in corso…",
+    "cancel": "Annulla",
+    "steps": {
+      "language": "Benvenuto",
+      "profile": "Chi sei",
+      "folder": "Cartella della libreria",
+      "details": "Dettagli della libreria",
+      "legacy": "Indice esistente trovato",
+      "taxonomy": "Tassonomia di partenza",
+      "aiFolders": "Cartelle abilitate a Claude",
+      "summary": "Riepilogo"
+    },
+    "language": {
+      "intro": "Benvenuto in Research Lab. Scegli la lingua dell'interfaccia. Potrai cambiarla poi dalle impostazioni.",
+      "label": "Lingua dell'interfaccia"
+    },
+    "profile": {
+      "intro": "Questi dati aiutano l'app a riconoscere i tuoi paper e a interrogare i servizi di citazioni. Tutto qui è facoltativo.",
+      "optional": "Puoi lasciare tutti i campi vuoti e compilarli più avanti dalle impostazioni."
+    },
+    "folder": {
+      "intro": "Scegli la cartella che contiene i tuoi documenti. Può essere una cartella qualsiasi, anche una già sincronizzata da un servizio cloud.",
+      "choose": "Scegli cartella…",
+      "change": "Scegli un'altra cartella…",
+      "dialogTitle": "Scegli la cartella della libreria",
+      "safe": "I tuoi documenti non vengono mai modificati, spostati o cancellati. L'app scrive solo nella propria cartella dati."
+    },
+    "legacy": {
+      "intro": "In questa cartella è stato trovato un indice creato dallo strumento precedente. Puoi importarlo una volta sola.",
+      "documents_one": "{{count}} documento",
+      "documents_other": "{{count}} documenti",
+      "taxonomy_one": "{{count}} voce di tassonomia",
+      "taxonomy_other": "{{count}} voci di tassonomia",
+      "import": "Importa questo indice nella nuova libreria",
+      "readOnly": "Il vecchio indice viene solo letto, mai modificato. Può restare come copia di sicurezza."
+    },
+    "import": {
+      "runningTitle": "Importazione dell'indice",
+      "running": "Importazione dell'indice esistente in corso. Può richiedere un momento.",
+      "progressLabel": "Avanzamento dell'importazione",
+      "counts": "{{done}} di {{total}}",
+      "countsUnknown": "{{done}} elaborati",
+      "failedHint": "La libreria è stata creata. Puoi continuare senza importare e riprovare più tardi.",
+      "continueWithout": "Continua senza importare",
+      "done": "Importazione completata: {{documents}} documenti e {{nodes}} voci di tassonomia.",
+      "warnings_one": "È stato registrato {{count}} avviso.",
+      "warnings_other": "Sono stati registrati {{count}} avvisi.",
+      "open": "Apri la libreria"
+    },
+    "taxonomy": {
+      "intro": "La tassonomia è l'elenco dei temi usati per taggare i documenti. Scegli come partire.",
+      "fromImport": "La tassonomia arriva dall'indice importato, quindi questa scelta non serve.",
+      "legend": "Tassonomia di partenza",
+      "empty": "Vuota, la costruisco io",
+      "file": "Da un file JSON",
+      "chooseFile": "Scegli file…",
+      "changeFile": "Scegli un altro file…",
+      "dialogTitle": "Scegli un file di tassonomia",
+      "claude": "Proposta da Claude sui primi documenti",
+      "claudeNote": "Disponibile dopo aver collegato Claude."
+    },
+    "ai": {
+      "intro": "I documenti vengono inviati a Claude solo dalle cartelle che abiliti qui. Per impostazione predefinita nessuna cartella è abilitata.",
+      "why": "Perché: alcuni materiali possono essere riservati. L'invio si abilita cartella per cartella, ogni invio mostra prima un'anteprima ed è registrato in un elenco. Prima di abilitare cartelle con materiale non pubblico controlla le condizioni del tuo piano Claude sull'uso dei dati.",
+      "treeLabel": "Cartelle della libreria",
+      "noneSelected": "Nessuna cartella abilitata: nulla verrà inviato a Claude.",
+      "selected_one": "{{count}} cartella abilitata, comprese le sue sottocartelle.",
+      "selected_other": "{{count}} cartelle abilitate, comprese le loro sottocartelle.",
+      "confirmNone": "Ho capito che per ora nulla verrà inviato a Claude",
+      "confirmSome_one": "Confermo che i documenti della cartella selezionata ({{count}}) possono essere inviati a Claude",
+      "confirmSome_other": "Confermo che i documenti delle {{count}} cartelle selezionate possono essere inviati a Claude"
+    },
+    "summary": {
+      "intro": "Controlla i dettagli e crea la libreria.",
+      "folder": "Cartella",
+      "import": "Importazione del vecchio indice",
+      "importYes": "Sì ({{count}} documenti)",
+      "taxonomy": "Tassonomia di partenza",
+      "taxonomyImport": "Dall'indice importato",
+      "ai": "Cartelle abilitate a Claude",
+      "aiNone": "Nessuna"
+    }
+  },
+  "settings": {
+    "needsLibrary": "Crea o attiva una libreria per usare questa sezione.",
+    "profile": { "title": "Tu e l'interfaccia" },
+    "language": { "label": "Lingua dell'interfaccia", "hint": "Si applica subito." },
+    "libraries": {
+      "title": "Librerie",
+      "empty": "Ancora nessuna libreria.",
+      "active": "Attiva",
+      "activate": "Attiva",
+      "rename": "Rinomina",
+      "forget": "Rimuovi dall'elenco",
+      "forgetTitle": "Rimuovi la libreria dall'elenco",
+      "forgetBody": "\"{{name}}\" verrà tolta da questo elenco. Nessun file o cartella viene cancellato e potrai aggiungere di nuovo la cartella più tardi.",
+      "forgetConfirm": "Rimuovi dall'elenco"
+    },
+    "library": {
+      "title": "Impostazioni della libreria: {{name}}",
+      "unreadable": "Non è stato possibile leggere le impostazioni di questa libreria.",
+      "general": "Generale",
+      "excluded": "Cartelle escluse",
+      "excludedHint": "Queste cartelle non vengono scansionate né indicizzate.",
+      "aiFolders": "Cartelle abilitate a Claude",
+      "aiFoldersHint": "Solo i documenti di queste cartelle (e delle loro sottocartelle) possono essere inviati a Claude.",
+      "confirmBeforeSend": "Chiedi conferma, con anteprima, prima di ogni invio",
+      "models": "Modelli",
+      "modelId": "Id del modello",
+      "modelLabel": "Etichetta",
+      "addModel": "Aggiungi modello",
+      "removeModel": "Rimuovi il modello {{name}}",
+      "defaultModel": "Modello predefinito",
+      "reasoning": "Livello di ragionamento predefinito",
+      "reasoningLow": "Basso",
+      "reasoningMedium": "Medio",
+      "reasoningHigh": "Alto",
+      "monthlyCap": "Tetto di spesa mensile (USD)",
+      "monthlyCapHint": "Lascia vuoto per nessun tetto.",
+      "batchConfirm": "Conferma i lavori in blocco sopra (USD)",
+      "batchConfirmHint": "I lavori più grandi mostrano una stima e chiedono prima.",
+      "mcp": "Server MCP",
+      "mcpHint": "Permette a Claude Code di interrogare questa libreria. Ascolta solo su questo computer e richiede un token.",
+      "mcpEnabled": "Abilita il server MCP",
+      "mcpWrite": "Consenti la scrittura",
+      "mcpWriteHint": "Disattivata per impostazione predefinita: il server è in sola lettura.",
+      "presets": "Preset di export",
+      "presetsEmpty": "Ancora nessun preset.",
+      "presetName": "Nome del preset",
+      "presetSources": "Documenti sorgente",
+      "sourcesNone": "Non inclusi",
+      "sourcesPaths": "Collegamenti ai file",
+      "sourcesCopies": "Copie",
+      "presetDepth": "Profondità dei paper citati",
+      "presetCited": "Includi i paper citati",
+      "presetNotes": "Includi le note",
+      "presetAnnotations": "Includi le annotazioni",
+      "presetDefaultName": "Preset {{n}}",
+      "addPreset": "Aggiungi preset"
+    },
+    "secrets": {
+      "title": "Chiavi API",
+      "intro": "Chiavi per la libreria \"{{name}}\". Sono conservate cifrate nell'archivio sicuro del sistema. Una volta salvate non si possono rivedere, solo sostituire o cancellare.",
+      "storage": "Le chiavi non vengono mai scritte nella cartella della libreria né in file sincronizzati.",
+      "names": { "anthropic-api-key": "Chiave API Anthropic", "gemini-api-key": "Chiave API Gemini" },
+      "set": "Impostata",
+      "notSet": "Non impostata",
+      "placeholder": "Incolla la chiave",
+      "replacePlaceholder": "Incolla una nuova chiave per sostituirla",
+      "delete": "Cancella"
+    }
+  }
 }

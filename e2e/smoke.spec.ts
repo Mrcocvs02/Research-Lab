@@ -46,11 +46,20 @@ test('typed IPC round trip and strict CSP', async () => {
 });
 
 test('language switch persists through settings (UI strings change)', async () => {
-  await ctx.window.getByTestId('language-select').selectOption('en');
+  const select = ctx.window.getByTestId('language-select');
+  // The select is disabled until the first settings load has finished: wait for that, not for a fixed time.
+  await expect(select).toBeEnabled();
+  await select.selectOption('en');
   await expect(ctx.window.getByTestId('shell-empty')).toContainText('No library is open');
-  const lang = await ctx.window.evaluate(async () => {
-    const r = (await (window as unknown as { rlBridge: { invokeRaw(c: string, p: unknown): Promise<{ data: { uiLanguage: string } }> } }).rlBridge.invokeRaw('settings:get', {})) as { data: { uiLanguage: string } };
-    return r.data.uiLanguage;
-  });
-  expect(lang).toBe('en');
+  // The UI updates before settings:set is persisted, so poll the stored value instead of reading it once.
+  await expect
+    .poll(
+      () =>
+        ctx.window.evaluate(async () => {
+          const r = (await (window as unknown as { rlBridge: { invokeRaw(c: string, p: unknown): Promise<{ data: { uiLanguage: string } }> } }).rlBridge.invokeRaw('settings:get', {})) as { data: { uiLanguage: string } };
+          return r.data.uiLanguage;
+        }),
+      { timeout: 10_000 },
+    )
+    .toBe('en');
 });

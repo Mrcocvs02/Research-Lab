@@ -178,7 +178,8 @@ const scanFields = {
   pruneDeletedDays: z.number().int().nonnegative(),
 };
 export const scanConfigSchema = z.object({
-  extensions: scanFields.extensions.default(['pdf']),
+  // Text-bearing research formats the extractor understands; code and data files are opt-in (D-055).
+  extensions: scanFields.extensions.default(['pdf', 'md', 'txt', 'tex', 'rst', 'docx', 'pptx', 'ipynb']),
   nameOnlyExtensions: scanFields.nameOnlyExtensions.default([]),
   pruneDeletedDays: scanFields.pruneDeletedDays.default(30),
 });

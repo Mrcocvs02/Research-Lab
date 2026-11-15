@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AppError, type ImportJobStatus } from '@rl/core';
+import { AppError, scanConfigSchema, type ImportJobStatus } from '@rl/core';
 import { createLegacyImporter } from './index.js';
 import { createLibraryStore } from './store.js';
 import { removeDir, tempDir } from './test-utils.js';
@@ -322,7 +322,7 @@ describe('legacy importer (synthetic index)', () => {
     expect(current.scan).toEqual({ extensions: ['pdf', 'txt'], nameOnlyExtensions: ['png'], pruneDeletedDays: 90 });
     // The importer's own store instance is separate; what matters is that library.json on disk still has the defaults,
     // because the caller owns the write.
-    expect((await createLibraryStore({ rootPath: root, dataDir, deviceId: 'd' }).readConfig()).scan.extensions).toEqual(['pdf']);
+    expect((await createLibraryStore({ rootPath: root, dataDir, deviceId: 'd' }).readConfig()).scan.extensions).toEqual(scanConfigSchema.parse({}).extensions);
   });
 
   it('leaves a library.json that the user already changed alone, with or without updateConfig', async () => {

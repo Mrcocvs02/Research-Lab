@@ -12,6 +12,18 @@ export const importChannels = defineChannels('import', {
     request: z.object({ libraryId: itemIdSchema, sourcePath: z.string().min(1) }),
     response: z.object({ jobId: z.string() }),
   },
+  /**
+   * Looks for an old "phd_index" index (`<rootPath>/.phd_index/files.jsonl`) in a folder the
+   * user picked with the dialog. Read-only; returns counts for the preview.
+   */
+  probeLegacy: {
+    request: z.object({ rootPath: z.string().min(1) }),
+    response: z.object({
+      found: z.boolean(),
+      documents: z.number().int().nonnegative(),
+      taxonomyNodes: z.number().int().nonnegative(),
+    }),
+  },
   status: { request: z.object({ jobId: z.string() }), response: importJobStatusSchema },
 });
 

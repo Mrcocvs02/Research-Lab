@@ -11,6 +11,8 @@ export default defineConfig({
       externalizeDeps: { exclude: workspacePackages },
       // `scan-worker` is the worker thread of the library runtime (scan, text extraction, index writes).
       rollupOptions: {
+        // Dependencies of the workspace packages that must stay real node modules (pdf.js finds its own worker file by path).
+        external: ['pdfjs-dist', /^pdfjs-dist\//, 'fflate'],
         input: {
           index: resolve(import.meta.dirname, 'src/main/index.ts'),
           'scan-worker': resolve(import.meta.dirname, 'src/main/scan-worker.ts'),

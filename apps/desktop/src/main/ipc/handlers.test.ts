@@ -9,6 +9,7 @@ import { resolveAppDirs } from '../dirs.js';
 import { LibraryService } from '../library-service.js';
 import { FileSecretStore } from '../secret-store.js';
 import { SettingsStore } from '../settings-store.js';
+import { noRuntime } from './no-runtime.js';
 import { buildHandlers, type MainServices } from './handlers/index.js';
 
 let tmp: string;
@@ -30,6 +31,7 @@ function setup() {
     emit: (e, p) => void events.push([e, p]),
     settings,
     approved,
+    runtime: noRuntime,
     libraries: new LibraryService(settings, approved, secrets),
     secrets,
     pickFolder: async () => picked,

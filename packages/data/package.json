@@ -3,7 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "dependencies": { "@rl/core": "*" },
+  "dependencies": {
+    "@rl/core": "*",
+    "fflate": "0.8.3",
+    "pdfjs-dist": "6.5.438"
+  },
   "exports": {
     ".": "./src/index.ts"
   }

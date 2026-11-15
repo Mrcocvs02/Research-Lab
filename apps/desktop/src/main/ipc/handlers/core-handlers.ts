@@ -87,13 +87,17 @@ export const importHandlers = (s: MainServices): DomainHandlers<'import'> => {
       }
       const jobId = `import-${Date.now().toString(36)}-${++counter}`;
       publish({ jobId, state: 'running', processed: 0 });
-      void importer
-        .run({
-          sourceDir: sourcePath,
-          libraryRoot: profile.rootPath,
-          dataDir,
-          deviceId: settings.deviceId,
-          onProgress: (p) => publish({ ...p, jobId, state: 'running' }),
+      void s
+        .backupDataDir(libraryId, dataDir)
+        .then((backup) => {
+          if (backup) s.log.info('data folder backed up before import', { files: backup.files });
+          return importer.run({
+            sourceDir: sourcePath,
+            libraryRoot: profile.rootPath,
+            dataDir,
+            deviceId: settings.deviceId,
+            onProgress: (p) => publish({ ...p, jobId, state: 'running' }),
+          });
         })
         .then((report) => publish({ jobId, state: 'done', processed: report.documents, report }))
         .catch((e: unknown) => {

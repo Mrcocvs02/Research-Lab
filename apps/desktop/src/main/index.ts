@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron';
 import path from 'node:path';
-import { createLegacyImporter } from '@rl/data';
+import { backupDataDir, createLegacyImporter } from '@rl/data';
 import {
   AppError,
   createDispatcher,
@@ -85,6 +85,7 @@ async function main(): Promise<void> {
     },
     appInfo: () => ({ name: APP_NAME, version: app.getVersion(), platform: process.platform, electron: process.versions.electron ?? '' }),
     createImporter: () => createLegacyImporter(),
+    backupDataDir: (libraryId, dataDir) => backupDataDir(dataDir, path.join(dirs.localData, 'backups', libraryId)),
   };
 
   const dispatch = createDispatcher(channels, buildHandlers(services), log);

@@ -35,6 +35,7 @@ function setup() {
     pickFolder: async () => picked,
     pickFile: async () => pickedFile,
     appInfo: () => ({ name: 'Research Lab', version: '0', platform: 'test', electron: 'x' }),
+    backupDataDir: async () => null,
     createImporter: () => {
       throw new Error('not implemented');
     },

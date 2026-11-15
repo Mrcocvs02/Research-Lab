@@ -22,4 +22,9 @@ export interface MainServices {
   appInfo(): { name: string; version: string; platform: string; electron: string };
   /** Factory so a missing implementation only fails when the feature is used. */
   createImporter(): LegacyImporter;
+  /**
+   * Copies an existing data folder into the local (non-synced) backup area before a bulk write.
+   * Resolves null when the data folder does not exist yet.
+   */
+  backupDataDir(libraryId: string, dataDir: string): Promise<{ backupDir: string; files: number } | null>;
 }

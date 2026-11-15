@@ -2,6 +2,7 @@ export * from './ai-field.js';
 export * from './annotation.js';
 export * from './citation.js';
 export * from './document.js';
+export * from './import-extras.js';
 export * from './legacy-index.js';
 export * from './log-entry.js';
 export * from './note.js';

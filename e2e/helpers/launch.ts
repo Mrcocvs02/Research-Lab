@@ -1,14 +1,16 @@
 import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
 import {
   createFixtureLibrary,
+  generateCorpus,
   diffSnapshots,
   formatDiff,
   fsPath,
   removeTree,
   snapshotTree,
   withRealFixtureCopy,
+  type CorpusManifest,
+  type CorpusOptions,
   type FixtureKind,
-  type FixtureLibrary,
   type FixtureManifest,
   type FixtureOptions,
   type Snapshot,
@@ -24,7 +26,7 @@ export const DESKTOP_DIR = path.resolve(import.meta.dirname, '../../apps/desktop
 /** Folder inside a library that the app may write to. Everything else must stay byte-identical. */
 export const DATA_DIR_NAME = '.lab';
 
-export type LibrarySpec = FixtureKind | 'real' | { kind: FixtureKind; options?: FixtureOptions };
+export type LibrarySpec = FixtureKind | 'real' | { kind: FixtureKind; options?: FixtureOptions } | { corpus: number; options?: CorpusOptions };
 
 export interface LaunchOptions {
   /** Extra environment variables for the app process (applied last). */
@@ -48,6 +50,8 @@ export interface LaunchedLibrary {
   root: string;
   /** Present for synthetic libraries only. */
   manifest?: FixtureManifest;
+  /** Present for `{ corpus }` libraries (generateCorpus manifest). */
+  corpus?: CorpusManifest;
   /**
    * Compares the library with its state at launch, ignoring the data folder (`.lab`) and `exclude`
    * (export folders, relative to the root).
@@ -122,7 +126,8 @@ export async function launchApp(options: LaunchOptions = {}): Promise<LaunchedAp
   liveDirs.add(base);
   const userDataDir = path.join(base, 'user');
   const localDataDir = path.join(base, 'local');
-  let fixture: FixtureLibrary | undefined;
+  let fixture: { root: string; manifest?: FixtureManifest; cleanup(): Promise<void> } | undefined;
+  let corpusManifest: CorpusManifest | undefined;
   let realCopy: { root: string; cleanup(): Promise<void> } | undefined;
   let libBase: string | undefined;
   let app: ElectronApplication | undefined;
@@ -139,6 +144,10 @@ export async function launchApp(options: LaunchOptions = {}): Promise<LaunchedAp
     if (spec === 'real') {
       realCopy = (await withRealFixtureCopy()) ?? undefined;
       if (!realCopy) throw new Error('library "real" requested but RL_FIXTURE_LIBRARY is not set (skip the test: see realLibrarySkipReason)');
+    } else if (spec && typeof spec === 'object' && 'corpus' in spec) {
+      const c = await generateCorpus(spec.corpus, spec.options);
+      corpusManifest = c.manifest;
+      fixture = { root: c.root, cleanup: c.cleanup };
     } else if (spec) {
       fixture = typeof spec === 'string' ? await createFixtureLibrary(spec) : await createFixtureLibrary(spec.kind, spec.options);
     }
@@ -151,7 +160,8 @@ export async function launchApp(options: LaunchOptions = {}): Promise<LaunchedAp
       const initial: Snapshot = await snapshotTree(libRoot, { exclude: [DATA_DIR_NAME] });
       library = {
         root: libRoot,
-        ...(fixture ? { manifest: fixture.manifest } : {}),
+        ...(fixture?.manifest ? { manifest: fixture.manifest } : {}),
+        ...(corpusManifest ? { corpus: corpusManifest } : {}),
         async diff(exclude = []) {
           return diffSnapshots(initial, await snapshotTree(libRoot, { exclude: [DATA_DIR_NAME, ...exclude] }));
         },

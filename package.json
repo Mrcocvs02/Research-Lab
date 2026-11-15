@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test -c e2e/playwright.config.ts",
     "check:generality": "node tools/check-generality.mjs",
-    "check:nondestructive": "node tools/check-nondestructive.mjs"
+    "check:nondestructive": "node tools/check-nondestructive.mjs",
+    "test:phase1": "npm run build && playwright test -c e2e/playwright.config.ts qa-offline qa-scan-nondestructive qa-search-perf qa-watcher"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",

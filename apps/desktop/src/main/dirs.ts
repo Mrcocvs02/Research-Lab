@@ -1,6 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { APP_DIR_NAME } from './app-info.js';
+import { resolveRuntimeConfig } from './runtime.js';
 
 export interface AppDirs {
   /** Roaming per-user app data: settings, encrypted secrets. May be synced by the OS profile. */
@@ -11,13 +12,14 @@ export interface AppDirs {
 
 /**
  * `RL_USER_DATA_DIR` and `RL_LOCAL_DATA_DIR` override the locations so that tests never
- * touch real data. Pure function: pass the defaults in.
+ * touch real data, but ONLY in a development run: with `isPackaged` they are ignored.
+ * Pure function: pass the defaults in.
  */
-export function resolveAppDirs(env: NodeJS.ProcessEnv, defaults: { userData: string }): AppDirs {
-  const pick = (v: string | undefined) => (v && path.isAbsolute(v) ? path.resolve(v) : undefined);
+export function resolveAppDirs(env: NodeJS.ProcessEnv, defaults: { userData: string }, isPackaged: boolean): AppDirs {
+  const rt = resolveRuntimeConfig(env, isPackaged);
   const localBase = env.LOCALAPPDATA ?? path.join(os.homedir(), 'AppData', 'Local');
   return {
-    userData: pick(env.RL_USER_DATA_DIR) ?? defaults.userData,
-    localData: pick(env.RL_LOCAL_DATA_DIR) ?? path.join(localBase, APP_DIR_NAME),
+    userData: rt.userDataDir ?? defaults.userData,
+    localData: rt.localDataDir ?? path.join(localBase, APP_DIR_NAME),
   };
 }

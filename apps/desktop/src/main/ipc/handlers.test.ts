@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -30,7 +30,7 @@ function setup() {
     emit: (e, p) => void events.push([e, p]),
     settings,
     approved,
-    libraries: new LibraryService(settings, approved),
+    libraries: new LibraryService(settings, approved, secrets),
     secrets,
     pickFolder: async () => picked,
     pickFile: async () => pickedFile,
@@ -64,9 +64,9 @@ afterEach(async () => {
 
 describe('app dirs', () => {
   it('honours env overrides and otherwise uses defaults', () => {
-    const d = resolveAppDirs({ RL_USER_DATA_DIR: path.join(tmp, 'u'), RL_LOCAL_DATA_DIR: path.join(tmp, 'l') }, { userData: 'X' });
+    const d = resolveAppDirs({ RL_USER_DATA_DIR: path.join(tmp, 'u'), RL_LOCAL_DATA_DIR: path.join(tmp, 'l') }, { userData: 'X' }, false);
     expect(d).toEqual({ userData: path.join(tmp, 'u'), localData: path.join(tmp, 'l') });
-    const def = resolveAppDirs({ LOCALAPPDATA: path.join(tmp, 'la'), RL_USER_DATA_DIR: 'relative' }, { userData: path.join(tmp, 'default') });
+    const def = resolveAppDirs({ LOCALAPPDATA: path.join(tmp, 'la'), RL_USER_DATA_DIR: 'relative' }, { userData: path.join(tmp, 'default') }, false);
     expect(def.userData).toBe(path.join(tmp, 'default'));
     expect(def.localData).toBe(path.join(tmp, 'la', 'ResearchLab'));
   });
@@ -102,6 +102,10 @@ describe('settings handlers', () => {
     await writeFile(path.join(tmp, 'user', 'settings.json'), '{broken');
     const { call } = setup();
     expect(data(await call('settings:get')).uiLanguage).toBe('it');
+    const files = await readdir(path.join(tmp, 'user'));
+    expect(files.some((f) => f.startsWith('settings.json.invalid-'))).toBe(true);
+    const notices = data(await call('app:notices')).notices;
+    expect(notices).toMatchObject([{ kind: 'settings-reset', reason: 'invalid-json' }]);
   });
 });
 
@@ -335,10 +339,10 @@ describe('first-run helpers', () => {
 describe('e2e dialog override', () => {
   it('only applies with RL_E2E=1 and an absolute path', () => {
     const abs = path.join(tmp, 'picked');
-    expect(e2eDialogOverride({ RL_E2E: '1', RL_E2E_DIALOG_PATH: abs })).toBe(abs);
-    expect(e2eDialogOverride({ RL_E2E_DIALOG_PATH: abs })).toBeNull();
-    expect(e2eDialogOverride({ RL_E2E: '0', RL_E2E_DIALOG_PATH: abs })).toBeNull();
-    expect(e2eDialogOverride({ RL_E2E: '1', RL_E2E_DIALOG_PATH: 'relative/dir' })).toBeNull();
-    expect(e2eDialogOverride({ RL_E2E: '1' })).toBeNull();
+    expect(e2eDialogOverride({ RL_E2E: '1', RL_E2E_DIALOG_PATH: abs }, false)).toBe(abs);
+    expect(e2eDialogOverride({ RL_E2E_DIALOG_PATH: abs }, false)).toBeNull();
+    expect(e2eDialogOverride({ RL_E2E: '0', RL_E2E_DIALOG_PATH: abs }, false)).toBeNull();
+    expect(e2eDialogOverride({ RL_E2E: '1', RL_E2E_DIALOG_PATH: 'relative/dir' }, false)).toBeNull();
+    expect(e2eDialogOverride({ RL_E2E: '1' }, false)).toBeNull();
   });
 });

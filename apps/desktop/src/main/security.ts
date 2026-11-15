@@ -1,10 +1,10 @@
 import { app, protocol, session, shell, net, type Session, type WebContents } from 'electron';
 import { pathToFileURL } from 'node:url';
-import path from 'node:path';
 import { isAllowedExternalUrl } from '@rl/core';
-import { isInside } from '@rl/core/node';
 import { APP_ORIGIN, APP_SCHEME } from './app-info.js';
 import { DEV_CSP, PROD_CSP } from './csp.js';
+import { isTrustedUrlFor, resolveRendererFile } from './renderer-url.js';
+import { getRuntime } from './runtime.js';
 
 /** Must run before `app.whenReady()`. */
 export function registerPrivilegedSchemes(): void {
@@ -13,40 +13,21 @@ export function registerPrivilegedSchemes(): void {
   ]);
 }
 
-/** Node's `URL.origin` is "null" for custom schemes, so build the origin by hand. */
-function originOf(url: string): string | null {
-  try {
-    const u = new URL(url);
-    return `${u.protocol}//${u.host}`;
-  } catch {
-    return null;
-  }
-}
-
-/** Origin the renderer is loaded from (dev server in dev, custom scheme when built). */
+/** Origin the renderer is loaded from (validated dev server in a development run, custom scheme when built). */
 export function rendererOrigin(): string {
-  const dev = process.env.ELECTRON_RENDERER_URL;
-  return (dev ? originOf(dev) : null) ?? APP_ORIGIN;
+  return getRuntime().rendererDevUrl ?? APP_ORIGIN;
 }
 
 export function isTrustedUrl(url: string): boolean {
-  return originOf(url) === rendererOrigin();
+  return isTrustedUrlFor(url, getRuntime().rendererDevUrl);
 }
 
 /** Serves the built renderer from `rendererDir` over `rl-app://app/`, with CSP, confined to that folder. */
 export function serveRenderer(ses: Session, rendererDir: string): void {
   ses.protocol.handle(APP_SCHEME, async (request) => {
-    const url = new URL(request.url);
-    if (url.host !== 'app') return new Response('Not found', { status: 404 });
-    let rel: string;
-    try {
-      rel = decodeURIComponent(url.pathname);
-    } catch {
-      return new Response('Bad request', { status: 400 });
-    }
-    const file = path.resolve(rendererDir, `.${rel === '/' ? '/index.html' : rel}`);
-    if (!isInside(rendererDir, file)) return new Response('Forbidden', { status: 403 });
-    const res = await net.fetch(pathToFileURL(file).toString(), { bypassCustomProtocolHandlers: true });
+    const resolved = await resolveRendererFile(rendererDir, request.url);
+    if (resolved.status !== 200) return new Response(resolved.status === 400 ? 'Bad request' : resolved.status === 403 ? 'Forbidden' : 'Not found', { status: resolved.status });
+    const res = await net.fetch(pathToFileURL(resolved.file).toString(), { bypassCustomProtocolHandlers: true });
     const headers = new Headers(res.headers);
     headers.set('Content-Security-Policy', PROD_CSP);
     headers.set('X-Content-Type-Options', 'nosniff');
@@ -58,7 +39,7 @@ export function serveRenderer(ses: Session, rendererDir: string): void {
 export function hardenSession(ses: Session): void {
   ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
   ses.setPermissionCheckHandler(() => false);
-  if (process.env.ELECTRON_RENDERER_URL) {
+  if (getRuntime().rendererDevUrl) {
     ses.webRequest.onHeadersReceived((details, callback) => {
       const headers = { ...details.responseHeaders, 'Content-Security-Policy': [DEV_CSP] };
       callback({ responseHeaders: headers });

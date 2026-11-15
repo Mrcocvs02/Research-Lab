@@ -3,6 +3,7 @@ import { mkdir, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
   AppError,
+  applyPatch,
   DATA_SUBDIRS,
   dataPath,
   defaultLibraryConfig,
@@ -12,21 +13,25 @@ import {
   type LibraryConfig,
   type LibraryConfigPatch,
   type LibraryProfile,
+  type SecretStore,
 } from '@rl/core';
-import { atomicWriteJson, readJsonFile, resolveInRoot } from '@rl/core/node';
+import { atomicWriteJson, DEFAULT_MAX_READ_BYTES, readJsonFile, resolveInRoot } from '@rl/core/node';
 import type { ApprovedPaths } from './approved-paths.js';
 import type { SettingsStore } from './settings-store.js';
-
-const defined = <T extends object>(o: T): Partial<T> => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
 
 /**
  * Library profiles (per machine) and library.json. Minimal on purpose: `@rl/data` owns
  * everything else inside the data dir.
  */
 export class LibraryService {
+  /** One write queue per library: read-modify-write of library.json must not interleave. */
+  private readonly configQueues = new Map<string, Promise<unknown>>();
+
   constructor(
     private readonly settings: SettingsStore,
     private readonly approved: ApprovedPaths,
+    /** Secrets scoped to a library are removed when its profile is forgotten. */
+    private readonly secrets?: Pick<SecretStore, 'deleteLibrary'>,
   ) {}
 
   async create(input: {
@@ -37,18 +42,19 @@ export class LibraryService {
     aiEnabledFolders?: string[];
     taxonomyFilePath?: string;
   }): Promise<LibraryProfile> {
-    if (!this.approved.has(input.rootPath)) {
+    const rootPath = this.approved.resolve(input.rootPath, 'library-root');
+    if (rootPath === null) {
       throw new AppError('PERMISSION_DENIED', 'The library folder must be chosen with the folder dialog');
     }
-    const rootPath = path.resolve(input.rootPath);
     const st = await stat(rootPath).catch(() => null);
     if (!st?.isDirectory()) throw new AppError('NOT_FOUND', 'The chosen folder does not exist');
 
-    if (input.taxonomyFilePath !== undefined && !this.approved.has(input.taxonomyFilePath)) {
+    const taxonomyFile = input.taxonomyFilePath === undefined ? null : this.approved.resolve(input.taxonomyFilePath, 'taxonomy-file');
+    if (input.taxonomyFilePath !== undefined && taxonomyFile === null) {
       throw new AppError('PERMISSION_DENIED', 'The taxonomy file must be chosen with the file dialog');
     }
-    // Validate the starting taxonomy before anything is written.
-    const taxonomy = input.taxonomyFilePath ? await readJsonFile(input.taxonomyFilePath, taxonomyFileSchema) : null;
+    // Validate the starting taxonomy (size-capped) before anything is written.
+    const taxonomy = taxonomyFile ? await readJsonFile(taxonomyFile, taxonomyFileSchema, { maxBytes: DEFAULT_MAX_READ_BYTES }) : null;
 
     const current = await this.settings.get();
     const same = (a: string, b: string) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
@@ -66,6 +72,7 @@ export class LibraryService {
 
     // Initialise the data dir (the only place the app writes), confined to the root.
     const dataDir = await resolveInRoot(rootPath, profile.dataDirName);
+    await this.assertUsableDataDir(dataDir);
     await mkdir(dataDir, { recursive: true });
     for (const sub of DATA_SUBDIRS) await mkdir(path.join(dataDir, sub), { recursive: true });
     const configFile = path.join(dataDir, dataPath.config);
@@ -79,12 +86,12 @@ export class LibraryService {
       await atomicWriteJson(configFile, libraryConfigSchema.parse(config));
     }
     if (taxonomy) {
-      const taxonomyFile = path.join(dataDir, dataPath.taxonomy);
-      const hasTaxonomy = await stat(taxonomyFile).then(
+      const target = path.join(dataDir, dataPath.taxonomy);
+      const hasTaxonomy = await stat(target).then(
         () => true,
         () => false,
       );
-      if (!hasTaxonomy) await atomicWriteJson(taxonomyFile, taxonomy);
+      if (!hasTaxonomy) await atomicWriteJson(target, taxonomy);
     }
 
     await this.settings.update((s) => {
@@ -114,8 +121,9 @@ export class LibraryService {
   ): Promise<Array<{ path: string; name: string; hasChildren: boolean }>> {
     let rootPath: string;
     if (root.rootPath !== undefined) {
-      if (!this.approved.has(root.rootPath)) throw new AppError('PERMISSION_DENIED', 'The folder must be chosen with the folder dialog');
-      rootPath = path.resolve(root.rootPath);
+      const approved = this.approved.resolve(root.rootPath, 'library-root');
+      if (approved === null) throw new AppError('PERMISSION_DENIED', 'The folder must be chosen with the folder dialog');
+      rootPath = approved;
     } else {
       rootPath = (await this.profile(root.libraryId)).rootPath;
     }
@@ -147,8 +155,13 @@ export class LibraryService {
     return libraryId;
   }
 
-  /** Removes the profile only; no file is deleted. */
+  /**
+   * Removes the profile and the secrets scoped to it (API keys of that library); no library
+   * file is deleted. Secrets go first: if that fails the profile is still there and the user can retry.
+   */
   async forget(libraryId: string): Promise<string | null> {
+    await this.profile(libraryId);
+    await this.secrets?.deleteLibrary(libraryId);
     const next = await this.settings.update((s) => {
       this.find(s, libraryId);
       s.libraries = s.libraries.filter((l) => l.id !== libraryId);
@@ -177,30 +190,54 @@ export class LibraryService {
     });
   }
 
-  async setConfig(patch: LibraryConfigPatch, libraryId?: string): Promise<LibraryConfig> {
-    const dir = await this.dataDir(libraryId);
-    const current = await this.getConfig(libraryId);
-    const merged = {
-      ...current,
-      ...defined({
-        name: patch.name,
-        language: patch.language,
-        excludedFolders: patch.excludedFolders,
-        aiEnabledFolders: patch.aiEnabledFolders,
-        exportPresets: patch.exportPresets,
-      }),
-      ai: { ...current.ai, ...defined(patch.ai ?? {}) },
-      scan: { ...current.scan, ...defined(patch.scan ?? {}) },
-      mcp: { ...current.mcp, ...defined(patch.mcp ?? {}) },
+  /** Applies a patch to library.json: only the fields present change; arrays are replaced whole. */
+  setConfig(patch: LibraryConfigPatch, libraryId?: string): Promise<LibraryConfig> {
+    return this.updateConfig((current) => applyPatch(current, patch), libraryId);
+  }
+
+  /**
+   * Serialised read-modify-write of library.json (one queue per library). Anything in the main
+   * process that rewrites library.json should go through here, so concurrent writers cannot
+   * overwrite each other's changes.
+   */
+  async updateConfig(mutate: (current: LibraryConfig) => unknown, libraryId?: string): Promise<LibraryConfig> {
+    const profile = await this.profile(libraryId);
+    const run = async () => {
+      const dir = await this.dataDir(profile.id);
+      const current = await this.getConfig(profile.id);
+      const parsed = libraryConfigSchema.safeParse(mutate(structuredClone(current)));
+      if (!parsed.success) {
+        throw new AppError('INVALID_REQUEST', 'Invalid library configuration', {
+          issues: parsed.error.issues.slice(0, 10).map((i) => ({ path: i.path.join('.'), message: i.message })),
+        });
+      }
+      await atomicWriteJson(path.join(dir, dataPath.config), parsed.data);
+      return parsed.data;
     };
-    const parsed = libraryConfigSchema.safeParse(merged);
-    if (!parsed.success) {
-      throw new AppError('INVALID_REQUEST', 'Invalid library configuration', {
-        issues: parsed.error.issues.slice(0, 10).map((i) => ({ path: i.path.join('.'), message: i.message })),
-      });
-    }
-    await atomicWriteJson(path.join(dir, dataPath.config), parsed.data);
-    return parsed.data;
+    const prev = this.configQueues.get(profile.id) ?? Promise.resolve();
+    const result = prev.then(run, run);
+    const tail = result.catch(() => {});
+    this.configQueues.set(profile.id, tail);
+    void tail.then(() => {
+      if (this.configQueues.get(profile.id) === tail) this.configQueues.delete(profile.id);
+    });
+    return result;
+  }
+
+  /**
+   * A data folder name that already exists must be a Research Lab data folder (valid
+   * library.json) or empty (left by an interrupted creation); otherwise we would write into
+   * somebody else's folder.
+   */
+  private async assertUsableDataDir(dataDir: string): Promise<void> {
+    const st = await stat(dataDir).catch(() => null);
+    if (!st) return;
+    const refuse = () => new AppError('ALREADY_EXISTS', 'A folder with this name already exists and is not a Research Lab data folder');
+    if (!st.isDirectory()) throw refuse();
+    if ((await readdir(dataDir)).length === 0) return;
+    await readJsonFile(path.join(dataDir, dataPath.config), libraryConfigSchema, { maxBytes: DEFAULT_MAX_READ_BYTES }).catch(() => {
+      throw refuse();
+    });
   }
 
   private find(s: AppSettings, id: string): LibraryProfile {

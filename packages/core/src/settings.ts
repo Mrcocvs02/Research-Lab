@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isoDateSchema, itemIdSchema, languageSchema, relativePathSchema, schemaVersionSchema } from './common.js';
+import { endsWithSpaceOrDot, isReservedWindowsName } from './fs-names.js';
 
 /* ------------------------------------------------------------------ */
 /* Shared AI configuration vocabulary                                  */
@@ -29,27 +30,51 @@ export const DEFAULT_MODELS: ModelConfig[] = [
 /* Per-machine app settings (never synced, may contain absolute paths) */
 /* ------------------------------------------------------------------ */
 
-export const userProfileSchema = z.object({
+// Field validators are shared by the full schemas (with defaults) and the patch schemas (without
+// any default): a patch must never re-apply a default to a field it does not mention. In zod 4
+// `.partial()` keeps inner `.default()`s, which is why patches are declared explicitly.
+const userFields = {
   /** Display name of the user. */
-  name: z.string().trim().default(''),
+  name: z.string().trim(),
   /** Variants under which the user appears among authors (to recognise own papers). */
-  authorVariants: z.array(z.string().trim().min(1)).default([]),
-  email: z.union([z.literal(''), z.email()]).default(''),
-  orcid: z.union([z.literal(''), z.string().regex(/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/, 'invalid ORCID')]).default(''),
+  authorVariants: z.array(z.string().trim().min(1)),
+  email: z.union([z.literal(''), z.email()]),
+  orcid: z.union([z.literal(''), z.string().regex(/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/, 'invalid ORCID')]),
   /** OpenAlex author id, e.g. "A1234567890". */
-  openAlexId: z.union([z.literal(''), z.string().regex(/^A\d+$/, 'invalid OpenAlex author id')]).default(''),
+  openAlexId: z.union([z.literal(''), z.string().regex(/^A\d+$/, 'invalid OpenAlex author id')]),
+};
+
+export const userProfileSchema = z.object({
+  name: userFields.name.default(''),
+  authorVariants: userFields.authorVariants.default([]),
+  email: userFields.email.default(''),
+  orcid: userFields.orcid.default(''),
+  openAlexId: userFields.openAlexId.default(''),
 });
 export type UserProfile = z.infer<typeof userProfileSchema>;
 
+export const userProfilePatchSchema = z.object({
+  name: userFields.name.optional(),
+  authorVariants: userFields.authorVariants.optional(),
+  email: userFields.email.optional(),
+  orcid: userFields.orcid.optional(),
+  openAlexId: userFields.openAlexId.optional(),
+});
+
 export const DEFAULT_DATA_DIR_NAME = '.lab';
 
-/** Folder name only: no separators, no traversal, no reserved chars. */
+/**
+ * Folder name only: no separators, no traversal, no reserved chars, no Windows device names
+ * and no trailing space or dot (Windows strips them, so the folder would not be where we think).
+ */
 export const dataDirNameSchema = z
   .string()
   .min(1)
   .max(64)
-  .regex(/^[^\\/:*?"<>|\0]+$/, 'invalid folder name')
-  .refine((n) => n !== '.' && n !== '..', 'invalid folder name');
+  // eslint-disable-next-line no-control-regex
+  .regex(/^[^\\/:*?"<>|\u0000-\u001f]+$/, 'invalid folder name')
+  .refine((n) => n !== '.' && n !== '..', 'invalid folder name')
+  .refine((n) => !isReservedWindowsName(n) && !endsWithSpaceOrDot(n), 'invalid folder name');
 
 export const libraryProfileSchema = z.object({
   id: itemIdSchema,
@@ -74,10 +99,13 @@ export const appSettingsSchema = z.object({
 });
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 
-/** Patchable subset exposed through IPC (`settings:set`). Libraries are managed via `library:*` channels. */
+/**
+ * Patchable subset exposed through IPC (`settings:set`). Libraries are managed via `library:*`
+ * channels. Only the fields present are applied (see `applyPatch`).
+ */
 export const appSettingsPatchSchema = z.object({
   uiLanguage: languageSchema.optional(),
-  user: userProfileSchema.partial().optional(),
+  user: userProfilePatchSchema.optional(),
   firstRunDone: z.boolean().optional(),
 });
 export type AppSettingsPatch = z.infer<typeof appSettingsPatchSchema>;
@@ -91,21 +119,44 @@ export function defaultAppSettings(): AppSettings {
 /* absolute paths)                                                     */
 /* ------------------------------------------------------------------ */
 
-export const usageCapSchema = z.object({
+const usageCapFields = {
   /** Monthly spending cap in USD; null means "no cap" (the confirmation flow still applies). */
-  monthlyUsd: z.number().positive().nullable().default(null),
+  monthlyUsd: z.number().positive().nullable(),
   /** Ask before every batch job, showing an estimate. */
-  confirmBatchAboveUsd: z.number().nonnegative().default(0.5),
+  confirmBatchAboveUsd: z.number().nonnegative(),
+};
+export const usageCapSchema = z.object({
+  monthlyUsd: usageCapFields.monthlyUsd.default(null),
+  confirmBatchAboveUsd: usageCapFields.confirmBatchAboveUsd.default(0.5),
+});
+export const usageCapPatchSchema = z.object({
+  monthlyUsd: usageCapFields.monthlyUsd.optional(),
+  confirmBatchAboveUsd: usageCapFields.confirmBatchAboveUsd.optional(),
 });
 
-export const libraryAiConfigSchema = z.object({
-  provider: aiProviderIdSchema.default('claude-agent-sdk'),
-  models: z.array(modelConfigSchema).min(1).default(() => structuredClone(DEFAULT_MODELS)),
-  defaultModel: z.string().min(1).default('claude-haiku-5-5'),
-  defaultReasoning: reasoningLevelSchema.default('low'),
-  usageCap: usageCapSchema.prefault({}),
+const aiFields = {
+  provider: aiProviderIdSchema,
+  models: z.array(modelConfigSchema).min(1),
+  defaultModel: z.string().min(1),
+  defaultReasoning: reasoningLevelSchema,
   /** When true (default), every send to the AI needs an explicit confirmation with preview. */
-  confirmBeforeSend: z.boolean().default(true),
+  confirmBeforeSend: z.boolean(),
+};
+export const libraryAiConfigSchema = z.object({
+  provider: aiFields.provider.default('claude-agent-sdk'),
+  models: aiFields.models.default(() => structuredClone(DEFAULT_MODELS)),
+  defaultModel: aiFields.defaultModel.default('claude-haiku-5-5'),
+  defaultReasoning: aiFields.defaultReasoning.default('low'),
+  usageCap: usageCapSchema.prefault({}),
+  confirmBeforeSend: aiFields.confirmBeforeSend.default(true),
+});
+export const libraryAiPatchSchema = z.object({
+  provider: aiFields.provider.optional(),
+  models: aiFields.models.optional(),
+  defaultModel: aiFields.defaultModel.optional(),
+  defaultReasoning: aiFields.defaultReasoning.optional(),
+  usageCap: usageCapPatchSchema.optional(),
+  confirmBeforeSend: aiFields.confirmBeforeSend.optional(),
 });
 
 export const exportPresetSchema = z.object({
@@ -119,13 +170,25 @@ export const exportPresetSchema = z.object({
 });
 export type ExportPreset = z.infer<typeof exportPresetSchema>;
 
-export const scanConfigSchema = z.object({
-  extensions: z.array(z.string()).default(['pdf']),
+const scanFields = {
+  extensions: z.array(z.string()),
   /** Extensions indexed by file name only (no text extraction). */
-  nameOnlyExtensions: z.array(z.string()).default([]),
+  nameOnlyExtensions: z.array(z.string()),
   /** Days after which records of deleted files are pruned. */
-  pruneDeletedDays: z.number().int().nonnegative().default(30),
+  pruneDeletedDays: z.number().int().nonnegative(),
+};
+export const scanConfigSchema = z.object({
+  extensions: scanFields.extensions.default(['pdf']),
+  nameOnlyExtensions: scanFields.nameOnlyExtensions.default([]),
+  pruneDeletedDays: scanFields.pruneDeletedDays.default(30),
 });
+export const scanConfigPatchSchema = z.object({
+  extensions: scanFields.extensions.optional(),
+  nameOnlyExtensions: scanFields.nameOnlyExtensions.optional(),
+  pruneDeletedDays: scanFields.pruneDeletedDays.optional(),
+});
+
+const mcpFields = { enabled: z.boolean(), writeEnabled: z.boolean() };
 
 export const libraryConfigSchema = z
   .object({
@@ -141,8 +204,8 @@ export const libraryConfigSchema = z
     exportPresets: z.array(exportPresetSchema).default([]),
     mcp: z
       .object({
-        enabled: z.boolean().default(false),
-        writeEnabled: z.boolean().default(false),
+        enabled: mcpFields.enabled.default(false),
+        writeEnabled: mcpFields.writeEnabled.default(false),
       })
       .prefault({}),
   })
@@ -156,15 +219,35 @@ export function defaultLibraryConfig(overrides: { name?: string; language?: 'it'
   return libraryConfigSchema.parse(overrides);
 }
 
-/** Editable subset of library.json exposed through IPC. */
+/**
+ * Editable subset of library.json exposed through IPC. Every field is optional and NONE has a
+ * default: only what is present is applied (see `applyPatch`); arrays replace the old value.
+ */
 export const libraryConfigPatchSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   language: languageSchema.optional(),
   excludedFolders: z.array(relativePathSchema).optional(),
   aiEnabledFolders: z.array(relativePathSchema).optional(),
-  ai: libraryAiConfigSchema.partial().optional(),
-  scan: scanConfigSchema.partial().optional(),
+  ai: libraryAiPatchSchema.optional(),
+  scan: scanConfigPatchSchema.optional(),
   exportPresets: z.array(exportPresetSchema).optional(),
-  mcp: z.object({ enabled: z.boolean(), writeEnabled: z.boolean() }).partial().optional(),
+  mcp: z.object({ enabled: mcpFields.enabled.optional(), writeEnabled: mcpFields.writeEnabled.optional() }).optional(),
 });
 export type LibraryConfigPatch = z.infer<typeof libraryConfigPatchSchema>;
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * Deep merge of a patch into a value: plain objects are merged key by key, only for the keys the
+ * patch actually has (`undefined` means "not sent"); arrays and primitives (including `null`)
+ * replace the old value as a whole. Returns a new value; the inputs are not modified.
+ */
+export function applyPatch<T>(base: T, patch: unknown): T {
+  if (!isPlainObject(base) || !isPlainObject(patch)) return (patch === undefined ? base : patch) as T;
+  const out: Record<string, unknown> = { ...base };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue;
+    out[k] = isPlainObject(v) && isPlainObject(out[k]) ? applyPatch(out[k], v) : v;
+  }
+  return out as T;
+}

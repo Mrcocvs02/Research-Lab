@@ -59,15 +59,58 @@ export async function atomicWriteJson(target: string, value: unknown, options: A
   await atomicWriteFile(target, `${JSON.stringify(value, null, space)}\n`, rest);
 }
 
-/** Reads and validates a JSON file. NOT_FOUND if missing, SCHEMA_INVALID if unparsable or invalid. */
-export async function readJsonFile<S extends z.ZodType>(file: string, schema: S): Promise<z.output<S>> {
-  let raw: string;
+/** Default cap for files the user picks and the app parses whole (taxonomy, config): 16 MiB. */
+export const DEFAULT_MAX_READ_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Reads a UTF-8 text file but never more than `maxBytes` (the file may grow while we read, so the
+ * size is enforced on the bytes actually read, not only on `stat`). Over the cap: INVALID_REQUEST.
+ */
+export async function readTextFileLimited(file: string, maxBytes: number = DEFAULT_MAX_READ_BYTES): Promise<string> {
+  let handle;
   try {
-    raw = await readFile(file, 'utf8');
+    handle = await open(file, 'r');
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
     if (code === 'ENOENT') throw new AppError('NOT_FOUND', 'File not found');
     throw new AppError('IO_ERROR', 'Cannot read file', { code: code ?? 'unknown' }, { cause: e });
+  }
+  try {
+    const st = await handle.stat();
+    if (!st.isFile()) throw new AppError('INVALID_PATH', 'Not a regular file');
+    if (st.size > maxBytes) throw new AppError('INVALID_REQUEST', 'File is too large', { maxBytes });
+    const chunks: Buffer[] = [];
+    let n = 0;
+    for (;;) {
+      const chunk = Buffer.allocUnsafe(64 * 1024);
+      const { bytesRead } = await handle.read(chunk, 0, chunk.length, null);
+      if (bytesRead === 0) break;
+      n += bytesRead;
+      if (n > maxBytes) throw new AppError('INVALID_REQUEST', 'File is too large', { maxBytes });
+      chunks.push(chunk.subarray(0, bytesRead));
+    }
+    return Buffer.concat(chunks, n).toString('utf8');
+  } catch (e) {
+    if (e instanceof AppError) throw e;
+    throw new AppError('IO_ERROR', 'Cannot read file', { code: (e as NodeJS.ErrnoException).code ?? 'unknown' }, { cause: e });
+  } finally {
+    await handle.close().catch(() => {});
+  }
+}
+
+/** Reads and validates a JSON file. NOT_FOUND if missing, SCHEMA_INVALID if unparsable or invalid. */
+export async function readJsonFile<S extends z.ZodType>(file: string, schema: S, options: { maxBytes?: number } = {}): Promise<z.output<S>> {
+  let raw: string;
+  if (options.maxBytes !== undefined) {
+    raw = await readTextFileLimited(file, options.maxBytes);
+  } else {
+    try {
+      raw = await readFile(file, 'utf8');
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') throw new AppError('NOT_FOUND', 'File not found');
+      throw new AppError('IO_ERROR', 'Cannot read file', { code: code ?? 'unknown' }, { cause: e });
+    }
   }
   let json: unknown;
   try {

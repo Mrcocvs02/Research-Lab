@@ -122,4 +122,6 @@ export interface SecretStore {
   get(scope: SecretScope, name: string): Promise<string | null>;
   has(scope: SecretScope, name: string): Promise<boolean>;
   delete(scope: SecretScope, name: string): Promise<void>;
+  /** Removes every secret scoped to a library (used when its profile is forgotten). */
+  deleteLibrary(libraryId: string): Promise<void>;
 }

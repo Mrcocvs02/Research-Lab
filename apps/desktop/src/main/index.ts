@@ -17,19 +17,23 @@ import { e2eDialogOverride } from './dialog-override.js';
 import { resolveAppDirs } from './dirs.js';
 import { buildHandlers, type MainServices } from './ipc/handlers/index.js';
 import { LibraryService } from './library-service.js';
+import { configureRuntime, resolveRuntimeConfig } from './runtime.js';
 import { FileSecretStore } from './secret-store.js';
 import { installGlobalSecurity, isTrustedUrl, registerPrivilegedSchemes, serveRenderer } from './security.js';
 import { SettingsStore } from './settings-store.js';
 import { createMainWindow } from './window.js';
 
-// Name and paths must be fixed before `ready`. Env overrides keep tests off real data.
+// Name and paths must be fixed before `ready`. Env overrides keep tests off real data, but only in a
+// development run: the installed app (`app.isPackaged`) ignores every RL_* / ELECTRON_RENDERER_URL variable.
 app.setName(APP_NAME);
-const dirs = resolveAppDirs(process.env, { userData: app.getPath('userData') });
+const runtime = configureRuntime(resolveRuntimeConfig(process.env, app.isPackaged));
+const dirs = resolveAppDirs(process.env, { userData: app.getPath('userData') }, app.isPackaged);
 app.setPath('userData', dirs.userData);
 app.setPath('sessionData', path.join(dirs.localData, 'session'));
 registerPrivilegedSchemes();
 
 const log = createFileLogger({ dir: path.join(dirs.localData, 'logs'), name: 'main', console: !app.isPackaged });
+for (const warning of runtime.warnings) log.warn(warning);
 
 function emit<K extends EventName>(event: K, payload: unknown): void {
   const parsed = events[event].safeParse(payload);
@@ -43,27 +47,28 @@ function emit<K extends EventName>(event: K, payload: unknown): void {
 async function main(): Promise<void> {
   await app.whenReady();
   installGlobalSecurity();
-  if (!process.env.ELECTRON_RENDERER_URL) {
+  if (!runtime.rendererDevUrl) {
     const { session } = await import('electron');
     serveRenderer(session.defaultSession, path.join(import.meta.dirname, '../renderer'));
   }
 
   const settings = SettingsStore.forDir(dirs.userData, log);
   const approved = new ApprovedPaths();
+  const secrets = new FileSecretStore(dirs.userData, {
+    isAvailable: () => safeStorage.isEncryptionAvailable(),
+    encrypt: (plain) => safeStorage.encryptString(plain),
+    decrypt: (data) => safeStorage.decryptString(data),
+  });
   const services: MainServices = {
     log,
     emit,
     settings,
     approved,
-    libraries: new LibraryService(settings, approved),
-    secrets: new FileSecretStore(dirs.userData, {
-      isAvailable: () => safeStorage.isEncryptionAvailable(),
-      encrypt: (plain) => safeStorage.encryptString(plain),
-      decrypt: (data) => safeStorage.decryptString(data),
-    }),
+    libraries: new LibraryService(settings, approved, secrets),
+    secrets,
     async pickFolder(purpose, title) {
-      // Test hook: only honoured when RL_E2E=1 (see dialog-override.ts).
-      const override = e2eDialogOverride(process.env);
+      // Test hook: only in a development run with RL_E2E=1 (see runtime.ts, dialog-override.ts).
+      const override = e2eDialogOverride(process.env, app.isPackaged);
       if (override) return override;
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
       const options: Electron.OpenDialogOptions = {
@@ -98,7 +103,14 @@ async function main(): Promise<void> {
     return dispatch(channel, payload);
   });
 
-  createMainWindow();
+  // Load the settings now so that problems found while loading (corrupt or newer file) are known
+  // before the window opens. A failure here is reported by the first `settings:get` too.
+  await settings.get().catch((e: unknown) => log.error('settings could not be loaded', { error: e }));
+  const win = createMainWindow();
+  // The renderer also pulls `app:notices` on start; the event covers a window that is already listening.
+  win.webContents.once('did-finish-load', () => {
+    for (const notice of settings.notices()) emit('app:notice', notice);
+  });
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
   });

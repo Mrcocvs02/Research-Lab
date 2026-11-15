@@ -4,6 +4,9 @@
  */
 import type { Channels, HandlerMap } from '@rl/core';
 import { appHandlers, dialogHandlers, importHandlers, libraryHandlers, secretsHandlers, settingsHandlers } from './core-handlers.js';
+import { documentsHandlers } from './documents-handlers.js';
+import { indexHandlers, scanHandlers } from './scan-handlers.js';
+import { searchHandlers } from './search-handlers.js';
 import type { MainServices } from './services.js';
 
 export type { MainServices } from './services.js';
@@ -16,5 +19,9 @@ export function buildHandlers(s: MainServices): HandlerMap<Channels> {
     ...dialogHandlers(s),
     ...importHandlers(s),
     ...secretsHandlers(s),
+    ...scanHandlers(s),
+    ...indexHandlers(s),
+    ...searchHandlers(s),
+    ...documentsHandlers(s),
   };
 }

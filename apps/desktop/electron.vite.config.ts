@@ -9,7 +9,13 @@ export default defineConfig({
   main: {
     build: {
       externalizeDeps: { exclude: workspacePackages },
-      rollupOptions: { input: { index: resolve(import.meta.dirname, 'src/main/index.ts') } },
+      // `scan-worker` is the worker thread of the library runtime (scan, text extraction, index writes).
+      rollupOptions: {
+        input: {
+          index: resolve(import.meta.dirname, 'src/main/index.ts'),
+          'scan-worker': resolve(import.meta.dirname, 'src/main/scan-worker.ts'),
+        },
+      },
     },
   },
   preload: {

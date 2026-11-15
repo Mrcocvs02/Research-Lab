@@ -1,0 +1,9 @@
+{
+  "name": "@rl/testkit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Test-only helpers (synthetic fixture libraries, tree snapshots). Never import from app code.",
+  "dependencies": { "pdf-lib": "1.17.1" },
+  "exports": { ".": "./src/index.ts" }
+}

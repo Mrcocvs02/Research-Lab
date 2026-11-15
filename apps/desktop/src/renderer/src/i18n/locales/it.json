@@ -1,0 +1,6 @@
+{
+  "app": { "title": "Research Lab", "tagline": "Organizza e studia la tua ricerca" },
+  "shell": { "empty": "Nessuna libreria aperta. La prima apertura guidata arriverà presto.", "language": "Lingua dell'interfaccia" },
+  "languages": { "it": "Italiano", "en": "English" },
+  "errors": { "generic": "Qualcosa è andato storto." }
+}

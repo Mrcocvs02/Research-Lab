@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["src/main", "src/preload", "electron.vite.config.ts"],
+  "exclude": ["**/*.test.tsx"]
+}

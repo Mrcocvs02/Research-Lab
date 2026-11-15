@@ -8,7 +8,7 @@ import { AppError } from '../errors.js';
 const TRANSIENT = new Set(['EBUSY', 'EPERM', 'EACCES', 'EMFILE', 'ENFILE']);
 
 export interface AtomicWriteOptions {
-  /** Rename attempts before giving up (OneDrive / antivirus can briefly lock the target). Default 8. */
+  /** Rename attempts before giving up (cloud sync or antivirus can briefly lock the target). Default 8. */
   attempts?: number;
   /** Base delay in ms, doubled each retry, capped at 1 s. Default 25. */
   baseDelayMs?: number;

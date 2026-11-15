@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "npm run dev -w @rl/desktop",
     "build": "npm run build -w @rl/desktop",
-    "typecheck": "tsc -p tsconfig.json && tsc -p apps/desktop/tsconfig.node.json && tsc -p apps/desktop/tsconfig.web.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p apps/desktop/tsconfig.node.json && tsc -p apps/desktop/tsconfig.web.json && tsc -p e2e/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test -c e2e/playwright.config.ts",

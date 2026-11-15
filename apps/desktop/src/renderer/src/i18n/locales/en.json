@@ -1,0 +1,6 @@
+{
+  "app": { "title": "Research Lab", "tagline": "Organize and study your research" },
+  "shell": { "empty": "No library is open. The guided first run is coming soon.", "language": "Interface language" },
+  "languages": { "it": "Italiano", "en": "English" },
+  "errors": { "generic": "Something went wrong." }
+}

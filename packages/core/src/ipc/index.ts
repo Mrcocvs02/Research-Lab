@@ -15,3 +15,4 @@ export interface RlApi {
 export const IPC_INVOKE_CHANNEL = 'rl:invoke';
 /** Name of the single Electron IPC channel carrying all push events. */
 export const IPC_EVENT_CHANNEL = 'rl:event';
+export * from './client.js';

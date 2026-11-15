@@ -1,0 +1,24 @@
+{
+  "name": "research-lab",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*", "e2e", "tools"],
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "dev": "npm run dev -w @rl/desktop",
+    "build": "npm run build -w @rl/desktop",
+    "typecheck": "tsc -p tsconfig.json && tsc -p apps/desktop/tsconfig.node.json && tsc -p apps/desktop/tsconfig.web.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "npm run build && playwright test -c e2e/playwright.config.ts",
+    "check:generality": "node tools/check-generality.mjs",
+    "check:nondestructive": "node tools/check-nondestructive.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "26.6.6",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
+  }
+}

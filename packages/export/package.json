@@ -1,0 +1,10 @@
+{
+  "name": "@rl/export",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@rl/core": "*" },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

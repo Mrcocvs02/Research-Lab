@@ -224,7 +224,7 @@ describe('import handlers', () => {
     services.createImporter = () => ({
       run: async ({ onProgress }) => {
         onProgress?.({ jobId: 'x', state: 'running', processed: 1, total: 2 });
-        return { documents: 2, taxonomyNodes: 1, skipped: 0, warnings: [] };
+        return { documents: 2, taxonomyNodes: 1, skipped: 0, warnings: [], skippedFiles: [], selfNames: [] };
       },
     });
     const root = path.join(tmp, 'lib');

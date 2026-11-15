@@ -176,7 +176,7 @@ describe('approvals are bound to their purpose (handlers)', () => {
 });
 
 describe('import start is exclusive per library', () => {
-  const report: ImportReport = { documents: 1, taxonomyNodes: 0, skipped: 0, warnings: [] };
+  const report: ImportReport = { documents: 1, taxonomyNodes: 0, skipped: 0, warnings: [], skippedFiles: [], selfNames: [] };
 
   const withImporter = (s: Setup) => {
     const gates: Array<() => void> = [];

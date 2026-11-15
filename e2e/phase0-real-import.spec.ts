@@ -32,7 +32,7 @@ test('first run imports a pre-existing index from a real library copy', async ()
     await next();
 
     // Legacy step: shown only because the probe found a pre-existing index.
-    await expect(window.getByTestId('legacy-preview')).toContainText('21');
+    await expect(window.getByTestId('legacy-preview')).toBeVisible();
     await window.getByTestId('wizard-import-legacy').check();
     await next();
     await next(); // taxonomy: comes from the import
@@ -43,9 +43,12 @@ test('first run imports a pre-existing index from a real library copy', async ()
 
     await expect(window.getByTestId('import-done')).toBeVisible({ timeout: 150_000 });
 
+    // Expected count comes from the copied index itself, not from a number tied to one library.
+    const indexLines = (await readFile(path.join(root, '.phd_index', 'files.jsonl'), 'utf8')).split('\n').filter((l) => l.trim());
     const docsDir = path.join(root, '.lab', 'documents');
     const docFiles = (await readdir(docsDir)).filter((f) => f.endsWith('.json'));
-    expect(docFiles).toHaveLength(21);
+    expect(indexLines.length).toBeGreaterThan(0);
+    expect(docFiles).toHaveLength(indexLines.length);
     for (const f of docFiles) {
       const doc = JSON.parse(await readFile(path.join(docsDir, f), 'utf8')) as { title?: string; tags?: unknown[] };
       expect(doc.title, f).toBeTruthy();

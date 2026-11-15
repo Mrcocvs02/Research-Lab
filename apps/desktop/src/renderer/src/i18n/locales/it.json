@@ -17,6 +17,7 @@
     "UNKNOWN_CHANNEL": "L'app ha provato a fare qualcosa che non supporta.",
     "NOT_FOUND": "L'elemento o la cartella richiesti non sono stati trovati.",
     "ALREADY_EXISTS": "Esiste già, per esempio una libreria sulla stessa cartella.",
+    "CONFLICT": "I dati sono stati modificati altrove nel frattempo. Ricarica e riprova.",
     "INVALID_PATH": "Questo nome di cartella o di file non è valido.",
     "PATH_OUTSIDE_ROOT": "Questa posizione è fuori dalla cartella della libreria ed è stata rifiutata.",
     "IO_ERROR": "Non è stato possibile leggere o scrivere il file. Controlla che la cartella sia disponibile.",

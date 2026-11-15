@@ -16,7 +16,7 @@ import type { WatchFile } from '../model/watch.js';
  */
 export class RevisionConflictError extends AppError {
   constructor(what: string, expected: number, actual: number | null) {
-    super('ALREADY_EXISTS', 'The data was changed by someone else; reload and retry', { conflict: 'revision', what, expected, actual });
+    super('CONFLICT', 'The data was changed by someone else; reload and retry', { conflict: 'revision', what, expected, actual });
     this.name = 'RevisionConflictError';
   }
 }

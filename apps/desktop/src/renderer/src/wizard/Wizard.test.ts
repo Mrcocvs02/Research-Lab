@@ -153,7 +153,7 @@ describe('Wizard', () => {
     expect(bar.getAttribute('aria-valuenow')).toBe('5');
     expect(bar.getAttribute('aria-valuemax')).toBe('20');
     act(() =>
-      emitEvent('import:progress', { jobId: 'job-1', state: 'done', processed: 21, report: { documents: 21, taxonomyNodes: 7, skipped: 0, warnings: [] } }),
+      emitEvent('import:progress', { jobId: 'job-1', state: 'done', processed: 21, report: { documents: 21, taxonomyNodes: 7, skipped: 0, warnings: [], skippedFiles: [], selfNames: [] } }),
     );
     await screen.findByTestId('import-done');
     fireEvent.click(screen.getByTestId('import-open'));

@@ -77,3 +77,7 @@ RL_FIXTURE_LIBRARY="<cartella della libreria>" npm run test:e2e
 ```
 
 In PowerShell: `$env:RL_FIXTURE_LIBRARY = "<cartella>"; npm run test:e2e`. La cartella viene solo letta e copiata (senza `.lab/`) in una cartella temporanea; i test lavorano sulla copia. Senza variabile i test che la usano sono saltati.
+
+## Variabili `RL_*`
+
+`RL_E2E`, `RL_E2E_DIALOG_PATH`, `RL_USER_DATA_DIR`, `RL_LOCAL_DATA_DIR` ed `ELECTRON_RENDERER_URL` valgono solo per l'app non impacchettata (sviluppo e test); l'app installata le ignora (D-014, D-015).

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { importReportExtrasSchema } from './model/import-extras.js';
 import { serializedErrorSchema } from './errors.js';
 
 export const importReportSchema = z.object({
@@ -17,6 +18,10 @@ export const importReportSchema = z.object({
   duplicates: z.number().int().nonnegative().optional(),
   /** Short human-readable warnings; never document text. */
   warnings: z.array(z.string()).default([]),
+  /** Records skipped because of a problem, capped; `skipped` holds the full count. */
+  skippedFiles: importReportExtrasSchema.shape.skippedFiles,
+  /** The user's own author names found in the old index, to offer as author variants. */
+  selfNames: importReportExtrasSchema.shape.selfNames,
 });
 export type ImportReport = z.infer<typeof importReportSchema>;
 

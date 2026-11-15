@@ -1,25 +1,21 @@
-import type { LegacyImporter, LibraryStore, Scanner, TextExtractor } from '@rl/core';
+import type { LegacyImporter, Scanner, TextExtractor } from '@rl/core';
+import { createLegacyImporterImpl, type LegacyImporterOptions } from './legacy-importer.js';
 
-export interface LibraryStoreOptions {
-  rootPath: string;
-  /** Data dir name inside the root (default `.lab`). */
-  dataDirName?: string;
-  deviceId: string;
-}
-
-/** Owner: data-engineer. File-based library store (atomic writes, one file per item). */
-export function createLibraryStore(_options: LibraryStoreOptions): LibraryStore {
-  throw new Error('not implemented');
-}
+export { backupDataDir, copyDataDir } from './backup.js';
+export { createLibraryStore, type FileLibraryStore, type LibraryStoreOptions, type LoadIssue } from './store.js';
+export { NameIndex, normalizeName, slugify } from './normalize.js';
+export { withRetry, isTransientIoError, type RetryOptions } from './retry.js';
+export { diffTaxonomy } from './taxonomy-diff.js';
+export type { LegacyImporterOptions } from './legacy-importer.js';
 
 /** Owner: data-engineer. Read-only walker of the library root. */
 export function createScanner(): Scanner {
   throw new Error('not implemented');
 }
 
-/** Owner: data-engineer. One-shot importer of the old index (read-only on the source). */
-export function createLegacyImporter(): LegacyImporter {
-  throw new Error('not implemented');
+/** One-shot importer of the old index (read-only on the source). */
+export function createLegacyImporter(options?: LegacyImporterOptions): LegacyImporter {
+  return createLegacyImporterImpl(options);
 }
 
 /** Owner: data-engineer. pdf.js based text extraction. */

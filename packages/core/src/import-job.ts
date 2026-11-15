@@ -5,6 +5,16 @@ export const importReportSchema = z.object({
   documents: z.number().int().nonnegative(),
   taxonomyNodes: z.number().int().nonnegative(),
   skipped: z.number().int().nonnegative(),
+  /** Optional detailed counts (additive; filled by the legacy importer). */
+  tags: z.number().int().nonnegative().optional(),
+  /** Taxonomy nodes by depth: "1" = roots, "2" = children of roots, ... */
+  nodesByLevel: z.record(z.string(), z.number().int().nonnegative()).optional(),
+  venues: z.number().int().nonnegative().optional(),
+  documentTypes: z.number().int().nonnegative().optional(),
+  /** Documents whose file was not found on disk (kept with `missing: true`). */
+  missing: z.number().int().nonnegative().optional(),
+  /** Index records that share the content of an earlier record (same id). */
+  duplicates: z.number().int().nonnegative().optional(),
   /** Short human-readable warnings; never document text. */
   warnings: z.array(z.string()).default([]),
 });

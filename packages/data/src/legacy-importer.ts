@@ -153,6 +153,8 @@ class TaxonomyBuilder {
   addNode(label: string, fields: Partial<TaxonomyNode>): string {
     const known = this.nodeIndex.resolve(label);
     if (known !== undefined) return known;
+    // Same id as an earlier import: the user may have renamed the node since; it is still the same node.
+    if (this.nodeIds.has(slugify(label))) return slugify(label);
     const node = taxonomyNodeShape({
       id: uniqueId(slugify(label), this.nodeIds),
       label: label.trim(),
@@ -169,6 +171,7 @@ class TaxonomyBuilder {
   addType(label: string): string {
     const known = this.typeIndex.resolve(label);
     if (known !== undefined) return known;
+    if (this.typeIds.has(slugify(label))) return slugify(label);
     const type: DocumentType = { id: uniqueId(slugify(label), this.typeIds), label: label.trim(), aliases: [] };
     this.types.push(type);
     this.created.types.push(type);
@@ -179,6 +182,7 @@ class TaxonomyBuilder {
   addVenue(name: string, aliases: string[]): string {
     const known = this.venueIndex.resolve(name);
     if (known !== undefined) return known;
+    if (this.venueIds.has(slugify(name))) return slugify(name);
     const venue: Venue = { id: uniqueId(slugify(name), this.venueIds), name: name.trim(), aliases };
     this.venues.push(venue);
     this.created.venues.push(venue);
@@ -312,6 +316,7 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
         tb.addNode(name, { aliases: m.aliases ?? [], group: 'macro', legacy: compact(rest(m, ['aliases'])) });
       }
       const microIds: [string, string][] = [];
+      let mergedExtras = 0;
       for (const [name, m] of Object.entries(legacyTax.micro ?? {})) {
         const parents: string[] = [];
         for (const pn of m.macro ?? []) {
@@ -345,12 +350,24 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
         }
       }
       for (const [name, e] of Object.entries(legacyTax.extra ?? {})) {
+        const same = tb.nodeIndex.resolve(name);
+        if (same !== undefined) {
+          // Same tag as a taxonomy node (or one of its aliases): fold it in, keeping what the old index recorded.
+          const target = tb.created.nodes.find((n) => n.id === same);
+          if (target) {
+            const prev = (target.legacy?.['mergedExtra'] as unknown[] | undefined) ?? [];
+            target.legacy = { ...(target.legacy ?? {}), mergedExtra: [...prev, compact({ name, group: e.group, source: e.source, added: e.added })] };
+            mergedExtras++;
+          }
+          continue;
+        }
         tb.addNode(name, {
           group: e.group ? `extra:${e.group}` : 'extra',
           ...(toIso(e.added) ? { createdAt: toIso(e.added) as string } : {}),
           legacy: compact({ group: e.group, source: e.source, added: e.added, ...rest(e, ['group', 'source', 'added']) }),
         });
       }
+      if (mergedExtras > 0) warn(`${mergedExtras} extra tag(s) have the same name as a taxonomy tag or alias and were merged into it`);
       checkAbort();
 
       /* --------------------------- documents --------------------------- */

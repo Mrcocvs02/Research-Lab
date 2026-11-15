@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, stat } from 'node:fs/promises';
+import { mkdir, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
   AppError,
@@ -7,6 +7,7 @@ import {
   dataPath,
   defaultLibraryConfig,
   libraryConfigSchema,
+  taxonomyFileSchema,
   type AppSettings,
   type LibraryConfig,
   type LibraryConfigPatch,
@@ -28,13 +29,26 @@ export class LibraryService {
     private readonly approved: ApprovedPaths,
   ) {}
 
-  async create(input: { name: string; rootPath: string; language?: 'it' | 'en'; dataDirName?: string }): Promise<LibraryProfile> {
+  async create(input: {
+    name: string;
+    rootPath: string;
+    language?: 'it' | 'en';
+    dataDirName?: string;
+    aiEnabledFolders?: string[];
+    taxonomyFilePath?: string;
+  }): Promise<LibraryProfile> {
     if (!this.approved.has(input.rootPath)) {
       throw new AppError('PERMISSION_DENIED', 'The library folder must be chosen with the folder dialog');
     }
     const rootPath = path.resolve(input.rootPath);
     const st = await stat(rootPath).catch(() => null);
     if (!st?.isDirectory()) throw new AppError('NOT_FOUND', 'The chosen folder does not exist');
+
+    if (input.taxonomyFilePath !== undefined && !this.approved.has(input.taxonomyFilePath)) {
+      throw new AppError('PERMISSION_DENIED', 'The taxonomy file must be chosen with the file dialog');
+    }
+    // Validate the starting taxonomy before anything is written.
+    const taxonomy = input.taxonomyFilePath ? await readJsonFile(input.taxonomyFilePath, taxonomyFileSchema) : null;
 
     const current = await this.settings.get();
     const same = (a: string, b: string) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
@@ -60,7 +74,17 @@ export class LibraryService {
       () => false,
     );
     if (!exists) {
-      await atomicWriteJson(configFile, defaultLibraryConfig({ name: profile.name, language: input.language ?? current.uiLanguage }));
+      const config = defaultLibraryConfig({ name: profile.name, language: input.language ?? current.uiLanguage });
+      config.aiEnabledFolders = input.aiEnabledFolders ?? [];
+      await atomicWriteJson(configFile, libraryConfigSchema.parse(config));
+    }
+    if (taxonomy) {
+      const taxonomyFile = path.join(dataDir, dataPath.taxonomy);
+      const hasTaxonomy = await stat(taxonomyFile).then(
+        () => true,
+        () => false,
+      );
+      if (!hasTaxonomy) await atomicWriteJson(taxonomyFile, taxonomy);
     }
 
     await this.settings.update((s) => {
@@ -68,6 +92,46 @@ export class LibraryService {
       if (s.activeLibraryId === null) s.activeLibraryId = profile.id;
     });
     return profile;
+  }
+
+  /** Renames the profile (per machine) and the name stored in library.json. */
+  async rename(libraryId: string, name: string): Promise<LibraryProfile> {
+    const profile = await this.profile(libraryId);
+    await this.setConfig({ name }, libraryId).catch((e: unknown) => {
+      // A missing data dir must not block renaming the profile.
+      if (!(e instanceof AppError && (e.code === 'NOT_FOUND' || e.code === 'PATH_OUTSIDE_ROOT'))) throw e;
+    });
+    const next = await this.settings.update((s) => {
+      this.find(s, profile.id).name = name;
+    });
+    return this.find(next, profile.id);
+  }
+
+  /** Direct sub-folders of `parent` under a root (hidden folders skipped). Read-only. */
+  async listFolders(
+    root: { rootPath?: string; libraryId?: string },
+    parent = '',
+  ): Promise<Array<{ path: string; name: string; hasChildren: boolean }>> {
+    let rootPath: string;
+    if (root.rootPath !== undefined) {
+      if (!this.approved.has(root.rootPath)) throw new AppError('PERMISSION_DENIED', 'The folder must be chosen with the folder dialog');
+      rootPath = path.resolve(root.rootPath);
+    } else {
+      rootPath = (await this.profile(root.libraryId)).rootPath;
+    }
+    const dir = parent ? await resolveInRoot(rootPath, parent) : rootPath;
+    const subdirs = async (d: string) => {
+      const entries = await readdir(d, { withFileTypes: true }).catch(() => []);
+      return entries.filter((e) => e.isDirectory() && !e.name.startsWith('.')).map((e) => e.name);
+    };
+    const names = (await subdirs(dir)).sort((a, b) => a.localeCompare(b)).slice(0, 500);
+    return Promise.all(
+      names.map(async (name) => ({
+        path: parent ? `${parent}/${name}` : name,
+        name,
+        hasChildren: (await subdirs(path.join(dir, name))).length > 0,
+      })),
+    );
   }
 
   async list(): Promise<{ profiles: LibraryProfile[]; activeLibraryId: string | null }> {

@@ -15,4 +15,16 @@ export const dialogChannels = defineChannels('dialog', {
     }),
     response: z.object({ path: z.string(), name: z.string() }).nullable(),
   },
+  /**
+   * Opens the OS file picker (single file) in the main process. Like `chooseFolder`, the
+   * returned absolute path is remembered as "approved" and is the only way a file path
+   * enters the renderer.
+   */
+  chooseFile: {
+    request: z.object({
+      purpose: z.enum(['taxonomy-file']),
+      title: z.string().max(200).optional(),
+    }),
+    response: z.object({ path: z.string(), name: z.string() }).nullable(),
+  },
 });

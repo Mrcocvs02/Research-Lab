@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { channels, createDispatcher, createMemoryLogger, type IpcEnvelope, type SecretScope } from '@rl/core';
 import { ApprovedPaths } from '../approved-paths.js';
+import { e2eDialogOverride } from '../dialog-override.js';
 import { resolveAppDirs } from '../dirs.js';
 import { LibraryService } from '../library-service.js';
 import { FileSecretStore } from '../secret-store.js';
@@ -12,6 +13,7 @@ import { buildHandlers, type MainServices } from './handlers/index.js';
 
 let tmp: string;
 let picked: string | null;
+let pickedFile: string | null;
 let events: Array<[string, unknown]>;
 
 function setup() {
@@ -31,6 +33,7 @@ function setup() {
     libraries: new LibraryService(settings, approved),
     secrets,
     pickFolder: async () => picked,
+    pickFile: async () => pickedFile,
     appInfo: () => ({ name: 'Research Lab', version: '0', platform: 'test', electron: 'x' }),
     createImporter: () => {
       throw new Error('not implemented');
@@ -46,10 +49,12 @@ const data = (r: IpcEnvelope) => {
   return r.data as Record<string, any>;
 };
 const errCode = (r: IpcEnvelope) => (r.ok ? 'ok' : r.error.code);
+const errorCodeOf = errCode;
 
 beforeEach(async () => {
   tmp = await realpath(await mkdtemp(path.join(os.tmpdir(), 'rl-desktop-')));
   picked = null;
+  pickedFile = null;
   events = [];
 });
 afterEach(async () => {
@@ -232,5 +237,107 @@ describe('import handlers', () => {
     const status = data(await dispatch('import:status', { jobId }));
     expect(status).toMatchObject({ state: 'done', report: { documents: 2 } });
     expect(events.map((e) => e[0])).toContain('import:progress');
+  });
+});
+
+describe('first-run helpers', () => {
+  const choose = async (call: (c: string, p?: unknown) => Promise<IpcEnvelope>, dir: string) => {
+    picked = dir;
+    return data(await call('dialog:chooseFolder', { purpose: 'library-root' }));
+  };
+
+  it('lists sub-folders lazily, skips hidden ones, and needs an approved root', async () => {
+    const { call } = setup();
+    const root = path.join(tmp, 'lib');
+    await mkdir(path.join(root, 'Alpha', 'Deep'), { recursive: true });
+    await mkdir(path.join(root, 'beta'));
+    await mkdir(path.join(root, '.hidden'));
+    await writeFile(path.join(root, 'file.txt'), 'x');
+    expect(errorCodeOf(await call('library:listFolders', { rootPath: root }))).toBe('PERMISSION_DENIED');
+    await choose(call, root);
+    const top = data(await call('library:listFolders', { rootPath: root })).folders;
+    expect(top).toEqual([
+      { path: 'Alpha', name: 'Alpha', hasChildren: true },
+      { path: 'beta', name: 'beta', hasChildren: false },
+    ]);
+    const sub = data(await call('library:listFolders', { rootPath: root, parent: 'Alpha' })).folders;
+    expect(sub).toEqual([{ path: 'Alpha/Deep', name: 'Deep', hasChildren: false }]);
+    expect(errorCodeOf(await call('library:listFolders', { rootPath: root, parent: '../x' }))).toBe('INVALID_REQUEST');
+  });
+
+  it('lists the folders of an existing library by id', async () => {
+    const { call } = setup();
+    const root = path.join(tmp, 'lib');
+    await mkdir(path.join(root, 'one'), { recursive: true });
+    await choose(call, root);
+    const p = data(await call('library:create', { name: 'L', rootPath: root }));
+    const r = data(await call('library:listFolders', { libraryId: p.id })).folders;
+    expect(r.map((f: { path: string }) => f.path)).toEqual(['one']);
+  });
+
+  it('creates a library with AI folders and a starting taxonomy from an approved file', async () => {
+    const { call } = setup();
+    const root = path.join(tmp, 'lib');
+    await mkdir(path.join(root, 'papers'), { recursive: true });
+    const file = path.join(tmp, 'tax.json');
+    await writeFile(file, JSON.stringify({ nodes: [{ id: 'topic-a', label: 'Topic A' }] }));
+    await choose(call, root);
+    // An unapproved taxonomy path is refused.
+    expect(errorCodeOf(await call('library:create', { name: 'L', rootPath: root, taxonomyFilePath: file }))).toBe('PERMISSION_DENIED');
+    pickedFile = file;
+    expect(data(await call('dialog:chooseFile', { purpose: 'taxonomy-file' }))).toEqual({ path: file, name: 'tax.json' });
+    await call('library:create', { name: 'L', rootPath: root, aiEnabledFolders: ['papers'], taxonomyFilePath: file });
+    const cfg = JSON.parse(await readFile(path.join(root, '.lab', 'library.json'), 'utf8'));
+    expect(cfg.aiEnabledFolders).toEqual(['papers']);
+    const tax = JSON.parse(await readFile(path.join(root, '.lab', 'taxonomy.json'), 'utf8'));
+    expect(tax.nodes[0]).toMatchObject({ id: 'topic-a', label: 'Topic A' });
+  });
+
+  it('rejects an invalid taxonomy file before creating anything', async () => {
+    const { call, services } = setup();
+    const root = path.join(tmp, 'lib');
+    await mkdir(root);
+    const file = path.join(tmp, 'bad.json');
+    await writeFile(file, JSON.stringify({ nodes: [{ label: '' }] }));
+    await choose(call, root);
+    pickedFile = file;
+    await call('dialog:chooseFile', { purpose: 'taxonomy-file' });
+    expect(errorCodeOf(await call('library:create', { name: 'L', rootPath: root, taxonomyFilePath: file }))).toBe('SCHEMA_INVALID');
+    expect((await services.libraries.list()).profiles).toEqual([]);
+  });
+
+  it('renames the profile and library.json without touching other files', async () => {
+    const { call } = setup();
+    const root = path.join(tmp, 'lib');
+    await mkdir(root);
+    await choose(call, root);
+    const p = data(await call('library:create', { name: 'Old', rootPath: root }));
+    const renamed = data(await call('library:rename', { libraryId: p.id, name: 'New name' }));
+    expect(renamed.name).toBe('New name');
+    expect(data(await call('library:getConfig', {})).name).toBe('New name');
+    expect(errorCodeOf(await call('library:rename', { libraryId: 'ghost', name: 'x' }))).toBe('NOT_FOUND');
+  });
+
+  it('probes a legacy index read-only and reports counts', async () => {
+    const { call } = setup();
+    const root = path.join(tmp, 'lib');
+    await mkdir(path.join(root, '.phd_index'), { recursive: true });
+    await choose(call, root);
+    expect(data(await call('import:probeLegacy', { rootPath: root }))).toEqual({ found: false, documents: 0, taxonomyNodes: 0 });
+    await writeFile(path.join(root, '.phd_index', 'files.jsonl'), '{"p":"a.pdf"}\n\n{"p":"b.pdf"}\nnot json\n');
+    await writeFile(path.join(root, '.phd_index', 'taxonomy.json'), JSON.stringify({ macro: { m1: {} }, micro: { u1: { macro: ['m1'] }, u2: {} } }));
+    expect(data(await call('import:probeLegacy', { rootPath: root }))).toEqual({ found: true, documents: 3, taxonomyNodes: 3 });
+    expect(errorCodeOf(await call('import:probeLegacy', { rootPath: path.join(tmp, 'other') }))).toBe('PERMISSION_DENIED');
+  });
+});
+
+describe('e2e dialog override', () => {
+  it('only applies with RL_E2E=1 and an absolute path', () => {
+    const abs = path.join(tmp, 'picked');
+    expect(e2eDialogOverride({ RL_E2E: '1', RL_E2E_DIALOG_PATH: abs })).toBe(abs);
+    expect(e2eDialogOverride({ RL_E2E_DIALOG_PATH: abs })).toBeNull();
+    expect(e2eDialogOverride({ RL_E2E: '0', RL_E2E_DIALOG_PATH: abs })).toBeNull();
+    expect(e2eDialogOverride({ RL_E2E: '1', RL_E2E_DIALOG_PATH: 'relative/dir' })).toBeNull();
+    expect(e2eDialogOverride({ RL_E2E: '1' })).toBeNull();
   });
 });

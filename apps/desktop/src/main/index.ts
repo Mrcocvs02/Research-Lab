@@ -13,6 +13,7 @@ import {
 import { createFileLogger } from '@rl/core/node';
 import { APP_NAME } from './app-info.js';
 import { ApprovedPaths } from './approved-paths.js';
+import { e2eDialogOverride } from './dialog-override.js';
 import { resolveAppDirs } from './dirs.js';
 import { buildHandlers, type MainServices } from './ipc/handlers/index.js';
 import { LibraryService } from './library-service.js';
@@ -61,10 +62,23 @@ async function main(): Promise<void> {
       decrypt: (data) => safeStorage.decryptString(data),
     }),
     async pickFolder(purpose, title) {
+      // Test hook: only honoured when RL_E2E=1 (see dialog-override.ts).
+      const override = e2eDialogOverride(process.env);
+      if (override) return override;
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
       const options: Electron.OpenDialogOptions = {
         title,
         properties: purpose === 'export-destination' ? ['openDirectory', 'createDirectory'] : ['openDirectory'],
+      };
+      const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
+      return result.canceled ? null : (result.filePaths[0] ?? null);
+    },
+    async pickFile(_purpose, title) {
+      const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+      const options: Electron.OpenDialogOptions = {
+        title,
+        properties: ['openFile'],
+        filters: [{ name: 'JSON', extensions: ['json'] }],
       };
       const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
       return result.canceled ? null : (result.filePaths[0] ?? null);

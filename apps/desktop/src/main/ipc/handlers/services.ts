@@ -17,6 +17,8 @@ export interface MainServices {
   secrets: SecretStore;
   /** Native folder picker; resolves null when cancelled. */
   pickFolder(purpose: 'library-root' | 'legacy-index' | 'export-destination', title?: string): Promise<string | null>;
+  /** Native single-file picker; resolves null when cancelled. */
+  pickFile(purpose: 'taxonomy-file', title?: string): Promise<string | null>;
   appInfo(): { name: string; version: string; platform: string; electron: string };
   /** Factory so a missing implementation only fails when the feature is used. */
   createImporter(): LegacyImporter;

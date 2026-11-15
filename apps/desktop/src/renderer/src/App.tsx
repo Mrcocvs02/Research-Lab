@@ -1,49 +1,75 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Language } from '@rl/core';
-import i18n from './i18n';
-import { rl } from './lib/rl';
+import { ErrorNote } from './components/ui';
+import { errorMessage } from './lib/errors';
+import { Settings } from './settings/Settings';
+import { Shell, type SectionId } from './shell/Shell';
+import { AppProvider, useApp } from './state/app-context';
+import { Wizard } from './wizard/Wizard';
 
-/** Empty shell: title + UI language. Real screens are added by the frontend role. */
 export function App() {
+  return (
+    <AppProvider>
+      <Root />
+    </AppProvider>
+  );
+}
+
+function Root() {
   const { t } = useTranslation();
-  const [language, setLanguage] = useState<Language>('it');
-  const [loaded, setLoaded] = useState(false);
+  const app = useApp();
+  const [section, setSection] = useState<SectionId>('library');
+  const [wizardOpen, setWizardOpen] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    rl.invoke('settings:get', {}).then(
-      (s) => {
-        if (!alive) return;
-        setLanguage(s.uiLanguage);
-        setLoaded(true);
-        void i18n.changeLanguage(s.uiLanguage);
-      },
-      () => {},
+  if (!app.ready) {
+    return (
+      <p className="boot" role="status">
+        {t('common.loading')}
+      </p>
     );
-    return () => {
-      alive = false;
-    };
-  }, []);
+  }
+  if (app.loadError) {
+    return (
+      <div className="boot">
+        <ErrorNote>{errorMessage(app.loadError, t)}</ErrorNote>
+        <button type="button" onClick={() => void app.refresh()}>
+          {t('common.retry')}
+        </button>
+      </div>
+    );
+  }
 
-  const onChange = async (next: Language) => {
-    setLanguage(next);
-    await i18n.changeLanguage(next);
-    await rl.invoke('settings:set', { uiLanguage: next }).catch(() => {});
+  const hasLibraries = app.profiles.length > 0;
+  const showWizard = !hasLibraries || wizardOpen;
+
+  const finished = async () => {
+    await app.refresh();
+    setWizardOpen(false);
+    setSection('library');
   };
 
   return (
-    <main className="shell">
-      <h1 data-testid="app-title">{t('app.title')}</h1>
-      <p>{t('app.tagline')}</p>
-      <p data-testid="shell-empty">{t('shell.empty')}</p>
-      <label>
-        {t('shell.language')}{' '}
-        <select data-testid="language-select" disabled={!loaded} value={language} onChange={(e) => void onChange(e.target.value as Language)}>
-          <option value="it">{t('languages.it')}</option>
-          <option value="en">{t('languages.en')}</option>
-        </select>
-      </label>
-    </main>
+    <>
+      <Shell section={section} onSection={setSection} onNewLibrary={() => setWizardOpen(true)}>
+        {section === 'settings' ? <Settings onNewLibrary={() => setWizardOpen(true)} /> : <Placeholder section={section} />}
+      </Shell>
+      {showWizard && <Wizard key={wizardOpen ? 'new' : 'first'} onFinished={() => void finished()} onCancel={hasLibraries ? () => setWizardOpen(false) : undefined} />}
+    </>
+  );
+}
+
+function Placeholder({ section }: { section: Exclude<SectionId, 'settings'> }) {
+  const { t } = useTranslation();
+  const app = useApp();
+  return (
+    <div className="page" data-testid={`section-${section}`}>
+      <h1>{t(`sections.${section}`)}</h1>
+      {section === 'library' && !app.activeProfile ? <p data-testid="shell-empty">{t('shell.empty')}</p> : <p>{t(`placeholders.${section}`)}</p>}
+      {section === 'library' && app.activeProfile && (
+        <p className="callout" data-testid="active-library-note">
+          {t('placeholders.libraryActive', { name: app.activeProfile.name })}
+        </p>
+      )}
+    </div>
   );
 }

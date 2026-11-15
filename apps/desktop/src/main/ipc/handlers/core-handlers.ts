@@ -1,5 +1,8 @@
-import { basename } from 'node:path';
-import { AppError, type ImportJobStatus } from '@rl/core';
+import { createReadStream } from 'node:fs';
+import { readFile, stat } from 'node:fs/promises';
+import { basename, join } from 'node:path';
+import { createInterface } from 'node:readline';
+import { AppError, legacyTaxonomySchema, type ImportJobStatus } from '@rl/core';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
 
@@ -22,6 +25,10 @@ export const libraryHandlers = (s: MainServices): DomainHandlers<'library'> => (
   'library:list': () => s.libraries.list(),
   'library:setActive': async ({ libraryId }) => ({ activeLibraryId: await s.libraries.setActive(libraryId) }),
   'library:forget': async ({ libraryId }) => ({ activeLibraryId: await s.libraries.forget(libraryId) }),
+  'library:rename': ({ libraryId, name }) => s.libraries.rename(libraryId, name),
+  'library:listFolders': async ({ rootPath, libraryId, parent }) => ({
+    folders: await s.libraries.listFolders({ rootPath, libraryId }, parent),
+  }),
   'library:getConfig': ({ libraryId }) => s.libraries.getConfig(libraryId),
   'library:setConfig': ({ libraryId, patch }) => s.libraries.setConfig(patch, libraryId),
 });
@@ -29,6 +36,12 @@ export const libraryHandlers = (s: MainServices): DomainHandlers<'library'> => (
 export const dialogHandlers = (s: MainServices): DomainHandlers<'dialog'> => ({
   'dialog:chooseFolder': async ({ purpose, title }) => {
     const picked = await s.pickFolder(purpose, title);
+    if (!picked) return null;
+    s.approved.add(picked);
+    return { path: picked, name: basename(picked) || picked };
+  },
+  'dialog:chooseFile': async ({ purpose, title }) => {
+    const picked = await s.pickFile(purpose, title);
     if (!picked) return null;
     s.approved.add(picked);
     return { path: picked, name: basename(picked) || picked };
@@ -57,6 +70,10 @@ export const importHandlers = (s: MainServices): DomainHandlers<'import'> => {
   };
 
   return {
+    'import:probeLegacy': async ({ rootPath }) => {
+      if (!s.approved.has(rootPath)) throw new AppError('PERMISSION_DENIED', 'The folder must be chosen with the folder dialog');
+      return probeLegacyIndex(rootPath);
+    },
     'import:startLegacy': async ({ libraryId, sourcePath }) => {
       if (!s.approved.has(sourcePath)) throw new AppError('PERMISSION_DENIED', 'The source folder must be chosen with the folder dialog');
       const profile = await s.libraries.profile(libraryId);
@@ -92,3 +109,35 @@ export const importHandlers = (s: MainServices): DomainHandlers<'import'> => {
     },
   };
 };
+
+/** Name of the folder the old index tool created inside a library root. */
+const LEGACY_INDEX_DIR = '.phd_index';
+
+/** Counts what an old index holds, read-only and tolerant of broken lines. */
+export async function probeLegacyIndex(rootPath: string): Promise<{ found: boolean; documents: number; taxonomyNodes: number }> {
+  const dir = join(rootPath, LEGACY_INDEX_DIR);
+  const filesJsonl = join(dir, 'files.jsonl');
+  const isFile = await stat(filesJsonl).then(
+    (st) => st.isFile(),
+    () => false,
+  );
+  if (!isFile) return { found: false, documents: 0, taxonomyNodes: 0 };
+
+  let documents = 0;
+  const lines = createInterface({ input: createReadStream(filesJsonl, { encoding: 'utf8' }), crlfDelay: Infinity });
+  for await (const line of lines) {
+    if (line.trim()) documents++;
+  }
+
+  let taxonomyNodes = 0;
+  try {
+    const parsed = legacyTaxonomySchema.safeParse(JSON.parse(await readFile(join(dir, 'taxonomy.json'), 'utf8')));
+    if (parsed.success) {
+      const t = parsed.data;
+      taxonomyNodes = Object.keys(t.macro ?? {}).length + Object.keys(t.micro ?? {}).length + Object.keys(t.extra ?? {}).length;
+    }
+  } catch {
+    // no taxonomy file or unreadable: count stays 0
+  }
+  return { found: true, documents, taxonomyNodes };
+}

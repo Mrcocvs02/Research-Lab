@@ -64,7 +64,7 @@ function Placeholder({ section }: { section: Exclude<SectionId, 'settings'> }) {
   return (
     <div className="page" data-testid={`section-${section}`}>
       <h1>{t(`sections.${section}`)}</h1>
-      <p>{t(`placeholders.${section}`)}</p>
+      {section === 'library' && !app.activeProfile ? <p data-testid="shell-empty">{t('shell.empty')}</p> : <p>{t(`placeholders.${section}`)}</p>}
       {section === 'library' && app.activeProfile && (
         <p className="callout" data-testid="active-library-note">
           {t('placeholders.libraryActive', { name: app.activeProfile.name })}

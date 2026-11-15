@@ -40,6 +40,7 @@ export function Shell({ section, onSection, onNewLibrary, children }: Props) {
             ))}
           </ul>
         </nav>
+        <SidebarLanguage />
       </aside>
 
       <main id="main" className="main" tabIndex={-1}>
@@ -69,6 +70,21 @@ export function Shell({ section, onSection, onNewLibrary, children }: Props) {
       </aside>
 
       <StatusBar />
+    </div>
+  );
+}
+
+function SidebarLanguage() {
+  const { t } = useTranslation();
+  const app = useApp();
+  const id = useId();
+  return (
+    <div className="switcher">
+      <label htmlFor={id}>{t('shell.language')}</label>
+      <select id={id} value={app.settings?.uiLanguage ?? 'it'} onChange={(e) => void app.setUiLanguage(e.target.value as 'it' | 'en')} data-testid="language-select">
+        <option value="it">{t('languages.it')}</option>
+        <option value="en">{t('languages.en')}</option>
+      </select>
     </div>
   );
 }

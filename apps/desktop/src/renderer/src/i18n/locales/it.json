@@ -65,7 +65,9 @@
     "sidebar": "Barra laterale",
     "navigation": "Sezioni",
     "activeLibrary": "Libreria attiva",
-    "noLibrary": "Nessuna libreria"
+    "noLibrary": "Nessuna libreria",
+    "language": "Lingua dell'interfaccia",
+    "empty": "Nessuna libreria aperta. Creane una per iniziare."
   },
   "chat": {
     "title": "Chat",

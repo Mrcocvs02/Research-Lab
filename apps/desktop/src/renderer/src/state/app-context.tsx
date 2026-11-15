@@ -71,8 +71,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const setUiLanguage = useCallback(async (language: Language) => {
-    await applyLanguage(language);
+    // Persist first: when the text switches, the setting is already saved.
     await rl.invoke('settings:set', { uiLanguage: language });
+    await applyLanguage(language);
     setSettings((s) => (s ? { ...s, uiLanguage: language } : s));
   }, []);
 

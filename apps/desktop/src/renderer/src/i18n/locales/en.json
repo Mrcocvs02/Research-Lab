@@ -65,7 +65,9 @@
     "sidebar": "Sidebar",
     "navigation": "Sections",
     "activeLibrary": "Active library",
-    "noLibrary": "No library"
+    "noLibrary": "No library",
+    "language": "Interface language",
+    "empty": "No library is open. Create one to get started."
   },
   "chat": {
     "title": "Chat",

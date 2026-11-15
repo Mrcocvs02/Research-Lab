@@ -2,9 +2,13 @@ import { z } from 'zod';
 import { isoDateSchema } from '../common.js';
 import { aiProviderIdSchema } from '../settings.js';
 
+/** Who produced an AI value: a configurable provider, or a pre-existing index imported once. */
+export const aiOriginProviderSchema = z.union([aiProviderIdSchema, z.literal('legacy-import')]);
+export type AiOriginProvider = z.infer<typeof aiOriginProviderSchema>;
+
 export const aiMetaSchema = z.object({
   model: z.string().min(1),
-  provider: aiProviderIdSchema,
+  provider: aiOriginProviderSchema,
   date: isoDateSchema,
   /** What produced it: command id, "import:legacy", "chat", ... */
   source: z.string().min(1),

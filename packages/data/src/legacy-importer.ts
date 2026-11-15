@@ -597,7 +597,7 @@ function legacyAi<T>(value: T, date: string): AiField<T> {
   return {
     value,
     // The old index was filled in by an AI assistant; model and exact provider were not recorded.
-    meta: { model: 'unknown', provider: 'claude-agent-sdk', date, source: 'legacy-import' },
+    meta: { model: 'unknown', provider: 'legacy-import', date, source: 'legacy-import' },
     review: { status: 'accepted', at: date },
   };
 }

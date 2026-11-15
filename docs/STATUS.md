@@ -1,12 +1,10 @@
 # Stato
 
-- **Fase:** 0 — fondamenta e impostazioni
-- **Onda:** 0.3 — revisione indipendente e di sicurezza
+- **Fase:** 1 — indice e ricerca
+- **Onda:** 1.1 — scansione/estrazione/osservatore, indice FTS5 e runtime, qa (prestazioni, offline)
 - **Fatto:**
-  - onda 0.1 (architect): monorepo, contratti `packages/core`, IPC tipizzato, guscio Electron sicuro, `node:sqlite` con FTS5
-  - onda 0.2: archivio dati e importatore (`packages/data`), procedura guidata e impostazioni (`apps/desktop`), testkit, verifiche di generalità e non distruzione (`packages/testkit`, `tools/`)
-  - integrazione: backup della cartella dati prima dell'importazione; e2e sull'importazione reale (21 documenti, tassonomia completa, originali intatti)
-  - verifiche: typecheck, 171 test unitari, 15 e2e, generalità verdi
-- **In corso:** reviewer e security sulla differenza della fase 0
+  - Fase 0 chiusa (tag `phase-0`): monorepo, contratti, guscio Electron sicuro, procedura guidata, impostazioni, archivio dati, importatore, testkit, verifiche di generalità e non distruzione; revisione indipendente e di sicurezza senza difetti aperti.
+  - Criterio fase 0 verificato: libreria creata su cartella qualsiasi (it/en, e2e), importazione reale con tutti i documenti, tag e tassonomia (e2e su copia), `npm test` verde (432), e2e verdi (24).
+- **In corso:** fase 1
 - **Bloccato:** —
-- **Prossimo:** correzioni dalla revisione, tag `phase-0`, poi fase 1 (scansione, estrazione, osservatore, FTS5)
+- **Prossimo:** fase 2 (navigazione, tassonomia con annulla, progetti)

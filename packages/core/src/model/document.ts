@@ -90,6 +90,11 @@ export const documentRecordSchema = z.object({
   mtimeMs: z.number().nonnegative(),
   /** True when the file was not found by the last scan (record kept until pruned). */
   missing: z.boolean().default(false),
+  /**
+   * Set by the scanner on new and changed files (no automatic tags): the inbox lists the documents that have it.
+   * Cleared by whoever triages the document. `since` is when the scanner saw it.
+   */
+  inbox: z.object({ since: isoDateSchema, reason: z.enum(['new', 'changed']) }).optional(),
 
   /** Document type id (taxonomy.documentTypes). */
   type: z.string().max(L.shortText).nullable().default(null),

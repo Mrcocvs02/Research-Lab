@@ -1,23 +1,27 @@
 import { createReadStream } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { createInterface } from 'node:readline';
-import { AppError, legacyTaxonomySchema, type ImportJobStatus } from '@rl/core';
+import { AppError, applyPatch, legacyTaxonomySchema, type ImportJobStatus } from '@rl/core';
+import { DEFAULT_MAX_READ_BYTES, readTextFileLimited } from '@rl/core/node';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
 
 export const appHandlers = (s: MainServices): DomainHandlers<'app'> => ({
   'app:info': () => s.appInfo(),
+  'app:notices': async () => {
+    await s.settings.get(); // notices are raised while the settings load
+    return { notices: s.settings.notices() };
+  },
+  'app:dismissNotice': ({ id }) => {
+    s.settings.dismissNotice(id);
+    return {};
+  },
 });
 
 export const settingsHandlers = (s: MainServices): DomainHandlers<'settings'> => ({
   'settings:get': () => s.settings.get(),
-  'settings:set': (patch) =>
-    s.settings.update((cur) => {
-      if (patch.uiLanguage) cur.uiLanguage = patch.uiLanguage;
-      if (patch.firstRunDone !== undefined) cur.firstRunDone = patch.firstRunDone;
-      if (patch.user) cur.user = { ...cur.user, ...Object.fromEntries(Object.entries(patch.user).filter(([, v]) => v !== undefined)) };
-    }),
+  // Only the fields present in the patch change (see `applyPatch`); the rest keeps its value.
+  'settings:set': (patch) => s.settings.update((cur) => applyPatch(cur, patch)),
 });
 
 export const libraryHandlers = (s: MainServices): DomainHandlers<'library'> => ({
@@ -37,13 +41,13 @@ export const dialogHandlers = (s: MainServices): DomainHandlers<'dialog'> => ({
   'dialog:chooseFolder': async ({ purpose, title }) => {
     const picked = await s.pickFolder(purpose, title);
     if (!picked) return null;
-    s.approved.add(picked);
+    s.approved.add(picked, purpose);
     return { path: picked, name: basename(picked) || picked };
   },
   'dialog:chooseFile': async ({ purpose, title }) => {
     const picked = await s.pickFile(purpose, title);
     if (!picked) return null;
-    s.approved.add(picked);
+    s.approved.add(picked, purpose);
     return { path: picked, name: basename(picked) || picked };
   },
 });
@@ -63,6 +67,8 @@ export const secretsHandlers = (s: MainServices): DomainHandlers<'secrets'> => (
 /** Job table for the one-shot legacy import. The actual work is `@rl/data`'s LegacyImporter. */
 export const importHandlers = (s: MainServices): DomainHandlers<'import'> => {
   const jobs = new Map<string, ImportJobStatus>();
+  /** Libraries with an import in progress: a second start would run two importers on the same files. */
+  const running = new Set<string>();
   let counter = 0;
   const publish = (status: ImportJobStatus) => {
     jobs.set(status.jobId, status);
@@ -71,40 +77,58 @@ export const importHandlers = (s: MainServices): DomainHandlers<'import'> => {
 
   return {
     'import:probeLegacy': async ({ rootPath }) => {
-      if (!s.approved.has(rootPath)) throw new AppError('PERMISSION_DENIED', 'The folder must be chosen with the folder dialog');
-      return probeLegacyIndex(rootPath);
+      // The old index lives inside the library root, so the folder is the one picked as library root.
+      const root = s.approved.resolve(rootPath, 'library-root');
+      if (root === null) throw new AppError('PERMISSION_DENIED', 'The folder must be chosen with the folder dialog');
+      return probeLegacyIndex(root);
     },
     'import:startLegacy': async ({ libraryId, sourcePath }) => {
-      if (!s.approved.has(sourcePath)) throw new AppError('PERMISSION_DENIED', 'The source folder must be chosen with the folder dialog');
-      const profile = await s.libraries.profile(libraryId);
-      const dataDir = await s.libraries.dataDir(libraryId);
-      const settings = await s.settings.get();
-      let importer;
+      // Claim the library synchronously, before any await, so two concurrent starts cannot both pass.
+      if (running.has(libraryId)) throw new AppError('ALREADY_EXISTS', 'An import is already running for this library');
+      running.add(libraryId);
+      let started = false;
       try {
-        importer = s.createImporter();
-      } catch {
-        throw new AppError('NOT_IMPLEMENTED', 'The importer is not available yet');
+        const profile = await s.libraries.profile(libraryId);
+        // The source is a folder picked for this purpose or, as in the first-run wizard, the
+        // library's own root (where the old index sits). Never a folder approved for something else.
+        const picked = s.approved.resolve(sourcePath, 'legacy-index');
+        const own = s.approved.resolve(sourcePath, 'library-root');
+        const sameRoot = (a: string, b: string) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
+        const source = picked ?? (own !== null && sameRoot(own, profile.rootPath) ? own : null);
+        if (source === null) throw new AppError('PERMISSION_DENIED', 'The source folder must be chosen with the folder dialog');
+        const dataDir = await s.libraries.dataDir(libraryId);
+        const settings = await s.settings.get();
+        let importer;
+        try {
+          importer = s.createImporter();
+        } catch {
+          throw new AppError('NOT_IMPLEMENTED', 'The importer is not available yet');
+        }
+        const jobId = `import-${Date.now().toString(36)}-${++counter}`;
+        publish({ jobId, state: 'running', processed: 0 });
+        started = true;
+        void s
+          .backupDataDir(libraryId, dataDir)
+          .then((backup) => {
+            if (backup) s.log.info('data folder backed up before import', { files: backup.files });
+            return importer.run({
+              sourceDir: source,
+              libraryRoot: profile.rootPath,
+              dataDir,
+              deviceId: settings.deviceId,
+              onProgress: (p) => publish({ ...p, jobId, state: 'running' }),
+            });
+          })
+          .then((report) => publish({ jobId, state: 'done', processed: report.documents, report }))
+          .catch((e: unknown) => {
+            s.log.error('legacy import failed', { error: e });
+            publish({ jobId, state: 'failed', processed: 0, error: AppError.from(e).toJSON() });
+          })
+          .finally(() => running.delete(libraryId));
+        return { jobId };
+      } finally {
+        if (!started) running.delete(libraryId);
       }
-      const jobId = `import-${Date.now().toString(36)}-${++counter}`;
-      publish({ jobId, state: 'running', processed: 0 });
-      void s
-        .backupDataDir(libraryId, dataDir)
-        .then((backup) => {
-          if (backup) s.log.info('data folder backed up before import', { files: backup.files });
-          return importer.run({
-            sourceDir: sourcePath,
-            libraryRoot: profile.rootPath,
-            dataDir,
-            deviceId: settings.deviceId,
-            onProgress: (p) => publish({ ...p, jobId, state: 'running' }),
-          });
-        })
-        .then((report) => publish({ jobId, state: 'done', processed: report.documents, report }))
-        .catch((e: unknown) => {
-          s.log.error('legacy import failed', { error: e });
-          publish({ jobId, state: 'failed', processed: 0, error: AppError.from(e).toJSON() });
-        });
-      return { jobId };
     },
     'import:status': ({ jobId }) => {
       const status = jobs.get(jobId);
@@ -117,8 +141,44 @@ export const importHandlers = (s: MainServices): DomainHandlers<'import'> => {
 /** Name of the folder the old index tool created inside a library root. */
 const LEGACY_INDEX_DIR = '.phd_index';
 
-/** Counts what an old index holds, read-only and tolerant of broken lines. */
-export async function probeLegacyIndex(rootPath: string): Promise<{ found: boolean; documents: number; taxonomyNodes: number }> {
+export interface ProbeLimits {
+  /** files.jsonl is only streamed, never held in memory; a file bigger than this is refused. Default 256 MiB. */
+  maxIndexBytes?: number;
+  /** taxonomy.json is parsed whole; bigger files count as "no taxonomy". Default 16 MiB. */
+  maxTaxonomyBytes?: number;
+}
+
+/** Counts non-blank lines of a file in constant memory (no line buffer, no per-line size to exceed). */
+async function countNonBlankLines(file: string, maxBytes: number): Promise<number> {
+  let lines = 0;
+  let total = 0;
+  let sawContent = false;
+  const stream = createReadStream(file);
+  try {
+    for await (const chunk of stream as AsyncIterable<Buffer>) {
+      total += chunk.length;
+      if (total > maxBytes) throw new AppError('INVALID_REQUEST', 'The index file is too large to preview', { maxBytes });
+      for (const byte of chunk) {
+        if (byte === 0x0a) {
+          if (sawContent) lines++;
+          sawContent = false;
+        } else if (byte > 0x20) {
+          sawContent = true;
+        }
+      }
+    }
+  } finally {
+    stream.destroy();
+  }
+  return sawContent ? lines + 1 : lines;
+}
+
+/** Counts what an old index holds, read-only, bounded in memory and tolerant of broken lines. */
+export async function probeLegacyIndex(
+  rootPath: string,
+  limits: ProbeLimits = {},
+): Promise<{ found: boolean; documents: number; taxonomyNodes: number }> {
+  const { maxIndexBytes = 256 * 1024 * 1024, maxTaxonomyBytes = DEFAULT_MAX_READ_BYTES } = limits;
   const dir = join(rootPath, LEGACY_INDEX_DIR);
   const filesJsonl = join(dir, 'files.jsonl');
   const isFile = await stat(filesJsonl).then(
@@ -127,21 +187,17 @@ export async function probeLegacyIndex(rootPath: string): Promise<{ found: boole
   );
   if (!isFile) return { found: false, documents: 0, taxonomyNodes: 0 };
 
-  let documents = 0;
-  const lines = createInterface({ input: createReadStream(filesJsonl, { encoding: 'utf8' }), crlfDelay: Infinity });
-  for await (const line of lines) {
-    if (line.trim()) documents++;
-  }
+  const documents = await countNonBlankLines(filesJsonl, maxIndexBytes);
 
   let taxonomyNodes = 0;
   try {
-    const parsed = legacyTaxonomySchema.safeParse(JSON.parse(await readFile(join(dir, 'taxonomy.json'), 'utf8')));
+    const parsed = legacyTaxonomySchema.safeParse(JSON.parse(await readTextFileLimited(join(dir, 'taxonomy.json'), maxTaxonomyBytes)));
     if (parsed.success) {
       const t = parsed.data;
       taxonomyNodes = Object.keys(t.macro ?? {}).length + Object.keys(t.micro ?? {}).length + Object.keys(t.extra ?? {}).length;
     }
   } catch {
-    // no taxonomy file or unreadable: count stays 0
+    // no taxonomy file, unreadable or too large: count stays 0
   }
   return { found: true, documents, taxonomyNodes };
 }

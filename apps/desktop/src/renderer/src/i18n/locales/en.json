@@ -28,8 +28,19 @@
     "AI_BUDGET_EXCEEDED": "The usage cap has been reached.",
     "AI_PROVIDER_ERROR": "The AI provider returned an error.",
     "SECRET_UNAVAILABLE": "Secure storage is not available on this computer, so keys cannot be saved.",
+    "READ_ONLY": "Your settings were saved by a newer version of the app, so they are read-only here. Update the app to change them.",
     "CANCELLED": "The operation was cancelled.",
     "INTERNAL": "Something went wrong."
+  },
+  "notices": {
+    "settingsReset": "Your settings file could not be used ({{reason}}), so the app restarted with default settings. The damaged file was kept as \"{{backup}}\" in the app data folder; libraries must be added again.",
+    "settingsReadOnly": "Your settings were saved by a newer version of the app (format {{found}}, this app understands {{supported}}). They are shown read-only and nothing will be changed. Update the app to edit them.",
+    "fields": "Fields: {{fields}}.",
+    "dismiss": "Dismiss",
+    "reason": {
+      "invalid-json": "it is not valid JSON",
+      "invalid-schema": "its content is not in the expected format"
+    }
   },
   "validation": {
     "invalid": "This value is not valid.",

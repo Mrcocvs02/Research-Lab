@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { endsWithSpaceOrDot, isReservedWindowsName } from './fs-names.js';
 
 /** Current on-disk schema version of every data file. Bump together with a migration. */
 export const SCHEMA_VERSION = 1 as const;
@@ -21,12 +22,19 @@ export type DocumentId = z.infer<typeof documentIdSchema>;
 
 export const sha256Schema = z.string().regex(/^[0-9a-f]{64}$/, 'sha256 must be 64 lowercase hex chars');
 
-/** Generic item id (projects, taxonomy nodes, annotations, profiles): url-safe slug or uuid. */
+/**
+ * Generic item id (projects, taxonomy nodes, annotations, profiles): url-safe slug or uuid.
+ * Ids become file names (`projects/<id>.json`), so they are normalised to lower case (on a
+ * case-insensitive file system `Foo.json` and `foo.json` would overwrite each other) and
+ * reserved Windows device names and a trailing dot are refused.
+ */
 export const itemIdSchema = z
   .string()
   .min(1)
   .max(128)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, 'id must be url-safe');
+  .toLowerCase()
+  .regex(/^[a-z0-9][a-z0-9._-]*$/, 'id must be url-safe')
+  .refine((id) => !endsWithSpaceOrDot(id) && !isReservedWindowsName(id), 'id is not a valid file name');
 export type ItemId = z.infer<typeof itemIdSchema>;
 
 /**

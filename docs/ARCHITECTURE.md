@@ -55,11 +55,13 @@ Un file per elemento; mai scrivere fuori dalla cartella dati o negli originali; 
 | Segreti (cifrati con `safeStorage`) | `<userData>\secrets.json` | no |
 | Indice di ricerca, cache, vettori, log dell'app | `%LOCALAPPDATA%\ResearchLab` (`localPath.*`) | no |
 
-Per i test: `RL_USER_DATA_DIR` e `RL_LOCAL_DATA_DIR` (cartelle assolute temporanee). La libreria reale di prova: `RL_FIXTURE_LIBRARY`, sempre su copia temporanea (D-004).
+Per i test: `RL_USER_DATA_DIR` e `RL_LOCAL_DATA_DIR` (cartelle assolute temporanee; ignorate dall'app installata, D-014). La libreria reale di prova: `RL_FIXTURE_LIBRARY`, sempre su copia temporanea (D-004).
 
 ## Sicurezza del guscio
 
 `contextIsolation`, `sandbox`, niente `nodeIntegration`; renderer servito da `rl-app://app/` con CSP restrittiva (D-010); preload minimale (`window.rlBridge`); navigazione e `window.open` bloccati; link esterni solo https su host consentiti; permessi negati; IPC da origine non fidata rifiutato.
+
+Variabili `RL_*` e `ELECTRON_RENDERER_URL`: solo in sviluppo (`!app.isPackaged`), risolte in `main/runtime.ts`; l'URL del server di sviluppo solo se `http://localhost:<porta>` o `127.0.0.1` (D-014). File di `rl-app://`: `main/renderer-url.ts` (D-015). Percorsi assoluti scelti dall'utente: `ApprovedPaths` per scopo, corrispondenza esatta (D-017). Patch parziali senza default e `applyPatch` (D-018). `settings.json` illeggibile o più nuovo: mai sovrascritto in silenzio, avviso nel banner (`app:notices`, D-021).
 
 ## Comandi
 

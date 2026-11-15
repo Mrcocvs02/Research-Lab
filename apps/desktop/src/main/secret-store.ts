@@ -48,11 +48,31 @@ export class FileSecretStore implements SecretStore {
     return r;
   }
 
+  /**
+   * The cipher's own error can echo its input (the plain value on encrypt), so it is never
+   * propagated: callers get a fixed message and no `cause`.
+   */
+  private encrypt(value: string): string {
+    try {
+      return this.cipher.encrypt(value).toString('base64');
+    } catch {
+      throw new AppError('SECRET_UNAVAILABLE', 'Secure storage failed to encrypt the value');
+    }
+  }
+
+  private decrypt(enc: string): string {
+    try {
+      return this.cipher.decrypt(Buffer.from(enc, 'base64'));
+    } catch {
+      throw new AppError('SECRET_UNAVAILABLE', 'Secure storage failed to decrypt the value');
+    }
+  }
+
   set(scope: SecretScope, name: string, value: string): Promise<void> {
     this.requireCipher();
     return this.serial(async () => {
       const data = await this.load();
-      data.entries[keyOf(scope, name)] = this.cipher.encrypt(value).toString('base64');
+      data.entries[keyOf(scope, name)] = this.encrypt(value);
       await atomicWriteJson(this.file, data);
     });
   }
@@ -60,7 +80,7 @@ export class FileSecretStore implements SecretStore {
   async get(scope: SecretScope, name: string): Promise<string | null> {
     this.requireCipher();
     const enc = (await this.load()).entries[keyOf(scope, name)];
-    return enc === undefined ? null : this.cipher.decrypt(Buffer.from(enc, 'base64'));
+    return enc === undefined ? null : this.decrypt(enc);
   }
 
   async has(scope: SecretScope, name: string): Promise<boolean> {
@@ -71,6 +91,18 @@ export class FileSecretStore implements SecretStore {
     return this.serial(async () => {
       const data = await this.load();
       delete data.entries[keyOf(scope, name)];
+      await atomicWriteJson(this.file, data);
+    });
+  }
+
+  /** Removes every entry scoped to the library. Needs no cipher: nothing is decrypted. */
+  deleteLibrary(libraryId: string): Promise<void> {
+    const prefix = `library:${libraryId}/`;
+    return this.serial(async () => {
+      const data = await this.load();
+      const doomed = Object.keys(data.entries).filter((k) => k.startsWith(prefix));
+      if (doomed.length === 0) return;
+      for (const k of doomed) delete data.entries[k];
       await atomicWriteJson(this.file, data);
     });
   }

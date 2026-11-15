@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { NoticeBanner } from './components/NoticeBanner';
 import { ErrorNote } from './components/ui';
 import { errorMessage } from './lib/errors';
 import { Settings } from './settings/Settings';
@@ -50,6 +51,7 @@ function Root() {
 
   return (
     <>
+      <NoticeBanner />
       <Shell section={section} onSection={setSection} onNewLibrary={() => setWizardOpen(true)}>
         {section === 'settings' ? <Settings onNewLibrary={() => setWizardOpen(true)} /> : <Placeholder section={section} />}
       </Shell>

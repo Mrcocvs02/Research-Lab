@@ -1,8 +1,8 @@
-import { lstat, realpath } from 'node:fs/promises';
+import { lstat, readlink, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError } from '../errors.js';
+import { endsWithSpaceOrDot, isReservedWindowsName } from '../fs-names.js';
 
-const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i;
 // eslint-disable-next-line no-control-regex
 const FORBIDDEN_CHARS = /[\u0000-\u001f<>"|?*:]/;
 
@@ -10,7 +10,8 @@ const FORBIDDEN_CHARS = /[\u0000-\u001f<>"|?*:]/;
  * Validates a library-relative path coming from an untrusted source and returns its
  * segments. Accepts `/` and `\` as separators. Rejects absolute paths (POSIX, drive,
  * UNC, `\\?\`), `..`, NUL/control chars, `:` (drive letters and NTFS streams) and
- * Windows reserved device names. `.` segments and empty segments are dropped.
+ * Windows reserved device names (CON, NUL, COM1-9, COM¹-³, CONIN$, ...) and names ending in a
+ * space or a dot (Windows strips them silently). `.` segments and empty segments are dropped.
  */
 export function splitRelativePath(input: unknown): string[] {
   if (typeof input !== 'string') throw new AppError('INVALID_PATH', 'Path must be a string');
@@ -24,7 +25,8 @@ export function splitRelativePath(input: unknown): string[] {
     if (seg === '' || seg === '.') continue;
     if (seg === '..') throw new AppError('PATH_OUTSIDE_ROOT', 'Parent traversal is not allowed');
     if (FORBIDDEN_CHARS.test(seg)) throw new AppError('INVALID_PATH', 'Path contains forbidden characters');
-    if (WINDOWS_RESERVED.test(seg.split('.')[0] ?? '')) throw new AppError('INVALID_PATH', 'Reserved device name');
+    if (isReservedWindowsName(seg)) throw new AppError('INVALID_PATH', 'Reserved device name');
+    if (endsWithSpaceOrDot(seg)) throw new AppError('INVALID_PATH', 'Name ends with a space or a dot');
     segments.push(seg);
   }
   return segments;
@@ -43,17 +45,36 @@ export function isInside(root: string, target: string): boolean {
   return rel !== '..' && !rel.startsWith(`..${path.sep}`);
 }
 
-async function realpathOfDeepestExisting(abs: string): Promise<{ real: string; rest: string[] }> {
+const MAX_LINK_DEPTH = 16;
+
+/**
+ * Real path of the deepest existing ancestor of `abs`, plus the not-yet-existing remainder.
+ * A dangling link (lstat works, realpath fails) must NOT be treated as "does not exist":
+ * creating a file through it would create the file at the link target, wherever that is.
+ * Its target is read and resolved in turn, so the caller checks the place the write would land.
+ */
+async function realpathOfDeepestExisting(abs: string, depth = 0): Promise<{ real: string; rest: string[] }> {
+  if (depth > MAX_LINK_DEPTH) throw new AppError('PATH_OUTSIDE_ROOT', 'Too many levels of links');
   const rest: string[] = [];
   let current = abs;
   for (;;) {
+    let exists = false;
     try {
       await lstat(current);
+      exists = true;
       return { real: await realpath(current), rest: rest.reverse() };
     } catch (e) {
       const code = (e as NodeJS.ErrnoException).code;
       if (code !== 'ENOENT' && code !== 'ENOTDIR') {
         throw new AppError('IO_ERROR', 'Cannot inspect path', { code: code ?? 'unknown' });
+      }
+      if (exists) {
+        // Dangling link: follow it by hand.
+        const target = await readlink(current).catch(() => {
+          throw new AppError('PATH_OUTSIDE_ROOT', 'Cannot resolve a broken link');
+        });
+        const resolved = await realpathOfDeepestExisting(path.resolve(path.dirname(current), target), depth + 1);
+        return { real: resolved.rest.length ? path.join(resolved.real, ...resolved.rest) : resolved.real, rest: rest.reverse() };
       }
       const parent = path.dirname(current);
       if (parent === current) throw new AppError('IO_ERROR', 'Root does not exist');

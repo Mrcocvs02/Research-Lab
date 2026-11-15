@@ -1,6 +1,7 @@
 export * from './common.js';
 export * from './data-paths.js';
 export * from './errors.js';
+export * from './fs-names.js';
 export * from './import-job.js';
 export * from './ipc/index.js';
 export * from './log.js';

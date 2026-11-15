@@ -17,6 +17,7 @@ export const ERROR_CODES = [
   'AI_BUDGET_EXCEEDED',
   'AI_PROVIDER_ERROR',
   'SECRET_UNAVAILABLE',
+  'READ_ONLY',
   'CANCELLED',
   'INTERNAL',
 ] as const;

@@ -28,8 +28,19 @@
     "AI_BUDGET_EXCEEDED": "Il tetto di utilizzo è stato raggiunto.",
     "AI_PROVIDER_ERROR": "Il fornitore AI ha restituito un errore.",
     "SECRET_UNAVAILABLE": "L'archivio sicuro non è disponibile su questo computer: le chiavi non si possono salvare.",
+    "READ_ONLY": "Le impostazioni sono state salvate da una versione più recente dell\\’app, quindi qui sono in sola lettura. Aggiorna l\\’app per modificarle.",
     "CANCELLED": "L'operazione è stata annullata.",
     "INTERNAL": "Qualcosa è andato storto."
+  },
+  "notices": {
+    "settingsReset": "Il file delle impostazioni non era utilizzabile ({{reason}}): l\\’app è ripartita con le impostazioni predefinite. Il file danneggiato è stato conservato come \"{{backup}}\" nella cartella dati dell\\’app; le librerie vanno aggiunte di nuovo.",
+    "settingsReadOnly": "Le impostazioni sono state salvate da una versione più recente dell\\’app (formato {{found}}, questa app capisce {{supported}}). Sono mostrate in sola lettura e non verrà modificato nulla. Aggiorna l\\’app per modificarle.",
+    "fields": "Campi: {{fields}}.",
+    "dismiss": "Chiudi",
+    "reason": {
+      "invalid-json": "non è un JSON valido",
+      "invalid-schema": "il contenuto non è nel formato previsto"
+    }
   },
   "validation": {
     "invalid": "Questo valore non è valido.",

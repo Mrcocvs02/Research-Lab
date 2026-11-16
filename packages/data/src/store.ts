@@ -230,7 +230,7 @@ class FileStore implements FileLibraryStore {
   private readonly queue: KeyedQueue;
   private readonly options: LibraryStoreOptions;
   private readonly change: ChangeContext | undefined;
-  /** Whether this change context already put its summary (and `undoOf`) on an entry: only the first one carries them. */
+  /** Whether this change context already wrote its summary on an entry: the next entries go without it (D-179). */
   private changeHeadLogged = false;
 
   constructor(options: LibraryStoreOptions, shared?: SharedState, change?: ChangeContext) {
@@ -647,12 +647,14 @@ class FileStore implements FileLibraryStore {
   async appendLog(entry: LogEntry): Promise<void> {
     let withCtx: LogEntry = entry;
     if (this.change && entry.type === 'change' && entry.changeId === undefined) {
-      // The summary and `undoOf` are a property of the group, not of each entry: a change on tens of thousands of documents
-      // would otherwise repeat them on every line and outgrow the part of the log that is read back (D-179).
-      const head = this.changeHeadLogged ? {} : { ...(this.change.summary ? { summary: this.change.summary } : {}), ...(this.change.undoOf ? { undoOf: this.change.undoOf } : {}) };
-      this.changeHeadLogged = true;
-      withCtx = { ...entry, changeId: this.change.changeId, ...head };
+      // The summary is a property of the group, not of each entry: a change on tens of thousands of documents would
+      // otherwise repeat it on every line and outgrow the part of the log that is read back (D-179). `undoOf` is short and
+      // stays on every entry, so that a group whose first lines fall outside that part is still known as an undo.
+      const head = !this.changeHeadLogged && this.change.summary ? { summary: this.change.summary } : {};
+      if ('summary' in head) this.changeHeadLogged = true;
+      withCtx = { ...entry, changeId: this.change.changeId, ...head, ...(this.change.undoOf ? { undoOf: this.change.undoOf } : {}) };
     }
+    const carriesHead = this.change !== undefined && 'summary' in withCtx && withCtx.summary !== undefined && withCtx.changeId === this.change.changeId;
     const valid = logEntrySchema.parse(withCtx);
     const month = valid.at.slice(0, 7);
     const rel = dataPath.logFile(valid.type === 'change' ? 'changes' : 'ai-sends', this.deviceId, month);
@@ -665,6 +667,8 @@ class FileStore implements FileLibraryStore {
         await appendFile(file, `${prefix}${JSON.stringify(valid)}\n`, 'utf8');
       }, this.retry),
     ).catch((e: unknown) => {
+      // The entry that should have carried the summary was not written: the next one carries it instead.
+      if (carriesHead) this.changeHeadLogged = false;
       throw e instanceof AppError ? e : new AppError('IO_ERROR', 'Cannot append to the log', { code: (e as NodeJS.ErrnoException).code ?? 'unknown' }, { cause: e });
     });
   }

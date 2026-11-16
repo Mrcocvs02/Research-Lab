@@ -331,6 +331,11 @@ describe('a bulk change is one change with one undo (D-178)', () => {
     expect((await store.documents.get(hex(1)))?.tags).toEqual([]);
     expect((await store.documents.get(hex(10)))?.tags).toEqual(['a']);
     expect(ok(await call('history:list', { limit: 10 })).items).toHaveLength(2);
+    // Every entry of the undo knows what it undoes (only the summary is logged once, D-179).
+    const undoEntries = (await store.readLog({ type: 'change' })).filter((e) => e.type === 'change' && e.changeId === undo.changeId);
+    expect(undoEntries).toHaveLength(todo);
+    expect(undoEntries.every((e) => e.type === 'change' && e.undoOf === tag.changeId)).toBe(true);
+    expect(undoEntries.filter((e) => e.type === 'change' && e.summary !== undefined)).toHaveLength(1);
     ok(await call('history:redo', {}));
     expect((await store.documents.get(hex(n - 1)))?.tags).toEqual(['a']);
     expect((await store.documents.get(hex(1)))?.tags).toEqual(['a']);

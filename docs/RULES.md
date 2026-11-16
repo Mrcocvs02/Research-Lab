@@ -19,3 +19,11 @@ Interfaccia in italiano e inglese (selezionabile), documentazione in italiano, c
 - Node.js 26 LTS in `C:\Program Files\nodejs`. Nel tool Bash (Git Bash) aggiungi prima: `export PATH="/c/Program Files/nodejs:$PATH"`.
 - Il repository sta in `C:\dev\research-lab`, fuori da OneDrive. Mai `node_modules` in una cartella sincronizzata.
 - La libreria reale di prova NON si committa: i test che la usano leggono il percorso dalla variabile d'ambiente `RL_FIXTURE_LIBRARY`, la copiano in una cartella temporanea e lavorano sulla copia; se la variabile manca il test viene saltato.
+
+## Commit e repository remoto
+- Repository remoto: `origin` = `https://github.com/Mrcocvs02/Research-Lab.git`, ramo `main`. L'agente principale fa push dopo ogni merge o correzione; i subagent non fanno mai push.
+- Nessun commit indica Claude come coautore: niente righe `Co-Authored-By` nei messaggi. L'identità git è quella locale del repository, già configurata.
+
+## Risorse della macchina
+- La macchina di sviluppo ha poca memoria libera: test pesanti (suite e2e completa, corpus da 1000 documenti, prove con file ostili) uno alla volta, mai in parallelo. Gli script `npm test` e `npm run test:e2e` si rifiutano di partire se la memoria disponibile è troppo bassa (`tools/mem-guard.mjs`).
+- Vitest usa al massimo 3 worker (`VITEST_MAX_WORKERS` per cambiarlo).

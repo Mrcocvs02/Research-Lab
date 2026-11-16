@@ -34,6 +34,7 @@ function setup(options: { cipher?: Cipher } = {}) {
     runtime: noRuntime,
     libraries: new LibraryService(settings, approved, secrets),
     secrets,
+    shell: { openPath: async () => '', showItemInFolder: () => {} },
     pickFolder: async () => picked,
     pickFile: async () => pickedFile,
     appInfo: () => ({ name: 'Research Lab', version: '0', platform: 'test', electron: 'x' }),

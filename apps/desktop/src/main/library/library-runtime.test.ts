@@ -99,6 +99,44 @@ describe('LibraryRuntime (real scanner, extractor and index; worker service in-p
     }
   });
 
+  it('organising through the runtime: tags, implications and edits reach the index and survive the next scan', async () => {
+    await put('a/alpha.md', 'Alpha text about kelp.\n');
+    await put('b/beta.md', 'Beta text about reefs.\n');
+    const { rt, store } = await open();
+    try {
+      rt.startScan();
+      await rt.whenIdle();
+      const ids = (await store.documents.list()).map((d) => d.id);
+      const org = rt.organizer;
+      const made = await org.applyTaxonomy([
+        { op: 'create', id: 'ocean', label: 'Ocean', aliases: ['sea'] },
+        { op: 'create', id: 'reef', label: 'Reef', parents: ['ocean'], implies: ['ocean'] },
+      ]);
+      await rt.reindexDocuments(made.reindex as never);
+      const tagged = await org.tagDocuments([ids[0] as string], ['reef']);
+      await rt.reindexDocuments(tagged.reindex as never);
+      // the implied tag and the alias both find it; the facets count it under both
+      expect((await rt.search({ text: '', filters: { tags: ['ocean'] } })).total).toBe(1);
+      expect((await rt.search({ text: 'sea' })).total).toBe(1);
+      expect((await rt.facets({ text: '' })).tags.map((t) => t.value).sort()).toEqual(['ocean', 'reef']);
+      const upd = await org.updateDocument(ids[1] as string, { title: 'My Beta', userDescription: 'a manatee remark' });
+      await rt.reindexDocuments(upd.reindex as never);
+      expect((await rt.search({ text: 'manatee' })).total).toBe(1);
+      // a full scan keeps what the user did
+      rt.startScan({ full: true });
+      await rt.whenIdle();
+      expect((await store.documents.get(ids[1] as never))?.title).toBe('My Beta');
+      expect((await rt.search({ text: '', filters: { tags: ['ocean'] } })).total).toBe(1);
+      expect((await rt.search({ text: 'manatee' })).total).toBe(1);
+      // undo is reflected after reindexing what it lists
+      const undone = await org.undo();
+      await rt.reindexDocuments(undone.reindex as never);
+      expect((await rt.search({ text: 'manatee' })).total).toBe(0);
+    } finally {
+      await rt.close();
+    }
+  });
+
   it('follows changes: new, changed, removed files; backs up first once the library has records', async () => {
     await put('one.md', 'First document about volcanoes.\n');
     await put('two.md', 'Second document about tides.\n');

@@ -17,6 +17,7 @@ import {
   type SearchResultPage,
   type TaxonomyFile,
 } from '@rl/core';
+import { createOrganizer, type Organizer, type OrganizerStore } from '@rl/data';
 import { enrichFromExtraction } from './enrich.js';
 import { buildIndexable, makeTaxonomyLookup, type TaxonomyLookup } from './indexable.js';
 import type { ExtractResult, IndexJob, LibraryWorker, RecordHost } from './worker-protocol.js';
@@ -122,6 +123,7 @@ export class LibraryRuntime {
   private scanConfig: ScanConfig = defaultLibraryConfig();
   private watcher: FileWatcher | null = null;
   private backedUp = false;
+  private org: Organizer | null = null;
   private taxonomyCache: { at: number; lookup: TaxonomyLookup } | null = null;
 
   private constructor(private readonly d: RuntimeDeps) {
@@ -467,6 +469,37 @@ export class LibraryRuntime {
         });
       }
     }
+  }
+
+  /**
+   * Organising operations of the active library (taxonomy, tags, document fields, projects, history). Every one
+   * writes through the store's queues; callers then `reindexDocuments` what the result lists.
+   */
+  get organizer(): Organizer {
+    if (!this.org) {
+      const store = this.d.store as Partial<OrganizerStore>;
+      if (typeof store.withChange !== 'function') throw new AppError('INTERNAL', 'The store cannot record changes');
+      this.org = createOrganizer({ store: this.d.store as OrganizerStore, deviceId: this.d.deviceId, now: this.d.now });
+    }
+    return this.org;
+  }
+
+  /** Same as `reindexDocument` for many documents: the taxonomy is read once and the worker gets batches of 25. */
+  async reindexDocuments(docIds: readonly DocumentId[]): Promise<void> {
+    if (docIds.length === 0) return;
+    this.taxonomyCache = null;
+    const taxonomy = await this.taxonomy();
+    const gone: DocumentId[] = [];
+    for (let i = 0; i < docIds.length; i += 25) {
+      const jobs: IndexJob[] = [];
+      for (const id of docIds.slice(i, i + 25)) {
+        const rec = await this.d.store.documents.get(id).catch(() => null);
+        if (!rec) gone.push(id);
+        else jobs.push({ doc: await buildIndexable(this.d.store, taxonomy, rec), text: 'keep' });
+      }
+      if (jobs.length > 0) await this.d.worker.index({ rootPath: this.d.rootPath, cacheDir: this.d.textCacheDir, jobs });
+    }
+    if (gone.length > 0) await this.d.worker.remove(gone);
   }
 
   /** Re-reads one document (record, notes, annotations) into the index; for edits made while the app runs. */

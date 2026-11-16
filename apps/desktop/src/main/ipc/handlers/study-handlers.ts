@@ -148,12 +148,14 @@ type Underlined = { value: boolean; origin: 'annotations' | 'manual' };
 export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotations'> => {
   const queue = new KeyedQueue();
   /** The annotations of one document change one at a time, together with the flag that follows them. */
-  const change = async <T>(docId: string, fn: (rt: LibraryRuntime) => Promise<{ value: T; changed: boolean; underlined: Underlined }>) => {
+  const change = async <T>(docId: string, fn: (rt: LibraryRuntime) => Promise<{ value: T; changed: boolean; flagChanged: boolean; underlined: Underlined }>) => {
     const rt = await activeDocument(s, docId);
     const r = await queue.run(`${rt.libraryId}|${docId}`, () => fn(rt));
     if (r.changed) {
       await refreshIndex(s, rt, docId);
       s.emit('library:changed', { kind: 'annotations', ids: [docId] });
+      // The "underlined" flag lives in the document record: lists showing it reload that document.
+      if (r.flagChanged) s.emit('library:changed', { kind: 'documents', ids: [docId] });
     }
     return r;
   };
@@ -191,7 +193,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
           return { ...base, forHash: rec.hash, annotations: list };
         });
         const u = await rt.organizer.syncUnderlined(docId, file.annotations.length > 0);
-        return { value: saved, changed: true, underlined: u.underlined };
+        return { value: saved, changed: true, flagChanged: u.changed, underlined: u.underlined };
       });
       return { annotation: r.value, underlined: r.underlined };
     },
@@ -203,7 +205,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
         // Nothing to remove: nothing is written (not even an empty file).
         if (current && removed) await rt.store.annotations.put({ ...current, annotations: list });
         const u = await rt.organizer.syncUnderlined(docId, list.length > 0);
-        return { value: removed, changed: removed || u.changed, underlined: u.underlined };
+        return { value: removed, changed: removed || u.changed, flagChanged: u.changed, underlined: u.underlined };
       });
       return { removed: r.value, underlined: r.underlined };
     },

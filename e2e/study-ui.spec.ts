@@ -22,17 +22,29 @@ async function openInReader(window: Page, title: string): Promise<void> {
   await row.getByTestId('row-read').click();
 }
 
-/** Selects the text of the first line of the first page, as a user dragging over it would. */
-async function selectFirstText(window: Page): Promise<void> {
-  const span = window.locator('[data-testid="reader-pages-area"] .page[data-page-number="1"] .textLayer span').filter({ hasText: /\w{4,}/ }).first();
-  await expect(span).toBeVisible({ timeout: 60_000 });
-  await span.evaluate((el) => {
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    const sel = document.getSelection()!;
-    sel.removeAllRanges();
-    sel.addRange(range);
-  });
+/**
+ * Selects, as a user dragging over it would, the first text line of page 1 that has a plain word of 6+ letters (not an identifier) outside the
+ * `exclude` text (the title: a search for that word must be answered by the highlight alone). Returns that word.
+ */
+async function selectLineWithWord(window: Page, exclude: string): Promise<string | null> {
+  const spans = window.locator('[data-testid="reader-pages-area"] .page[data-page-number="1"] .textLayer span');
+  await expect(spans.filter({ hasText: /\w{4,}/ }).first()).toBeVisible({ timeout: 60_000 });
+  return spans.evaluateAll((els, ex) => {
+    const all = els.map((e) => (e.textContent ?? '').toLowerCase()).join(' ');
+    const count = (w: string) => all.split(w.toLowerCase()).length - 1;
+    for (const el of els) {
+      // Not in the metadata shown by the list, and nowhere else on the page either.
+      const word = (el.textContent ?? '').split(/\s+/).find((w) => /^[A-Za-z]{6,}$/.test(w) && !ex.toLowerCase().includes(w.toLowerCase()) && count(w) === 1);
+      if (!word) continue;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = document.getSelection()!;
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return word;
+    }
+    return null;
+  }, exclude);
 }
 
 test('highlight a PDF in the reader, write a page note, restart, find both again (phase 3)', async ({}, testInfo) => {
@@ -54,6 +66,8 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
 
     // Open it in the reader from the list.
     await window.getByTestId('search-sort').selectOption('title');
+    // Everything the list shows about the document (title, authors, ...): a word from there would be answered by metadata.
+    const rowText = await rowByTitle(window, title).innerText();
     await openInReader(window, title);
     await expect(window.getByTestId('reader')).toBeVisible();
     await expect(window.getByTestId('reader-error')).toHaveCount(0);
@@ -66,12 +80,9 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
     expect(resources).toEqual([200, 200, 200]);
 
     // Select text and highlight it in green with a comment.
-    await selectFirstText(window);
+    const word = await selectLineWithWord(window, `${rowText} ${NOTE_WORD}`);
+    test.skip(!word, 'page 1 has no word outside the title');
     await expect(window.getByTestId('annotation-bar')).toBeVisible({ timeout: 10_000 });
-    // A word of the highlighted text that is not in the title: a search for it can only be answered by the highlight.
-    const highlighted = (await window.getByTestId('ann-text').textContent()) ?? '';
-    const word = highlighted.split(/[^A-Za-z]+/).find((w) => w.length >= 6 && !title.toLowerCase().includes(w.toLowerCase()) && !NOTE_WORD.includes(w.toLowerCase()));
-    test.skip(!word, 'the first line of text has no word that is outside the title');
     await window.getByTestId('ann-color-green').check({ force: true });
     await window.getByTestId('ann-comment').fill('worth a second look');
     await window.getByTestId('ann-highlight').click();
@@ -111,19 +122,17 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
     // Back to the library with the list intact; the search finds the note and says where.
     await window.getByTestId('reader-close').click();
     await expect(window.getByTestId('reader')).toHaveCount(0);
-    await window.getByTestId('search-input').fill(NOTE_WORD);
-    const label = window.getByTestId('hit-field').first();
-    await expect(label).toBeVisible({ timeout: 60_000 });
-    await expect(label).toHaveAttribute('data-field', 'note');
-    await expect(label).toHaveText('in your notes');
-
     // A word that is only in the highlighted text finds the document, labelled as a highlight.
     await window.getByTestId('search-input').fill(word!);
     const found = rowByTitle(window, title).getByTestId('hit-field');
     await expect(found).toBeVisible({ timeout: 60_000 });
     await expect(found).toHaveAttribute('data-field', 'annotation');
     await window.getByTestId('search-input').fill(NOTE_WORD);
-    await expect(window.getByTestId('hit-field').first()).toHaveAttribute('data-field', 'note', { timeout: 60_000 });
+    const label = window.getByTestId('hit-field').first();
+    await expect(label).toBeVisible({ timeout: 60_000 });
+    await expect(label).toHaveAttribute('data-field', 'note');
+    await expect(label).toHaveText('in your notes');
+
 
     // And the hit opens the reader on the list of the notes, one click away from the page note.
     await label.click();

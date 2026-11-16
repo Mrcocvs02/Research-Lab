@@ -94,8 +94,128 @@
     "title": "Chat",
     "collapse": "Comprimi il pannello della chat",
     "expand": "Espandi il pannello della chat",
-    "placeholder": "Qui comparirà la chat con Claude.",
-    "note": "Disponibile dopo aver collegato Claude."
+    "loading": "Caricamento della chat…",
+    "needsLibrary": "Apri una libreria per usare la chat.",
+    "palette": "Comandi",
+    "paletteShortcut": "Comandi (Ctrl+K)",
+    "paletteSearch": "Cerca un comando",
+    "paletteCustom": "tuo",
+    "paletteNone": "Nessun comando corrisponde.",
+    "paletteHint": "Scegliere un comando riempie la casella del messaggio. Non viene inviato nulla finché non premi Invia.",
+    "chipDocPage": "{{name}}, p. {{page}}",
+    "chipNote": "Nota: {{name}}",
+    "chipProject": "Progetto: {{name}}",
+    "chipOpen_doc": "Apri nel lettore",
+    "chipOpen_note": "Apri la nota di questo documento",
+    "chipOpen_project": "Apri il progetto",
+    "card": {
+      "running": "In corso",
+      "done": "Fatto",
+      "failed": "Non riuscito",
+      "more": "altri {{count}}"
+    },
+    "errors": {
+      "cancelled": "Annullato. Quanto scritto finora è stato conservato.",
+      "cap": "Il tetto di spesa mensile è stato raggiunto, quindi non è stato inviato nulla. Alza il tetto nelle impostazioni o aspetta il mese prossimo.",
+      "noAccess": "Nessun accesso a Claude. Accedi con Claude Code o salva una chiave API nelle impostazioni.",
+      "offline": "Claude non è raggiungibile: controlla la connessione a internet e riprova.",
+      "generic": "Claude non ha potuto rispondere. Riprova tra un momento."
+    },
+    "turnUsage": "{{input}} token in ingresso, {{output}} in uscita",
+    "withDocs_one": "Con {{count}} documento come contesto",
+    "withDocs_other": "Con {{count}} documenti come contesto",
+    "generated": "Generato dall'AI",
+    "thinking": "Sto pensando…",
+    "cards": "Azioni dell'assistente",
+    "removeContext": "Togli {{name}} dal contesto",
+    "openSettings": "Apri le impostazioni dell'AI",
+    "unavailable": {
+      "no-access": "L'AI non è disponibile: manca l'accesso a Claude.",
+      "offline": "L'AI non è disponibile: Claude non è raggiungibile.",
+      "cap-reached": "L'AI non è disponibile: il tetto di spesa mensile è stato raggiunto.",
+      "error": "L'AI al momento non è disponibile.",
+      "fix_no-access": "Per attivarla, accedi con lo strumento a riga di comando Claude Code su questo computer, oppure salva una chiave API nelle impostazioni. Il resto dell'app funziona come sempre.",
+      "fix_offline": "Controlla la connessione a internet. Il resto dell'app funziona come sempre.",
+      "fix_cap-reached": "Alza il tetto mensile nelle impostazioni o aspetta il mese prossimo. Il resto dell'app funziona come sempre.",
+      "fix_error": "Riprova più tardi o controlla le impostazioni dell'AI. Il resto dell'app funziona come sempre."
+    },
+    "noFolders": "Nessuna cartella è abilitata per l'AI, quindi nessun documento viene mai inviato.",
+    "new": "Nuova conversazione",
+    "history": "Cronologia",
+    "historyEmpty": "Ancora nessuna conversazione.",
+    "deleteTitle": "Elimina la conversazione",
+    "deleteConfirm": "Eliminare la conversazione \"{{title}}\" dalla cronologia? Il registro di ciò che è stato inviato a Claude conserva le sue voci.",
+    "delete": "Elimina",
+    "deleteOne": "Elimina {{title}}",
+    "turns_one": "{{count}} messaggio",
+    "turns_other": "{{count}} messaggi",
+    "empty": "Chiedi della tua libreria. Seleziona dei documenti nell'elenco, o aprine uno nel lettore, per darli come contesto.",
+    "conversation": "Conversazione",
+    "contextReader": "Contesto: il documento aperto, pagina {{page}}",
+    "context_one": "Contesto: {{count}} documento",
+    "context_other": "Contesto: {{count}} documenti",
+    "contextLimit": "Si possono dare al massimo {{limit}} documenti come contesto: verranno usati solo i primi {{limit}} su {{count}}.",
+    "input": "Messaggio",
+    "inputPlaceholder": "Scrivi un messaggio…",
+    "model": "Modello",
+    "reasoning": "Ragionamento",
+    "cancel": "Ferma",
+    "send": "Invia",
+    "shortcuts": "Invio manda, Maiusc+Invio va a capo. Ctrl+J mostra o nasconde la chat, Ctrl+K apre i comandi.",
+    "usage": "Questo mese: {{used}}",
+    "usageCap": "Questo mese: {{used}} su {{cap}}",
+    "preview": {
+      "title": "Inviare a Claude?",
+      "intro": "Questi documenti verranno inviati al modello {{model}}. Controllali prima di confermare.",
+      "allowed_one": "Inviato: {{count}} documento",
+      "allowed_other": "Inviati: {{count}} documenti",
+      "noneAllowed": "Nessun documento verrà inviato: parte solo il tuo messaggio.",
+      "refused_one": "Non inviato: {{count}} documento",
+      "refused_other": "Non inviati: {{count}} documenti",
+      "reason_folder-not-enabled": "la sua cartella non è abilitata per l'AI",
+      "reason_missing": "il file manca",
+      "reason_unknown": "il documento non è nella libreria",
+      "folders": "Cartelle:",
+      "tokens": "Circa {{tokens}} token in ingresso",
+      "noPrice": "costo non stimato",
+      "cost": "costo stimato {{usd}}",
+      "note": "L'invio viene registrato nel registro delle impostazioni dell'AI.",
+      "send": "Invia"
+    },
+    "commands": {
+      "describe": {
+        "label": "Descrivi questo articolo",
+        "prompt": "Descrivi l'articolo selezionato: di cosa parla, il metodo e i risultati principali, in poche frasi."
+      },
+      "tags": {
+        "label": "Tag e parole chiave",
+        "prompt": "Suggerisci tag e parole chiave per i documenti selezionati, usando i tag della mia tassonomia dove si adattano."
+      },
+      "related": {
+        "label": "Trova documenti correlati",
+        "prompt": "Trova nella mia libreria i documenti correlati a quello selezionato e spiega perché ciascuno lo è."
+      },
+      "readNext": {
+        "label": "Cosa leggere dopo",
+        "prompt": "In base a ciò che ho letto e ai miei progetti, cosa dovrei leggere dopo? Dammi un breve elenco ordinato con i motivi."
+      },
+      "summarizeSelection": {
+        "label": "Riassumi la selezione",
+        "prompt": "Riassumi insieme i documenti selezionati: temi comuni, differenze e domande aperte."
+      },
+      "updateProject": {
+        "label": "Aggiorna il progetto",
+        "prompt": "Aggiorna le note del mio progetto corrente con le novità dei documenti selezionati e proponi documenti da aggiungere."
+      },
+      "whatsNew": {
+        "label": "Controlla le novità",
+        "prompt": "Controlla le novità sugli argomenti della mia libreria dall'ultima volta ed elenca le pubblicazioni più rilevanti."
+      },
+      "secondBrain": {
+        "label": "Esporta il secondo cervello",
+        "prompt": "Prepara un'esportazione della mia libreria come secondo cervello: note, collegamenti tra documenti e un riassunto di ogni argomento."
+      }
+    }
   },
   "status": {
     "library": "Libreria: {{name}}",
@@ -363,7 +483,6 @@
       "intro": "Chiavi per la libreria \"{{name}}\". Sono conservate cifrate nell'archivio sicuro del sistema. Una volta salvate non si possono rivedere, solo sostituire o cancellare.",
       "storage": "Le chiavi non vengono mai scritte nella cartella della libreria né in file sincronizzati.",
       "names": {
-        "anthropic-api-key": "Chiave API Anthropic",
         "gemini-api-key": "Chiave API Gemini"
       },
       "set": "Impostata",
@@ -371,6 +490,64 @@
       "placeholder": "Incolla la chiave",
       "replacePlaceholder": "Incolla una nuova chiave per sostituirla",
       "delete": "Cancella"
+    },
+    "ai": {
+      "title": "Claude (AI)",
+      "intro": "Chat, tag e descrizioni usano Claude. Da nessuna cartella parte nulla finché non la abiliti qui sotto, e ogni invio è elencato nel registro.",
+      "nothingSent": "Nessuna cartella è abilitata: non viene inviato nulla a Claude.",
+      "foldersEnabled_one": "{{count}} cartella abilitata all'invio",
+      "foldersEnabled_other": "{{count}} cartelle abilitate all'invio",
+      "statusTitle": "Stato",
+      "provider": "Fornitore",
+      "access": "Accesso",
+      "refresh": "Ricontrolla",
+      "providers": {
+        "claude-agent-sdk": "Claude (Agent SDK)",
+        "anthropic-api": "API Anthropic",
+        "gemini": "Gemini",
+        "mock": "Fornitore di prova"
+      },
+      "auth": {
+        "claude-code": "Accesso di Claude Code",
+        "api-key": "Chiave API",
+        "none": "Nessuno"
+      },
+      "available": "Disponibile",
+      "notAvailable": "Non disponibile",
+      "reason": {
+        "no-access": "nessun accesso a Claude",
+        "offline": "Claude non è raggiungibile",
+        "cap-reached": "tetto mensile raggiunto",
+        "error": "errore"
+      },
+      "help": "Per attivare l'accesso, accedi con lo strumento a riga di comando Claude Code su questo computer (l'app usa quell'accesso), oppure salva una chiave API qui sotto.",
+      "statusUnknown": "Non è stato possibile leggere lo stato.",
+      "modelsTitle": "Modelli e limiti",
+      "apiKey": {
+        "title": "Chiave API (facoltativa)",
+        "hint": "Serve solo se non usi l'accesso di Claude Code. Resta nell'archivio sicuro del sistema e non viene più mostrata.",
+        "label": "Chiave API Anthropic",
+        "stored": "Salvata",
+        "notStored": "Non salvata",
+        "placeholder": "Incolla la chiave",
+        "replacePlaceholder": "Incolla una nuova chiave per sostituirla",
+        "store": "Salva la chiave",
+        "remove": "Rimuovi la chiave"
+      },
+      "log": {
+        "title": "Cosa è stato inviato a Claude",
+        "hint": "Ogni invio, dal più recente: quando, a quale modello, perché, quali documenti e quanto.",
+        "empty": "Non è ancora stato inviato nulla.",
+        "date": "Data",
+        "model": "Modello",
+        "purpose": "Scopo",
+        "documents": "Documenti",
+        "tokens": "Token",
+        "cost": "Costo",
+        "more": "Mostra altri",
+        "confirmed": "confermato",
+        "moreDocs": "altri {{count}}"
+      }
     }
   },
   "notify": {

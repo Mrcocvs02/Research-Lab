@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultLibraryConfig, type LibraryProfile } from '@rl/core';
 import i18n from '../i18n';
 import { AppProvider } from '../state/app-context';
+import { memoryAi } from '../testing/memoryAi';
 import { callsTo, memoryBackend, setHandlers } from '../testing/mockRl';
 import { Settings } from './Settings';
 
@@ -18,6 +19,7 @@ function setup(extra: Record<string, (p: any) => unknown> = {}) {
   const secrets = new Map<string, string>();
   setHandlers({
     ...handlers,
+    ...memoryAi().handlers,
     'library:getConfig': () => config,
     'library:setConfig': (p: any) => {
       config = { ...config, ...p.patch, ai: { ...config.ai, ...(p.patch.ai ?? {}) } };
@@ -96,22 +98,13 @@ describe('Settings', () => {
     expect(state.profiles).toHaveLength(1);
   });
 
-  it('edits the library config, validates models and the default model, and saves a full patch', async () => {
+  it('edits the library config (name, MCP, export presets) and saves a patch that leaves the AI settings alone', async () => {
     setup();
     await screen.findByTestId('library-config');
     fireEvent.change(screen.getByTestId('config-name'), { target: { value: '' } });
     expect(screen.getByText(/Enter a name/)).toBeTruthy();
     expect((screen.getByTestId('config-save') as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByTestId('config-name'), { target: { value: 'Alpha 2' } });
-
-    fireEvent.change(screen.getByLabelText('Monthly usage cap (USD)'), { target: { value: '-3' } });
-    expect(screen.getByText(/positive amount/)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Monthly usage cap (USD)'), { target: { value: '12.5' } });
-
-    fireEvent.click(screen.getByText('Add model'));
-    expect(screen.getAllByText('Enter a model id.').length).toBeGreaterThan(0);
-    expect((screen.getByTestId('config-save') as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByLabelText(/^Remove model\s*$/));
 
     fireEvent.click(screen.getByLabelText('Enable the MCP server'));
     fireEvent.click(screen.getByTestId('add-preset'));
@@ -123,26 +116,26 @@ describe('Settings', () => {
     expect(sent.libraryId).toBe('lib-a');
     expect(sent.patch).toMatchObject({
       name: 'Alpha 2',
-      aiEnabledFolders: [],
-      ai: { usageCap: { monthlyUsd: 12.5 } },
       mcp: { enabled: true, writeEnabled: false },
     });
     expect(sent.patch.exportPresets).toHaveLength(1);
+    expect(sent.patch).not.toHaveProperty('ai');
+    expect(sent.patch).not.toHaveProperty('aiEnabledFolders');
   });
 
   it('stores API keys write-only: only "set / not set" is ever shown', async () => {
     setup();
-    const status = await screen.findByTestId('secret-status-anthropic-api-key');
+    const status = await screen.findByTestId('secret-status-gemini-api-key');
     expect(status.textContent).toBe('Not set');
-    const input = screen.getByLabelText('Anthropic API key') as HTMLInputElement;
+    const input = screen.getByLabelText('Gemini API key') as HTMLInputElement;
     expect(input.type).toBe('password');
     fireEvent.change(input, { target: { value: 'sk-test-not-a-real-key' } });
     fireEvent.click(input.parentElement!.querySelector('button.primary')!);
-    await waitFor(() => expect(screen.getByTestId('secret-status-anthropic-api-key').textContent).toBe('Set'));
-    expect(callsTo('secrets:set')).toEqual([{ scope: { kind: 'library', libraryId: 'lib-a' }, name: 'anthropic-api-key', value: 'sk-test-not-a-real-key' }]);
-    expect((screen.getByLabelText('Anthropic API key') as HTMLInputElement).value).toBe('');
+    await waitFor(() => expect(screen.getByTestId('secret-status-gemini-api-key').textContent).toBe('Set'));
+    expect(callsTo('secrets:set')).toEqual([{ scope: { kind: 'library', libraryId: 'lib-a' }, name: 'gemini-api-key', value: 'sk-test-not-a-real-key' }]);
+    expect((screen.getByLabelText('Gemini API key') as HTMLInputElement).value).toBe('');
     expect(document.body.textContent).not.toContain('sk-test-not-a-real-key');
     fireEvent.click(screen.getAllByText('Delete')[0]!);
-    await waitFor(() => expect(screen.getByTestId('secret-status-anthropic-api-key').textContent).toBe('Not set'));
+    await waitFor(() => expect(screen.getByTestId('secret-status-gemini-api-key').textContent).toBe('Not set'));
   });
 });

@@ -105,9 +105,15 @@ function buildList(rows: Array<{ indent: number; ordered: boolean; text: string 
 
 const SAFE_LINK = /^(https?:\/\/|mailto:)/i;
 
+/**
+ * Optional hook of a caller that owns some link targets (the chat turns `lab://` links into chips): it returns the
+ * element for a link, or null to let the default rule decide (a safe web link, or plain text).
+ */
+export type LinkHook = (href: string, label: string, key: string) => ReactNode | null;
+
 interface Pattern {
   re: RegExp;
-  render(m: RegExpExecArray, key: string, depth: number): ReactNode;
+  render(m: RegExpExecArray, key: string, depth: number, hook?: LinkHook): ReactNode;
 }
 
 const PATTERNS: Pattern[] = [
@@ -115,22 +121,25 @@ const PATTERNS: Pattern[] = [
   { re: /!\[([^\]]*)\]\(([^)\s]*)\)/, render: (m, key) => <em key={key}>{safeText(m[1]!) || '[image]'}</em> },
   {
     re: /\[([^\]]+)\]\(([^)\s]+)\)/,
-    render: (m, key, depth) =>
-      SAFE_LINK.test(m[2]!) ? (
+    render: (m, key, depth, hook) => {
+      const owned = hook?.(m[2]!, m[1]!, key);
+      if (owned != null) return owned;
+      return SAFE_LINK.test(m[2]!) ? (
         <a key={key} href={m[2]} target="_blank" rel="noopener noreferrer">
-          {inline(m[1]!, `${key}l`, depth + 1)}
+          {inline(m[1]!, `${key}l`, depth + 1, hook)}
         </a>
       ) : (
-        <span key={key}>{inline(m[1]!, `${key}l`, depth + 1)}</span>
-      ),
+        <span key={key}>{inline(m[1]!, `${key}l`, depth + 1, hook)}</span>
+      );
+    },
   },
-  { re: /\*\*([^*]+?)\*\*|__([^_]+?)__/, render: (m, key, depth) => <strong key={key}>{inline(m[1] ?? m[2]!, `${key}b`, depth + 1)}</strong> },
-  { re: /~~([^~]+?)~~/, render: (m, key, depth) => <del key={key}>{inline(m[1]!, `${key}d`, depth + 1)}</del> },
-  { re: /\*([^*\s][^*]*?)\*|(?<![\p{L}\p{N}])_([^_\s][^_]*?)_(?![\p{L}\p{N}])/u, render: (m, key, depth) => <em key={key}>{inline(m[1] ?? m[2]!, `${key}e`, depth + 1)}</em> },
+  { re: /\*\*([^*]+?)\*\*|__([^_]+?)__/, render: (m, key, depth, hook) => <strong key={key}>{inline(m[1] ?? m[2]!, `${key}b`, depth + 1, hook)}</strong> },
+  { re: /~~([^~]+?)~~/, render: (m, key, depth, hook) => <del key={key}>{inline(m[1]!, `${key}d`, depth + 1, hook)}</del> },
+  { re: /\*([^*\s][^*]*?)\*|(?<![\p{L}\p{N}])_([^_\s][^_]*?)_(?![\p{L}\p{N}])/u, render: (m, key, depth, hook) => <em key={key}>{inline(m[1] ?? m[2]!, `${key}e`, depth + 1, hook)}</em> },
 ];
 
 /** Inline formatting of one paragraph; very long or deeply nested text is shown as plain text. */
-export function inline(text: string, keyBase = 'i', depth = 0): ReactNode[] {
+export function inline(text: string, keyBase = 'i', depth = 0, hook?: LinkHook): ReactNode[] {
   if (depth > MAX_DEPTH || text.length > MAX_INLINE) return [safeText(text)];
   const out: ReactNode[] = [];
   let rest = text;
@@ -146,38 +155,38 @@ export function inline(text: string, keyBase = 'i', depth = 0): ReactNode[] {
       break;
     }
     if (best.m.index > 0) out.push(safeText(rest.slice(0, best.m.index)));
-    out.push(best.p.render(best.m, `${keyBase}${n++}`, depth));
+    out.push(best.p.render(best.m, `${keyBase}${n++}`, depth, hook));
     rest = rest.slice(best.m.index + best.m[0].length);
   }
   return out;
 }
 
-function renderList(list: ListBlock, key: string): ReactNode {
+function renderList(list: ListBlock, key: string, hook?: LinkHook): ReactNode {
   const Tag = list.t;
   return (
     <Tag key={key}>
       {list.items.map((it, i) => (
         <li key={i}>
-          {inline(it.text, `${key}-${i}`)}
-          {it.children && renderList(it.children, `${key}-${i}c`)}
+          {inline(it.text, `${key}-${i}`, 0, hook)}
+          {it.children && renderList(it.children, `${key}-${i}c`, hook)}
         </li>
       ))}
     </Tag>
   );
 }
 
-export function renderBlocks(blocks: Block[]): ReactNode[] {
+export function renderBlocks(blocks: Block[], hook?: LinkHook): ReactNode[] {
   return blocks.map((b, i) => {
     const key = `b${i}`;
     switch (b.t) {
       case 'h': {
         const Tag = `h${Math.min(6, b.level + 1)}` as 'h2';
-        return <Tag key={key}>{inline(b.text, key)}</Tag>;
+        return <Tag key={key}>{inline(b.text, key, 0, hook)}</Tag>;
       }
       case 'p':
-        return <p key={key}>{inline(b.text, key)}</p>;
+        return <p key={key}>{inline(b.text, key, 0, hook)}</p>;
       case 'quote':
-        return <blockquote key={key}>{inline(b.text, key)}</blockquote>;
+        return <blockquote key={key}>{inline(b.text, key, 0, hook)}</blockquote>;
       case 'code':
         return (
           <pre key={key}>
@@ -187,16 +196,16 @@ export function renderBlocks(blocks: Block[]): ReactNode[] {
       case 'hr':
         return <hr key={key} />;
       default:
-        return renderList(b, key);
+        return renderList(b, key, hook);
     }
   });
 }
 
 /** Markdown text as safe React elements. */
-export function Markdown({ source, className }: { source: string; className?: string }) {
+export function Markdown({ source, className, linkHook }: { source: string; className?: string; linkHook?: LinkHook }) {
   return (
     <div className={className ? `markdown ${className}` : 'markdown'} data-testid="markdown">
-      {renderBlocks(parseBlocks(source))}
+      {renderBlocks(parseBlocks(source), linkHook)}
     </div>
   );
 }

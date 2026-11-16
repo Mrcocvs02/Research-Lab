@@ -1,10 +1,15 @@
-import { useId, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Lazy, lazyRetry } from '../components/Lazy';
+import { useAiUi } from '../lib/aiUi';
 import { useNotify } from '../lib/notify';
-import { useLocalFlag } from '../lib/useLocalFlag';
 import { useApp } from '../state/app-context';
 import { scanText } from '../views/library/ScanStatusText';
 import { useScanStatus } from '../views/library/useScanStatus';
+
+// The chat and the command palette (and all the AI code with them) load the first time they are shown.
+const ChatPanel = lazyRetry(() => import('../views/chat/ChatPanel').then((m) => ({ default: m.ChatPanel })));
+const Palette = lazyRetry(() => import('../views/chat/Palette').then((m) => ({ default: m.Palette })));
 
 export const SECTIONS = ['library', 'projects', 'network', 'inbox', 'settings'] as const;
 export type SectionId = (typeof SECTIONS)[number];
@@ -16,11 +21,18 @@ interface Props {
   children: ReactNode;
 }
 
-/** Window layout: sidebar, main area, collapsible chat panel placeholder, status bar. */
+/** Window layout: sidebar, main area, collapsible chat panel, status bar. */
 export function Shell({ section, onSection, onNewLibrary, children }: Props) {
   const { t } = useTranslation();
-  const [chatCollapsed, setChatCollapsed] = useLocalFlag('rl.chatCollapsed', false);
+  const { chatOpen, setChatOpen, paletteOpen, setPaletteOpen } = useAiUi();
+  const app = useApp();
+  const chatCollapsed = !chatOpen;
   const chatId = useId();
+  // The chat is mounted the first time the panel opens and then kept (hidden when collapsed), so a running answer goes on.
+  const [chatLoaded, setChatLoaded] = useState(chatOpen);
+  useEffect(() => {
+    if (chatOpen) setChatLoaded(true);
+  }, [chatOpen]);
 
   return (
     <div className="shell" data-testid="shell">
@@ -53,6 +65,11 @@ export function Shell({ section, onSection, onNewLibrary, children }: Props) {
       <aside className={chatCollapsed ? 'chat collapsed' : 'chat'} aria-label={t('chat.title')} data-testid="chat-panel">
         <div className="chat-head">
           {!chatCollapsed && <h2>{t('chat.title')}</h2>}
+          {!chatCollapsed && (
+            <button type="button" className="link chat-palette-button" onClick={() => setPaletteOpen(true)} title={t('chat.paletteShortcut')} data-testid="palette-open">
+              {t('chat.palette')}
+            </button>
+          )}
           <button
             type="button"
             className="icon-button"
@@ -60,17 +77,27 @@ export function Shell({ section, onSection, onNewLibrary, children }: Props) {
             aria-controls={chatId}
             aria-label={chatCollapsed ? t('chat.expand') : t('chat.collapse')}
             title={chatCollapsed ? t('chat.expand') : t('chat.collapse')}
-            onClick={() => setChatCollapsed(!chatCollapsed)}
+            onClick={() => setChatOpen(!chatOpen)}
             data-testid="chat-toggle"
           >
             <span aria-hidden="true">{chatCollapsed ? '‹' : '›'}</span>
           </button>
         </div>
         <div id={chatId} className="chat-body" hidden={chatCollapsed}>
-          <p>{t('chat.placeholder')}</p>
-          <p className="hint">{t('chat.note')}</p>
+          {chatLoaded && app.activeProfile ? (
+            <Lazy>
+              <ChatPanel key={app.activeProfile.id} />
+            </Lazy>
+          ) : (
+            <p className="hint">{app.activeProfile ? t('chat.loading') : t('chat.needsLibrary')}</p>
+          )}
         </div>
       </aside>
+      {paletteOpen && (
+        <Lazy>
+          <Palette onClose={() => setPaletteOpen(false)} />
+        </Lazy>
+      )}
 
       <StatusBar />
     </div>

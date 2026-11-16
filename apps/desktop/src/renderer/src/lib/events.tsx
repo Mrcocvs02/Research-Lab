@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { rl } from './rl';
 
-export type ChangeKind = 'documents' | 'taxonomy' | 'projects';
+export type ChangeKind = 'documents' | 'taxonomy' | 'projects' | 'notes' | 'annotations';
 type Versions = Record<ChangeKind, number>;
 
 interface EventsValue {
@@ -11,7 +11,7 @@ interface EventsValue {
   invalidateAll(): void;
 }
 
-const NONE: EventsValue = { versions: { documents: 0, taxonomy: 0, projects: 0 }, invalidate() {}, invalidateAll() {} };
+const NONE: EventsValue = { versions: { documents: 0, taxonomy: 0, projects: 0, notes: 0, annotations: 0 }, invalidate() {}, invalidateAll() {} };
 const Ctx = createContext<EventsValue>(NONE);
 
 /**
@@ -19,9 +19,9 @@ const Ctx = createContext<EventsValue>(NONE);
  * loading effect and reloads when it moves; nothing else is needed to stay current (checklist item 10).
  */
 export function LibraryEventsProvider({ children }: { children: ReactNode }) {
-  const [versions, setVersions] = useState<Versions>({ documents: 0, taxonomy: 0, projects: 0 });
+  const [versions, setVersions] = useState<Versions>({ documents: 0, taxonomy: 0, projects: 0, notes: 0, annotations: 0 });
   const invalidate = useCallback((kind: ChangeKind) => setVersions((v) => ({ ...v, [kind]: v[kind] + 1 })), []);
-  const invalidateAll = useCallback(() => setVersions((v) => ({ documents: v.documents + 1, taxonomy: v.taxonomy + 1, projects: v.projects + 1 })), []);
+  const invalidateAll = useCallback(() => setVersions((v) => ({ documents: v.documents + 1, taxonomy: v.taxonomy + 1, projects: v.projects + 1, notes: v.notes + 1, annotations: v.annotations + 1 })), []);
   useEffect(() => rl.on('library:changed', (e) => invalidate(e.kind)), [invalidate]);
   const value = useMemo(() => ({ versions, invalidate, invalidateAll }), [versions, invalidate, invalidateAll]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

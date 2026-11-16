@@ -90,7 +90,7 @@ export const libraryChannels = defineChannels('library', {
 /** Pushed after a change made through IPC (or undo/redo) so open views can reload. `ids`: affected ids when few. */
 export const libraryEvents = defineEvents('library', {
   changed: z.object({
-    kind: z.enum(['documents', 'taxonomy', 'projects']),
+    kind: z.enum(['documents', 'taxonomy', 'projects', 'notes', 'annotations']),
     ids: z.array(z.string()).max(500).optional(),
   }),
 });

@@ -71,6 +71,60 @@ export interface FileLibraryStore extends LibraryStore {
   issues(): LoadIssue[];
   /** Same store, but crediting another actor in the change log. */
   withActor(actor: ChangeEntry['actor']): FileLibraryStore;
+  /**
+   * Same store, but every change entry it logs carries `changeId` (and `summary`, `undoOf`): the entries of one user
+   * operation form one group that `history` can list and undo. Also turns on logging of document field and project
+   * changes, which the plain store does not log (only tags and taxonomy).
+   */
+  withChange(ctx: ChangeContext): FileLibraryStore;
+}
+
+export interface ChangeContext {
+  changeId: string;
+  summary?: string;
+  undoOf?: string;
+}
+
+/** The user-owned document fields whose before/after are logged when a change context is set (undo restores them). */
+export const LOGGED_DOCUMENT_FIELDS = ['title', 'authors', 'year', 'type', 'ref', 'doi', 'arxivId', 'userDescription', 'study', 'extracted'] as const;
+/** The project fields whose before/after are logged. */
+export const LOGGED_PROJECT_FIELDS = ['kind', 'name', 'description', 'status', 'members', 'notes', 'readingPlan', 'archivedFrom'] as const;
+
+/** `undefined` is not JSON: it is logged as `null` (and an absent `userDescription` as `''`). */
+export function logValue(key: string, value: unknown): unknown {
+  if (value === undefined) return key === 'userDescription' ? '' : null;
+  return value;
+}
+
+/** Stable JSON (sorted keys): equality of two values read at different times. */
+export function canonical(value: unknown): string {
+  const norm = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(norm);
+    if (v && typeof v === 'object') {
+      return Object.fromEntries(
+        Object.entries(v as Record<string, unknown>)
+          .filter(([, x]) => x !== undefined)
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, x]) => [k, norm(x)]),
+      );
+    }
+    return v;
+  };
+  return JSON.stringify(norm(value));
+}
+
+function changedFields(before: Record<string, unknown> | null, after: Record<string, unknown> | null, keys: readonly string[]): { before: Record<string, unknown>; after: Record<string, unknown> } | null {
+  const b: Record<string, unknown> = {};
+  const a: Record<string, unknown> = {};
+  for (const k of keys) {
+    const bv = logValue(k, before?.[k]);
+    const av = logValue(k, after?.[k]);
+    if (canonical(bv) !== canonical(av)) {
+      b[k] = bv;
+      a[k] = av;
+    }
+  }
+  return Object.keys(b).length > 0 ? { before: b, after: a } : null;
 }
 
 /** In-process serialisation: tasks with the same key run one after the other; a failure does not block the next. */
@@ -167,8 +221,10 @@ class FileStore implements FileLibraryStore {
   private readonly loadIssues: LoadIssue[];
   private readonly queue: KeyedQueue;
   private readonly options: LibraryStoreOptions;
+  private readonly change: ChangeContext | undefined;
 
-  constructor(options: LibraryStoreOptions, shared?: SharedState) {
+  constructor(options: LibraryStoreOptions, shared?: SharedState, change?: ChangeContext) {
+    this.change = change;
     if (!path.isAbsolute(options.rootPath)) throw new AppError('INVALID_PATH', 'Library root must be absolute');
     if (!DEVICE_ID.test(options.deviceId)) throw new AppError('INVALID_REQUEST', 'Invalid device id');
     this.options = options;
@@ -189,7 +245,11 @@ class FileStore implements FileLibraryStore {
   }
 
   withActor(actor: ChangeEntry['actor']): FileLibraryStore {
-    return new FileStore({ ...this.options, actor }, { issues: this.loadIssues, queue: this.queue });
+    return new FileStore({ ...this.options, actor }, { issues: this.loadIssues, queue: this.queue }, this.change);
+  }
+
+  withChange(ctx: ChangeContext): FileLibraryStore {
+    return new FileStore(this.options, { issues: this.loadIssues, queue: this.queue }, ctx);
   }
 
   /* ---------------------------- low level ---------------------------- */
@@ -381,6 +441,12 @@ class FileStore implements FileLibraryStore {
     });
   }
 
+  /** Field changes of a document and changes of a project are logged only inside a change context (user operations). */
+  private async logFields(kind: 'document' | 'project', id: string, action: string, diff: { before: Record<string, unknown>; after: Record<string, unknown> } | null): Promise<void> {
+    if (!this.change || diff === null) return;
+    await this.appendLog({ type: 'change', at: new Date().toISOString(), deviceId: this.deviceId, actor: this.actor, target: { kind, id }, action, before: diff.before, after: diff.after });
+  }
+
   readonly documents: ItemRepository<DocumentRecord, DocumentId> = this.repo<DocumentRecord, DocumentId>({
     dir: dataPath.documents,
     file: (id) => dataPath.document(id),
@@ -400,6 +466,9 @@ class FileStore implements FileLibraryStore {
       } else if (!sameTags(before.tags, after.tags)) {
         await this.logDocument(after.id, 'tags.update', { tags: before.tags }, { tags: after.tags });
       }
+      if (before !== null && this.change) {
+        await this.logFields('document', after.id, 'document.fields', changedFields(before as never, after as never, LOGGED_DOCUMENT_FIELDS));
+      }
     },
     onRemove: async (before) => this.logDocument(before.id, 'document.remove', { tags: before.tags, path: before.path }, null),
   });
@@ -418,6 +487,15 @@ class FileStore implements FileLibraryStore {
     schema: projectSchema,
     idSchema: itemIdSchema,
     idOf: (p) => p.id,
+    revision: {
+      get: (p) => p.revision ?? 0,
+      set: (p, n) => ({ ...p, revision: n }),
+    },
+    onPut: async (before, after) => {
+      if (before === null) await this.logFields('project', after.id, 'project.create', { before: {}, after: { project: after } });
+      else await this.logFields('project', after.id, 'project.update', changedFields(before as never, after as never, LOGGED_PROJECT_FIELDS));
+    },
+    onRemove: async (before) => this.logFields('project', before.id, 'project.remove', { before: { project: before }, after: {} }),
   });
 
   readonly annotations = {
@@ -555,7 +633,8 @@ class FileStore implements FileLibraryStore {
   }
 
   async appendLog(entry: LogEntry): Promise<void> {
-    const valid = logEntrySchema.parse(entry);
+    const withCtx = this.change && entry.type === 'change' && entry.changeId === undefined ? { ...entry, changeId: this.change.changeId, ...(this.change.summary ? { summary: this.change.summary } : {}), ...(this.change.undoOf ? { undoOf: this.change.undoOf } : {}) } : entry;
+    const valid = logEntrySchema.parse(withCtx);
     const month = valid.at.slice(0, 7);
     const rel = dataPath.logFile(valid.type === 'change' ? 'changes' : 'ai-sends', this.deviceId, month);
     const file = await this.abs(rel, true);

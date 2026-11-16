@@ -5,6 +5,12 @@ import type { LibraryService } from '../../library-service.js';
 import type { SettingsStore } from '../../settings-store.js';
 import type { EmitFn } from '../types.js';
 
+export interface ShellService {
+  /** Opens a file with the default application; resolves '' on success, else an error text (Electron's `shell.openPath`). */
+  openPath(absolutePath: string): Promise<string>;
+  showItemInFolder(absolutePath: string): void;
+}
+
 /**
  * Everything handlers may use. Handlers never import `electron`; main/index.ts builds this
  * object with the real implementations, tests build it with fakes.
@@ -18,6 +24,8 @@ export interface MainServices {
   /** Scan, index and search of the active library (see `library/`). */
   runtime: Pick<RuntimeManager, 'sync' | 'require' | 'status' | 'hold'>;
   secrets: SecretStore;
+  /** Opens files with the system (injected so that handlers are testable without Electron). Receives absolute paths resolved in main only. */
+  shell: ShellService;
   /** Native folder picker; resolves null when cancelled. */
   pickFolder(purpose: 'library-root' | 'legacy-index' | 'export-destination', title?: string): Promise<string | null>;
   /** Native single-file picker; resolves null when cancelled. */

@@ -3,6 +3,8 @@ import type { AiField, DocumentId, DocumentRecord, IndexableDocument, LibrarySto
 /** Words of the taxonomy that make a document findable: tag labels and aliases, type labels, venue names. */
 export interface TaxonomyLookup {
   tagTerms(ids: string[]): Record<string, string[]>;
+  /** The tags plus everything they imply, transitively (computed here, never stored on the record). */
+  expandTags(ids: readonly string[]): string[];
   tagLabel(id: string): string | undefined;
   typeLabel(id: string | null): string | undefined;
   venueName(id: string | undefined): string | undefined;
@@ -13,6 +15,19 @@ export function makeTaxonomyLookup(tax: Pick<TaxonomyFile, 'nodes' | 'documentTy
   const types = new Map((tax?.documentTypes ?? []).map((t) => [t.id, t]));
   const venues = new Map((tax?.venues ?? []).map((v) => [v.id, v]));
   return {
+    expandTags(ids) {
+      const out = new Set<string>(ids);
+      const stack = [...ids];
+      while (stack.length > 0) {
+        for (const next of nodes.get(stack.pop() as string)?.implies ?? []) {
+          if (!out.has(next)) {
+            out.add(next);
+            stack.push(next);
+          }
+        }
+      }
+      return [...out];
+    },
     tagTerms(ids) {
       const out: Record<string, string[]> = {};
       for (const id of ids) {
@@ -57,9 +72,11 @@ export async function buildIndexable(
   record: DocumentRecord,
   extraction?: { abstract?: string },
 ): Promise<Omit<IndexableDocument, 'pages'>> {
+  // Implied tags are searchable and filterable like the document's own (D-103): the index sees the expanded list.
+  const tags = taxonomy.expandTags(record.tags);
   const out: Omit<IndexableDocument, 'pages'> = {
-    record,
-    tagTerms: taxonomy.tagTerms(record.tags),
+    record: tags.length === record.tags.length ? record : { ...record, tags },
+    tagTerms: taxonomy.tagTerms(tags),
     typeLabel: taxonomy.typeLabel(record.type),
     venueName: taxonomy.venueName(record.ref.venueId),
     abstract: abstractOf(record, extraction),
@@ -67,7 +84,8 @@ export async function buildIndexable(
   };
   try {
     const notes = await src.notes.listForDocument(record.id as DocumentId);
-    out.notes = notes.map((n) => n.body).join('\n\n');
+    // The user's short description of the file is searched like a note.
+    out.notes = [record.userDescription, ...notes.map((n) => n.body)].filter(Boolean).join('\n\n');
   } catch {
     // keep what is indexed
   }

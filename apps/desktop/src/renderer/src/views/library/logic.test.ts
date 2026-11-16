@@ -40,16 +40,30 @@ describe('selection', () => {
   });
   it('arrow keys move the selection, shift extends, ctrl only moves the focus', () => {
     let s = moveSelect(emptySelection(), order, 1);
-    expect([s.active, [...s.ids]]).toEqual([0, ['a']]);
+    expect([s.active, [...s.ids]]).toEqual(['a', ['a']]);
     s = moveSelect(s, order, 1, { shift: true });
     s = moveSelect(s, order, 1, { shift: true });
     expect([...s.ids]).toEqual(['a', 'b', 'c']);
     s = moveSelect(s, order, 1, { ctrl: true });
-    expect([s.active, [...s.ids]]).toEqual([3, ['a', 'b', 'c']]);
+    expect([s.active, [...s.ids]]).toEqual(['d', ['a', 'b', 'c']]);
     s = toggleActive(s, order);
     expect([...s.ids].sort()).toEqual(['a', 'b', 'c', 'd']);
-    expect(moveSelect(s, order, 'end').active).toBe(4);
-    expect(moveSelect(s, order, -99).active).toBe(0);
+    expect(moveSelect(s, order, 'end').active).toBe('e');
+    expect(moveSelect(s, order, -99).active).toBe('a');
+  });
+  it('keeps focus and anchor by id when the list changes under them', () => {
+    let s = clickSelect(emptySelection(), order, 2); // c
+    // a new row arrives at the top: c moves from index 2 to 3, the focus stays on c
+    const next = ['n', 'a', 'b', 'c', 'd'];
+    expect(s.active).toBe('c');
+    expect([...moveSelect(s, next, 1).ids]).toEqual(['d']);
+    expect([...moveSelect(s, next, -1).ids]).toEqual(['b']);
+    s = clickSelect(s, next, 0, { shift: true });
+    expect([...s.ids].sort()).toEqual(['a', 'b', 'c', 'n']);
+    const lost = { ...emptySelection(), ids: new Set(['a']), active: 'gone' };
+    expect(toggleActive(lost, next)).toBe(lost);
+    // an active row that left the list: moving restarts from the edge instead of acting on another document
+    expect([...moveSelect({ ...emptySelection(), active: 'gone' }, next, 1).ids]).toEqual(['n']);
   });
   it('select all and holes', () => {
     expect(selectAll(order).ids.size).toBe(5);

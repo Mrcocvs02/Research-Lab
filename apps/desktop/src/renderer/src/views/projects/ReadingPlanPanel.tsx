@@ -10,13 +10,15 @@ interface Props {
   detail: ProjectDetail;
   /** Saves the whole plan (already ordered); the panel does not keep its own copy. */
   onChange(items: PlanItemView[]): void;
+  /** The state of an item is its document's: changing it updates the document, not the plan. */
+  onStudyState(docId: string, state: StudyState): void;
 }
 
 /**
  * The reading plan: an ordered list with a state per item. Reorder by dragging a row, with Alt+Up / Alt+Down on
  * a focused row, or with the move buttons; every route ends in the same `onChange`.
  */
-export function ReadingPlanPanel({ detail, onChange }: Props) {
+export function ReadingPlanPanel({ detail, onChange, onStudyState }: Props) {
   const { t } = useTranslation();
   const items = sortPlan(detail.readingPlan);
   const addable = notInPlan(detail.members, items);
@@ -30,7 +32,7 @@ export function ReadingPlanPanel({ detail, onChange }: Props) {
     onChange(moveItem(items, from, to));
     setAnnounce(t('plan.moved', { title: items[from]?.title ?? '', position: to + 1, total: items.length }));
   };
-  const setStatus = (i: number, status: StudyState) => onChange(items.map((it, j) => (j === i ? { ...it, status } : it)));
+  const setStatus = (i: number, state: StudyState) => items[i] && onStudyState(items[i]!.docId, state);
   const remove = (i: number) => onChange(items.filter((_, j) => j !== i).map((it, j) => ({ ...it, order: j })));
 
   const onKeyDown = (e: KeyboardEvent, i: number) => {

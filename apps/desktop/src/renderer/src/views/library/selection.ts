@@ -4,10 +4,10 @@
  */
 export interface SelectionState {
   ids: ReadonlySet<string>;
-  /** Start of a Shift range. */
-  anchor: number | null;
-  /** The row that has the keyboard focus. */
-  active: number | null;
+  /** Id of the row that starts a Shift range (tracked by id: the list can change under it). */
+  anchor: string | null;
+  /** Id of the row that has the keyboard focus. */
+  active: string | null;
 }
 
 export type Order = ReadonlyArray<string | undefined>;
@@ -15,6 +15,9 @@ export interface Mods {
   shift?: boolean;
   ctrl?: boolean;
 }
+
+/** Index of `id` in the order, or -1 (also when the row is not loaded or left the list). */
+export const indexOfId = (order: Order, id: string | null): number => (id === null ? -1 : order.indexOf(id));
 
 export const emptySelection = (): SelectionState => ({ ids: new Set(), anchor: null, active: null });
 
@@ -39,17 +42,18 @@ export function rangeHasHoles(order: Order, a: number, b: number): boolean {
 export function clickSelect(state: SelectionState, order: Order, index: number, mods: Mods = {}): SelectionState {
   const id = order[index];
   if (id === undefined) return state;
-  if (mods.shift && state.anchor !== null) {
-    const span = range(order, state.anchor, index);
-    return { ids: new Set(mods.ctrl ? [...state.ids, ...span] : span), anchor: state.anchor, active: index };
+  const anchorAt = indexOfId(order, state.anchor);
+  if (mods.shift && anchorAt >= 0) {
+    const span = range(order, anchorAt, index);
+    return { ids: new Set(mods.ctrl ? [...state.ids, ...span] : span), anchor: state.anchor, active: id };
   }
   if (mods.ctrl) {
     const ids = new Set(state.ids);
     if (ids.has(id)) ids.delete(id);
     else ids.add(id);
-    return { ids, anchor: index, active: index };
+    return { ids, anchor: id, active: id };
   }
-  return { ids: new Set([id]), anchor: index, active: index };
+  return { ids: new Set([id]), anchor: id, active: id };
 }
 
 export type Move = number | 'home' | 'end';
@@ -57,27 +61,31 @@ export type Move = number | 'home' | 'end';
 /** An arrow, Home or End key: moves the focus; Shift extends the range, Ctrl only moves the focus. */
 export function moveSelect(state: SelectionState, order: Order, move: Move, mods: Mods = {}): SelectionState {
   if (order.length === 0) return state;
-  const from = state.active ?? (typeof move === 'number' && move < 0 ? order.length : -1);
+  const activeAt = indexOfId(order, state.active);
+  const from = activeAt >= 0 ? activeAt : typeof move === 'number' && move < 0 ? order.length : -1;
   const target = move === 'home' ? 0 : move === 'end' ? order.length - 1 : from + move;
-  const active = Math.max(0, Math.min(order.length - 1, target));
-  if (mods.ctrl && !mods.shift) return { ...state, active };
+  const at = Math.max(0, Math.min(order.length - 1, target));
+  const id = order[at] ?? null;
+  if (mods.ctrl && !mods.shift) return { ...state, active: id };
   if (mods.shift) {
-    const anchor = state.anchor ?? (state.active ?? active);
-    return { ids: new Set(range(order, anchor, active)), anchor, active };
+    const anchorAt = indexOfId(order, state.anchor);
+    const from2 = anchorAt >= 0 ? anchorAt : activeAt >= 0 ? activeAt : at;
+    return { ids: new Set(range(order, from2, at)), anchor: order[from2] ?? id, active: id };
   }
-  const id = order[active];
-  return { ids: id === undefined ? new Set() : new Set([id]), anchor: active, active };
+  return { ids: id === null ? new Set() : new Set([id]), anchor: id, active: id };
 }
 
 /** Space with Ctrl: toggles the focused row without touching the rest. */
 export function toggleActive(state: SelectionState, order: Order): SelectionState {
-  if (state.active === null) return state;
-  return clickSelect(state, order, state.active, { ctrl: true });
+  const at = indexOfId(order, state.active);
+  if (at < 0) return state;
+  return clickSelect(state, order, at, { ctrl: true });
 }
 
+/** Selects every id of `order` (the whole result, loaded or not: see `DocList.allIds`). */
 export function selectAll(order: Order): SelectionState {
   const ids = order.filter((x): x is string => x !== undefined);
-  return { ids: new Set(ids), anchor: 0, active: Math.max(0, order.length - 1) };
+  return { ids: new Set(ids), anchor: ids[0] ?? null, active: ids[ids.length - 1] ?? null };
 }
 
 export const selectedCount = (s: SelectionState) => s.ids.size;

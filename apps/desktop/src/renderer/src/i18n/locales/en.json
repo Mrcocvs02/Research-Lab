@@ -478,6 +478,8 @@
     "currentTags": "Tags on the selection",
     "noTags": "None of the selected documents has tags.",
     "onCount": "on {{count}} of {{total}}",
+    "implied": "implied",
+    "impliedHint": "Implied by another tag; remove that one instead.",
     "remove": "Remove…",
     "removeConfirm_one": "Remove from {{count}} document",
     "removeConfirm_other": "Remove from {{count}} documents"

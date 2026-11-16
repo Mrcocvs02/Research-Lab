@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { LaunchedApp } from './helpers/launch';
-import { ipc } from './helpers/phase1';
+import { ipc, ipcData } from './helpers/phase1';
 import { backToList, clickRow, createTagInManager, openSyntheticLibrary, pickTag, rowByTitle, rows } from './helpers/ui';
 
 /**
@@ -179,6 +179,44 @@ test('keyboard: arrows, Shift, Ctrl+A, Enter opens the card, Delete deletes noth
     await rows(window).first().click();
     await list.press('Enter');
     await expect(window.getByTestId('doc-panel')).toBeVisible();
+    await ctx.verifyLibraryUntouched();
+  } finally {
+    await ctx?.close();
+  }
+});
+
+test('bulk tags follow the selected ids and the selection survives a refresh; Enter acts on the focused document (review fixes 1 and 3)', async ({}, testInfo) => {
+  test.setTimeout(300_000);
+  let ctx: LaunchedApp | undefined;
+  try {
+    const opened = await openSyntheticLibrary(testInfo, 'papers');
+    ctx = opened.ctx;
+    const { window, total } = opened;
+    await window.getByTestId('search-sort').selectOption('title');
+    const list = window.getByTestId('search-results');
+    await rows(window).first().click();
+    await list.press('Control+a');
+    await expect(window.getByTestId('selection-count')).toHaveText(new RegExp(`${total} selected`));
+    await window.getByTestId('selection-details').click();
+    const bulk = window.getByTestId('bulk-panel');
+    await pickTag(window, bulk.getByTestId('bulk-tag-input'), 'First topic', true);
+    await expect(bulk.getByTestId('bulk-tag')).toHaveCount(1);
+    // the change reloaded the list: the selection and the counter are still the whole result
+    await expect(window.getByTestId('selection-count')).toHaveText(new RegExp(`${total} selected`));
+    await pickTag(window, bulk.getByTestId('bulk-tag-input'), 'Second topic', true);
+    await expect(bulk.getByTestId('bulk-tag')).toHaveCount(2);
+    for (const item of await bulk.getByTestId('bulk-tag').all()) await expect(item).toContainText(`on ${total} of ${total}`);
+    await expect(window.getByTestId('selection-count')).toHaveText(new RegExp(`${total} selected`));
+
+    // Focus by id: a title change elsewhere moves the first row to the end; Enter still opens the focused document.
+    await window.getByTestId('selection-clear').click();
+    const items = (await ipcData<{ items: Array<{ docId: string }> }>(window, 'documents:list', { sort: 'title' })).items;
+    await rows(window).nth(1).click();
+    const focused = await rows(window).nth(1).getAttribute('data-doc-id');
+    await ipcData(window, 'documents:update', { docId: items[0]!.docId, patch: { title: 'Zzz moved to the end' } });
+    await expect(rows(window).last()).toContainText('Zzz moved to the end');
+    await list.press('Enter');
+    await expect(window.getByTestId('doc-panel')).toHaveAttribute('data-doc-id', focused!);
     await ctx.verifyLibraryUntouched();
   } finally {
     await ctx?.close();

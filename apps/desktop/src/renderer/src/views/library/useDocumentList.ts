@@ -16,7 +16,10 @@ export interface DocRow {
   type: string | null;
   path: string;
   studyState: StudyState;
+  /** Every tag, the implied ones included. */
   tags: string[];
+  /** Only the tags put on the document by hand (the ones that can be removed); falls back to `tags` until the main process sends it. */
+  directTags: string[];
   addedAt: string;
   missing: boolean;
   /** File size in bytes. */
@@ -27,6 +30,10 @@ export interface DocRow {
 }
 
 export const PAGE_SIZE = 100;
+/** Rows per call when only ids are wanted (the largest page the server allows). */
+const IDS_PAGE = 200;
+/** A refresh re-reads at most this many already loaded pages besides the first. */
+const REFRESH_PAGES = 30;
 const DEBOUNCE_MS = 150;
 
 const fromSummary = (s: SummaryItem): DocRow => ({
@@ -38,13 +45,14 @@ const fromSummary = (s: SummaryItem): DocRow => ({
   path: s.path,
   studyState: s.studyState,
   tags: s.tags,
+  directTags: s.directTags ?? s.tags,
   addedAt: s.addedAt,
   missing: s.missing,
   size: s.size,
 });
 
 const fromHit = (h: Hit): DocRow => {
-  const row: DocRow = { docId: h.docId, title: h.title, authors: h.authors, year: h.year, type: h.type, path: h.path, studyState: h.studyState, tags: h.tags, addedAt: '', missing: false, size: h.size, snippet: h.snippet, field: h.field };
+  const row: DocRow = { docId: h.docId, title: h.title, authors: h.authors, year: h.year, type: h.type, path: h.path, studyState: h.studyState, tags: h.tags, directTags: h.directTags ?? h.tags, addedAt: '', missing: false, size: h.size, snippet: h.snippet, field: h.field };
   if (h.pages) row.pages = h.pages;
   return row;
 };
@@ -61,8 +69,10 @@ export interface DocList {
   rowAt(index: number): DocRow | undefined;
   /** Asks for the pages that cover rows `start`..`end` (inclusive). */
   ensure(start: number, end: number): void;
-  /** Loads every row (for "select all" and range selection across unloaded pages). */
+  /** Loads every row (range selection across unloaded pages, tag counts of a big selection). */
   loadAll(): Promise<DocRow[]>;
+  /** The ids of the whole current result, in list order. Pages are asked from the server and only their ids are kept. */
+  allIds(): Promise<string[]>;
   /** The ids in list order; `undefined` for rows not loaded yet. */
   ids(): Array<string | undefined>;
 }
@@ -126,7 +136,18 @@ export function useDocumentList(plan: QueryPlan, enabled: boolean, refreshKey: s
           try {
             const r = await fetchPage(p, 0, PAGE_SIZE, true);
             if (mine !== ticket.current) return;
-            store.current = { key: p.key, total: r.total, pages: new Map([[0, r.rows]]), asked: new Set([0]) };
+            const pages = new Map<number, DocRow[]>([[0, r.rows]]);
+            // Same query: keep the pages that were showing, so rows (and the selection's active row) do not vanish.
+            const again = sameQuery ? [...store.current.pages.keys()].filter((n) => n > 0 && n * PAGE_SIZE < r.total).sort((a, b) => a - b).slice(0, REFRESH_PAGES) : [];
+            for (let i = 0; i < again.length; i += 4) {
+              await Promise.all(
+                again.slice(i, i + 4).map(async (n) => {
+                  pages.set(n, (await fetchPage(p, n * PAGE_SIZE, PAGE_SIZE, false)).rows);
+                }),
+              );
+              if (mine !== ticket.current) return;
+            }
+            store.current = { key: p.key, total: r.total, pages, asked: new Set(pages.keys()) };
             setState({ loading: false, error: null, facets: r.facets ?? null, forText: p.text });
             bump();
           } catch (error) {
@@ -192,6 +213,22 @@ export function useDocumentList(plan: QueryPlan, enabled: boolean, refreshKey: s
     return out;
   }, [fetchPage]);
 
+  const allIds = useCallback(async (): Promise<string[]> => {
+    const s = store.current;
+    const pageCount = Math.ceil(s.total / PAGE_SIZE);
+    if (Array.from({ length: pageCount }, (_, p) => p).every((p) => s.pages.has(p))) return ids().filter((x): x is string => x !== undefined);
+    const p = planRef.current;
+    const calls = Math.ceil(s.total / IDS_PAGE);
+    const out: string[][] = [];
+    for (let i = 0; i < calls; i += 4) {
+      const batch = await Promise.all(
+        Array.from({ length: Math.min(4, calls - i) }, async (_, k) => (await fetchPage(p, (i + k) * IDS_PAGE, IDS_PAGE, false)).rows.map((r) => r.docId)),
+      );
+      out.push(...batch);
+    }
+    return out.flat();
+  }, [fetchPage, ids]);
+
   return {
     total: store.current.total,
     loading: state.loading,
@@ -202,6 +239,7 @@ export function useDocumentList(plan: QueryPlan, enabled: boolean, refreshKey: s
     rowAt,
     ensure,
     loadAll,
+    allIds,
     ids,
   };
 }

@@ -412,24 +412,38 @@ export function formatSize(bytes: number): string {
 }
 
 /** Editing the tags of several documents at once: add one, or remove one of those the selection carries. */
-export function BulkTagEditor({ rows, onClose }: { rows: DocRow[]; onClose(): void }) {
+export function BulkTagEditor({ docIds, rows, onNeedRows, onClose }: { docIds: string[]; rows: DocRow[]; onNeedRows?(): void; onClose(): void }) {
   const { t } = useTranslation();
   const { model } = useTaxonomy();
   const { tag, createAndAdd } = useTagActions();
-  const docIds = useMemo(() => rows.map((r) => r.docId), [rows]);
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
 
+  // Actions and counts follow the selected ids; the tags shown come from the rows loaded so far, so ask for the rest.
+  useEffect(() => {
+    if (rows.length < docIds.length) onNeedRows?.();
+  }, [rows.length, docIds.length, onNeedRows]);
+
+  /** Tags put by hand (removable) first, then the ones that are only implied by another tag (shown as such, not removable). */
   const counts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of rows) for (const id of r.tags ?? []) m.set(id, (m.get(id) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+    const direct = new Map<string, number>();
+    const implied = new Map<string, number>();
+    for (const r of rows) {
+      const own = r.directTags ?? r.tags ?? [];
+      for (const id of own) direct.set(id, (direct.get(id) ?? 0) + 1);
+      for (const id of r.tags ?? []) if (!own.includes(id)) implied.set(id, (implied.get(id) ?? 0) + 1);
+    }
+    const byCount = (a: [string, number], b: [string, number]) => b[1] - a[1];
+    return [
+      ...[...direct.entries()].sort(byCount).map(([id, n]) => ({ id, n, implied: false })),
+      ...[...implied.entries()].filter(([id]) => !direct.has(id)).sort(byCount).map(([id, n]) => ({ id, n, implied: true })),
+    ];
   }, [rows]);
 
   return (
     <div className="doc-card-panel" data-testid="bulk-panel">
       <header className="panel-head">
         <div className="panel-title">
-          <h2 data-testid="bulk-title">{t('bulk.title', { count: rows.length })}</h2>
+          <h2 data-testid="bulk-title">{t('bulk.title', { count: docIds.length })}</h2>
         </div>
         <button type="button" className="icon-button" aria-label={t('common.close')} onClick={onClose}>
           <span aria-hidden="true">×</span>
@@ -448,13 +462,17 @@ export function BulkTagEditor({ rows, onClose }: { rows: DocRow[]; onClose(): vo
       <Section title={t('bulk.currentTags')}>
         {counts.length === 0 && <p className="hint">{t('bulk.noTags')}</p>}
         <ul className="bulk-tags">
-          {counts.map(([id, n]) => {
+          {counts.map(({ id, n, implied }) => {
             const node = model.byId.get(resolveId(model, id));
             return (
-              <li key={id} data-testid="bulk-tag" data-tag={id}>
+              <li key={id} data-testid="bulk-tag" data-tag={id} data-implied={implied ? 1 : 0}>
                 <TagChip label={node?.label ?? id} color={node?.color} id={id} />
-                <span className="facet-count">{t('bulk.onCount', { count: n, total: rows.length })}</span>
-                {pendingRemove === id ? (
+                <span className="facet-count">{t('bulk.onCount', { count: n, total: docIds.length })}</span>
+                {implied ? (
+                  <span className="badge" title={t('bulk.impliedHint')} data-testid="bulk-implied">
+                    {t('bulk.implied')}
+                  </span>
+                ) : pendingRemove === id ? (
                   <span className="confirm-inline">
                     <button
                       type="button"

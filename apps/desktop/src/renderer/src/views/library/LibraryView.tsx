@@ -91,6 +91,8 @@ function LibraryInner() {
   }, [selection, list.version]);
 
   const selectedIds = useMemo(() => [...selection.ids], [selection]);
+  const loadAll = list.loadAll;
+  const needRows = useCallback(() => void loadAll().catch(() => {}), [loadAll]);
   const single = selection.ids.size === 1 ? selectedIds[0]! : null;
   const showPanel = detailOpen && selection.ids.size > 0;
   const anything = hasAnyCondition(browse);
@@ -236,7 +238,7 @@ function LibraryInner() {
 
           {showPanel && (
             <aside className="detail-pane" aria-label={t('docs.details')} data-testid="detail-pane" onKeyDown={(e) => e.key === 'Escape' && setDetailOpen(false)}>
-              {single ? <DocumentCard key={single} docId={single} onClose={() => setDetailOpen(false)} /> : <BulkTagEditor rows={selectedRows} onClose={() => setDetailOpen(false)} />}
+              {single ? <DocumentCard key={single} docId={single} onClose={() => setDetailOpen(false)} /> : <BulkTagEditor docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onClose={() => setDetailOpen(false)} />}
             </aside>
           )}
         </div>

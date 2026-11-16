@@ -1,11 +1,11 @@
-import { memo, useCallback, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { memo, useCallback, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppError } from '@rl/core';
 import { VirtualList } from '../../components/VirtualList';
 import { rl } from '../../lib/rl';
 import { useNotify } from '../../lib/notify';
 import type { DocList, DocRow } from './useDocumentList';
-import { clickSelect, emptySelection, moveSelect, rangeHasHoles, selectAll, toggleActive, type SelectionState } from './selection';
+import { clickSelect, emptySelection, indexOfId, moveSelect, rangeHasHoles, selectAll, toggleActive, type SelectionState } from './selection';
 import { formatSize } from './formatSize';
 import { safeText } from './safeText';
 import { plainSnippet, Snippet } from './Snippet';
@@ -173,14 +173,18 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
   const reveal = useCallback((docId: string) => rl.invoke('documents:reveal', { docId }).catch(reportError), [reportError]);
 
   /** Row ids in order, loading everything first when a range crosses rows that are not loaded. */
-  const orderFor = (from: number | null, to: number): Array<string | undefined> | Promise<Array<string | undefined>> => {
+  const orderFor = (fromId: string | null, to: number): Array<string | undefined> | Promise<Array<string | undefined>> => {
     const order = list.ids();
-    if (from !== null && rangeHasHoles(order, from, to)) return list.loadAll().then(() => list.ids());
+    if (fromId !== null) {
+      const from = order.indexOf(fromId);
+      // An anchor that is not loaded (its page was dropped) or a range over unloaded rows: load everything first.
+      if (from < 0 || rangeHasHoles(order, from, to)) return list.loadAll().then(() => list.ids());
+    }
     return order;
   };
 
   /** Applies  to the order now when every row is loaded, else after loading them (a range across pages). */
-  const withOrder = (from: number | null, to: number, apply: (order: Array<string | undefined>) => void) => {
+  const withOrder = (from: string | null, to: number, apply: (order: Array<string | undefined>) => void) => {
     const order = orderFor(from, to);
     if (Array.isArray(order)) apply(order);
     else void order.then(apply);
@@ -225,20 +229,22 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
     if (move !== null) {
       e.preventDefault();
       const cur = selRef.current;
-      const target = move === 'home' ? 0 : move === 'end' ? list.total - 1 : (cur.active ?? (move < 0 ? list.total : -1)) + move;
+      const activeAt = indexOfId(list.ids(), cur.active);
+      const target = move === 'home' ? 0 : move === 'end' ? list.total - 1 : (activeAt >= 0 ? activeAt : move < 0 ? list.total : -1) + move;
       const m = move;
       withOrder(mods.shift ? (cur.anchor ?? cur.active) : null, Math.max(0, Math.min(list.total - 1, target)), (order) => onSelection(moveSelect(cur, order, m, mods)));
       return;
     }
     if ((e.key === 'a' || e.key === 'A') && mods.ctrl) {
       e.preventDefault();
-      void list.loadAll().then(() => onSelection(selectAll(list.ids())));
+      // Ids only: the rows that are not loaded stay on the server.
+      void list.allIds().then((ids) => onSelection(selectAll(ids)), reportError);
     } else if (e.key === ' ' && mods.ctrl) {
       e.preventDefault();
       onSelection(toggleActive(selRef.current, list.ids()));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      const id = selRef.current.active !== null ? list.ids()[selRef.current.active] : undefined;
+      const id = selRef.current.active;
       if (id) void (mods.ctrl ? openFile(id) : onOpenDetail(id));
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
@@ -249,7 +255,10 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
     }
   };
 
-  const activeRow = selection.active !== null ? list.rowAt(selection.active) : undefined;
+  // The focus is tracked by id; its position follows the list when rows are added, removed or reordered.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const activeIndex = useMemo(() => { const at = indexOfId(list.ids(), selection.active); return at >= 0 ? at : null; }, [list.version, list.total, selection.active]);
+  const activeRow = activeIndex !== null ? list.rowAt(activeIndex) : undefined;
   const itemHeight = view === 'grid' ? ROW_HEIGHT.card : searching ? ROW_HEIGHT.search : ROW_HEIGHT.browse;
   const range = useCallback((a: number, b: number) => list.ensure(a, b), [list]);
 
@@ -261,7 +270,7 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
       {...(view === 'grid' ? { minColumnWidth: CARD_MIN_WIDTH } : {})}
       onRange={range}
       onColumns={setColumns}
-      activeIndex={selection.active}
+      activeIndex={activeIndex}
       ariaLabel={ariaLabel}
       multiselectable
       activeId={activeRow ? `doc-${activeRow.docId}` : undefined}
@@ -275,7 +284,7 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
             row={row}
             view={view}
             selected={row ? selection.ids.has(row.docId) : false}
-            active={selection.active === i}
+            active={row ? selection.active === row.docId : false}
             searching={searching}
             onClick={(e) => click(i, e)}
             onDoubleClick={() => row && void openFile(row.docId)}

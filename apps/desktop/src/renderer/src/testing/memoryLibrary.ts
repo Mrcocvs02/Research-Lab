@@ -46,7 +46,7 @@ interface FakeProject {
   archivedFrom?: string;
   revision: number;
   members: Array<{ docId: string; addedAt: string }>;
-  plan: Array<{ docId: string; order: number; status?: string }>;
+  plan: Array<{ docId: string; order: number }>;
 }
 
 const NOW = '2026-01-01T00:00:00.000Z';
@@ -78,7 +78,7 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     nodes: init.nodes ?? ([] as FakeNode[]),
     projects: init.projects ?? ([] as FakeProject[]),
     taxRevision: 1,
-    history: [] as Array<{ id: string; summary: string; action: string; undone: boolean; undo(): void; redo(): void }>,
+    history: [] as Array<{ id: string; summary: string; action: string; undone: boolean; dead?: boolean; undo(): void; redo(): void }>,
     nextId: 1,
   };
   const snapshot = () => structuredClone({ docs: state.docs, nodes: state.nodes, projects: state.projects });
@@ -88,13 +88,15 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     state.projects = s.projects;
   };
   /** Runs a mutation and records it as an undoable change. */
-  const change = <T>(action: string, summary: string, kind: 'documents' | 'taxonomy' | 'projects', fn: () => T): T & { changeId: string } => {
+  const change = <T>(action: string, summary: string, kind: 'documents' | 'taxonomy' | 'projects', fn: () => T, ids?: string[]): T & { changeId: string } => {
+    // A new change ends the redo line: what was undone before can no longer be redone.
+    for (const h of state.history) if (h.undone) h.dead = true;
     const before = snapshot();
     const result = fn();
     const after = snapshot();
     const id = `c${state.nextId++}`;
     state.history.unshift({ id, summary, action, undone: false, undo: () => restore(structuredClone(before)), redo: () => restore(structuredClone(after)) });
-    emitEvent('library:changed', { kind });
+    emitEvent('library:changed', ids ? { kind, ids } : { kind });
     return { ...(result as object), changeId: id } as T & { changeId: string };
   };
 
@@ -128,6 +130,7 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     path: d.path,
     studyState: d.studyState,
     tags: tagsWithImplied(d),
+    directTags: [...d.tags],
     addedAt: d.addedAt,
     missing: Boolean(d.missing),
     size: d.size ?? 1234,
@@ -135,6 +138,7 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
   const matches = (d: FakeDoc, text: string, f: any = {}) => {
     const t = (text ?? '').trim().toLowerCase();
     if (t && !`${d.title} ${d.authors.join(' ')}`.toLowerCase().includes(t)) return false;
+    if (d.missing && !f.includeMissing) return false;
     const has = (tag: string) => tagsWithImplied(d).some((x) => descendantsOf(tag).has(x));
     for (const tag of f.tags ?? []) if (!has(tag)) return false;
     if (f.tagsAny?.length && !f.tagsAny.some(has)) return false;
@@ -175,7 +179,7 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     years: bucket(docs.filter((d) => d.year).map((d) => String(d.year))),
     folders: [],
   });
-  const hit = (d: FakeDoc) => ({ docId: d.docId, title: d.title, authors: d.authors, year: d.year, type: d.type, path: d.path, studyState: d.studyState, score: 1, field: 'title', snippet: d.title ?? '', size: d.size ?? 1234, tags: tagsWithImplied(d) });
+  const hit = (d: FakeDoc) => ({ docId: d.docId, title: d.title, authors: d.authors, year: d.year, type: d.type, path: d.path, studyState: d.studyState, score: 1, field: 'title', snippet: d.title ?? '', size: d.size ?? 1234, tags: tagsWithImplied(d), directTags: [...d.tags] });
 
   const counts = (n: FakeNode) => {
     const direct = state.docs.filter((d) => d.tags.includes(n.id)).length;
@@ -245,7 +249,7 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
         const d = doc(m.docId);
         return { docId: m.docId, addedAt: m.addedAt, known: Boolean(d), missing: false, title: d?.title ?? null, authors: d?.authors ?? [], year: d?.year ?? null, path: d?.path ?? null, studyState: d?.studyState ?? null };
       }),
-      readingPlan: [...p.plan].sort((a, b) => a.order - b.order).map((it) => ({ ...it, studyState: doc(it.docId)?.studyState ?? null, title: doc(it.docId)?.title ?? null, missing: false })),
+      readingPlan: [...p.plan].sort((a, b) => a.order - b.order).map((it) => ({ ...it, status: doc(it.docId)?.studyState ?? 'to-read', studyState: doc(it.docId)?.studyState ?? null, title: doc(it.docId)?.title ?? null, missing: false })),
     };
   };
   const project = (id: string) => {
@@ -272,7 +276,7 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
       const d = state.docs.find((x) => x.docId === p.docId);
       if (!d) throw new AppError('NOT_FOUND', 'doc');
       if (p.expectedRevision !== undefined && p.expectedRevision !== (d.revision ?? 0)) throw new AppError('CONFLICT', 'revision');
-      return change('document.fields', 'Document fields changed', 'documents', () => {
+      const out = change('document.fields', 'Document fields changed', 'documents', () => {
         const patch = p.patch;
         if ('title' in patch) d.title = patch.title;
         if ('authors' in patch) d.authors = patch.authors;
@@ -286,7 +290,11 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
         if ('underlined' in patch) d.underlined = patch.underlined;
         d.revision = (d.revision ?? 0) + 1;
         return { document: record(d) };
-      });
+      }, [d.docId]);
+      // Projects that hold the document follow its study state.
+      const involved = state.projects.filter((x) => x.members.some((m) => m.docId === d.docId)).map((x) => x.id);
+      if (involved.length > 0) emitEvent('library:changed', { kind: 'projects', ids: involved });
+      return out;
     },
     'documents:tag': (p) => {
       let changed = 0;
@@ -392,6 +400,8 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     },
     'history:list': () => ({
       items: state.history.map((h) => ({ changeId: h.id, at: NOW, deviceId: 'dev', actor: 'user', kind: 'change', action: h.action, summary: h.summary, counts: { documents: 1, taxonomy: 0, projects: 0 }, undoable: !h.undone, undone: h.undone, mine: true })),
+      canUndo: state.history.some((h) => !h.undone),
+      canRedo: state.history.some((h) => h.undone && !h.dead),
     }),
     'history:undo': (p) => {
       const h = p.changeId ? state.history.find((x) => x.id === p.changeId) : state.history.find((x) => !x.undone);

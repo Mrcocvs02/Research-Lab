@@ -59,4 +59,15 @@ describe('mock provider', () => {
     expect(r.value).toEqual({ n: 1 });
     await expect(s.completeStructured({ model: 'm', reasoning: 'low', system: '', prompt: 'p', schema: z.object({ n: z.string() }), source: 'cmd' })).rejects.toMatchObject({ code: 'AI_PROVIDER_ERROR' });
   });
+
+  it('demo flow: intro text, a search card, then an answer linking a real document', async () => {
+    const p = createMockAiProvider({ demo: true });
+    const tools = [{ name: 'search_library', description: '', input: z.object({ query: z.string() }), writes: false, run: async () => ({ summary: 'Searched', docIds: [], data: { items: [{ id: '00000000000000aa' }] } }) }];
+    const ev = await collect(p.chat(req({ tools, messages: [{ role: 'user', content: 'Summarize this paper' }] })));
+    expect(ev.map((e) => e.type)).toEqual(['text-delta', 'tool-call', 'tool-result', 'text-delta', 'text-delta', 'usage', 'done']);
+    const text = ev.filter((e): e is Extract<ChatEvent, { type: 'text-delta' }> => e.type === 'text-delta').map((e) => e.text).join('');
+    expect(text).toContain('lab://doc/00000000000000aa?page=1');
+    const ctx = await collect(p.chat(req({ tools, messages: [{ role: 'user', content: '<<<DATA document\nid: 00000000000000bb\ntitle: x\nDATA>>>\nUser request:\nhi' }] })));
+    expect(JSON.stringify(ctx)).toContain('lab://doc/00000000000000bb?page=1');
+  });
 });

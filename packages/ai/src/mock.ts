@@ -21,6 +21,11 @@ export interface MockScript {
   /** Ends the turn with this error event instead of `done`. */
   fail?: { code: 'AI_PROVIDER_ERROR' | 'AI_BUDGET_EXCEEDED'; message: string };
   usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
+  /**
+   * Demo flow for the e2e runtime (`RL_AI_PROVIDER=mock`): a short intro, a `search_library` card, then an answer that links a REAL
+   * document (`lab://doc/<id>?page=1`: the first context document, else the first search hit). Ignored when `reply` or `toolCalls` are set.
+   */
+  demo?: boolean;
   /** `ai:status` answers for the mock. */
   access?: AiAccess;
   available?: boolean;
@@ -80,26 +85,41 @@ export function createMockAiProvider(script: MockScript = {}): AiProviderEx {
         yield { type: 'error', code: 'AI_PROVIDER_ERROR', message: e instanceof Error ? e.message : 'mock script failed' };
         return;
       }
-      const calls = [...(script.toolCalls ?? []), ...parseToolDirectives(last)];
+      const demo = script.demo === true && script.reply === undefined && script.toolCalls === undefined;
+      const calls = demo ? [] : [...(script.toolCalls ?? []), ...parseToolDirectives(last)];
       let n = 0;
-      for (const call of calls) {
-        if (request.signal?.aborted) return yield cancelled();
+      let foundId: string | undefined;
+      const runCall = async function* (call: { name: string; input: unknown }): AsyncGenerator<ChatEvent> {
         const id = `mock-tool-${++n}`;
         yield { type: 'tool-call', id, name: call.name, input: call.input };
         const spec = request.tools?.find((t) => t.name === call.name);
         if (!spec) {
           yield { type: 'tool-result', id, name: call.name, ok: false, summary: `Unknown tool ${call.name}` };
-          continue;
+          return;
         }
         try {
           const result = await spec.run(call.input, request.signal ? { signal: request.signal } : {});
+          const items = isToolResult(result) ? (result.data as { items?: Array<{ id?: string }> } | null)?.items : undefined;
+          foundId ??= items?.[0]?.id;
           yield { type: 'tool-result', id, name: call.name, ok: true, summary: isToolResult(result) ? result.summary : 'Done' };
         } catch (e) {
           const err = AppError.from(e);
           yield { type: 'tool-result', id, name: call.name, ok: false, summary: `${err.code}: ${err.message}`.slice(0, 300) };
         }
+      };
+      for (const call of calls) {
+        if (request.signal?.aborted) return yield cancelled();
+        yield* runCall(call);
       }
-      const chunkList = script.chunkList ?? split(reply, script.chunks ?? 4);
+      let chunkList = script.chunkList ?? split(reply, script.chunks ?? 4);
+      if (demo) {
+        const intro = 'Let me check the library. ';
+        yield { type: 'text-delta', text: intro };
+        const word = last.replace(/User request:|<<<DATA[\s\S]*?DATA>>>/g, ' ').match(/[\p{L}\p{N}]{4,}/gu)?.sort((a, b) => b.length - a.length)[0] ?? 'paper';
+        yield* runCall({ name: 'search_library', input: { query: word } });
+        const id = last.match(/<<<DATA document\r?\nid: ([0-9a-f]{16})/)?.[1] ?? foundId;
+        chunkList = [id ? `Here is the paper: [Source](lab://doc/${id}?page=1). ` : 'I found nothing relevant. ', 'This is a mock answer.'];
+      }
       for (const text of chunkList) {
         if (script.delayMs) await abortableSleep(script.delayMs, request.signal);
         if (request.signal?.aborted) return yield cancelled();

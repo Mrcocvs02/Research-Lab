@@ -56,7 +56,8 @@ export default defineConfig({
       // `scan-worker` is the worker thread of the library runtime (scan, text extraction, index writes).
       rollupOptions: {
         // Dependencies of the workspace packages that must stay real node modules (pdf.js finds its own worker file by path).
-        external: ['pdfjs-dist', /^pdfjs-dist\//, 'fflate'],
+        // The Agent SDK (about 5 MB, plus a platform executable) is imported dynamically on the first AI use and never bundled (D-205).
+        external: ['pdfjs-dist', /^pdfjs-dist\//, 'fflate', '@anthropic-ai/claude-agent-sdk', /^@anthropic-ai\/claude-agent-sdk\//],
         input: {
           index: resolve(import.meta.dirname, 'src/main/index.ts'),
           'scan-worker': resolve(import.meta.dirname, 'src/main/scan-worker.ts'),

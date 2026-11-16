@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, safeStorage, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, net, safeStorage, session, shell } from 'electron';
 import path from 'node:path';
 import { backupDataDir, createLegacyImporter, createLibraryStore, createWatcher } from '@rl/data';
 import { createSearchIndex } from '@rl/search';
@@ -22,6 +22,8 @@ import { e2eDialogOverride } from './dialog-override.js';
 import { resolveAppDirs } from './dirs.js';
 import { presentPdf } from './ipc/handlers/doc-files.js';
 import { buildHandlers, type MainServices } from './ipc/handlers/index.js';
+import { createProviderFactory } from './ai/provider-factory.js';
+import { abortAllChatTurns } from './ai/service.js';
 import { createBackupPolicy } from './library/backup-policy.js';
 import { RuntimeManager } from './library/runtime-manager.js';
 import { spawnScanWorker, watchdogFromEnv } from './library/worker-host.js';
@@ -127,6 +129,9 @@ async function main(): Promise<void> {
     appInfo: () => ({ name: APP_NAME, version: app.getVersion(), platform: process.platform, electron: process.versions.electron ?? '' }),
     createImporter: (options) => createLegacyImporter(options),
     backupDataDir: (libraryId, dataDir) => backupPolicy(libraryId, dataDir, { force: true }),
+    // RL_AI_PROVIDER=mock is honoured only in a development run (runtime.aiProvider is null when packaged).
+    aiProvider: createProviderFactory({ forceMock: runtime.aiProvider === 'mock', mockScript: { demo: true }, localDataDir: dirs.localData, secrets, clientApp: `research-lab/${app.getVersion()}` }),
+    isOnline: () => net.isOnline(),
   };
 
   // The reader loads PDFs through rl-doc://; every request looks the document up in the active library again.
@@ -166,6 +171,8 @@ async function main(): Promise<void> {
     if (quitting) return;
     event.preventDefault();
     quitting = true;
+    // A running chat turn owns a Claude Code process: it ends with the app.
+    abortAllChatTurns();
     // A worker stuck in a synchronous loop must not keep the app from quitting: after a limit it is killed.
     const limit = new Promise<void>((resolve) => setTimeout(resolve, 15_000).unref());
     void Promise.race([runtimeManager.closeAll(), limit])

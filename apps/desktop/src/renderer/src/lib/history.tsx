@@ -1,7 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
-import { AppError } from '@rl/core';
+import { RlError } from './rl-error';
 import { useApp } from '../state/app-context';
 import { useLibraryEvents } from './events';
 import { useNotify } from './notify';
@@ -89,7 +89,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         invalidateAll();
       } catch (e) {
         // Nothing to undo is an ordinary answer, not a failure.
-        if (AppError.from(e).code === 'NOT_FOUND') info(t(kind === 'undo' ? 'history.nothingToUndo' : 'history.nothingToRedo'));
+        if (RlError.from(e).code === 'NOT_FOUND') info(t(kind === 'undo' ? 'history.nothingToUndo' : 'history.nothingToRedo'));
         else reportError(e);
       } finally {
         busyRef.current = false;
@@ -131,6 +131,9 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+// The panel with the list of changes is only needed when it is opened.
+const HistoryPanel = lazy(() => import('./HistoryPanel').then((m) => ({ default: m.HistoryPanel })));
+
 /** Undo and redo buttons plus the "History" panel with the recent changes. */
 export function HistoryControls() {
   const { t } = useTranslation();
@@ -148,59 +151,10 @@ export function HistoryControls() {
       <button type="button" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(!open)} data-testid="history-toggle">
         {t('history.title')}
       </button>
-      {open && <HistoryPanel id={panelId} onClose={() => setOpen(false)} />}
-    </div>
-  );
-}
-
-export function HistoryPanel({ id, onClose }: { id: string; onClose(): void }) {
-  const { t, i18n } = useTranslation();
-  const h = useHistory();
-  const time = (iso: string) => {
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(i18n.language);
-  };
-  return (
-    <div className="history-panel" id={id} role="region" aria-label={t('history.title')} data-testid="history-panel" onKeyDown={(e) => e.key === 'Escape' && onClose()}>
-      <div className="history-head">
-        <h2>{t('history.title')}</h2>
-        <button type="button" className="icon-button" aria-label={t('common.close')} onClick={onClose}>
-          <span aria-hidden="true">×</span>
-        </button>
-      </div>
-      {h.items.length === 0 ? (
-        <p className="hint" data-testid="history-empty">
-          {t('history.empty')}
-        </p>
-      ) : (
-        <ol className="history-list">
-          {h.items.map((item) => (
-            <li key={item.changeId} className={item.undone ? 'history-item undone' : 'history-item'} data-testid="history-item" data-change-id={item.changeId} data-action={item.action}>
-              <div className="history-line">
-                <span className="history-summary">
-                  {t(`history.actions.${item.action.replaceAll(".", "_")}`, { defaultValue: item.summary, documents: item.counts.documents, tags: item.counts.taxonomy, projects: item.counts.projects })}
-                </span>
-                {item.actor === 'ai' && <span className="ai-badge">{t('ai.badge')}</span>}
-              </div>
-              <div className="history-meta">
-                <span>{time(item.at)}</span>
-                {item.kind !== 'change' && <span className="badge">{t(`history.kind.${item.kind}`)}</span>}
-                {item.undone && <span className="badge">{t('history.undoneBadge')}</span>}
-                {!item.mine && <span className="badge">{t('history.otherDevice')}</span>}
-                {item.undoable && !item.undone && item.mine && (
-                  <button type="button" className="link" disabled={h.busy} onClick={() => void h.undo(item.changeId)} data-testid="history-undo-item">
-                    {t('history.undoThis')}
-                  </button>
-                )}
-                {item.undone && item.mine && (
-                  <button type="button" className="link" disabled={h.busy} onClick={() => void h.redo(item.changeId)} data-testid="history-redo-item">
-                    {t('history.redoThis')}
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ol>
+      {open && (
+        <Suspense fallback={null}>
+          <HistoryPanel id={panelId} onClose={() => setOpen(false)} />
+        </Suspense>
       )}
     </div>
   );

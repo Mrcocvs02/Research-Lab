@@ -218,6 +218,38 @@ describe('LibraryView: selection', () => {
   });
 });
 
+describe('LibraryView: select all and missing documents', () => {
+  it('Ctrl+A on a result that is not loaded asks for the ids only, with the same filters and text', async () => {
+    const docs = makeDocs(250);
+    setup({ docs });
+    await ready();
+    type('search-input', 'Paper');
+    await waitFor(() => expect(screen.getByTestId('results-pane').dataset.query).toBe('Paper'));
+    const listCalls = callsTo('documents:list').length + callsTo('search:query').length;
+    fireEvent.keyDown(screen.getByTestId('search-results'), { key: 'a', ctrlKey: true });
+    await waitFor(() => expect(screen.getByTestId('selection-count').textContent).toBe('250 selected'));
+    expect(callsTo('documents:ids')).toHaveLength(1);
+    expect(callsTo('documents:ids')[0]).toMatchObject({ text: 'Paper', sort: 'relevance' });
+    // No page of rows was downloaded just to get the ids.
+    expect(callsTo('documents:list').length + callsTo('search:query').length).toBe(listCalls);
+  });
+
+  it('shows the documents whose file is missing only when asked', async () => {
+    const docs = makeDocs(4);
+    docs[1]!.missing = true;
+    setup({ docs });
+    await ready();
+    expect(rows()).toHaveLength(3);
+    fireEvent.click(screen.getByTestId('show-missing'));
+    await waitFor(() => expect(rows()).toHaveLength(4));
+    expect(rowOf('Paper 0001').textContent).toContain('file missing');
+    // It is a view option, not a filter: there is nothing to clear.
+    expect(screen.queryByTestId('search-clear-filters')).toBeNull();
+    fireEvent.click(screen.getByTestId('show-missing'));
+    await waitFor(() => expect(rows()).toHaveLength(3));
+  });
+});
+
 describe('LibraryView: tags', () => {
   async function selectTwo() {
     await ready();
@@ -587,15 +619,16 @@ describe('LibraryView: phase 2 review fixes', () => {
     expect(screen.getByTestId('bulk-title').textContent).toContain('250');
   });
 
-  it('Ctrl+A asks the server for ids in big pages and does not keep the rows', async () => {
+  it('Ctrl+A asks the server for the ids in one call and does not download the rows', async () => {
     setup({ docs: makeDocs(1000) });
     await ready();
     fireEvent.click(rowOf('Paper 0000'));
     fireEvent.keyDown(screen.getByTestId('search-results'), { key: 'a', ctrlKey: true });
     await waitFor(() => expect(countText()).toBe('1000 selected'));
-    const sizes = callsTo('documents:list').map((c) => c.limit);
-    expect(sizes.filter((n) => n === 200)).toHaveLength(5);
-    expect(sizes.filter((n) => n === 100).length).toBeLessThanOrEqual(2);
+    expect(callsTo('documents:ids')).toHaveLength(1);
+    // Only the first page of rows was ever loaded (the one the list shows).
+    expect(callsTo('documents:list').every((c) => c.limit === 100)).toBe(true);
+    expect(callsTo('documents:list').length).toBeLessThanOrEqual(2);
   });
 
   it('keeps Enter and the arrows on the same document when the list changes under the focus', async () => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NoticeBanner } from './components/NoticeBanner';
 import { ErrorNote } from './components/ui';
@@ -6,12 +6,14 @@ import { errorMessage } from './lib/errors';
 import { LibraryEventsProvider } from './lib/events';
 import { HistoryProvider } from './lib/history';
 import { NotifyProvider } from './lib/notify';
-import { Settings } from './settings/Settings';
-import { ProjectsView } from './views/projects/ProjectsView';
 import { LibraryView } from './views/library/LibraryView';
 import { Shell, type SectionId } from './shell/Shell';
 import { AppProvider, useApp } from './state/app-context';
-import { Wizard } from './wizard/Wizard';
+
+// Only the Library view is part of the first screen; the others load when they are opened (docs/RULES.md, lightness).
+const Settings = lazy(() => import('./settings/Settings').then((m) => ({ default: m.Settings })));
+const ProjectsView = lazy(() => import('./views/projects/ProjectsView').then((m) => ({ default: m.ProjectsView })));
+const Wizard = lazy(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })));
 
 export function App() {
   return (
@@ -36,7 +38,7 @@ function Root() {
   if (!app.ready) {
     return (
       <p className="boot" role="status">
-        {t('common.loading')}
+        {t('common.loading', { defaultValue: '' })}
       </p>
     );
   }
@@ -64,6 +66,7 @@ function Root() {
     <>
       <NoticeBanner />
       <Shell section={section} onSection={setSection} onNewLibrary={() => setWizardOpen(true)}>
+        <Suspense fallback={null}>
         {section === 'settings' ? (
           <Settings onNewLibrary={() => setWizardOpen(true)} />
         ) : section === 'library' && app.activeProfile && !showWizard ? (
@@ -73,8 +76,13 @@ function Root() {
         ) : (
           <Placeholder section={section} />
         )}
+        </Suspense>
       </Shell>
-      {showWizard && <Wizard key={wizardOpen ? 'new' : 'first'} onFinished={() => void finished()} onCancel={hasLibraries ? () => setWizardOpen(false) : undefined} />}
+      {showWizard && (
+        <Suspense fallback={null}>
+          <Wizard key={wizardOpen ? 'new' : 'first'} onFinished={() => void finished()} onCancel={hasLibraries ? () => setWizardOpen(false) : undefined} />
+        </Suspense>
+      )}
     </>
   );
 }

@@ -8,6 +8,8 @@ const workspacePackages = ['@rl/core', '@rl/data', '@rl/search', '@rl/ai', '@rl/
 export default defineConfig({
   main: {
     build: {
+      // electron-vite builds main, preload and renderer unminified by default; minified code is smaller to read from disk and to parse.
+      minify: 'oxc',
       externalizeDeps: { exclude: workspacePackages },
       // `scan-worker` is the worker thread of the library runtime (scan, text extraction, index writes).
       rollupOptions: {
@@ -22,6 +24,7 @@ export default defineConfig({
   },
   preload: {
     build: {
+      minify: 'oxc',
       // Sandboxed preloads can only require 'electron': bundle everything else, as CommonJS.
       externalizeDeps: false,
       rollupOptions: {
@@ -34,7 +37,15 @@ export default defineConfig({
     root: resolve(import.meta.dirname, 'src/renderer'),
     plugins: [react()],
     build: {
-      rollupOptions: { input: { index: resolve(import.meta.dirname, 'src/renderer/index.html') } },
+      minify: 'oxc',
+      cssMinify: true,
+      rollupOptions: {
+        input: { index: resolve(import.meta.dirname, 'src/renderer/index.html') },
+        // `@rl/core` is one barrel whose modules build zod schemas at load time: without this, importing one constant from
+        // it keeps all of zod (about 300 KB) in the first screen. The package has no side effects other than defining
+        // its exports, so what the renderer does not use can go (zod itself is then only in the chunks that use it).
+        treeshake: { moduleSideEffects: (id: string) => !/[\/]packages[\/]core[\/]src[\/]/.test(id) },
+      },
     },
   },
 });

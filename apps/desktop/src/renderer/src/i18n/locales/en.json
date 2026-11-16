@@ -170,6 +170,7 @@
       "read": "Read"
     },
     "sort": "Sort by",
+    "showMissing": "Show missing documents",
     "sorts": {
       "relevance": "Relevance",
       "title": "Title",

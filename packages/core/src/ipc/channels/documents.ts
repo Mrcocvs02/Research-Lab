@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { documentIdSchema, isoDateSchema, itemIdSchema, relativePathSchema } from '../../common.js';
 import { DOCUMENT_LIMITS, documentRecordSchema, studyStateSchema } from '../../model/document.js';
 import { defineChannels } from '../registry.js';
-import { listSortSchema, searchFiltersSchema, SEARCH_LIMITS } from './search.js';
+import { listSortSchema, searchFiltersSchema, searchSortSchema, SEARCH_LIMITS } from './search.js';
 
 export const documentSummarySchema = z.object({
   docId: documentIdSchema,
@@ -71,6 +71,20 @@ export const documentsChannels = defineChannels('documents', {
       offset: z.number().int().min(0).max(1_000_000).optional(),
     }),
     response: z.object({ total: z.number().int().nonnegative(), items: z.array(documentSummarySchema) }),
+  },
+  /**
+   * Only the ids of the documents that `search:query` (with `text`) or `documents:list` (without) would list for the
+   * same filters, in the same order, at most `limit` of them (default and ceiling `SEARCH_LIMITS.idsMax`); `total` is the
+   * number of matches. For "select all": no row is built and nothing else is sent.
+   */
+  ids: {
+    request: z.object({
+      text: z.string().max(SEARCH_LIMITS.text).optional(),
+      filters: searchFiltersSchema.optional(),
+      sort: searchSortSchema.optional(),
+      limit: z.number().int().min(1).max(SEARCH_LIMITS.idsMax).optional(),
+    }),
+    response: z.object({ total: z.number().int().nonnegative(), ids: z.array(documentIdSchema) }),
   },
   /** The record of one document, without `legacy` (NOT_FOUND when unknown). */
   get: { request: z.object({ docId: documentIdSchema }), response: documentViewSchema },

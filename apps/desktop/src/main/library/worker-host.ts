@@ -15,7 +15,7 @@ export interface SpawnOptions {
 
 /**
  * Watchdog times from the environment, for the test runs only (an installed app ignores them, like every other
- * test hook, see `runtime.ts`): `RL_WORKER_FILE_TIMEOUT_MS`, `RL_WORKER_PAGE_TIMEOUT_MS`.
+ * test hook, see `runtime.ts`): `RL_WORKER_FILE_TIMEOUT_MS`, `RL_WORKER_PAGE_TIMEOUT_MS`, `RL_WORKER_IDLE_MS` (idle time before the worker is closed).
  */
 export function watchdogFromEnv(env: NodeJS.ProcessEnv, isPackaged: boolean): Partial<WatchdogOptions> {
   if (isPackaged) return {};
@@ -23,6 +23,8 @@ export function watchdogFromEnv(env: NodeJS.ProcessEnv, isPackaged: boolean): Pa
   const out: Partial<WatchdogOptions> = {};
   const file = num(env['RL_WORKER_FILE_TIMEOUT_MS']);
   const page = num(env['RL_WORKER_PAGE_TIMEOUT_MS']);
+  const idle = num(env['RL_WORKER_IDLE_MS']);
+  if (idle !== undefined) out.idleCloseMs = idle;
   if (file !== undefined) out.extractFileMs = file;
   if (page !== undefined) out.extractPageMs = page;
   return out;

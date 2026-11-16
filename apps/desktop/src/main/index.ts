@@ -21,6 +21,7 @@ import { createBackupPolicy } from './library/backup-policy.js';
 import { RuntimeManager } from './library/runtime-manager.js';
 import { spawnScanWorker, watchdogFromEnv } from './library/worker-host.js';
 import { LibraryService } from './library-service.js';
+import { applyResourceSwitches } from './resources.js';
 import { configureRuntime, resolveRuntimeConfig } from './runtime.js';
 import { FileSecretStore } from './secret-store.js';
 import { installGlobalSecurity, isTrustedUrl, registerPrivilegedSchemes, serveRenderer } from './security.js';
@@ -30,6 +31,7 @@ import { createMainWindow } from './window.js';
 // Name and paths must be fixed before `ready`. Env overrides keep tests off real data, but only in a
 // development run: the installed app (`app.isPackaged`) ignores every RL_* / ELECTRON_RENDERER_URL variable.
 app.setName(APP_NAME);
+applyResourceSwitches(app.commandLine);
 const runtime = configureRuntime(resolveRuntimeConfig(process.env, app.isPackaged));
 const dirs = resolveAppDirs(process.env, { userData: app.getPath('userData') }, app.isPackaged);
 app.setPath('userData', dirs.userData);

@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
-import { SEARCH_MARK_OPEN } from '@rl/core';
+import { SEARCH_LIMITS, SEARCH_MARK_OPEN } from '@rl/core';
 import type {
   DocumentListQuery,
   DocumentSummary,
@@ -618,6 +618,35 @@ export class SqliteSearchIndex implements SearchIndex {
          WHERE d.id IN (${from}) AND d.folder <> '' GROUP BY value ORDER BY count DESC, value LIMIT ${FACET_LIMITS.folders}`,
       ),
     };
+  }
+
+  async ids(query: SearchQuery): Promise<{ total: number; ids: string[] }> {
+    const db = this.h;
+    const limit = Math.max(1, Math.min(SEARCH_LIMITS.idsMax, Math.floor(query.limit ?? SEARCH_LIMITS.idsMax)));
+    const m = this.matches(query, false);
+    if (m.mode === 'none') return { total: 0, ids: [] };
+    if (m.mode === 'list') {
+      const sort = !query.sort || query.sort === 'relevance' ? 'title' : query.sort;
+      const cond = m.where.sql ? `WHERE ${m.where.sql}` : '';
+      const total = (db.prepare(`SELECT count(*) AS c FROM docs d ${cond}`).get(...m.where.params) as { c: number }).c;
+      const rows = db.prepare(`SELECT d.doc_id AS id FROM docs d ${cond} ORDER BY ${ORDER[sort]} LIMIT ?`).all(...m.where.params, limit) as Array<{ id: string }>;
+      return { total, ids: rows.map((r) => r.id) };
+    }
+    // Same order as `searchPage`: by score (relevance) or by the SQL order of the chosen sort, over the matching rows.
+    const sort: SearchSort = query.sort ?? 'relevance';
+    const rows =
+      sort === 'relevance'
+        ? (() => {
+            const order = [...m.scored].sort((a, b) => b.score - a.score || a.id - b.id).slice(0, limit);
+            const byId = new Map(
+              (db.prepare('SELECT d.id, d.doc_id FROM docs d WHERE d.id IN (SELECT value FROM json_each(?))').all(JSON.stringify(order.map((o) => o.id))) as Array<{ id: number; doc_id: string }>).map((r) => [r.id, r.doc_id]),
+            );
+            return order.map((o) => ({ id: byId.get(o.id) ?? '' })).filter((r) => r.id !== '');
+          })()
+        : (db
+            .prepare(`SELECT d.doc_id AS id FROM docs d WHERE d.id IN (SELECT value FROM json_each(?)) ORDER BY ${ORDER[sort]} LIMIT ?`)
+            .all(JSON.stringify(m.scored.map((s) => s.id)), limit) as Array<{ id: string }>);
+    return { total: m.scored.length, ids: rows.map((r) => r.id) };
   }
 
   async list(query: DocumentListQuery): Promise<{ total: number; items: DocumentSummary[] }> {

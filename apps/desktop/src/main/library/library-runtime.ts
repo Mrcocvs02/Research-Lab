@@ -590,6 +590,10 @@ export class LibraryRuntime {
     return { ...f, labels };
   }
 
+  ids(query: SearchQuery): Promise<{ total: number; ids: string[] }> {
+    return this.d.index.ids(query);
+  }
+
   list(query: DocumentListQuery): Promise<{ total: number; items: DocumentSummary[] }> {
     return this.d.index.list(query);
   }

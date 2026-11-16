@@ -30,8 +30,6 @@ export interface DocRow {
 }
 
 export const PAGE_SIZE = 100;
-/** Rows per call when only ids are wanted (the largest page the server allows). */
-const IDS_PAGE = 200;
 /** A refresh re-reads at most this many already loaded pages besides the first. */
 const REFRESH_PAGES = 30;
 const DEBOUNCE_MS = 150;
@@ -217,17 +215,10 @@ export function useDocumentList(plan: QueryPlan, enabled: boolean, refreshKey: s
     const s = store.current;
     const pageCount = Math.ceil(s.total / PAGE_SIZE);
     if (Array.from({ length: pageCount }, (_, p) => p).every((p) => s.pages.has(p))) return ids().filter((x): x is string => x !== undefined);
+    // One call that returns only the ids, in list order: no row is built or sent.
     const p = planRef.current;
-    const calls = Math.ceil(s.total / IDS_PAGE);
-    const out: string[][] = [];
-    for (let i = 0; i < calls; i += 4) {
-      const batch = await Promise.all(
-        Array.from({ length: Math.min(4, calls - i) }, async (_, k) => (await fetchPage(p, (i + k) * IDS_PAGE, IDS_PAGE, false)).rows.map((r) => r.docId)),
-      );
-      out.push(...batch);
-    }
-    return out.flat();
-  }, [fetchPage, ids]);
+    return (await rl.invoke('documents:ids', { text: p.text, filters: p.filters, sort: p.sort })).ids;
+  }, [ids]);
 
   return {
     total: store.current.total,

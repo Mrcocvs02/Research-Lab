@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppError } from '@rl/core';
+import { RlError } from '../../lib/rl-error';
 import type { Channels, DocumentPatch, ResponseOf, StudyState } from '@rl/core';
 
 type DocumentView = ResponseOf<Channels, 'documents:get'>;
@@ -264,7 +264,7 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
     [docId, invalidate, reportError],
   );
 
-  const openFile = () => rl.invoke('documents:open', { docId }).catch((e: unknown) => (AppError.from(e).code === 'PERMISSION_DENIED' ? fail(t('docs.openRefused')) : reportError(e)));
+  const openFile = () => rl.invoke('documents:open', { docId }).catch((e: unknown) => (RlError.from(e).code === 'PERMISSION_DENIED' ? fail(t('docs.openRefused')) : reportError(e)));
   const reveal = () => rl.invoke('documents:reveal', { docId }).catch(reportError);
 
   const venues = view?.venues ?? [];

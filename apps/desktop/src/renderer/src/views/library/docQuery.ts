@@ -53,10 +53,16 @@ export function planQuery(s: BrowseState): QueryPlan {
   return { text: s.text, filters, sort, key: JSON.stringify({ t: s.text, f: filters, s: sort }) };
 }
 
+/** Turns "show missing documents" on or off (off removes the key, so the filter list stays empty). */
+export function withMissing(filters: BrowseState['filters'], on: boolean): BrowseState['filters'] {
+  const { includeMissing: _drop, ...rest } = filters;
+  return on ? { ...rest, includeMissing: true } : rest;
+}
+
 export function hasAnyCondition(s: BrowseState): boolean {
   return (
     s.text.trim() !== '' ||
-    Object.keys(s.filters).length > 0 ||
+    Object.keys(s.filters).some((k) => k !== 'includeMissing') ||
     s.tags.include.length > 0 ||
     s.tags.exclude.length > 0 ||
     s.folder !== null

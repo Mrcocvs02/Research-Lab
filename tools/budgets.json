@@ -1,0 +1,7 @@
+{
+  "_note": "Measured after the lightness work (D-170..D-176) plus a 15% margin. Raising a value needs a decision in docs/DECISIONS.md.",
+  "renderer": { "dictionaryChunks": ["it", "en"], "initialJsKB": 403, "totalJsKB": 630, "totalKB": 660 },
+  "main": { "totalJsKB": 328 },
+  "preload": { "totalKB": 132 },
+  "runtime": { "idleMemoryMb": 501, "firstContentMs": 530 }
+}

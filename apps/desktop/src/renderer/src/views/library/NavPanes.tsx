@@ -48,7 +48,7 @@ export function folderRows(data: FolderTreeData, expanded: ReadonlySet<string>, 
 }
 
 /** The folders of the library with their document counts; a click lists that folder's documents. */
-export function FolderPane({ folder, includeSub, onSelect, onIncludeSub }: { folder: string | null; includeSub: boolean; onSelect(path: string | null): void; onIncludeSub(v: boolean): void }) {
+export function FolderPane({ folder, includeSub, onSelect, onIncludeSub, reloadKey }: { folder: string | null; includeSub: boolean; onSelect(path: string | null): void; onIncludeSub(v: boolean): void; reloadKey?: string }) {
   const { t } = useTranslation();
   const version = useChangeVersion('documents');
   const [data, setData] = useState<FolderTreeData | null>(null);
@@ -57,18 +57,24 @@ export function FolderPane({ folder, includeSub, onSelect, onIncludeSub }: { fol
 
   useEffect(() => {
     let alive = true;
-    rl.invoke('library:tree', {}).then(
-      (d) => {
-        if (!alive) return;
-        setData(d);
-        setError(null);
-      },
-      (e: unknown) => alive && setError(e),
-    );
+    const load = () =>
+      rl.invoke('library:tree', {}).then(
+        (d) => {
+          if (!alive) return;
+          setData(d);
+          setError(null);
+        },
+        (e: unknown) => alive && setError(e),
+      );
+    void load();
+    // The main process reuses its document list for about a second and a half: ask once more after that, so a
+    // change that landed inside the window (the end of a scan) is not missed.
+    const again = setTimeout(() => void load(), 1800);
     return () => {
       alive = false;
+      clearTimeout(again);
     };
-  }, [version]);
+  }, [version, reloadKey]);
 
   // The chosen folder is always visible.
   useEffect(() => {

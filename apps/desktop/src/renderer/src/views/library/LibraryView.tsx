@@ -183,7 +183,7 @@ function LibraryInner() {
               ))}
             </div>
             <div role="tabpanel" id={`tabpanel-${tab}`} aria-labelledby={`tab-${tab}`}>
-              {tab === 'folders' && <FolderPane folder={browse.folder} includeSub={browse.includeSub} onSelect={(path) => set({ folder: path })} onIncludeSub={setIncludeSub} />}
+              {tab === 'folders' && <FolderPane folder={browse.folder} includeSub={browse.includeSub} onSelect={(path) => set({ folder: path })} onIncludeSub={setIncludeSub} reloadKey={refreshKey} />}
               {tab === 'tags' && (
                 <TagTreePane
                   include={browse.tags.include}

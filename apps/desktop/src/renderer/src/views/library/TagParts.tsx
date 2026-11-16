@@ -72,6 +72,7 @@ export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaL
   const reset = () => {
     setText('');
     setActive(0);
+    setOpen(false);
   };
   const choose = async (i: number) => {
     const opt = options[i];
@@ -142,7 +143,7 @@ export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaL
         onKeyDown={onKeyDown}
       />
       <ul id={listId} role="listbox" className="tag-options" hidden={!showList} data-testid="tag-options">
-        {options.map((o, i) => (
+        {showList && options.map((o, i) => (
           <li
             key={o.kind === 'tag' ? o.s.id : '__create__'}
             id={`${listId}-${i}`}

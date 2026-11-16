@@ -172,7 +172,7 @@ export function HistoryPanel({ id, onClose }: { id: string; onClose(): void }) {
             <li key={item.changeId} className={item.undone ? 'history-item undone' : 'history-item'} data-testid="history-item" data-change-id={item.changeId} data-action={item.action}>
               <div className="history-line">
                 <span className="history-summary">
-                  {t(`history.actions.${item.action}`, { defaultValue: item.summary, documents: item.counts.documents, tags: item.counts.taxonomy, projects: item.counts.projects })}
+                  {t(`history.actions.${item.action.replaceAll(".", "_")}`, { defaultValue: item.summary, documents: item.counts.documents, tags: item.counts.taxonomy, projects: item.counts.projects })}
                 </span>
                 {item.actor === 'ai' && <span className="ai-badge">{t('ai.badge')}</span>}
               </div>

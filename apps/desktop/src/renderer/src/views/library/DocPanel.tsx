@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { DocumentPatch, DocumentView, StudyState } from '@rl/core';
+import { AppError } from '@rl/core';
+import type { Channels, DocumentPatch, ResponseOf, StudyState } from '@rl/core';
+
+type DocumentView = ResponseOf<Channels, 'documents:get'>;
 import { useChangeVersion, useLibraryEvents } from '../../lib/events';
 import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
@@ -218,7 +221,7 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
   const { t } = useTranslation();
   const version = useChangeVersion('documents');
   const { invalidate } = useLibraryEvents();
-  const { reportError } = useNotify();
+  const { reportError, fail } = useNotify();
   const { view, model } = useTaxonomy();
   const { tag, createAndAdd } = useTagActions();
   const [doc, setDoc] = useState<DocumentView | null>(null);
@@ -261,7 +264,7 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
     [docId, invalidate, reportError],
   );
 
-  const openFile = () => rl.invoke('documents:open', { docId }).catch(reportError);
+  const openFile = () => rl.invoke('documents:open', { docId }).catch((e: unknown) => (AppError.from(e).code === 'PERMISSION_DENIED' ? fail(t('docs.openRefused')) : reportError(e)));
   const reveal = () => rl.invoke('documents:reveal', { docId }).catch(reportError);
 
   const venues = view?.venues ?? [];

@@ -15,7 +15,8 @@ export function TagFilterBar({ tags, onChange }: { tags: BrowseState['tags']; on
   const { t } = useTranslation();
   const { model, colorOf, labelOf } = useTaxonomy();
   const groupId = useId();
-  const taken = useMemo(() => new Set([...tags.include, ...tags.exclude]), [tags]);
+  const included = useMemo(() => new Set(tags.include), [tags.include]);
+  const excluded = useMemo(() => new Set(tags.exclude), [tags.exclude]);
   const chip = (id: string, excluded: boolean) => {
     const node = model.byId.get(resolveId(model, id));
     return (
@@ -47,8 +48,8 @@ export function TagFilterBar({ tags, onChange }: { tags: BrowseState['tags']; on
           ))}
         </div>
       )}
-      <TagPicker model={model} exclude={taken} ariaLabel={t('filter.include')} placeholder={t('filter.includePlaceholder')} onPick={(id) => onChange(setTagFilter(tags, id, 'include'))} testId="filter-include-input" />
-      <TagPicker model={model} exclude={taken} ariaLabel={t('filter.exclude')} placeholder={t('filter.excludePlaceholder')} onPick={(id) => onChange(setTagFilter(tags, id, 'exclude'))} testId="filter-exclude-input" />
+      <TagPicker model={model} exclude={included} ariaLabel={t('filter.include')} placeholder={t('filter.includePlaceholder')} onPick={(id) => onChange(setTagFilter(tags, id, 'include'))} testId="filter-include-input" />
+      <TagPicker model={model} exclude={excluded} ariaLabel={t('filter.exclude')} placeholder={t('filter.excludePlaceholder')} onPick={(id) => onChange(setTagFilter(tags, id, 'exclude'))} testId="filter-exclude-input" />
     </div>
   );
 }

@@ -8,17 +8,10 @@ import { useNotify } from '../../lib/notify';
 import { splitLines } from '../../lib/validate';
 import { safeText } from './safeText';
 import { TagChip, TagPicker } from './TagParts';
-import { canDelete, descendants, fold, flattenTree, impliesCycle, pathLabel, wouldCycle, type TreeRow } from './taxonomyModel';
+import { canDelete, descendants, parentsAfterDrop, fold, flattenTree, impliesCycle, pathLabel, wouldCycle, type TreeRow } from './taxonomyModel';
 import { useTaxonomy } from './useTaxonomy';
 
 export const PRESET_COLORS = ['#d9480f', '#e8590c', '#f08c00', '#2f9e44', '#0c8599', '#1971c2', '#4263eb', '#7048e8', '#ae3ec9', '#d6336c', '#868e96', '#495057'];
-
-/** New parents for a node dropped on `target` (null = the empty area, i.e. out of the parent it was dragged from). */
-export function parentsAfterDrop(node: Pick<TaxonomyNodeView, 'parents'>, fromParent: string | null, target: string | null): string[] {
-  const rest = node.parents.filter((p) => p !== fromParent);
-  if (target === null) return rest;
-  return rest.includes(target) ? rest : [...rest, target];
-}
 
 function CommitText({ label, value, onCommit, testId, multiline }: { label: string; value: string; onCommit(v: string): void; testId: string; multiline?: boolean }) {
   const id = useId();

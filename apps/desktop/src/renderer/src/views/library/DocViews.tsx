@@ -1,5 +1,6 @@
 import { memo, useCallback, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AppError } from '@rl/core';
 import { VirtualList } from '../../components/VirtualList';
 import { rl } from '../../lib/rl';
 import { useNotify } from '../../lib/notify';
@@ -152,31 +153,39 @@ interface Props {
 
 /** The documents as a virtualised list or grid with multi-selection and keyboard navigation. */
 export function DocViews({ list, view, searching, selection, onSelection, onOpenDetail, onDeleteKey, ariaLabel }: Props) {
-  const { reportError } = useNotify();
+  const { reportError, fail } = useNotify();
+  const { t } = useTranslation();
   const [columns, setColumns] = useState(1);
   const selRef = useRef(selection);
   selRef.current = selection;
 
-  const openFile = useCallback((docId: string) => rl.invoke('documents:open', { docId }).catch(reportError), [reportError]);
+  const openFile = useCallback(
+    (docId: string) =>
+      rl.invoke('documents:open', { docId }).catch((e: unknown) => (AppError.from(e).code === 'PERMISSION_DENIED' ? fail(t('docs.openRefused')) : reportError(e))),
+    [reportError, fail, t],
+  );
   const reveal = useCallback((docId: string) => rl.invoke('documents:reveal', { docId }).catch(reportError), [reportError]);
 
   /** Row ids in order, loading everything first when a range crosses rows that are not loaded. */
-  const orderFor = async (from: number | null, to: number): Promise<Array<string | undefined>> => {
-    let order = list.ids();
-    if (from !== null && rangeHasHoles(order, from, to)) {
-      await list.loadAll();
-      order = list.ids();
-    }
+  const orderFor = (from: number | null, to: number): Array<string | undefined> | Promise<Array<string | undefined>> => {
+    const order = list.ids();
+    if (from !== null && rangeHasHoles(order, from, to)) return list.loadAll().then(() => list.ids());
     return order;
   };
 
-  const click = async (index: number, e: MouseEvent) => {
-    const mods = { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey };
-    const order = await orderFor(mods.shift ? selRef.current.anchor : null, index);
-    onSelection(clickSelect(selRef.current, order, index, mods));
+  /** Applies  to the order now when every row is loaded, else after loading them (a range across pages). */
+  const withOrder = (from: number | null, to: number, apply: (order: Array<string | undefined>) => void) => {
+    const order = orderFor(from, to);
+    if (Array.isArray(order)) apply(order);
+    else void order.then(apply);
   };
 
-  const onKeyDown = async (e: KeyboardEvent) => {
+  const click = (index: number, e: MouseEvent) => {
+    const mods = { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey };
+    withOrder(mods.shift ? selRef.current.anchor : null, index, (order) => onSelection(clickSelect(selRef.current, order, index, mods)));
+  };
+
+  const onKeyDown = (e: KeyboardEvent) => {
     const mods = { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey };
     const page = 8 * columns;
     let move: number | 'home' | 'end' | null = null;
@@ -211,14 +220,13 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
       e.preventDefault();
       const cur = selRef.current;
       const target = move === 'home' ? 0 : move === 'end' ? list.total - 1 : (cur.active ?? (move < 0 ? list.total : -1)) + move;
-      const order = await orderFor(mods.shift ? (cur.anchor ?? cur.active) : null, Math.max(0, Math.min(list.total - 1, target)));
-      onSelection(moveSelect(cur, order, move, mods));
+      const m = move;
+      withOrder(mods.shift ? (cur.anchor ?? cur.active) : null, Math.max(0, Math.min(list.total - 1, target)), (order) => onSelection(moveSelect(cur, order, m, mods)));
       return;
     }
     if ((e.key === 'a' || e.key === 'A') && mods.ctrl) {
       e.preventDefault();
-      await list.loadAll();
-      onSelection(selectAll(list.ids()));
+      void list.loadAll().then(() => onSelection(selectAll(list.ids())));
     } else if (e.key === ' ' && mods.ctrl) {
       e.preventDefault();
       onSelection(toggleActive(selRef.current, list.ids()));
@@ -251,7 +259,7 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
       ariaLabel={ariaLabel}
       multiselectable
       activeId={activeRow ? `doc-${activeRow.docId}` : undefined}
-      onKeyDown={(e) => void onKeyDown(e)}
+      onKeyDown={onKeyDown}
       testId="search-results"
       className={view === 'grid' ? 'vl-grid' : 'vl-list'}
       renderItem={(i) => {
@@ -263,7 +271,7 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
             selected={row ? selection.ids.has(row.docId) : false}
             active={selection.active === i}
             searching={searching}
-            onClick={(e) => void click(i, e)}
+            onClick={(e) => click(i, e)}
             onDoubleClick={() => row && void openFile(row.docId)}
             onOpenFile={() => row && void openFile(row.docId)}
             onReveal={() => row && void reveal(row.docId)}

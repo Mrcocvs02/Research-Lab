@@ -144,3 +144,10 @@ export function canDelete(model: TaxonomyModel, node: TaxonomyNodeView): boolean
   if ((model.children.get(node.id) ?? []).length > 0) return false;
   return !model.nodes.some((n) => n.implies.includes(node.id));
 }
+
+/** New parents for a node dropped on `target` (null = the empty area, i.e. out of the parent it was dragged from). */
+export function parentsAfterDrop(node: Pick<TaxonomyNodeView, 'parents'>, fromParent: string | null, target: string | null): string[] {
+  const rest = node.parents.filter((p) => p !== fromParent);
+  if (target === null) return rest;
+  return rest.includes(target) ? rest : [...rest, target];
+}

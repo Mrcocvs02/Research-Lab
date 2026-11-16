@@ -36,7 +36,8 @@ export const useTaxonomy = () => useContext(Ctx);
 
 /** The taxonomy of the active library, kept current on `library:changed` (taxonomy). */
 export function TaxonomyProvider({ children }: { children: ReactNode }) {
-  const version = useChangeVersion('taxonomy');
+  // The counts per node follow the documents too, so both kinds of change reload it.
+  const version = useChangeVersion('taxonomy') + useChangeVersion('documents');
   const { invalidate } = useLibraryEvents();
   const { reportError } = useNotify();
   const [view, setView] = useState<TaxonomyView | null>(null);

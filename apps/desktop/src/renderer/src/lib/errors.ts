@@ -1,9 +1,15 @@
+import { FlushError } from './dirtyEditors';
 import { RlError } from './rl-error';
 import type { TFunction } from 'i18next';
 
 /** Localised, user-facing text for any thrown value. Never shows stacks or raw internals. */
 export function errorMessage(error: unknown, t: TFunction): string {
+  // Unsaved notes stopped a library switch or a close (the text is still on screen).
+  if (error instanceof FlushError) return t('notes.flushFailed');
   const err = RlError.from(error);
+  // Highlights: the per-document count or the size of the file is at its limit.
+  if (err.code === 'INVALID_REQUEST' && err.details?.reason === 'annotations-limit') return t('reader.annotationsLimit', { limit: err.details.limit });
+  if (err.code === 'INVALID_REQUEST' && err.details?.reason === 'annotations-size') return t('reader.annotationsSize');
   // A project that would hold more documents than it can (the server's own check, for an existing project).
   if (err.code === 'INVALID_REQUEST' && err.details?.reason === 'members-limit') return t('projects.tooManyResult', { limit: err.details.limit, n: err.details.count });
   // A change group that may be incomplete in the log (very large log): never undone partially.

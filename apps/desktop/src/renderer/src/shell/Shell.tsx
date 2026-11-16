@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNotify } from '../lib/notify';
 import { useLocalFlag } from '../lib/useLocalFlag';
 import { useApp } from '../state/app-context';
 import { scanText } from '../views/library/ScanStatusText';
@@ -94,11 +95,12 @@ function SidebarLanguage() {
 function LibrarySwitcher({ onNewLibrary }: { onNewLibrary(): void }) {
   const { t } = useTranslation();
   const app = useApp();
+  const { reportError } = useNotify();
   const id = useId();
   return (
     <div className="switcher">
       <label htmlFor={id}>{t('shell.activeLibrary')}</label>
-      <select id={id} value={app.activeLibraryId ?? ''} onChange={(e) => e.target.value && void app.setActiveLibrary(e.target.value)} data-testid="library-switcher">
+      <select id={id} value={app.activeLibraryId ?? ''} onChange={(e) => e.target.value && void app.setActiveLibrary(e.target.value).catch(reportError)} data-testid="library-switcher">
         {app.profiles.length === 0 && <option value="">{t('shell.noLibrary')}</option>}
         {app.profiles.map((p) => (
           <option key={p.id} value={p.id}>

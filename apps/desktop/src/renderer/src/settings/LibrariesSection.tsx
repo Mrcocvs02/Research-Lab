@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ErrorNote } from '../components/ui';
+import { flushAll } from '../lib/dirtyEditors';
 import { errorMessage } from '../lib/errors';
 import { rl } from '../lib/rl';
 import { useApp } from '../state/app-context';
@@ -74,7 +75,12 @@ export function LibrariesSection({ onNew }: { onNew: () => void }) {
               {renaming !== p.id && (
                 <div className="row-actions">
                   {!active && (
-                    <button type="button" onClick={() => void run(() => rl.invoke('library:setActive', { libraryId: p.id }))}>
+                    <button type="button" onClick={() =>
+                      void run(async () => {
+                        await flushAll(); // unsaved notes belong to the library that is active now
+                        await rl.invoke('library:setActive', { libraryId: p.id });
+                      })
+                    }>
                       {t('settings.libraries.activate')}
                     </button>
                   )}

@@ -11,11 +11,14 @@ import { commandsChannels } from './commands.js';
 import { dialogChannels } from './dialog.js';
 import { documentsChannels } from './documents.js';
 import { importChannels, importEvents } from './import.js';
+import { inboxChannels, inboxEvents } from './inbox.js';
+import { jobsChannels, jobsEvents } from './jobs.js';
 import { historyChannels } from './history.js';
 import { libraryChannels, libraryEvents } from './library.js';
 import { notesChannels } from './notes.js';
 import { projectsChannels } from './projects.js';
 import { readerChannels } from './reader.js';
+import { reviewChannels } from './review.js';
 import { taxonomyChannels } from './taxonomy.js';
 import { thumbsChannels } from './thumbs.js';
 import { scanChannels, scanEvents } from './scan.js';
@@ -23,9 +26,9 @@ import { indexChannels, searchChannels } from './search.js';
 import { secretsChannels } from './secrets.js';
 import { settingsChannels } from './settings.js';
 
-export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels);
+export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels);
 
-export const events = mergeRegistries(appEvents, importEvents, scanEvents, libraryEvents, chatEvents);
+export const events = mergeRegistries(appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents);
 
 export type Channels = typeof channels;
 export type Events = typeof events;
@@ -46,3 +49,6 @@ export { annotationColorSchema, annotationInputSchema, type AnnotationInput } fr
 export { thumbItemSchema } from './thumbs.js';
 export { aiAuthSchema, aiPreviewSchema, aiSendViewSchema, aiStatusSchema } from './ai.js';
 export { chatCardSchema, chatConversationSummarySchema, chatTurnSchema, chatUsageSchema } from './chat.js';
+export { aiJobFieldSchema, aiJobRequestSchema, aiJobStatusSchema, type AiJobField, type AiJobStatus } from './jobs.js';
+export { reviewFieldSchema, reviewItemSchema, type ReviewField, type ReviewItem } from './review.js';
+export { inboxItemSchema, inboxMetadataSchema, type InboxItem, type InboxMetadata } from './inbox.js';

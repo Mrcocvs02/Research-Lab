@@ -14,11 +14,22 @@ export const aiStatusSchema = z.object({
   auth: aiAuthSchema,
   /** Why it is not available, for a clear message; absent when available. */
   reason: z.enum(['no-access', 'offline', 'cap-reached', 'error']).optional(),
-  /** Folders whose documents may be sent (library config); empty means nothing can be sent. */
+  /**
+   * Folders whose documents may be sent (library config); empty means nothing can be sent. A folder enables its
+   * sub-folders; '' enables the whole library; '.' enables only the files directly in the root of the library.
+   */
   enabledFolders: z.array(relativePathSchema),
   /** Spent this calendar month (from the local AI-send log) and the monthly cap of the library (null: none). */
   monthUsd: z.number().nonnegative(),
   capUsd: z.number().positive().nullable(),
+  /**
+   * The Claude Code executable the Agent SDK provider runs (absent for other providers): where it was found
+   * ('settings': chosen by the user; 'path': on PATH; 'local-bin': the user's local bin folder; 'sdk': the copy bundled
+   * with the SDK; 'none': not found) and its absolute path. A path of this machine: shown, never synced.
+   */
+  claudeCode: z
+    .object({ path: z.string().nullable(), source: z.enum(['settings', 'path', 'local-bin', 'sdk', 'none']) })
+    .optional(),
 });
 
 /** What a send would include, before it happens (plan §5, privacy): shown to the user, who confirms. */
@@ -85,4 +96,12 @@ export const aiChannels = defineChannels('ai', {
     request: z.object({ limit: z.number().int().min(1).max(500).default(100), before: isoDateSchema.optional() }),
     response: z.object({ items: z.array(aiSendViewSchema) }),
   },
+  /**
+   * Lets the user choose the Claude Code executable with a file dialog shown by main (the renderer never passes a
+   * path: it cannot make main run a program of its choice). Saved in the app settings of this machine
+   * (`ai.claudeCodePath`). Null when the dialog was cancelled; INVALID_REQUEST when the file is not a regular file.
+   */
+  chooseExecutable: { request: z.object({}), response: z.object({ path: z.string().nullable() }) },
+  /** Forgets the chosen executable: back to automatic discovery. */
+  clearExecutable: { request: z.object({}), response: z.object({ ok: z.literal(true) }) },
 });

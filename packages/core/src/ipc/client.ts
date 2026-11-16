@@ -11,6 +11,11 @@ import type { RlApi } from './index.js';
 export interface RlBridge {
   invokeRaw(channel: string, payload: unknown): Promise<IpcEnvelope>;
   subscribe(event: string, listener: (payload: unknown) => void): () => void;
+  /**
+   * Absolute path of a file the user dropped on the window (Electron `webUtils.getPathForFile`), '' when it has none.
+   * Used only to pass dropped PDFs to `inbox:add`, where main checks them again.
+   */
+  pathForFile(file: File): string;
 }
 
 /** Builds the typed `invoke` / `on` API from a bridge. Validates event payloads. */

@@ -14,6 +14,13 @@ export { abortAllChatTurns };
 
 export const aiHandlers = (s: MainServices): DomainHandlers<'ai'> => ({
   'ai:status': () => computeStatus(s),
+  // Wave 4.2 (stubs until the main side is merged).
+  'ai:chooseExecutable': () => {
+    throw new AppError('NOT_IMPLEMENTED', 'Not implemented yet');
+  },
+  'ai:clearExecutable': () => {
+    throw new AppError('NOT_IMPLEMENTED', 'Not implemented yet');
+  },
   'ai:preview': async ({ purpose, model, docIds, promptChars }) => {
     const ctx = await loadCtx(s);
     return (await computePreview(s, ctx, { purpose, model, docIds, promptChars })).preview;

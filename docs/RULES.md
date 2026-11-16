@@ -1,6 +1,6 @@
 # Regole assolute (dal prompt dell'agente, sezione 10 del piano)
 
-1. Non modificare, spostare o cancellare mai un documento originale. L'app scrive solo nella cartella dati della libreria e nelle cartelle di export scelte dall'utente. Fai un backup della cartella dati prima della prima scrittura reale.
+1. Non modificare, spostare o cancellare mai un documento originale. L'app scrive solo nella cartella dati della libreria e nelle cartelle di export scelte dall'utente. Unica eccezione, decisa dall'utente (D-217): confermando un PDF della cartella di arrivo, l'app ne crea una copia NUOVA in una cartella esistente della libreria, senza mai sovrascrivere e senza toccare l'originale. Fai un backup della cartella dati prima della prima scrittura reale.
 2. Scritture atomiche (file temporaneo e rinomina), un file per elemento, nessun database sincronizzato: gli indici rigenerabili stanno nella cartella locale dell'app.
 3. Le chiavi API vivono solo nell'archivio sicuro del sistema. Mai nel repository, nei log, nei test o in una cartella sincronizzata.
 4. L'invio a Claude è abilitato cartella per cartella e, di default, solo dopo conferma. Mostra sempre un'anteprima di cosa viene inviato, registra ogni invio e rispetta il tetto di spesa.

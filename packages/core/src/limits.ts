@@ -60,4 +60,24 @@ export const AI_LIMITS = {
   title: 200,
   /** Conversations listed at once. */
   conversations: 500,
+  /** New taxonomy nodes the AI may propose for one document. */
+  newTags: 20,
+  /** Items of one page of the review queue, and of one bulk decision. */
+  reviewPage: 200,
+  /** Jobs kept in the list of the session (finished ones are dropped oldest first). */
+  jobsKept: 50,
+} as const;
+
+/** Upper bounds of the inbox (phase 4, wave 4.2). */
+export const INBOX_LIMITS = {
+  /** Items waiting in the inbox of one library (files dropped from outside plus new files found by the scan). */
+  items: 500,
+  /** Files of one drop or one dialog choice. */
+  addBatch: 50,
+  /** Largest PDF accepted from outside the library. */
+  fileBytes: 512 * 1024 * 1024,
+  /** Characters of a proposed file name (extension included). */
+  name: 180,
+  /** Characters of an abstract kept from the online record. */
+  abstract: 20_000,
 } as const;

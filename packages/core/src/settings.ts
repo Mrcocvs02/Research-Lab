@@ -101,6 +101,17 @@ export const appSettingsSchema = z.object({
   activeLibraryId: itemIdSchema.nullable().default(null),
   /** True once the guided first run has been completed or skipped. */
   firstRunDone: z.boolean().default(false),
+  /** AI settings of THIS machine (never synced). */
+  ai: z
+    .object({
+      /**
+       * Claude Code executable chosen by the user (absolute path). Set only through `ai:chooseExecutable` (a dialog in
+       * main), never through `settings:set`: the renderer cannot name a program for main to run. Null: found
+       * automatically (PATH, the user's local bin folder, then the copy bundled with the Agent SDK).
+       */
+      claudeCodePath: z.string().min(1).max(1024).nullable().default(null),
+    })
+    .prefault({}),
 });
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 

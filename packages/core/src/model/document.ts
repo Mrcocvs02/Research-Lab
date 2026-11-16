@@ -52,14 +52,34 @@ export const aiRelationSchema = z.object({
   reason: z.string().max(L.aiText),
 });
 
+/**
+ * A taxonomy node the AI proposes because no existing one fits (plan §5: "alias e acronimi per ogni micro nuovo").
+ * Nothing is created until the user accepts it; `parentId` is an existing node (null: a new root).
+ */
+export const aiNewTagSchema = z.object({
+  label: z.string().trim().min(1).max(200),
+  parentId: itemIdSchema.nullable(),
+  /** Aliases and acronyms of the new node. */
+  aliases: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
+  /** One line: why no existing node fits. */
+  reason: z.string().max(500).optional(),
+});
+export type AiNewTag = z.infer<typeof aiNewTagSchema>;
+
 /** AI-generated fields, always wrapped; never mixed with user fields. */
 export const documentAiSchema = z.object({
   summary: aiFieldSchema(z.string().max(L.aiText)).optional(),
   description: aiFieldSchema(z.string().max(L.aiText)).optional(),
   keywords: aiFieldSchema(z.array(z.string().max(L.author)).max(L.aiList)).optional(),
   synonyms: aiFieldSchema(z.array(z.string().max(L.author)).max(L.aiList)).optional(),
-  /** Proposed taxonomy node ids (not applied until accepted by the user). */
+  /**
+   * Proposed taxonomy node ids (not applied until accepted by the user). On review the accepted ones are added to the
+   * user's `tags`; `value` keeps the accepted subset and `review.originalValue` the full proposal (status `edited` when
+   * only some were accepted), which is what the acceptance rate is computed from.
+   */
   suggestedTags: aiFieldSchema(z.array(itemIdSchema).max(L.aiList)).optional(),
+  /** Proposed NEW taxonomy nodes, same review rules as `suggestedTags` (an accepted one is created, then tagged). */
+  suggestedNewTags: aiFieldSchema(z.array(aiNewTagSchema).max(20)).optional(),
   relations: aiFieldSchema(z.array(aiRelationSchema).max(L.aiList)).optional(),
   suggestedType: aiFieldSchema(z.string().max(L.shortText)).optional(),
 });

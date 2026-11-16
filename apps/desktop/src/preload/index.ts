@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { AppError, channels, events, IPC_EVENT_CHANNEL, IPC_INVOKE_CHANNEL, type IpcEnvelope, type RlBridge } from '@rl/core';
 
 /**
@@ -21,6 +21,13 @@ const bridge: RlBridge = {
     return () => {
       ipcRenderer.removeListener(IPC_EVENT_CHANNEL, handler);
     };
+  },
+  pathForFile(file) {
+    try {
+      return webUtils.getPathForFile(file);
+    } catch {
+      return '';
+    }
   },
 };
 

@@ -34,7 +34,7 @@ App desktop (Electron + React + TypeScript, monorepo npm) che organizza librerie
 - In Git Bash: `export PATH="/c/Program Files/nodejs:$PATH"` prima di node/npm.
 
 ## Vincoli che non si negoziano
-Originali mai modificati; scritture solo nella cartella dati della libreria; segreti solo nell'archivio sicuro; invio all'AI solo per cartelle abilitate; output AI separato dalle note dell'utente; nessun nome, percorso o cartella reale nel codice e nei test; codice leggero ed efficiente, ma la funzionalità viene prima della leggerezza.
+Originali mai modificati; scritture solo nella cartella dati della libreria (unica eccezione: la copia confermata dalla cartella di arrivo, D-217); segreti solo nell'archivio sicuro; invio all'AI solo per cartelle abilitate; output AI separato dalle note dell'utente; nessun nome, percorso o cartella reale nel codice e nei test; codice leggero ed efficiente, ma la funzionalità viene prima della leggerezza.
 
 ## Compattazione automatica
 Configurata in `.claude/settings.local.json` (non versionato) della cartella di lavoro: soglia al 60% del contesto (`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`), compattazione anche durante l'inattività. L'hook `tools/claude-hooks/compact-hook.mjs` salva lo stato in `.claude/last-compact.md` prima di compattare (PreCompact) e lo restituisce con l'elenco dei file da rileggere subito dopo (SessionStart `compact`).

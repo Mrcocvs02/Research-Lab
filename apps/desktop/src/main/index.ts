@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, session, shell } from 'electron';
 import path from 'node:path';
 import { backupDataDir, createLegacyImporter, createLibraryStore, createWatcher } from '@rl/data';
 import { createSearchIndex } from '@rl/search';
@@ -9,13 +9,16 @@ import {
   IPC_EVENT_CHANNEL,
   IPC_INVOKE_CHANNEL,
   channels,
+  type DocumentId,
   type EventName,
 } from '@rl/core';
 import { createFileLogger } from '@rl/core/node';
 import { APP_NAME } from './app-info.js';
+import { createDocHandler } from './doc-protocol.js';
 import { ApprovedPaths } from './approved-paths.js';
 import { e2eDialogOverride } from './dialog-override.js';
 import { resolveAppDirs } from './dirs.js';
+import { presentPdf } from './ipc/handlers/doc-files.js';
 import { buildHandlers, type MainServices } from './ipc/handlers/index.js';
 import { createBackupPolicy } from './library/backup-policy.js';
 import { RuntimeManager } from './library/runtime-manager.js';
@@ -24,7 +27,7 @@ import { LibraryService } from './library-service.js';
 import { applyResourceSwitches } from './resources.js';
 import { configureRuntime, resolveRuntimeConfig } from './runtime.js';
 import { FileSecretStore } from './secret-store.js';
-import { installGlobalSecurity, isTrustedUrl, registerPrivilegedSchemes, serveRenderer } from './security.js';
+import { installGlobalSecurity, isTrustedUrl, registerPrivilegedSchemes, rendererOrigin, serveDocuments, serveRenderer } from './security.js';
 import { SettingsStore } from './settings-store.js';
 import { createMainWindow } from './window.js';
 
@@ -54,7 +57,6 @@ async function main(): Promise<void> {
   await app.whenReady();
   installGlobalSecurity();
   if (!runtime.rendererDevUrl) {
-    const { session } = await import('electron');
     serveRenderer(session.defaultSession, path.join(import.meta.dirname, '../renderer'));
   }
 
@@ -92,7 +94,7 @@ async function main(): Promise<void> {
     runtime: runtimeManager,
     libraries,
     secrets,
-    shell: { openPath: (p) => shell.openPath(p), showItemInFolder: (p) => shell.showItemInFolder(p) },
+    shell: { openPath: (p) => shell.openPath(p), showItemInFolder: (p) => shell.showItemInFolder(p), openExternal: (u) => shell.openExternal(u) },
     async pickFolder(purpose, title) {
       // Test hook: only in a development run with RL_E2E=1 (see runtime.ts, dialog-override.ts).
       const override = e2eDialogOverride(process.env, app.isPackaged);
@@ -119,6 +121,9 @@ async function main(): Promise<void> {
     createImporter: (options) => createLegacyImporter(options),
     backupDataDir: (libraryId, dataDir) => backupPolicy(libraryId, dataDir, { force: true }),
   };
+
+  // The reader loads PDFs through rl-doc://; every request looks the document up in the active library again.
+  serveDocuments(session.defaultSession, createDocHandler({ resolve: (id) => presentPdf(services, id as DocumentId), allowedOrigin: rendererOrigin }));
 
   const dispatch = createDispatcher(channels, buildHandlers(services), log);
   ipcMain.handle(IPC_INVOKE_CHANNEL, async (event, channel: unknown, payload: unknown) => {

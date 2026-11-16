@@ -1,6 +1,7 @@
 import { app, protocol, session, shell, net, type Session, type WebContents } from 'electron';
 import { pathToFileURL } from 'node:url';
 import { isAllowedExternalUrl } from '@rl/core';
+import { DOC_SCHEME } from '@rl/core';
 import { APP_ORIGIN, APP_SCHEME } from './app-info.js';
 import { DEV_CSP, PROD_CSP } from './csp.js';
 import { isTrustedUrlFor, resolveRendererFile } from './renderer-url.js';
@@ -10,6 +11,8 @@ import { getRuntime } from './runtime.js';
 export function registerPrivilegedSchemes(): void {
   protocol.registerSchemesAsPrivileged([
     { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
+    // Bytes of the PDFs for the reader (range requests, fetched from the renderer origin). No bypassCSP: connect-src names it.
+    { scheme: DOC_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
   ]);
 }
 
@@ -33,6 +36,11 @@ export function serveRenderer(ses: Session, rendererDir: string): void {
     headers.set('X-Content-Type-Options', 'nosniff');
     return new Response(res.body, { status: res.status, headers });
   });
+}
+
+/** Serves `rl-doc://` (see `doc-protocol.ts`) in the given session. */
+export function serveDocuments(ses: Session, handler: (request: Request) => Promise<Response>): void {
+  ses.protocol.handle(DOC_SCHEME, handler);
 }
 
 /** Session-wide hardening: deny every permission, add CSP to the dev server, block downloads of unknown origin. */

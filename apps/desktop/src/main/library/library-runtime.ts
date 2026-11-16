@@ -169,6 +169,11 @@ export class LibraryRuntime {
     return this.d.libraryId;
   }
 
+  /** The data folder of the active library (notes and annotations are read and written through it). */
+  get store(): LibraryStore {
+    return this.d.store;
+  }
+
   status(): ScanStatus {
     return this.current;
   }

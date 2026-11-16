@@ -34,7 +34,7 @@ function setup() {
     runtime: noRuntime,
     libraries: new LibraryService(settings, approved, secrets),
     secrets,
-    shell: { openPath: async () => '', showItemInFolder: () => {} },
+    shell: { openPath: async () => '', showItemInFolder: () => {}, openExternal: async () => {} },
     pickFolder: async () => picked,
     pickFile: async () => pickedFile,
     appInfo: () => ({ name: 'Research Lab', version: '0', platform: 'test', electron: 'x' }),

@@ -44,10 +44,15 @@ function initialRenderer() {
 }
 
 const initial = initialRenderer();
+// `renderer/pdfjs/` holds files pdf.js fetches only for the PDFs that need them (fonts, CMaps, image decoders, D-193):
+// they have their own budget and do not count in the code of the app.
+const RESOURCES = path.join(out, 'renderer', 'pdfjs');
+const app = (ext) => files(path.join(out, 'renderer'), ext).filter((f) => !f.startsWith(RESOURCES + path.sep));
 const measured = {
   'renderer.initialJsKB': kib(initial.bytes),
-  'renderer.totalJsKB': kib(sum(files(path.join(out, 'renderer'), '.js'))),
-  'renderer.totalKB': kib(sum(files(path.join(out, 'renderer'), '.js')) + sum(files(path.join(out, 'renderer'), '.css')) + sum(files(path.join(out, 'renderer'), '.html'))),
+  'renderer.totalJsKB': kib(sum(app('.js'))),
+  'renderer.totalKB': kib(sum(app('.js')) + sum(app('.css')) + sum(app('.html'))),
+  'renderer.readerResourcesKB': kib(sum(files(RESOURCES, ''))),
   'main.totalJsKB': kib(sum(files(path.join(out, 'main'), '.js'))),
   'preload.totalKB': kib(sum([...files(path.join(out, 'preload'), '.cjs'), ...files(path.join(out, 'preload'), '.js')])),
 };

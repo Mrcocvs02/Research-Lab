@@ -7,7 +7,8 @@
     ],
     "initialJsKB": 403,
     "totalJsKB": 1370,
-    "totalKB": 1600
+    "totalKB": 1600,
+    "readerResourcesKB": 2760
   },
   "main": {
     "totalJsKB": 640

@@ -80,6 +80,9 @@ function toViewerError(e: unknown): ViewerError {
 
 const isWebUrl = (url: string) => /^https?:\/\//i.test(url);
 
+/** URL of a pdf.js resource folder copied next to the page at build time (`pdfjs/`, see electron.vite.config.ts). */
+const resourceUrl = (folder: string) => new URL(`pdfjs/${folder}`, document.baseURI).href;
+
 export async function createViewer(container: HTMLDivElement, viewerEl: HTMLDivElement, handlers: ViewerHandlers): Promise<Viewer> {
   const pdfjs = await import('pdfjs-dist');
   // pdf_viewer reads the core library from this global when it loads.
@@ -189,6 +192,14 @@ export async function createViewer(container: HTMLDivElement, viewerEl: HTMLDivE
         enableXfa: false,
         disableAutoFetch: true, // read the ranges that are needed, not the whole file in the background
         verbosity: 0,
+        // Fetched only when a PDF needs them (D-193): non-embedded standard fonts, CMaps of CJK text, ICC profiles, and
+        // the JavaScript decoders of JBIG2/JPEG 2000 scans (no WebAssembly: the CSP has no 'wasm-unsafe-eval').
+        cMapUrl: resourceUrl('cmaps/'),
+        cMapPacked: true,
+        standardFontDataUrl: resourceUrl('standard_fonts/'),
+        iccUrl: resourceUrl('iccs/'),
+        wasmUrl: resourceUrl('wasm/'),
+        useWasm: false,
       };
       task = pdfjs.getDocument(params);
       const t = task;

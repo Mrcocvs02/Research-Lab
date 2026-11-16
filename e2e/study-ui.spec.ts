@@ -50,6 +50,12 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
     await expect(window.getByTestId('reader')).toBeVisible();
     await expect(window.getByTestId('reader-error')).toHaveCount(0);
     await expect(window.getByTestId('reader-pages')).toContainText(/\d/, { timeout: 60_000 });
+    // The files pdf.js fetches for some PDFs (D-193) are served next to the page, under the same CSP.
+    const resources = await window.evaluate(async () => {
+      const urls = ['pdfjs/standard_fonts/FoxitSerif.pfb', 'pdfjs/cmaps/UniJIS-UTF16-H.bcmap', 'pdfjs/wasm/openjpeg_nowasm_fallback.js'];
+      return Promise.all(urls.map(async (u) => (await fetch(new URL(u, document.baseURI))).status));
+    });
+    expect(resources).toEqual([200, 200, 200]);
 
     // Select text and highlight it in green with a comment.
     await selectFirstText(window);

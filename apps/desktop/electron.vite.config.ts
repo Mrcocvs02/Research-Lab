@@ -1,6 +1,47 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
-import { resolve } from 'node:path';
+import type { Plugin } from 'vite';
+import { cpSync, createReadStream, existsSync, statSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join, normalize, resolve, sep } from 'node:path';
+
+/**
+ * Files pdf.js fetches only when a PDF needs them (D-193): standard fonts for PDFs that do not embed theirs, CMaps
+ * for CJK text, ICC profiles, and the JavaScript decoders of JBIG2 and JPEG 2000 images (scanned papers). The
+ * WebAssembly versions are left out: they would need 'wasm-unsafe-eval' in the CSP. Served at `pdfjs/` next to the page.
+ */
+const PDFJS_DIR = dirname(createRequire(import.meta.url).resolve('pdfjs-dist/package.json'));
+const PDFJS_RESOURCES: Record<string, string> = {
+  cmaps: 'cmaps',
+  standard_fonts: 'standard_fonts',
+  iccs: 'iccs',
+  'wasm/jbig2_nowasm_fallback.js': 'wasm/jbig2_nowasm_fallback.js',
+  'wasm/openjpeg_nowasm_fallback.js': 'wasm/openjpeg_nowasm_fallback.js',
+};
+
+function pdfjsResources(): Plugin {
+  let outDir = '';
+  return {
+    name: 'rl-pdfjs-resources',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    // Development server: the same files under /pdfjs/, read from the package (only the listed ones).
+    configureServer(server) {
+      server.middlewares.use('/pdfjs/', (req, res, next) => {
+        const rel = normalize(decodeURIComponent((req.url ?? '').split('?')[0]!)).replace(/^[\\/]+/, '');
+        const allowed = Object.keys(PDFJS_RESOURCES).some((k) => rel === normalize(k) || rel.startsWith(normalize(k) + sep));
+        const file = join(PDFJS_DIR, rel);
+        if (!allowed || !file.startsWith(PDFJS_DIR + sep) || !existsSync(file) || !statSync(file).isFile()) return next();
+        if (file.endsWith('.js')) res.setHeader('Content-Type', 'text/javascript');
+        createReadStream(file).pipe(res);
+      });
+    },
+    writeBundle() {
+      for (const [from, to] of Object.entries(PDFJS_RESOURCES)) cpSync(join(PDFJS_DIR, from), join(outDir, 'pdfjs', to), { recursive: true });
+    },
+  };
+}
 
 /** Workspace packages ship TypeScript sources: they must be bundled, not externalized. */
 const workspacePackages = ['@rl/core', '@rl/data', '@rl/search', '@rl/ai', '@rl/citations', '@rl/graph', '@rl/export', '@rl/mcp'];
@@ -36,7 +77,7 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(import.meta.dirname, 'src/renderer'),
-    plugins: [react()],
+    plugins: [react(), pdfjsResources()],
     build: {
       minify: 'oxc',
       cssMinify: true,

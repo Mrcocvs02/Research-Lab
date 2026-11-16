@@ -263,5 +263,9 @@ export async function pruneThumbs(localDataDir: string, libraryId: string, isKno
 
 /** Drops every thumbnail of a library (after "Rebuild index"). */
 export async function clearThumbs(localDataDir: string, libraryId: string): Promise<void> {
-  await rm(thumbDir(localDataDir, libraryId), { recursive: true, force: true }).catch(() => {});
+  try {
+    await rm(thumbDir(localDataDir, libraryId), { recursive: true, force: true });
+  } catch {
+    // a cache: it is made again when needed
+  }
 }

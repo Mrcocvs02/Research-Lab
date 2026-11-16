@@ -12,9 +12,10 @@ export function createMainWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     show: false,
-    // Test runs keep the window off screen but fully painted (see RL_E2E_HIDDEN in runtime.ts).
-    paintWhenInitiallyHidden: true,
-    skipTaskbar: hidden,
+    // Test runs (RL_E2E_HIDDEN, see runtime.ts): the window is shown far off screen, without focus
+    // and without a taskbar entry. A never-shown window would have its frames throttled by Chromium,
+    // which makes UI tests several times slower.
+    ...(hidden ? { x: -32000, y: -32000, skipTaskbar: true } : {}),
     title: APP_NAME,
     autoHideMenuBar: true,
     webPreferences: {
@@ -33,7 +34,7 @@ export function createMainWindow(): BrowserWindow {
       backgroundThrottling: !hidden,
     },
   });
-  if (!hidden) win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => (hidden ? win.showInactive() : win.show()));
 
   const dev = getRuntime().rendererDevUrl;
   void win.loadURL(dev ? `${dev}/` : `${APP_ORIGIN}/index.html`);

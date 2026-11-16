@@ -11,6 +11,13 @@ import { openSyntheticLibrary, rowByTitle } from './helpers/ui';
 const READER_CHANNELS = ['reader:open', 'notes:save', 'notes:get', 'notes:list', 'annotations:save', 'annotations:list'];
 const NOTE_WORD = 'quasarmarker';
 
+/** Opens a document in the reader from its row: the row buttons show on hover, as for a user. */
+async function openInReader(window: Page, title: string): Promise<void> {
+  const row = rowByTitle(window, title);
+  await row.hover();
+  await row.getByTestId('row-read').click();
+}
+
 /** Selects the text of the first line of the first page, as a user dragging over it would. */
 async function selectFirstText(window: Page): Promise<void> {
   const span = window.locator('[data-testid="reader-pages-area"] .page[data-page-number="1"] .textLayer span').filter({ hasText: /\w{4,}/ }).first();
@@ -39,7 +46,7 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
 
     // Open it in the reader from the list.
     await window.getByTestId('search-sort').selectOption('title');
-    await rowByTitle(window, title).getByTestId('row-read').click();
+    await openInReader(window, title);
     await expect(window.getByTestId('reader')).toBeVisible();
     await expect(window.getByTestId('reader-error')).toHaveCount(0);
     await expect(window.getByTestId('reader-pages')).toContainText(/\d/, { timeout: 60_000 });
@@ -74,7 +81,7 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
     await window.getByTestId('search-result').first().waitFor({ state: 'visible', timeout: 60_000 });
 
     // The highlight and the note are still there.
-    await rowByTitle(window, title).getByTestId('row-read').click();
+    await openInReader(window, title);
     await expect(window.getByTestId('annotation-item')).toHaveCount(1, { timeout: 60_000 });
     await expect(window.getByTestId('annotation-mark').first()).toBeVisible({ timeout: 60_000 });
     await expect(window.getByTestId('reader-study-reading')).toBeChecked();
@@ -92,9 +99,10 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
     await expect(label).toHaveAttribute('data-field', 'note');
     await expect(label).toHaveText('in your notes');
 
-    // And the hit opens the reader on the page note.
+    // And the hit opens the reader on the list of the notes, one click away from the page note.
     await label.click();
     await expect(window.getByTestId('reader')).toBeVisible();
+    await window.getByTestId('notes-list-item').first().click();
     await expect(window.getByTestId('note-page-input')).toHaveValue(`${NOTE_WORD} on the first page`);
   } finally {
     await second?.close().catch(() => {});

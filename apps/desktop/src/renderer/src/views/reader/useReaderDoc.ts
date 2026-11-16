@@ -6,6 +6,13 @@ import { rl } from '../../lib/rl';
 export type ReaderDoc = ResponseOf<Channels, 'documents:get'>;
 export type Underlined = { value: boolean; origin: 'annotations' | 'manual' };
 
+/** The record as it will be after `patch` (a manual "underlined" value has origin `manual`, as the server sets it). */
+function withPatch(d: ReaderDoc, patch: { studyState: StudyState } | { underlined: boolean }): ReaderDoc {
+  return 'studyState' in patch
+    ? { ...d, study: { ...d.study, state: patch.studyState } }
+    : { ...d, study: { ...d.study, underlined: { value: patch.underlined, origin: 'manual' } } };
+}
+
 /**
  * The document record the reader shows (title, study state, the "underlined" flag): read when the reader opens and
  * when documents change, changed through `documents:update` (so it is undoable like every other edit of the card).
@@ -32,6 +39,8 @@ export function useReaderDoc(docId: string, onError: (e: unknown) => void) {
 
   const update = useCallback(
     (patch: { studyState: StudyState } | { underlined: boolean }) => {
+      // Shown at once: a radio or a checkbox that waited for the answer would flip back for a moment after the click.
+      setDoc((d) => (d ? withPatch(d, patch) : d));
       queue.current = queue.current.then(async () => {
         try {
           const r = await rl.invoke('documents:update', { docId, patch });
@@ -39,6 +48,8 @@ export function useReaderDoc(docId: string, onError: (e: unknown) => void) {
           invalidate('documents');
         } catch (e) {
           fail.current(e);
+          // The change did not happen: show the record as it is.
+          await rl.invoke('documents:get', { docId }).then(setDoc, () => {});
         }
       });
     },

@@ -119,7 +119,9 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
                 onClick={(e) => {
                   e.stopPropagation();
                   if (row.page !== undefined && readable) onRead(row.page, row.field === 'note' ? 'pageNote' : 'annotations');
-                  else if (row.field === 'note') onDetail();
+                  // The index does not know which page a matched note is on: for a PDF the reader opens on the list of its
+                  // notes (one click to the right page); other files show the card with the file note.
+                  else if (row.field === 'note') (readable ? onRead(undefined, 'notes') : onDetail());
                   else if (readable) onRead(undefined, 'annotations');
                 }}
                 data-testid="hit-field"

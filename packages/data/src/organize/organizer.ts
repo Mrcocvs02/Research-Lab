@@ -104,7 +104,7 @@ export function patchDocument(cur: DocumentRecord, patch: DocumentPatch, taxonom
 export class Organizer {
   private readonly ctx: OrgCtx;
   private readonly projects: ProjectService;
-  private readonly history: HistoryService;
+  private readonly history!: HistoryService;
   private chain: Promise<unknown> = Promise.resolve();
   private cache: { at: number; infos: DocInfo[] } | null = null;
   private readonly ttl: number;
@@ -119,6 +119,7 @@ export class Organizer {
       docInfos: (fresh) => this.docInfos(fresh),
       invalidate: () => {
         this.cache = null;
+        this.history?.invalidate();
       },
     };
     this.projects = new ProjectService(this.ctx);
@@ -167,7 +168,6 @@ export class Organizer {
 
       const changeId = this.ctx.newChangeId();
       const cs = store.withChange({ changeId, summary: describeOps(before, ops) });
-      // Documents first, the taxonomy last: an interruption in between leaves documents tagged with the surviving node.
       const resolve = (t: string): string => {
         let x = t;
         for (let i = 0; i < 1000 && redirects.has(x); i++) x = redirects.get(x) as string;
@@ -175,13 +175,34 @@ export class Organizer {
       };
       const retag = infos.filter((d) => d.tags.some((t) => redirects.has(t)));
       const now = this.ctx.now().toISOString();
-      await inChunks(retag, 8, async (d) => {
-        await cs.documents.update(d.id, (cur) => {
-          if (!cur) throw new AppError('NOT_FOUND', 'Unknown document', { docId: d.id });
-          return { ...cur, tags: [...new Set(cur.tags.map(resolve))], updatedAt: now };
+      // Documents first, the taxonomy last (an interruption in between leaves documents on the surviving node), and
+      // all or nothing: the document writes are not credited to the change yet (the plain store; its entries carry
+      // no change id and are not part of any undoable change). If the taxonomy cannot be written (somebody else changed
+      // it) or a document cannot be written, the documents already changed go back to their tags, and only when the
+      // whole operation succeeded are the document changes logged as part of this change.
+      const written = new Map<string, { from: string[]; to: string[] }>();
+      try {
+        await inChunks(retag, 8, async (d) => {
+          await store.documents.update(d.id, (cur) => {
+            if (!cur) throw new AppError('NOT_FOUND', 'Unknown document', { docId: d.id });
+            const tags = [...new Set(cur.tags.map(resolve))];
+            written.set(d.id, { from: cur.tags, to: tags });
+            return { ...cur, tags, updatedAt: now };
+          });
         });
-      });
-      await cs.writeTaxonomy(next, { expectedRevision: before.revision });
+        await cs.writeTaxonomy(next, { expectedRevision: before.revision });
+      } catch (e) {
+        await inChunks([...written], 8, async ([id, w]) => {
+          await store.documents
+            .update(id, (cur) => (cur && canonical(cur.tags) === canonical(w.to) ? { ...cur, tags: w.from, updatedAt: now } : (cur as DocumentRecord)))
+            .catch(() => undefined);
+        });
+        this.ctx.invalidate();
+        throw e;
+      }
+      for (const [id, w] of written) {
+        await cs.appendLog({ type: 'change', at: now, deviceId: this.ctx.deviceId, actor: 'user', target: { kind: 'document', id }, action: 'tags.update', before: { tags: w.from }, after: { tags: w.to } });
+      }
       this.ctx.invalidate();
 
       const after = await store.readTaxonomy();
@@ -333,6 +354,10 @@ export class Organizer {
 
   listHistory(limit?: number): Promise<HistoryItem[]> {
     return this.history.list(limit);
+  }
+  /** The items plus `canUndo` / `canRedo`: whether `undo()` / `redo()` without an id would find something to do. */
+  historyView(limit?: number): Promise<{ items: HistoryItem[]; canUndo: boolean; canRedo: boolean }> {
+    return this.history.view(limit);
   }
   undo(changeId?: string): Promise<HistoryResult> {
     return this.run(() => this.history.undo(changeId));

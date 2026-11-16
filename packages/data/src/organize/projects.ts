@@ -56,7 +56,8 @@ export function detailOf(p: Project, info: ReadonlyMap<string, DocInfo>, changeI
         return {
           docId: i.docId,
           order: i.order,
-          ...(i.status ? { status: i.status } : {}),
+          // The reading state is the document's own (single source); a `status` stored by an older version is ignored.
+          ...(d ? { status: d.studyState } : {}),
           ...(i.due ? { due: i.due } : {}),
           ...(i.note !== undefined ? { note: i.note } : {}),
           studyState: d?.studyState ?? null,
@@ -228,7 +229,8 @@ export class ProjectService {
           if (seen.has(i.docId)) throw new AppError('INVALID_REQUEST', 'A document appears twice in the reading plan', { docId: i.docId });
           seen.add(i.docId);
         }
-        const plan = items.map((i, n) => ({ n, i })).sort((a, b) => a.i.order - b.i.order || a.n - b.n).map(({ i }) => i);
+        // `status` per item is deprecated: accepted, never stored (the state of a document is `study.state`).
+        const plan = items.map(({ status: _deprecated, ...i }, n) => ({ n, i })).sort((a, b) => a.i.order - b.i.order || a.n - b.n).map(({ i }) => i);
         return JSON.stringify(plan) === JSON.stringify(cur.readingPlan) ? null : { ...cur, readingPlan: plan };
       },
       expectedRevision,

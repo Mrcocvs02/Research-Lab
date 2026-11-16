@@ -4,6 +4,8 @@ import type { ChangeContext } from '../store.js';
 /** A store that can credit its changes to one user operation (the file store of `@rl/data`). */
 export interface OrganizerStore extends LibraryStore {
   withChange(ctx: ChangeContext): LibraryStore;
+  /** Cheap fingerprint of the change-log files (names, sizes, mtimes): equal fingerprints, equal logs. */
+  logSignature?(): Promise<string>;
 }
 
 /** What the organizer keeps in memory about each document (not the whole record). */
@@ -16,6 +18,7 @@ export interface DocInfo {
   authors: string[];
   year: number | null;
   studyState: StudyState;
+  updatedAt: string;
 }
 
 export const toInfo = (r: DocumentRecord): DocInfo => ({
@@ -27,6 +30,7 @@ export const toInfo = (r: DocumentRecord): DocInfo => ({
   authors: r.authors,
   year: r.year,
   studyState: r.study.state,
+  updatedAt: r.updatedAt,
 });
 
 /** Shared by the parts of the organizer; every mutating call runs under `run` (one at a time). */

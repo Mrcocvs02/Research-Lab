@@ -48,12 +48,20 @@ test('first run imports a pre-existing index from a real library copy', async ()
     const docsDir = path.join(root, '.lab', 'documents');
     const docFiles = (await readdir(docsDir)).filter((f) => f.endsWith('.json'));
     expect(indexLines.length).toBeGreaterThan(0);
-    expect(docFiles).toHaveLength(indexLines.length);
-    for (const f of docFiles) {
-      const doc = JSON.parse(await readFile(path.join(docsDir, f), 'utf8')) as { title?: string; tags?: unknown[] };
-      expect(doc.title, f).toBeTruthy();
-      expect(doc.tags?.length ?? 0, f).toBeGreaterThan(0);
+    type Rec = { path: string; title?: string; tags?: unknown[]; legacy?: unknown; inbox?: unknown };
+    const docs: Rec[] = [];
+    for (const f of docFiles) docs.push(JSON.parse(await readFile(path.join(docsDir, f), 'utf8')) as Rec);
+    // Every index row becomes exactly one imported document, with title and tags.
+    const imported = docs.filter((d) => d.legacy !== undefined);
+    expect(imported).toHaveLength(indexLines.length);
+    for (const d of imported) {
+      expect(d.title, d.path).toBeTruthy();
+      expect(d.tags?.length ?? 0, d.path).toBeGreaterThan(0);
     }
+    // Files added to the library after the old index was written are found by the first scan and wait in the inbox.
+    for (const d of docs.filter((x) => x.legacy === undefined)) expect(d.inbox, d.path).toBeTruthy();
+    // Never two records for the same file.
+    expect(new Set(docs.map((d) => d.path)).size).toBe(docs.length);
     const taxonomy = JSON.parse(await readFile(path.join(root, '.lab', 'taxonomy.json'), 'utf8')) as {
       nodes: unknown[] | Record<string, unknown>;
     };

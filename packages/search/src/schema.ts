@@ -2,7 +2,7 @@
  * Layout of the search index file. The file is local and rebuildable (never synced): when
  * `INDEX_SCHEMA_VERSION` differs from the one stored in the file, everything is dropped and refilled.
  */
-export const INDEX_SCHEMA_VERSION = 1;
+export const INDEX_SCHEMA_VERSION = 2;
 
 /** Page rows of `page_fts` have rowid = docs.id * PAGE_ROWID_BASE + page, so a document's pages are one rowid range. */
 export const PAGE_ROWID_BASE = 1_000_000;

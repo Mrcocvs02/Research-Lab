@@ -18,6 +18,12 @@ export const documentSummarySchema = z.object({
   missing: z.boolean(),
 });
 
+/**
+ * What the renderer may see of a record: everything except `legacy` (verbatim leftovers of the old index,
+ * which can hold absolute paths and other data with no meaning here). D-081.
+ */
+export const documentViewSchema = documentRecordSchema.omit({ legacy: true });
+
 export const documentsChannels = defineChannels('documents', {
   /** Paginated, sorted and filtered list of the documents of the active library (from the index; no file is read). */
   list: {
@@ -29,6 +35,6 @@ export const documentsChannels = defineChannels('documents', {
     }),
     response: z.object({ total: z.number().int().nonnegative(), items: z.array(documentSummarySchema) }),
   },
-  /** The full record of one document (NOT_FOUND when unknown). */
-  get: { request: z.object({ docId: documentIdSchema }), response: documentRecordSchema },
+  /** The record of one document, without `legacy` (NOT_FOUND when unknown). */
+  get: { request: z.object({ docId: documentIdSchema }), response: documentViewSchema },
 });

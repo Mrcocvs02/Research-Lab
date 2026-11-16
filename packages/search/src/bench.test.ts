@@ -14,6 +14,9 @@ import { makeDoc } from './test-utils.js';
 const DOCS = Number(process.env.RL_BENCH_DOCS ?? 1000);
 const PAGES = Number(process.env.RL_BENCH_PAGES ?? 20);
 const WORDS = Number(process.env.RL_BENCH_WORDS ?? 300);
+/** Long documents (theses, books: 300+ pages) added on top of the regular ones. */
+const LONG_DOCS = Number(process.env.RL_BENCH_LONG_DOCS ?? 25);
+const LONG_PAGES = Number(process.env.RL_BENCH_LONG_PAGES ?? 340);
 const P95_BUDGET_MS = 200;
 const ROUNDS = 20;
 
@@ -46,8 +49,14 @@ let dbFile: string;
 const timings = new Map<string, number[]>();
 let buildMs = 0;
 
-let QUERIES: Array<{ name: string; query: SearchQuery }> = [];
-const makeQueries = (common: string, mid: string, rare: string, pair: string): Array<{ name: string; query: SearchQuery }> => [
+interface BenchQuery {
+  name: string;
+  query: SearchQuery;
+  /** Also compute the facets, as the interface does for every keystroke (`search:run`); the time is of both. */
+  facets?: boolean;
+}
+let QUERIES: BenchQuery[] = [];
+const makeQueries = (common: string, mid: string, rare: string, pair: string): BenchQuery[] => [
   { name: 'one common word', query: { text: common } },
   { name: 'two words (body)', query: { text: `${common} ${mid}` } },
   { name: 'rare word', query: { text: rare } },
@@ -60,6 +69,16 @@ const makeQueries = (common: string, mid: string, rare: string, pair: string): A
   { name: 'text, sorted by year, page 2', query: { text: mid, sort: 'year-desc', offset: 25 } },
   { name: 'filters only (list)', query: { text: '', filters: { types: ['article'], studyStates: ['read'] } } },
   { name: 'hostile input', query: { text: `" OR ( NEAR ${common}` } },
+  // With facets (query + facets in one request) and long documents.
+  { name: 'one common word + facets', query: { text: common }, facets: true },
+  { name: 'two words + facets', query: { text: `${common} ${mid}` }, facets: true },
+  { name: 'prefix + facets', query: { text: `${common.slice(0, 3)}*` }, facets: true },
+  { name: 'phrase + facets', query: { text: '"rimo tusa"' }, facets: true },
+  { name: 'filters only + facets', query: { text: '', filters: { types: ['article'], studyStates: ['read'] } }, facets: true },
+  { name: 'text + tag + year + facets', query: { text: mid, filters: { tags: ['topic-3'], yearFrom: 2015, yearTo: 2022 } }, facets: true },
+  { name: 'long docs: body word + facets', query: { text: mid, filters: { types: ['thesis'] } }, facets: true },
+  { name: 'long docs: common word + facets', query: { text: common, sort: 'year-desc' }, facets: true },
+  { name: 'long docs: title word + facets', query: { text: 'ZZLONG' }, facets: true },
 ];
 
 beforeAll(async () => {
@@ -101,17 +120,47 @@ beforeAll(async () => {
     if (batch.length === 100) await index.upsertMany(batch.splice(0));
   }
   if (batch.length) await index.upsertMany(batch);
+  // Long documents: hundreds of pages each, so a common word matches thousands of pages of a few documents.
+  for (let d = 0; d < LONG_DOCS; d++) {
+    const pages = Array.from({ length: LONG_PAGES + (d % 5) * 20 }, (_, p) => {
+      const ws: string[] = [];
+      for (let i = 0; i < WORDS; i++) ws.push(rand() < 0.0003 ? 'rimo tusa' : word());
+      return { page: p + 1, text: ws.join(' ') + '.' };
+    });
+    batch.push(
+      makeDoc(
+        {
+          seed: `bench-long-${d}`,
+          title: `${word()} ${word()} ZZLONG`,
+          authors: [`${surnames[d % surnames.length]} ${word()}`],
+          year: 2005 + (d % 15),
+          type: 'thesis',
+          venue: `Venue ${d % 12}`,
+          path: `theses/long-${d}.pdf`,
+          tags: [`topic-${d % 10}`],
+          state: 'to-read',
+        },
+        { pages, abstract: Array.from({ length: 200 }, word).join(' ') },
+      ),
+    );
+    if (batch.length >= 5) await index.upsertMany(batch.splice(0));
+  }
+  if (batch.length) await index.upsertMany(batch);
   buildMs = performance.now() - started;
   QUERIES = makeQueries(vocab[0]!, vocab[150]!, vocab[3000]!, `${vocab[0]} ${vocab[1]}`);
   // eslint-disable-next-line no-console
   console.log(`build ${(buildMs / 1000).toFixed(1)} s`);
 
   // Warm-up (statement preparation, caches), not measured.
-  for (const q of QUERIES) await index.searchPage(q.query);
+  const run = async (q: BenchQuery) => {
+    await index.searchPage(q.query);
+    if (q.facets) await index.facets(q.query);
+  };
+  for (const q of QUERIES) await run(q);
   for (let r = 0; r < ROUNDS; r++) {
     for (const q of QUERIES) {
       const t0 = performance.now();
-      await index.searchPage(q.query);
+      await run(q);
       const list = timings.get(q.name) ?? [];
       list.push(performance.now() - t0);
       timings.set(q.name, list);
@@ -129,9 +178,9 @@ const pct = (xs: number[], p: number) => {
   return s[Math.min(s.length - 1, Math.ceil((p / 100) * s.length) - 1)]!;
 };
 
-describe(`search benchmark (${DOCS} documents x ${PAGES} pages)`, () => {
+describe(`search benchmark (${DOCS} documents x ${PAGES} pages + ${LONG_DOCS} long documents of ${LONG_PAGES}+ pages)`, () => {
   it('indexes everything', async () => {
-    expect(await index.count()).toBe(DOCS);
+    expect(await index.count()).toBe(DOCS + LONG_DOCS);
   });
 
   it(`answers typical queries with p95 under ${P95_BUDGET_MS} ms`, async () => {
@@ -145,7 +194,7 @@ describe(`search benchmark (${DOCS} documents x ${PAGES} pages)`, () => {
     // eslint-disable-next-line no-console
     console.log(
       [
-        `index: ${DOCS} docs, ${DOCS * PAGES} pages, ${(size / 1024 / 1024).toFixed(1)} MiB on disk, built in ${(buildMs / 1000).toFixed(1)} s`,
+        `index: ${DOCS + LONG_DOCS} docs, ${DOCS * PAGES + LONG_DOCS * (LONG_PAGES + 40)} pages, ${(size / 1024 / 1024).toFixed(1)} MiB on disk, built in ${(buildMs / 1000).toFixed(1)} s`,
         ...rows,
         `ALL                            p50 ${pct(all, 50).toFixed(1).padStart(6)} ms   p95 ${pct(all, 95).toFixed(1).padStart(6)} ms   max ${Math.max(...all).toFixed(1)} ms`,
       ].join('\n'),
@@ -160,5 +209,8 @@ describe(`search benchmark (${DOCS} documents x ${PAGES} pages)`, () => {
     expect(hit.hits[0]!.field).toBe('title');
     const facets = await index.facets({ text: QUERIES[0]!.query.text });
     expect(facets.total).toBeGreaterThan(0);
+    const long = await index.searchPage({ text: 'ZZLONG', limit: 200 });
+    expect(long.total).toBe(LONG_DOCS);
+    expect((await index.facets({ text: 'ZZLONG' })).types).toEqual([{ value: 'thesis', count: LONG_DOCS }]);
   });
 });

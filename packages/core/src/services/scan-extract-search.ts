@@ -158,7 +158,7 @@ export interface SearchQuery {
 /** A page of the document where the query matched. */
 export interface SearchPageHit {
   page: number;
-  /** Snippet with match markers `[[...]]`. */
+  /** Snippet with the match between the control characters U+0001 and U+0002 (see SEARCH_MARK_OPEN). */
   snippet: string;
 }
 
@@ -167,7 +167,7 @@ export interface SearchHit {
   score: number;
   /** Where it matched. */
   field: 'title' | 'summary' | 'note' | 'annotation' | 'text';
-  /** Short snippet with match markers `[[...]]`; may be empty. */
+  /** Short snippet, matches between U+0001 and U+0002 (SEARCH_MARK_OPEN, SEARCH_MARK_CLOSE); may be empty. */
   snippet: string;
   /** Best matching page of the full text. */
   page?: number;

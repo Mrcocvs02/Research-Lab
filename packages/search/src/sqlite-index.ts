@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
+import { SEARCH_MARK_OPEN } from '@rl/core';
 import type {
   DocumentListQuery,
   DocumentSummary,
@@ -15,11 +16,13 @@ import type {
   SearchResultPage,
   SearchSort,
 } from '@rl/core';
-import { normalizeText, parseQuery, type TextFilters } from './query.js';
+import { normalizeText, parseQuery, stripControl, type TextFilters } from './query.js';
 import { DOC_FTS_WEIGHTS, DROP_SQL, INDEX_SCHEMA_VERSION, MAX_PAGE_NUMBER, PAGE_ROWID_BASE, SCHEMA_SQL } from './schema.js';
 
-const OPEN = "'[['";
-const CLOSE = "']]'";
+// Match markers are control characters (SEARCH_MARK_*), stripped from every indexed text: document content can
+// never forge a highlight. SQL literals for `snippet()`.
+const OPEN = 'char(1)';
+const CLOSE = 'char(2)';
 const ELLIPSIS = "'…'";
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 200;
@@ -137,6 +140,14 @@ interface Matches {
 export class SqliteSearchIndex implements SearchIndex {
   private db: DatabaseSync | null = null;
   private fresh = false;
+  /** Counts the writes made through this object; with `PRAGMA data_version` (other connections) it versions the cache. */
+  private writes = 0;
+  /**
+   * The last evaluation of a query's MATCH. `searchPage` always evaluates and stores it; `facets` for the same
+   * text and filters (the renderer asks for both on every keystroke) reuses it, so the full-text work is done
+   * once per request pair. Never served to `searchPage`, so repeated searches are never answered from memory.
+   */
+  private lastMatches: { key: string; matches: Matches } | null = null;
 
   get needsRebuild(): boolean {
     return this.fresh;
@@ -203,6 +214,7 @@ export class SqliteSearchIndex implements SearchIndex {
 
   async reset(): Promise<void> {
     const db = this.h;
+    this.writes++;
     db.exec(DROP_SQL);
     db.exec(SCHEMA_SQL);
     db.exec(`PRAGMA user_version = ${INDEX_SCHEMA_VERSION}`);
@@ -221,6 +233,7 @@ export class SqliteSearchIndex implements SearchIndex {
 
   async upsertMany(docs: IndexableDocument[]): Promise<void> {
     const db = this.h;
+    this.writes++;
     db.exec('BEGIN IMMEDIATE');
     try {
       for (const doc of docs) this.upsertOne(db, doc);
@@ -290,7 +303,7 @@ export class SqliteSearchIndex implements SearchIndex {
     const tagWords: string[] = [];
     for (const tag of r.tags) {
       const terms = doc.tagTerms?.[tag] ?? [tag];
-      tagWords.push(...terms);
+      tagWords.push(...terms.map(stripControl));
       insTag.run(id, tag, `|${terms.map((x) => normalizeText(x)).join('|')}|`);
     }
 
@@ -298,14 +311,14 @@ export class SqliteSearchIndex implements SearchIndex {
       `INSERT INTO doc_fts(rowid, title, authors, abstract, keywords, tags, venue, notes, annotations) VALUES (?,?,?,?,?,?,?,?,?)`,
     ).run(
       id,
-      title ?? '',
-      r.authors.join('; '),
-      doc.abstract ?? kept.abstract,
-      doc.keywords ? doc.keywords.join('; ') : kept.keywords,
+      stripControl(title ?? ''),
+      stripControl(r.authors.join('; ')),
+      stripControl(doc.abstract ?? kept.abstract),
+      doc.keywords ? stripControl(doc.keywords.join('; ')) : kept.keywords,
       tagWords.join('; '),
-      venue ?? '',
-      doc.notes ?? kept.notes,
-      doc.annotations ?? kept.annotations,
+      stripControl(venue ?? ''),
+      stripControl(doc.notes ?? kept.notes),
+      stripControl(doc.annotations ?? kept.annotations),
     );
 
     if (doc.pages) {
@@ -314,7 +327,7 @@ export class SqliteSearchIndex implements SearchIndex {
       let pages = 0;
       for (const p of doc.pages) {
         if (!Number.isInteger(p.page) || p.page < 1 || p.page > MAX_PAGE_NUMBER || !p.text.trim()) continue;
-        ins.run(id * PAGE_ROWID_BASE + p.page, p.text);
+        ins.run(id * PAGE_ROWID_BASE + p.page, stripControl(p.text));
         pages++;
       }
       db.prepare('UPDATE docs SET text_hash = ?, page_count = ? WHERE id = ?').run(doc.textHash ?? r.hash, pages, id);
@@ -325,6 +338,7 @@ export class SqliteSearchIndex implements SearchIndex {
     const db = this.h;
     const row = db.prepare('SELECT id FROM docs WHERE doc_id = ?').get(docId) as { id: number } | undefined;
     if (!row) return;
+    this.writes++;
     db.exec('BEGIN IMMEDIATE');
     try {
       db.prepare('DELETE FROM doc_fts WHERE rowid = ?').run(row.id);
@@ -350,7 +364,21 @@ export class SqliteSearchIndex implements SearchIndex {
     return (await this.searchPage(query)).hits;
   }
 
-  private matches(query: SearchQuery): Matches {
+  /** Identity of what `matches` depends on: text, filters and the state of the data. */
+  private matchKey(query: SearchQuery): string {
+    const v = (this.h.prepare('PRAGMA data_version').get() as { data_version: number }).data_version;
+    return JSON.stringify([query.text ?? '', query.filters ?? null, v, this.writes]);
+  }
+
+  private matches(query: SearchQuery, reuse: boolean): Matches {
+    const key = this.matchKey(query);
+    if (reuse && this.lastMatches?.key === key) return this.lastMatches.matches;
+    const matches = this.evaluate(query);
+    this.lastMatches = { key, matches };
+    return matches;
+  }
+
+  private evaluate(query: SearchQuery): Matches {
     const db = this.h;
     const parsed = parseQuery(query.text ?? '');
     const where = buildWhere(query.filters, parsed.filters);
@@ -387,7 +415,7 @@ export class SqliteSearchIndex implements SearchIndex {
     const db = this.h;
     const limit = clampLimit(query.limit);
     const offset = clampOffset(query.offset);
-    const m = this.matches(query);
+    const m = this.matches(query, false);
     if (m.mode === 'none') return { total: 0, hits: [] };
 
     if (m.mode === 'list') {
@@ -403,7 +431,7 @@ export class SqliteSearchIndex implements SearchIndex {
     const sort: SearchSort = query.sort ?? 'relevance';
     let pageIds: Array<{ id: number; score: number }>;
     if (sort === 'relevance') {
-      pageIds = m.scored.sort((a, b) => b.score - a.score || a.id - b.id).slice(offset, offset + limit);
+      pageIds = [...m.scored].sort((a, b) => b.score - a.score || a.id - b.id).slice(offset, offset + limit);
     } else {
       const scoreOf = new Map(m.scored.map((s) => [s.id, s.score]));
       const rows = db
@@ -473,7 +501,7 @@ export class SqliteSearchIndex implements SearchIndex {
       const sn = snippets.get(id);
       const marked = (col: string): string | null => {
         const v = sn?.[col];
-        return typeof v === 'string' && v.includes('[[') ? v : null;
+        return typeof v === 'string' && v.includes(SEARCH_MARK_OPEN) ? v : null;
       };
       let field: SearchResultHit['field'] = 'text';
       let snippet = '';
@@ -513,7 +541,7 @@ export class SqliteSearchIndex implements SearchIndex {
 
   async facets(query: SearchQuery): Promise<SearchFacets> {
     const db = this.h;
-    const m = this.matches(query);
+    const m = this.matches(query, true);
     if (m.mode === 'none') return emptyFacets();
     // Matching documents as a sub-select: in list mode straight from the filter, else from the scored ids.
     let from: string;

@@ -9,7 +9,6 @@ import { useScanStatus } from './useScanStatus';
 import { useSearch, type SearchState } from './useSearch';
 
 const SORTS = ['relevance', 'title', 'year-desc', 'year-asc', 'added-desc', 'author'] as const;
-const PAGE_SIZE = 25;
 
 /**
  * The Library section: search bar, results with snippets and pages, facets, scan controls.
@@ -22,7 +21,7 @@ export function LibraryView() {
   const helpId = useId();
   const sortId = useId();
   const { status, start, cancel, rebuild } = useScanStatus();
-  const [state, setState] = useState<SearchState>({ text: '', filters: {}, sort: 'relevance', limit: PAGE_SIZE });
+  const [state, setState] = useState<SearchState>({ text: '', filters: {}, sort: 'relevance' });
 
   // Scan on opening the view when nothing ran in this session (a new library, for instance).
   const startedFor = useRef<string | null>(null);
@@ -34,10 +33,10 @@ export function LibraryView() {
   }, [status?.state, app.activeLibraryId, start]);
 
   const refreshKey = `${status?.state ?? 'none'}:${status?.indexed ?? 0}`;
-  const { results, facets, loading, error, forText } = useSearch(state, Boolean(app.activeLibraryId), refreshKey);
+  const { results, facets, loading, error, forText, hasMore, loadMore } = useSearch(state, Boolean(app.activeLibraryId), refreshKey);
   const running = status?.state === 'running';
-  // A new text, filter or sort starts again from the first page of results.
-  const set = (patch: Partial<SearchState>) => setState((s) => ({ ...s, limit: PAGE_SIZE, ...patch }));
+  // A new text, filter or sort starts again from the first page of results (the hook resets on any change).
+  const set = (patch: Partial<SearchState>) => setState((s) => ({ ...s, ...patch }));
 
   return (
     <div className="page library-page" data-testid="section-library">
@@ -99,8 +98,8 @@ export function LibraryView() {
             </p>
           )}
           {results && results.hits.length > 0 && <ResultList hits={results.hits} />}
-          {results && results.hits.length > 0 && results.total > results.hits.length && (
-            <button type="button" onClick={() => setState((s) => ({ ...s, limit: s.limit + PAGE_SIZE }))} data-testid="search-more">
+          {results && hasMore && (
+            <button type="button" onClick={loadMore} disabled={loading} data-testid="search-more">
               {t('search.more')}
             </button>
           )}

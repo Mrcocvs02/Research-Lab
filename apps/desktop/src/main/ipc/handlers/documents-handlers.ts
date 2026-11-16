@@ -3,5 +3,9 @@ import type { MainServices } from './services.js';
 
 export const documentsHandlers = (s: MainServices): DomainHandlers<'documents'> => ({
   'documents:list': async ({ filters, sort, limit, offset }) => (await s.runtime.require()).list({ filters, sort, limit, offset }),
-  'documents:get': async ({ docId }) => (await s.runtime.require()).getDocument(docId),
+  'documents:get': async ({ docId }) => {
+    // `legacy` holds verbatim leftovers of the old index (it can carry absolute paths): it never reaches the renderer.
+    const { legacy: _legacy, ...view } = await (await s.runtime.require()).getDocument(docId);
+    return view;
+  },
 });

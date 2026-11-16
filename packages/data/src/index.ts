@@ -9,6 +9,15 @@ export { NameIndex, normalizeName, slugify } from './normalize.js';
 export { withRetry, isTransientIoError, type RetryOptions } from './retry.js';
 export { createWatcher, type LibraryWatcher, type WatchBatch, type WatcherOptions } from './watcher.js';
 export { arxivYear, cleanDoi, findArxivIds, findDois } from './extract/identifiers.js';
+export {
+  PERMANENT_EXTRACT_REASONS,
+  TRANSIENT_EXTRACT_REASONS,
+  classifyExtractError,
+  extractErrorReason,
+  type ExtractFailureKind,
+  type PermanentExtractReason,
+  type TransientExtractReason,
+} from './extract/errors.js';
 export { toFsPath } from './fs-util.js';
 export { diffTaxonomy } from './taxonomy-diff.js';
 export { DEFAULT_IMPORT_LIMITS, type ImportLimits, type LegacyImporterOptions, type LegacyImporterWithExtras } from './legacy-importer.js';

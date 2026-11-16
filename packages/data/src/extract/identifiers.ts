@@ -14,27 +14,49 @@ export interface DoiMatch {
 
 const MAX_DOI = 200;
 
-/** Removes the punctuation a sentence or a reference list glues to the end of a DOI. */
+const TRAILING_PUNCT = new Set(['.', ',', ';', ':', '!', '?', "'", '"', '’', '”', '…']);
+const BRACKETS: Array<readonly [string, string]> = [
+  ['(', ')'],
+  ['[', ']'],
+  ['{', '}'],
+  ['<', '>'],
+];
+
+/**
+ * Removes the punctuation a sentence or a reference list glues to the end of a DOI. Linear in the input: the bracket
+ * counts are taken once and updated as characters are dropped (a loop re-counting per dropped character is quadratic).
+ */
 export function cleanDoi(raw: string): string {
-  let s = raw.replace(/[­​]/g, '');
-  for (;;) {
-    const before = s;
-    s = s.replace(/[.,;:!?'"’”…]+$/u, '');
-    // Closing brackets only when they have no opening partner inside the DOI.
-    for (const [open, close] of [
-      ['(', ')'],
-      ['[', ']'],
-      ['{', '}'],
-      ['<', '>'],
-    ] as const) {
-      while (s.endsWith(close) && s.split(open).length < s.split(close).length) s = s.slice(0, -1);
+  const s = raw.replace(/[­​]/g, '');
+  const open = BRACKETS.map(([o]) => countChar(s, o));
+  const close = BRACKETS.map(([, c]) => countChar(s, c));
+  let end = s.length;
+  while (end > 0) {
+    const c = s.charAt(end - 1);
+    if (TRAILING_PUNCT.has(c)) {
+      end--;
+      continue;
     }
-    if (s === before) break;
+    // Closing brackets only when they have no opening partner inside the DOI.
+    const k = BRACKETS.findIndex(([, cl]) => cl === c);
+    if (k >= 0 && (open[k] as number) < (close[k] as number)) {
+      (close[k] as number)--;
+      end--;
+      continue;
+    }
+    break;
   }
-  return s;
+  return s.slice(0, end);
 }
 
-const DOI_RE = /10\.\d{4,9}\/[^\s"<>]+/gi; // whitespace class also covers NBSP and the unicode line separators
+function countChar(s: string, ch: string): number {
+  let n = 0;
+  for (let i = s.indexOf(ch); i !== -1; i = s.indexOf(ch, i + 1)) n++;
+  return n;
+}
+
+// Bounded match (a DOI longer than MAX_DOI is rejected anyway): no input can make one match, or its cleaning, expensive.
+const DOI_RE = /10\.\d{4,9}\/[^\s"<>]{1,250}/gi; // whitespace class also covers NBSP and the unicode line separators
 
 /** Every DOI in `text`, in order, cleaned of trailing punctuation. */
 export function findDois(text: string): DoiMatch[] {
@@ -51,9 +73,9 @@ export function findDois(text: string): DoiMatch[] {
 }
 
 const NEW_ID = String.raw`\d{4}\.\d{4,5}`;
-const OLD_ID = String.raw`[a-z]+(?:-[a-z]+)*(?:\.[A-Za-z]{2})?\/\d{7}`;
+const OLD_ID = String.raw`[a-z]{1,20}(?:-[a-z]{1,20}){0,3}(?:\.[A-Za-z]{2})?\/\d{7}`;
 const ARXIV_RE = new RegExp(
-  String.raw`(?:arxiv\s*:\s*|arxiv\.org\/(?:abs|pdf)\/)(${NEW_ID}|${OLD_ID})(?:v(\d+))?(?![\d])`,
+  String.raw`(?:arxiv\s{0,10}:\s{0,10}|arxiv\.org\/(?:abs|pdf)\/)(${NEW_ID}|${OLD_ID})(?:v(\d+))?(?![\d])`,
   'gi',
 );
 

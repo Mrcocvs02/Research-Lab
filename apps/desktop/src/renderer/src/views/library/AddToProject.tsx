@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Channels, ResponseOf } from '@rl/core';
+import { PROJECT_LIMITS, type Channels, type ResponseOf } from '@rl/core';
 import { Dialog } from '../../components/Dialog';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
@@ -21,6 +21,8 @@ export function AddToProject({ docIds, onClose }: { docIds: string[]; onClose():
   const [name, setName] = useState('');
   const [kind, setKind] = useState<'project' | 'collection'>('project');
   const [busy, setBusy] = useState(false);
+  // More documents than any project can hold: said here, before anything is sent (the server refuses it too).
+  const tooMany = docIds.length > PROJECT_LIMITS.members;
 
   useEffect(() => {
     let alive = true;
@@ -52,7 +54,7 @@ export function AddToProject({ docIds, onClose }: { docIds: string[]; onClose():
 
   const create = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || tooMany) return;
     setBusy(true);
     try {
       const r = await rl.invoke('projects:create', { name: name.trim(), kind, docIds });
@@ -65,6 +67,12 @@ export function AddToProject({ docIds, onClose }: { docIds: string[]; onClose():
 
   return (
     <Dialog title={t('projects.addTitle', { count: docIds.length })} onClose={onClose} testId="add-to-project">
+      {tooMany && <ErrorNote testId="add-too-many">{t('projects.tooMany', { limit: PROJECT_LIMITS.members, n: docIds.length })}</ErrorNote>}
+      {busy && (
+        <p className="hint" role="status" data-testid="add-busy">
+          {t('projects.adding', { count: docIds.length })}
+        </p>
+      )}
       {error ? <ErrorNote>{errorMessage(error, t)}</ErrorNote> : null}
       {projects === null && !error && <p className="hint">{t('common.loading')}</p>}
       {projects && projects.length === 0 && <p className="hint">{t('projects.noneYet')}</p>}
@@ -72,7 +80,7 @@ export function AddToProject({ docIds, onClose }: { docIds: string[]; onClose():
         <ul className="pick-list" aria-label={t('projects.pick')}>
           {projects.map((p) => (
             <li key={p.id}>
-              <button type="button" className="pick" disabled={busy} onClick={() => void addTo(p)} data-testid="pick-project" data-project-id={p.id}>
+              <button type="button" className="pick" disabled={busy || tooMany} onClick={() => void addTo(p)} data-testid="pick-project" data-project-id={p.id}>
                 <span className="pick-name">{safeText(p.name)}</span>
                 <span className="hint">{t(`projects.kind.${p.kind}`)}</span>
               </button>
@@ -98,7 +106,7 @@ export function AddToProject({ docIds, onClose }: { docIds: string[]; onClose():
           <button type="button" onClick={onClose}>
             {t('common.cancel')}
           </button>
-          <button type="submit" className="primary" disabled={busy || !name.trim()} data-testid="create-project-with-selection">
+          <button type="submit" className="primary" disabled={busy || tooMany || !name.trim()} data-testid="create-project-with-selection">
             {t('projects.createWith', { count: docIds.length })}
           </button>
         </div>

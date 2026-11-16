@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RlError } from '../../lib/rl-error';
-import type { Channels, DocumentPatch, ResponseOf, StudyState } from '@rl/core';
+import { SEARCH_LIMITS, type Channels, type DocumentPatch, type ResponseOf, type StudyState } from '@rl/core';
 
 type DocumentView = ResponseOf<Channels, 'documents:get'>;
 import { useChangeVersion, useLibraryEvents } from '../../lib/events';
@@ -24,10 +24,24 @@ export function useTagActions() {
   const { t } = useTranslation();
   const { apply } = useTaxonomy();
   const { invalidate } = useLibraryEvents();
-  const { info, reportError } = useNotify();
+  const { info, fail, reportError } = useNotify();
+  const [busy, setBusy] = useState(false);
+  const running = useRef(false);
 
   const tag = useCallback(
     async (docIds: string[], change: { add?: string[]; remove?: string[] }): Promise<boolean> => {
+      // Only a change of several documents is exclusive (and shows as busy); the card of one document keeps its own order.
+      const bulk = docIds.length > 1;
+      if (bulk && running.current) return false;
+      // One change takes at most `idsMax` documents (what a selection by Ctrl+A holds); a longer range is refused here, with the reason.
+      if (docIds.length > SEARCH_LIMITS.idsMax) {
+        fail(t('bulk.tooMany', { limit: SEARCH_LIMITS.idsMax, n: docIds.length }));
+        return false;
+      }
+      if (bulk) {
+        running.current = true;
+        setBusy(true);
+      }
       try {
         const r = await rl.invoke('documents:tag', { docIds, ...change });
         invalidate('documents');
@@ -36,9 +50,14 @@ export function useTagActions() {
       } catch (e) {
         reportError(e);
         return false;
+      } finally {
+        if (bulk) {
+          running.current = false;
+          setBusy(false);
+        }
       }
     },
-    [invalidate, info, reportError, t],
+    [invalidate, info, fail, reportError, t],
   );
 
   /** Creates the tag at the top level, then puts it on the documents. */
@@ -50,7 +69,7 @@ export function useTagActions() {
     },
     [apply, tag],
   );
-  return { tag, createAndAdd };
+  return { tag, createAndAdd, busy };
 }
 
 function Section({ title, children, className, testId }: { title: string; children: ReactNode; className?: string; testId?: string }) {
@@ -415,7 +434,7 @@ export function formatSize(bytes: number): string {
 export function BulkTagEditor({ docIds, rows, onNeedRows, onClose }: { docIds: string[]; rows: DocRow[]; onNeedRows?(): void; onClose(): void }) {
   const { t } = useTranslation();
   const { model } = useTaxonomy();
-  const { tag, createAndAdd } = useTagActions();
+  const { tag, createAndAdd, busy } = useTagActions();
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
 
   // Actions and counts follow the selected ids; the tags shown come from the rows loaded so far, so ask for the rest.
@@ -440,7 +459,7 @@ export function BulkTagEditor({ docIds, rows, onNeedRows, onClose }: { docIds: s
   }, [rows]);
 
   return (
-    <div className="doc-card-panel" data-testid="bulk-panel">
+    <div className="doc-card-panel" data-testid="bulk-panel" aria-busy={busy}>
       <header className="panel-head">
         <div className="panel-title">
           <h2 data-testid="bulk-title">{t('bulk.title', { count: docIds.length })}</h2>
@@ -457,7 +476,13 @@ export function BulkTagEditor({ docIds, rows, onNeedRows, onClose }: { docIds: s
           onPick={(id) => void tag(docIds, { add: [id] })}
           onCreate={(label) => createAndAdd(docIds, label)}
           testId="bulk-tag-input"
+          disabled={busy}
         />
+        {busy && (
+          <p className="hint" role="status" data-testid="bulk-busy">
+            {t('bulk.working', { count: docIds.length })}
+          </p>
+        )}
       </Section>
       <Section title={t('bulk.currentTags')}>
         {counts.length === 0 && <p className="hint">{t('bulk.noTags')}</p>}
@@ -477,6 +502,7 @@ export function BulkTagEditor({ docIds, rows, onNeedRows, onClose }: { docIds: s
                     <button
                       type="button"
                       className="danger"
+                      disabled={busy}
                       onClick={() => {
                         setPendingRemove(null);
                         void tag(docIds, { remove: [id] });
@@ -490,7 +516,7 @@ export function BulkTagEditor({ docIds, rows, onNeedRows, onClose }: { docIds: s
                     </button>
                   </span>
                 ) : (
-                  <button type="button" className="link" onClick={() => setPendingRemove(id)} data-testid="bulk-remove">
+                  <button type="button" className="link" disabled={busy} onClick={() => setPendingRemove(id)} data-testid="bulk-remove">
                     {t('bulk.remove')}
                   </button>
                 )}

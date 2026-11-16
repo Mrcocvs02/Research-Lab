@@ -696,3 +696,91 @@ describe('LibraryView: phase 2 review fixes', () => {
     expect(new Set(revs).size).toBe(revs.length);
   });
 });
+
+describe('LibraryView: bulk actions and their limits (D-178)', () => {
+  const countText = () => screen.queryByTestId('selection-count')?.textContent ?? '';
+  const toastTexts = () => screen.queryAllByTestId('toast').map((x) => x.textContent ?? '');
+  const fakeIds = (n: number) => Array.from({ length: n }, (_, i) => `x${String(i).padStart(15, '0')}`);
+  const addTag = async (text: string) => {
+    const input = await screen.findByTestId('bulk-tag-input');
+    fireEvent.change(input, { target: { value: text } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+  };
+  const selectAll = async (expected: string) => {
+    await ready();
+    fireEvent.click(rowOf('Paper 0000'));
+    fireEvent.keyDown(screen.getByTestId('search-results'), { key: 'a', ctrlKey: true });
+    await waitFor(() => expect(countText()).toBe(expected));
+  };
+  const PROJECT = { id: 'p1', kind: 'project' as const, name: 'Thesis', description: '', notes: '', status: 'active' as const, revision: 0, members: [], plan: [] };
+
+  it('Ctrl+A on a result longer than the server returns says how many of how many were selected', async () => {
+    setup({ docs: makeDocs(250) }, { 'documents:ids': () => ({ total: 250, ids: makeDocs(200).map((d) => d.docId) }) });
+    await selectAll('200 selected');
+    await waitFor(() => expect(toastTexts().some((x) => x.includes('200 of 250 documents selected'))).toBe(true));
+  });
+
+  it('Ctrl+A on a result that fits says nothing about limits', async () => {
+    setup({ docs: makeDocs(250) });
+    await selectAll('250 selected');
+    expect(toastTexts().some((x) => x.includes('at most'))).toBe(false);
+  });
+
+  it('shows the busy state of a long bulk tag and takes no second one meanwhile', async () => {
+    let release = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    let lib!: ReturnType<typeof setup>;
+    lib = setup({ docs: makeDocs(250) }, { 'documents:tag': async (p) => (await gate, lib.handlers['documents:tag']!(p)) });
+    await selectAll('250 selected');
+    fireEvent.click(screen.getByTestId('selection-details'));
+    await addTag('stats');
+    expect((await screen.findByTestId('bulk-busy')).textContent).toContain('250');
+    expect((screen.getByTestId('bulk-tag-input') as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByTestId('bulk-panel').getAttribute('aria-busy')).toBe('true');
+    release();
+    await waitFor(() => expect(screen.queryByTestId('bulk-busy')).toBeNull());
+    expect(callsTo('documents:tag')).toHaveLength(1);
+    expect((screen.getByTestId('bulk-tag-input') as HTMLInputElement).disabled).toBe(false);
+    await waitFor(() => expect(lib.state.docs.filter((d) => d.tags.includes('stats'))).toHaveLength(250));
+  });
+
+  it('refuses a tag change on more documents than one change can hold, with the reason and without sending it', async () => {
+    setup({ docs: makeDocs(250) }, { 'documents:ids': () => ({ total: 250, ids: fakeIds(50_001) }) });
+    await selectAll('50001 selected');
+    fireEvent.click(screen.getByTestId('selection-details'));
+    await addTag('stats');
+    await waitFor(() => expect(toastTexts().some((x) => x.includes('One change can cover at most 50000 documents; 50001 are selected.'))).toBe(true));
+    expect(callsTo('documents:tag')).toHaveLength(0);
+  });
+
+  it('"Add to project" says a project holds at most 20000 documents before sending anything', async () => {
+    setup({ docs: makeDocs(250), projects: [structuredClone(PROJECT)] }, { 'documents:ids': () => ({ total: 250, ids: fakeIds(20_001) }) });
+    await selectAll('20001 selected');
+    fireEvent.click(screen.getByTestId('add-to-project-button'));
+    expect((await screen.findByTestId('add-too-many')).textContent).toBe('A project can hold at most 20000 documents; 20001 are selected.');
+    expect((await screen.findByTestId('pick-project') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByTestId('new-project-name'), { target: { value: 'Fresh' } });
+    expect((screen.getByTestId('create-project-with-selection') as HTMLButtonElement).disabled).toBe(true);
+    expect(callsTo('projects:addMembers')).toHaveLength(0);
+    expect(callsTo('projects:create')).toHaveLength(0);
+  });
+
+  it('20000 documents are still accepted by "Add to project"', async () => {
+    const lib = setup({ docs: makeDocs(250), projects: [structuredClone(PROJECT)] }, { 'documents:ids': () => ({ total: 250, ids: fakeIds(20_000) }) });
+    await selectAll('20000 selected');
+    fireEvent.click(screen.getByTestId('add-to-project-button'));
+    fireEvent.click(await screen.findByTestId('pick-project'));
+    await waitFor(() => expect(lib.state.projects[0]!.members).toHaveLength(20_000));
+    expect(screen.queryByTestId('add-too-many')).toBeNull();
+  });
+
+  it('explains a refusal of the server when an existing project would overflow', async () => {
+    setup({ docs: makeDocs(4), projects: [structuredClone(PROJECT)] }, { 'projects:addMembers': () => { throw new AppError('INVALID_REQUEST', 'Too many members', { reason: 'members-limit', limit: 20_000, count: 20_003 }); } });
+    await ready();
+    fireEvent.click(rowOf('Paper 0000'));
+    fireEvent.click(rowOf('Paper 0002'), { ctrlKey: true });
+    fireEvent.click(screen.getByTestId('add-to-project-button'));
+    fireEvent.click(await screen.findByTestId('pick-project'));
+    await waitFor(() => expect(toastTexts().some((x) => x.includes('A project can hold at most 20000 documents; this one would have 20003.'))).toBe(true));
+  });
+});

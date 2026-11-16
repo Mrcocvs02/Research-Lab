@@ -4,6 +4,8 @@ import type { TFunction } from 'i18next';
 /** Localised, user-facing text for any thrown value. Never shows stacks or raw internals. */
 export function errorMessage(error: unknown, t: TFunction): string {
   const err = RlError.from(error);
+  // A project that would hold more documents than it can (the server's own check, for an existing project).
+  if (err.code === 'INVALID_REQUEST' && err.details?.reason === 'members-limit') return t('projects.tooManyResult', { limit: err.details.limit, n: err.details.count });
   // Codes the dictionary does not know show the generic message.
   return t(`errors.${err.code}`, { defaultValue: t('errors.INTERNAL') });
 }

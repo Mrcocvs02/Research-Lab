@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ErrorBoundary, Lazy, lazyRetry } from './components/Lazy';
 import { NoticeBanner } from './components/NoticeBanner';
@@ -7,6 +7,7 @@ import { errorMessage } from './lib/errors';
 import { LibraryEventsProvider } from './lib/events';
 import { HistoryProvider } from './lib/history';
 import { NotifyProvider } from './lib/notify';
+import { ReaderProvider, useReader } from './lib/reader';
 import { LibraryView } from './views/library/LibraryView';
 import { Shell, type SectionId } from './shell/Shell';
 import { AppProvider, useApp } from './state/app-context';
@@ -14,6 +15,8 @@ import { AppProvider, useApp } from './state/app-context';
 // Only the Library view is part of the first screen; the others load when they are opened (docs/RULES.md, lightness).
 const Settings = lazyRetry(() => import('./settings/Settings').then((m) => ({ default: m.Settings })));
 const ProjectsView = lazyRetry(() => import('./views/projects/ProjectsView').then((m) => ({ default: m.ProjectsView })));
+// The reader (and pdf.js with it) loads the first time a document is opened in it.
+const ReaderView = lazyRetry(() => import('./views/reader/ReaderView').then((m) => ({ default: m.ReaderView })));
 const Wizard = lazyRetry(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })));
 
 export function App() {
@@ -23,7 +26,9 @@ export function App() {
         <LibraryEventsProvider>
           <NotifyProvider>
             <HistoryProvider>
-              <Root />
+              <ReaderProvider>
+                <Root />
+              </ReaderProvider>
             </HistoryProvider>
           </NotifyProvider>
         </LibraryEventsProvider>
@@ -37,6 +42,11 @@ function Root() {
   const app = useApp();
   const [section, setSection] = useState<SectionId>('library');
   const [wizardOpen, setWizardOpen] = useState(false);
+  const reader = useReader();
+  // A document id belongs to one library: the reader does not outlive a switch.
+  const libraryId = app.activeLibraryId;
+  const { closeReader } = reader;
+  useEffect(() => closeReader(), [libraryId, closeReader]);
 
   if (!app.ready) {
     return (
@@ -65,21 +75,38 @@ function Root() {
     setSection('library');
   };
 
+  const readerOpen = reader.target !== null && section === 'library' && app.activeProfile !== null && !showWizard;
+
   return (
     <>
       <NoticeBanner />
-      <Shell section={section} onSection={setSection} onNewLibrary={() => setWizardOpen(true)}>
+      <Shell
+        section={section}
+        onSection={(s) => {
+          closeReader();
+          setSection(s);
+        }}
+        onNewLibrary={() => setWizardOpen(true)}
+      >
         <Lazy>
         {section === 'settings' ? (
           <Settings onNewLibrary={() => setWizardOpen(true)} />
         ) : section === 'library' && app.activeProfile && !showWizard ? (
-          <LibraryView key={app.activeProfile.id} />
+          // Kept mounted (only hidden) while the reader is open, so closing it returns to the same list and selection.
+          <div className="keep-alive" hidden={readerOpen}>
+            <LibraryView key={app.activeProfile.id} />
+          </div>
         ) : section === 'projects' && app.activeProfile && !showWizard ? (
           <ProjectsView key={app.activeProfile.id} />
         ) : (
           <Placeholder section={section} />
         )}
         </Lazy>
+        {readerOpen && reader.target && (
+          <Lazy>
+            <ReaderView key={reader.target.docId} target={reader.target} onClose={closeReader} />
+          </Lazy>
+        )}
       </Shell>
       {showWizard && (
         <Lazy>

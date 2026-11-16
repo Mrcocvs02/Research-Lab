@@ -184,7 +184,13 @@
       "size-asc": "Size, smallest first"
     },
     "more": "Show more",
-    "unavailable": "Search is not available for this library: {{message}}"
+    "unavailable": "Search is not available for this library: {{message}}",
+    "hitIn": {
+      "note": "in your notes",
+      "annotation": "in highlights"
+    },
+    "openAtPage": "Open page {{page}} in the reader",
+    "openNotes": "Open the notes"
   },
   "scan": {
     "idle": "Index: {{count}} documents",
@@ -448,7 +454,9 @@
     "openFile": "Open file",
     "reveal": "Show in folder",
     "openRefused": "This kind of file is not opened from the app. Use \"Show in folder\" instead.",
-    "deleteHint": "Nothing is deleted from the keyboard. Use the panel to remove tags (you will be asked to confirm)."
+    "deleteHint": "Nothing is deleted from the keyboard. Use the panel to remove tags (you will be asked to confirm).",
+    "read": "Read",
+    "readHint": "Open in the reader (shortcut: R on the list)"
   },
   "filter": {
     "tags": "Tags:",
@@ -520,7 +528,9 @@
     "file": "File",
     "path": "Path",
     "size": "Size",
-    "added": "Added"
+    "added": "Added",
+    "notes": "Notes on the file",
+    "notesHint": "Your own notes in Markdown, kept apart from the file. Page notes are in the reader."
   },
   "tax": {
     "title": "Taxonomy",
@@ -648,7 +658,14 @@
     "markdownHint": "Headings with #, lists with -, **bold**, *italic*, `code`. HTML is not interpreted.",
     "empty": "Nothing to preview.",
     "unsaved": "Unsaved changes",
-    "saved": "Saved"
+    "saved": "Saved",
+    "fileTitle": "Note on the whole file",
+    "pageTitle": "Note on page {{page}}",
+    "fileLabel": "Note on the whole file (Markdown)",
+    "pageLabel": "Note on page {{page}} (Markdown)",
+    "conflict": "This note was changed elsewhere while you were editing it. Your text is still here.",
+    "reloadTheirs": "Reload theirs",
+    "keepMine": "Keep mine"
   },
   "plan": {
     "hint": "Drag a row, press Alt+Up or Alt+Down on it, or use the arrows to reorder.",
@@ -667,5 +684,77 @@
     "to-read": "To read",
     "reading": "Reading",
     "read": "Read"
+  },
+  "reader": {
+    "back": "Back to the library",
+    "untitled": "(untitled)",
+    "regionLabel": "Reader: {{title}}",
+    "navigation": "Pages",
+    "goToPage": "Go to page",
+    "pageOf": "of {{count}}",
+    "prev": "Previous page",
+    "next": "Next page",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "zoomLevel": "Zoom {{percent}}%",
+    "fitWidth": "Fit width",
+    "find": "Find",
+    "findHint": "Find in the document (Ctrl+F)",
+    "findLabel": "Find in the document",
+    "findPrev": "Previous match",
+    "findNext": "Next match",
+    "findClose": "Close find",
+    "findCount": "{{current}} of {{total}}",
+    "findNone": "No matches",
+    "panel": "Notes and highlights",
+    "pagesLabel": "Pages of the document",
+    "loading": "Opening the document…",
+    "studyGroup": "Study",
+    "underlinedOrigin_annotations": "from your highlights",
+    "underlinedOrigin_manual": "set by hand",
+    "keys": "Keys: N next page, P previous, Ctrl+F find, Ctrl+G go to page, Ctrl+plus/minus zoom, Ctrl+0 fit width, Esc close.",
+    "stale": "The file changed after you made these highlights: their positions may no longer match the text.",
+    "errors": {
+      "notPdf": "Only PDF files can be opened in the reader.",
+      "missing": "The file was not found. It may have been moved or deleted.",
+      "encrypted": "This PDF is protected by a password and cannot be opened here. Open it with another program.",
+      "invalid": "This file is not a valid PDF or it is damaged.",
+      "failed": "The document could not be opened."
+    },
+    "tabs": {
+      "annotations": "Highlights",
+      "pageNote": "Page note",
+      "fileNote": "File note",
+      "notes": "All notes"
+    },
+    "kind": {
+      "highlight": "Highlight",
+      "underline": "Underline"
+    },
+    "colors": {
+      "yellow": "Yellow",
+      "green": "Green",
+      "blue": "Blue",
+      "pink": "Pink",
+      "orange": "Orange"
+    },
+    "ann": {
+      "newLabel": "Highlight or underline the selected text",
+      "editLabel": "Change this annotation",
+      "color": "Colour",
+      "kind": "Type",
+      "comment": "Comment (optional)",
+      "saveComment": "Save comment",
+      "delete": "Delete",
+      "empty": "No highlights or underlines yet. Select text in the document to add one.",
+      "pageHeading": "Page {{page}}",
+      "jump": "Go to the {{kind}} on page {{page}}"
+    },
+    "notesList": {
+      "empty": "No notes on this document yet.",
+      "file": "Whole file",
+      "page": "Page {{page}}"
+    }
   }
 }

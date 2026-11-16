@@ -21,6 +21,7 @@ export interface FakeDoc {
   doi?: string | null;
   arxivId?: string | null;
   underlined?: boolean;
+  underlinedOrigin?: 'annotations' | 'manual';
   extracted?: Record<string, unknown>;
   ai?: Record<string, unknown>;
 }
@@ -47,6 +48,18 @@ interface FakeProject {
   revision: number;
   members: Array<{ docId: string; addedAt: string }>;
   plan: Array<{ docId: string; order: number }>;
+}
+
+export interface FakeAnnotation {
+  id: string;
+  kind: 'highlight' | 'underline';
+  page: number;
+  rects: Array<{ x: number; y: number; w: number; h: number }>;
+  text: string;
+  color: string;
+  comment?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const NOW = '2026-01-01T00:00:00.000Z';
@@ -78,6 +91,17 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     nodes: init.nodes ?? ([] as FakeNode[]),
     projects: init.projects ?? ([] as FakeProject[]),
     taxRevision: 1,
+    /** Notes by `docId` and page (`0` is the note of the whole file). */
+    notes: new Map<string, { body: string; createdAt: string; updatedAt: string }>(),
+    /** Annotations by `docId`. */
+    annotations: new Map<string, FakeAnnotation[]>(),
+    /** Documents whose annotations are reported as made on another version of the file. */
+    stale: new Set<string>(),
+    /** Documents `reader:open` refuses, with the reason (`details.reason`). */
+    readerRefusal: new Map<string, string>(),
+    /** Fields added to the search hit of a document (`field`, `page`, `snippet`). */
+    hitExtra: new Map<string, Record<string, unknown>>(),
+    clock: 0,
     history: [] as Array<{ id: string; summary: string; action: string; undone: boolean; dead?: boolean; undo(): void; redo(): void }>,
     nextId: 1,
   };
@@ -179,7 +203,7 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     years: bucket(docs.filter((d) => d.year).map((d) => String(d.year))),
     folders: [],
   });
-  const hit = (d: FakeDoc) => ({ docId: d.docId, title: d.title, authors: d.authors, year: d.year, type: d.type, path: d.path, studyState: d.studyState, score: 1, field: 'title', snippet: d.title ?? '', size: d.size ?? 1234, tags: tagsWithImplied(d), directTags: [...d.tags] });
+  const hit = (d: FakeDoc) => ({ docId: d.docId, title: d.title, authors: d.authors, year: d.year, type: d.type, path: d.path, studyState: d.studyState, score: 1, field: 'title', snippet: d.title ?? '', ...(state.hitExtra.get(d.docId) ?? {}), size: d.size ?? 1234, tags: tagsWithImplied(d), directTags: [...d.tags] });
 
   const counts = (n: FakeNode) => {
     const direct = state.docs.filter((d) => d.tags.includes(n.id)).length;
@@ -229,7 +253,7 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     arxivId: d.arxivId ?? null,
     userDescription: d.userDescription,
     tags: d.tags,
-    study: { state: d.studyState, underlined: { value: Boolean(d.underlined), origin: 'manual' } },
+    study: { state: d.studyState, underlined: { value: Boolean(d.underlined), origin: d.underlinedOrigin ?? 'manual' } },
     ai: d.ai ?? {},
     addedAt: d.addedAt,
     updatedAt: d.addedAt,
@@ -258,6 +282,16 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     return p;
   };
   const projectChange = <T>(summary: string, fn: () => T) => change('project.update', summary, 'projects', fn);
+
+  /** The "underlined" flag follows the annotations unless the user set it to true by hand (and that is kept). */
+  const underlinedAfterAnnotations = (docId: string) => {
+    const d = state.docs.find((x) => x.docId === docId);
+    if (d && !(d.underlined && d.underlinedOrigin === 'manual')) {
+      d.underlined = (state.annotations.get(docId) ?? []).length > 0;
+      d.underlinedOrigin = 'annotations';
+    }
+    return { value: Boolean(d?.underlined), origin: d?.underlinedOrigin ?? 'manual' };
+  };
 
   const handlers: Record<string, Handler> = {
     'scan:status': () => ({ libraryId: 'lib-a', state: 'done', seen: state.docs.length, processed: 0, indexed: state.docs.length }),
@@ -291,7 +325,7 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
         if ('arxivId' in patch) d.arxivId = patch.arxivId;
         if ('userDescription' in patch) d.userDescription = patch.userDescription;
         if ('studyState' in patch) d.studyState = patch.studyState;
-        if ('underlined' in patch) d.underlined = patch.underlined;
+        if ('underlined' in patch) (d.underlined = patch.underlined, (d.underlinedOrigin = 'manual'));
         d.revision = (d.revision ?? 0) + 1;
         return { document: record(d) };
       }, [d.docId]);
@@ -315,6 +349,69 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
         return { changed, unchanged: p.docIds.length - changed };
       });
       return out;
+    },
+    'reader:open': (p) => {
+      const d = state.docs.find((x) => x.docId === p.docId);
+      if (!d) throw new AppError('NOT_FOUND', 'doc');
+      const reason = state.readerRefusal.get(d.docId) ?? (d.missing ? 'missing' : /\.pdf$/i.test(d.path) ? null : 'not-pdf');
+      if (reason) throw new AppError('PERMISSION_DENIED', 'refused', { reason });
+      return { url: `rl-doc://doc/${d.docId}?v=aaaaaaaa`, hash: 'a'.repeat(64), title: d.title };
+    },
+    'reader:openLink': () => ({ ok: true }),
+    'notes:get': (p) => {
+      const n = state.notes.get(`${p.docId}|${p.page ?? 0}`);
+      return { note: n ? { docId: p.docId, ...(p.page ? { page: p.page } : {}), ...n } : null };
+    },
+    'notes:list': (p) => ({
+      items: [...state.notes.entries()]
+        .filter(([k]) => k.startsWith(`${p.docId}|`))
+        .map(([k, n]) => ({ page: Number(k.split('|')[1]) || null, updatedAt: n.updatedAt, excerpt: n.body.slice(0, 200) }))
+        .sort((a, b) => (a.page ?? 0) - (b.page ?? 0)),
+    }),
+    'notes:save': (p) => {
+      const key = `${p.docId}|${p.page ?? 0}`;
+      const cur = state.notes.get(key);
+      if ((cur?.updatedAt ?? null) !== p.expectedUpdatedAt) throw new AppError('CONFLICT', 'note changed');
+      let note: ReturnType<typeof state.notes.get> | null = null;
+      if (p.body.trim() === '') state.notes.delete(key);
+      else {
+        const at = new Date(Date.parse(NOW) + ++state.clock * 1000).toISOString();
+        note = { body: p.body, createdAt: cur?.createdAt ?? at, updatedAt: at };
+        state.notes.set(key, note);
+      }
+      emitEvent('library:changed', { kind: 'notes', ids: [p.docId] });
+      return { note: note ? { docId: p.docId, ...(p.page ? { page: p.page } : {}), ...note } : null };
+    },
+    'annotations:list': (p) => ({ annotations: structuredClone(state.annotations.get(p.docId) ?? []), stale: state.stale.has(p.docId) }),
+    'annotations:save': (p) => {
+      const list = state.annotations.get(p.docId) ?? [];
+      const a = p.annotation;
+      const at = new Date(Date.parse(NOW) + ++state.clock * 1000).toISOString();
+      const prev = a.id ? list.find((x) => x.id === a.id) : undefined;
+      if (a.id && !prev) throw new AppError('NOT_FOUND', 'annotation');
+      const saved: FakeAnnotation = {
+        id: a.id ?? `an${state.nextId++}`,
+        kind: a.kind,
+        page: a.page,
+        rects: a.rects,
+        text: a.text ?? '',
+        color: a.color ?? 'yellow',
+        ...(a.comment ? { comment: a.comment } : {}),
+        createdAt: prev?.createdAt ?? at,
+        updatedAt: at,
+      };
+      state.annotations.set(p.docId, prev ? list.map((x) => (x.id === saved.id ? saved : x)) : [...list, saved]);
+      const underlined = underlinedAfterAnnotations(p.docId);
+      emitEvent('library:changed', { kind: 'annotations', ids: [p.docId] });
+      return { annotation: structuredClone(saved), underlined };
+    },
+    'annotations:remove': (p) => {
+      const list = state.annotations.get(p.docId) ?? [];
+      const removed = list.some((x) => x.id === p.id);
+      state.annotations.set(p.docId, list.filter((x) => x.id !== p.id));
+      const underlined = underlinedAfterAnnotations(p.docId);
+      emitEvent('library:changed', { kind: 'annotations', ids: [p.docId] });
+      return { removed, underlined };
     },
     'documents:open': () => ({ ok: true }),
     'documents:reveal': () => ({ ok: true }),

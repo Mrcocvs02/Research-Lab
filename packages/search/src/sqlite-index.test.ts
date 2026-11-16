@@ -4,6 +4,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { SearchIndex } from '@rl/core';
+import { SEARCH_MARK_CLOSE as C, SEARCH_MARK_OPEN as O } from '@rl/core';
 import { createSearchIndex, INDEX_SCHEMA_VERSION, parseQuery } from './index.js';
 import { docId, makeDoc } from './test-utils.js';
 
@@ -67,14 +68,14 @@ describe('search', () => {
     ]);
     const a = (await index.search({ text: 'sparse' }))[0]!;
     expect(a).toMatchObject({ field: 'title', docId: docId('a') });
-    expect(a.snippet).toContain('[[Sparse]]');
+    expect(a.snippet).toContain(`${O}Sparse${C}`);
     const b = (await index.search({ text: 'sparse' }))[1]!;
     expect(b.field).toBe('summary');
     const abl = Object.fromEntries((await index.search({ text: 'ablation' })).map((h) => [h.docId, h]));
     expect(abl[docId('c')]!.field).toBe('note');
     expect(abl[docId('d')]!.field).toBe('annotation');
     expect(abl[docId('e')]).toMatchObject({ field: 'text', page: 3 });
-    expect(abl[docId('e')]!.snippet).toContain('[[ablation]]');
+    expect(abl[docId('e')]!.snippet).toContain(`${O}ablation${C}`);
   });
 
   it('knows the pages of the full text where the query matches', async () => {
@@ -94,7 +95,7 @@ describe('search', () => {
     const hit = (await index.search({ text: 'variance' }))[0]!;
     expect(hit.pages?.map((p) => p.page)).toEqual([2, 5]);
     expect([2, 5]).toContain(hit.page);
-    expect(hit.pages![0]!.snippet).toContain('[[variance]]');
+    expect(hit.pages![0]!.snippet).toContain(`${O}variance${C}`);
   });
 
   it('matches phrases, prefixes, OR and ignores accents and case', async () => {
@@ -364,5 +365,62 @@ describe('index file', () => {
     await a.upsert(makeDoc({ seed: 'a', title: 'Works again' }));
     expect(await a.count()).toBe(1);
     await a.close();
+  });
+});
+
+describe('match markers and pagination (D-080)', () => {
+  it('marks only real matches: [[ ]] and control characters in the text are not markers', async () => {
+    await index.upsertMany([
+      makeDoc({ seed: 'wiki', title: 'Notes on [[wikilink]] syntax and ]] brackets' }, { abstract: 'The [[sparse]] idea', pages: [{ page: 1, text: 'text with [[sparse]] and \u0001forged\u0002 marks' }] }),
+      makeDoc({ seed: 'plain', title: 'Plain title' }, { abstract: 'only [[brackets]] here', pages: [{ page: 1, text: 'no \u0001other\u0002 words' }] }),
+    ]);
+    // The brackets are not a match: a field that merely contains them is not chosen as the matching field.
+    const hits = await index.search({ text: 'wikilink' });
+    expect(hits).toHaveLength(1);
+    expect(hits[0]!.field).toBe('title');
+    expect(hits[0]!.snippet).toContain(`${O}wikilink${C}`);
+    expect(hits[0]!.snippet.replaceAll(O, '').replaceAll(C, '')).toContain('[[');
+    // A page whose text carries forged markers: only the searched word is marked.
+    const page = (await index.search({ text: 'sparse' })).find((h) => h.docId === docId('wiki'))!;
+    const marked = [...page.pages![0]!.snippet.matchAll(new RegExp(`${O}(.*?)${C}`, 'g'))].map((m) => m[1]);
+    expect(marked).toEqual(['sparse']);
+    expect(page.pages![0]!.snippet.match(new RegExp(`[${O}${C}]`, 'g'))).toHaveLength(2);
+    // Words from the forged markers were not turned into extra words of the page.
+    expect((await index.search({ text: 'forged' }))[0]!.pages![0]!.snippet.match(new RegExp(`[${O}${C}]`, 'g'))).toHaveLength(2);
+    // A field with brackets but no match never wins the "field" choice.
+    const other = (await index.search({ text: 'words' }))[0]!;
+    expect(other.field).toBe('text');
+  });
+
+  it('pages through more than the maximum page size with offset', async () => {
+    const docs = Array.from({ length: 450 }, (_, i) => makeDoc({ seed: `p${i}`, title: `Common title ${String(i).padStart(3, '0')}` }, { abstract: 'shared words' }));
+    await index.upsertMany(docs);
+    for (const text of ['shared', '']) {
+      const seen = new Set<string>();
+      let total = 0;
+      for (let offset = 0; offset < 600; offset += 25) {
+        const page = await index.searchPage({ text, sort: 'title', limit: 25, offset });
+        total = page.total;
+        for (const h of page.hits) seen.add(h.docId);
+        if (page.hits.length === 0) break;
+      }
+      expect(total).toBe(450);
+      expect(seen.size).toBe(450);
+    }
+    expect((await index.searchPage({ text: 'shared', limit: 200, offset: 400 })).hits).toHaveLength(50);
+    expect((await index.searchPage({ text: 'shared', limit: 25, offset: 450 })).hits).toHaveLength(0);
+  });
+
+  it('facets reuse the evaluation of the query, and never a stale one', async () => {
+    await index.upsert(makeDoc({ seed: 'a', title: 'Alpha cats', tags: ['t1'] }));
+    const q = { text: 'cats' };
+    await index.searchPage(q);
+    expect((await index.facets(q)).total).toBe(1);
+    await index.upsert(makeDoc({ seed: 'b', title: 'Beta cats', tags: ['t1'] }));
+    // Same text, but the data changed in between: the facets see the new document.
+    expect((await index.facets(q)).total).toBe(2);
+    expect((await index.facets(q)).tags).toEqual([{ value: 't1', count: 2 }]);
+    // Facets without a search first, and for other text, answer for their own query.
+    expect((await index.facets({ text: 'alpha' })).total).toBe(1);
   });
 });

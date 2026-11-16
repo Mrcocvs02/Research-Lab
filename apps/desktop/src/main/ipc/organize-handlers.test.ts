@@ -201,7 +201,7 @@ describe('organising channels', () => {
 
   it('no response carries an absolute path', async () => {
     await store.writeTaxonomy(taxonomyFileSchema.parse({ nodes: [node('a')] }));
-    await store.documents.put(doc(1, { legacy: { path: String.raw`C:\Users\someone\old.pdf` }, tags: ['a'] }));
+    await store.documents.put(doc(1, { legacy: { path: String.raw`C:\Users\%USERNAME%\old.pdf` }, tags: ['a'] }));
     const { call } = await harness();
     const all = [
       await call('taxonomy:get'),

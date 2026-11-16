@@ -40,6 +40,6 @@ Quando compatti il contesto conserva, in quest'ordine:
 - fase e onda correnti, ultimo commit su `main` e tag di fase già creati;
 - subagent in corso (ruolo, ramo/worktree, cosa stanno facendo) e rami non ancora uniti;
 - difetti aperti dalle revisioni e lavoro non verificato;
-- preferenze dell'utente: subagent Sonnet (Haiku per cose semplici), niente coautore Claude nei commit, push a ogni passo, test pesanti uno alla volta, finestre di test fuori schermo, app leggera;
+- preferenze dell'utente: subagent Sonnet (Haiku per cose semplici), niente coautore Claude nei commit, push a ogni passo, test pesanti uno alla volta, finestre di test fuori schermo, app leggera ma senza togliere funzioni utili;
 - decisioni prese nella sessione ma non ancora scritte in `docs/DECISIONS.md`.
 Tralascia l'output completo di test, diff e log: restano in git e nei file `docs/`.

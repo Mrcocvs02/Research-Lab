@@ -55,6 +55,8 @@ export function ReaderView({ target, onClose }: Props) {
   const [tab, setTab] = useState<ReaderPanel>(target.panel ?? 'annotations');
   const [sideOpen, setSideOpen] = useLocalFlag('rl.readerSide', true);
   const [pending, setPending] = useState<SelectionPiece[] | null>(null);
+  /** Pages inside the selection that were not drawn yet and so were left out (shown with the bar). */
+  const [skipped, setSkipped] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [color, setColor] = useState<AnnotationColor>('yellow');
   const [comment, setComment] = useState('');
@@ -160,9 +162,10 @@ export function ReaderView({ target, onClose }: Props) {
     const onSelection = () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        const pieces = viewerRef.current?.readSelection() ?? [];
-        if (pieces.length > 0) {
-          setPending(pieces);
+        const read = viewerRef.current?.readSelection();
+        if (read && read.pieces.length > 0) {
+          setPending(read.pieces);
+          setSkipped(read.skipped);
           setSelectedId(null);
         }
       }, 200);
@@ -184,33 +187,66 @@ export function ReaderView({ target, onClose }: Props) {
   }, [findText, findOpen, ready]);
 
   const goTo = (n: number, y?: number) => viewerRef.current?.goTo(Math.min(Math.max(1, Math.round(n)), Math.max(1, pages)), y);
+  /** The last comment sent for an annotation, so blur, Enter, the button and closing the bar never send the same text twice. */
+  const sentComment = useRef<{ id: string; value: string } | null>(null);
+  const saveComment = (a: Annotation, value: string) => {
+    const next = value.trim();
+    const known = sentComment.current?.id === a.id ? sentComment.current.value : (a.comment ?? '');
+    if (next === known) return;
+    sentComment.current = { id: a.id, value: next };
+    // A failed save forgets it, so the next blur or Enter tries again.
+    void change(a, { comment: next }).then((ok) => {
+      if (!ok && sentComment.current?.id === a.id) sentComment.current = null;
+    });
+  };
   const closeBar = () => {
+    // Closing the bar (Escape, the close button) must not drop a comment that was typed but not saved yet.
+    if (!pending && selected) saveComment(selected, editComment);
     setPending(null);
+    setSkipped(0);
     setSelectedId(null);
     window.getSelection()?.removeAllRanges();
   };
 
-  const create = async (kind: 'highlight' | 'underline') => {
-    if (!pending || busy) return;
+  /**
+   * Saves one annotation per piece (page). The first failure stops everything: the pieces already saved are not offered
+   * again, the bar stays open with the rest so the user can retry, and the error is shown.
+   */
+  const createFrom = async (kind: 'highlight' | 'underline', pieces: SelectionPiece[], keepBar: boolean) => {
+    if (busy || pieces.length === 0) return;
     setBusy(true);
     try {
-      for (const piece of pending) {
+      const note = comment.trim();
+      for (const [i, piece] of pieces.entries()) {
         const text = piece.text.slice(0, STUDY_LIMITS.annotationText);
-        const note = comment.trim();
-        await ann.save({ kind, page: piece.page, rects: piece.rects, text, color, ...(note ? { comment: note } : {}) });
+        const saved = await ann.save({ kind, page: piece.page, rects: piece.rects, text, color, ...(note ? { comment: note } : {}) });
+        if (!saved) {
+          // `ann.save` already showed why; say where it stopped.
+          fail(t('reader.createStopped', { page: piece.page }));
+          if (keepBar) setPending(pieces.slice(i));
+          return;
+        }
       }
       setComment('');
-      closeBar();
+      if (keepBar) closeBar();
     } finally {
       setBusy(false);
     }
   };
+  const create = (kind: 'highlight' | 'underline') => (pending ? createFrom(kind, pending, true) : Promise.resolve());
 
-  const change = async (a: Annotation, patch: Partial<Pick<Annotation, 'kind' | 'color' | 'comment'>>) => {
+  /** Keyboard path to annotate: the current find match becomes a highlight or underline (same normalisation as a selection). */
+  const annotateMatch = (kind: 'highlight' | 'underline') => {
+    const read = viewerRef.current?.readFindMatch();
+    if (!read || read.pieces.length === 0) return fail(t('reader.findNoMatch'));
+    void createFrom(kind, read.pieces, false);
+  };
+
+  const change = async (a: Annotation, patch: Partial<Pick<Annotation, 'kind' | 'color' | 'comment'>>): Promise<boolean> => {
     setBusy(true);
     try {
       const next = { ...a, ...patch };
-      await ann.save({ id: a.id, kind: next.kind, page: next.page, rects: next.rects, text: next.text, color: colorOf(next.color), ...(next.comment !== undefined ? { comment: next.comment } : {}) });
+      return (await ann.save({ id: a.id, kind: next.kind, page: next.page, rects: next.rects, text: next.text, color: colorOf(next.color), ...(next.comment !== undefined ? { comment: next.comment } : {}) })) !== null;
     } finally {
       setBusy(false);
     }
@@ -257,6 +293,7 @@ export function ReaderView({ target, onClose }: Props) {
     const inField = isEditable(e.target);
     if (mod && !e.altKey) {
       const key = e.key.toLowerCase();
+      if (e.shiftKey && findOpen && (key === 'h' || key === 'u')) return (e.preventDefault(), annotateMatch(key === 'h' ? 'highlight' : 'underline'));
       if (key === 'f') return (e.preventDefault(), openFind());
       if (key === 'g') return (e.preventDefault(), pageInputRef.current?.select());
       if (key === '=' || key === '+') return (e.preventDefault(), viewerRef.current?.zoomBy(1));
@@ -399,6 +436,12 @@ export function ReaderView({ target, onClose }: Props) {
               <button type="button" className="icon-button" aria-label={t('reader.findNext')} title={t('reader.findNext')} onClick={() => viewerRef.current?.find(findText, { again: true })} data-testid="reader-find-next">
                 <span aria-hidden="true">↓</span>
               </button>
+              <button type="button" disabled={findState.total === 0} onClick={() => annotateMatch('highlight')} title={t('reader.findAnnotateHint')} data-testid="reader-find-highlight">
+                {t('reader.findHighlight')}
+              </button>
+              <button type="button" disabled={findState.total === 0} onClick={() => annotateMatch('underline')} title={t('reader.findAnnotateHint')} data-testid="reader-find-underline">
+                {t('reader.findUnderline')}
+              </button>
               <span className="hint" role="status" data-testid="reader-find-count">
                 {findLabel}
               </span>
@@ -437,7 +480,7 @@ export function ReaderView({ target, onClose }: Props) {
             data-testid="reader-pages-area"
           >
             <div ref={viewerElRef} className="pdfViewer" />
-            <AnnotationLayers layers={layers} annotations={ann.annotations} selectedId={selectedId} />
+            <AnnotationLayers layers={layers} annotations={ann.annotations} selectedId={selectedId} staleIds={ann.staleIds} />
           </div>
           {(pending || selected) && (
             <div className="ann-dock">
@@ -448,6 +491,7 @@ export function ReaderView({ target, onClose }: Props) {
                   color={color}
                   comment={comment}
                   busy={busy}
+                  notice={skipped > 0 ? t('reader.skipped', { count: skipped }) : undefined}
                   onColor={setColor}
                   onComment={setComment}
                   onCreate={(k) => void create(k)}
@@ -464,10 +508,9 @@ export function ReaderView({ target, onClose }: Props) {
                     onColor={(c) => void change(selected, { color: c })}
                     onKind={(k) => void change(selected, { kind: k })}
                     onComment={setEditComment}
-                    onSaveComment={() => {
-                      const next = editComment.trim();
-                      if (next !== (selected.comment ?? '')) void change(selected, { comment: next });
-                    }}
+                    onSaveComment={() => saveComment(selected, editComment)}
+                    stale={ann.staleIds.has(selected.id)}
+                    onReconfirm={() => void change(selected, {})}
                     onDelete={() => void remove(selected)}
                     onClose={closeBar}
                   />
@@ -487,7 +530,7 @@ export function ReaderView({ target, onClose }: Props) {
               ))}
             </div>
             <div role="tabpanel" id={`reader-tabpanel-${tab}`} aria-labelledby={`reader-tab-${tab}`} className="reader-tabpanel">
-              {tab === 'annotations' && <AnnotationList annotations={ann.annotations} selectedId={selectedId} onPick={pick} />}
+              {tab === 'annotations' && <AnnotationList annotations={ann.annotations} selectedId={selectedId} staleIds={ann.staleIds} onPick={pick} />}
               {tab === 'pageNote' && <NoteEditor key={`page-${page}`} docId={docId} page={page} testId="note-page" />}
               {tab === 'fileNote' && <NoteEditor key="file" docId={docId} testId="note-file" />}
               {tab === 'notes' && (

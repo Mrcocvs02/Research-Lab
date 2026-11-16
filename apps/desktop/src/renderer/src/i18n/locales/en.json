@@ -665,7 +665,9 @@
     "pageLabel": "Note on page {{page}} (Markdown)",
     "conflict": "This note was changed elsewhere while you were editing it. Your text is still here.",
     "reloadTheirs": "Reload theirs",
-    "keepMine": "Keep mine"
+    "keepMine": "Keep mine",
+    "saveFailed": "The note could not be saved. Your text is still here: try again.",
+    "flushFailed": "Some notes could not be saved, so nothing was closed or switched. Check the open note and try again."
   },
   "plan": {
     "hint": "Drag a row, press Alt+Up or Alt+Down on it, or use the arrows to reorder.",
@@ -707,13 +709,22 @@
     "findClose": "Close find",
     "findCount": "{{current}} of {{total}}",
     "findNone": "No matches",
+    "findHighlight": "Highlight match",
+    "findUnderline": "Underline match",
+    "findAnnotateHint": "Highlight the current match with Ctrl+Shift+H, underline it with Ctrl+Shift+U.",
+    "findNoMatch": "There is no current match to highlight. Search for some text first.",
+    "skipped_one": "{{count}} page of the selection was not loaded yet and was left out. Scroll through it and select again to include it.",
+    "skipped_other": "{{count}} pages of the selection were not loaded yet and were left out. Scroll through them and select again to include them.",
+    "annotationsLimit": "This document already has the most highlights it can hold ({{limit}}).",
+    "annotationsSize": "The highlights of this document take up too much space to add more. Delete some first.",
+    "createStopped": "Stopped at page {{page}}: the highlight could not be saved, so the next pages were not saved either.",
     "panel": "Notes and highlights",
     "pagesLabel": "Pages of the document",
     "loading": "Opening the document…",
     "studyGroup": "Study",
     "underlinedOrigin_annotations": "from your highlights",
     "underlinedOrigin_manual": "set by hand",
-    "keys": "Keys: N next page, P previous, Ctrl+F find, Ctrl+G go to page, Ctrl+plus/minus zoom, Ctrl+0 fit width, Esc close.",
+    "keys": "Keys: N next page, P previous, Ctrl+F find, Ctrl+G go to page, Ctrl+plus/minus zoom, Ctrl+0 fit width, Ctrl+Shift+H or U highlight or underline the find match, Esc close.",
     "stale": "The file changed after you made these highlights: their positions may no longer match the text.",
     "errors": {
       "notPdf": "Only PDF files can be opened in the reader.",
@@ -749,7 +760,10 @@
       "delete": "Delete",
       "empty": "No highlights or underlines yet. Select text in the document to add one.",
       "pageHeading": "Page {{page}}",
-      "jump": "Go to the {{kind}} on page {{page}}"
+      "jump": "Go to the {{kind}} on page {{page}}",
+      "stale": "May be misplaced: the file changed",
+      "reconfirm": "The position is right",
+      "reconfirmHint": "Saves it again on the file as it is now."
     },
     "notesList": {
       "empty": "No notes on this document yet.",

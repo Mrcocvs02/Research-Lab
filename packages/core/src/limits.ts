@@ -21,6 +21,8 @@ export const STUDY_LIMITS = {
   rectsPerAnnotation: 200,
   annotationText: 10_000,
   annotationComment: 5_000,
+  /** Largest annotations file `annotations:save` writes (the store reads files up to twice this). */
+  annotationsFileBytes: 16 * 1024 * 1024,
 } as const;
 
 /** Colours an annotation can take: the renderer maps each name to its own style (never raw CSS from data). */

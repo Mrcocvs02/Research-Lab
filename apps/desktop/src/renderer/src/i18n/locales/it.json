@@ -665,7 +665,9 @@
     "pageLabel": "Nota sulla pagina {{page}} (Markdown)",
     "conflict": "Questa nota è stata modificata altrove mentre la scrivevi. Il tuo testo è ancora qui.",
     "reloadTheirs": "Ricarica l’altra",
-    "keepMine": "Tieni la mia"
+    "keepMine": "Tieni la mia",
+    "saveFailed": "Non è stato possibile salvare la nota. Il testo è ancora qui: riprova.",
+    "flushFailed": "Alcune note non si sono potute salvare, quindi non è stato chiuso né cambiato nulla. Controlla la nota aperta e riprova."
   },
   "plan": {
     "hint": "Trascina una riga, premi Alt+Su o Alt+Giù su di essa, oppure usa le frecce per riordinare.",
@@ -707,13 +709,22 @@
     "findClose": "Chiudi la ricerca",
     "findCount": "{{current}} di {{total}}",
     "findNone": "Nessun risultato",
+    "findHighlight": "Evidenzia il risultato",
+    "findUnderline": "Sottolinea il risultato",
+    "findAnnotateHint": "Evidenzia il risultato corrente con Ctrl+Maiusc+H, sottolinealo con Ctrl+Maiusc+U.",
+    "findNoMatch": "Non c'è un risultato corrente da evidenziare. Cerca prima del testo.",
+    "skipped_one": "{{count}} pagina della selezione non era ancora caricata ed è stata esclusa. Scorrila e seleziona di nuovo per includerla.",
+    "skipped_other": "{{count}} pagine della selezione non erano ancora caricate e sono state escluse. Scorrile e seleziona di nuovo per includerle.",
+    "annotationsLimit": "Questo documento ha già il massimo di evidenziazioni possibile ({{limit}}).",
+    "annotationsSize": "Le evidenziazioni di questo documento occupano troppo spazio per aggiungerne altre. Eliminane qualcuna prima.",
+    "createStopped": "Fermato alla pagina {{page}}: l'evidenziazione non si è potuta salvare, quindi non sono state salvate nemmeno le pagine successive.",
     "panel": "Note ed evidenziazioni",
     "pagesLabel": "Pagine del documento",
     "loading": "Apertura del documento…",
     "studyGroup": "Studio",
     "underlinedOrigin_annotations": "dalle tue evidenziazioni",
     "underlinedOrigin_manual": "impostato a mano",
-    "keys": "Tasti: N pagina successiva, P precedente, Ctrl+F cerca, Ctrl+G vai a pagina, Ctrl+più/meno ingrandimento, Ctrl+0 adatta alla larghezza, Esc chiudi.",
+    "keys": "Tasti: N pagina successiva, P precedente, Ctrl+F cerca, Ctrl+G vai a pagina, Ctrl+più/meno ingrandimento, Ctrl+0 adatta alla larghezza, Ctrl+Maiusc+H o U evidenzia o sottolinea il risultato della ricerca, Esc chiudi.",
     "stale": "Il file è cambiato dopo queste evidenziazioni: le posizioni potrebbero non corrispondere più al testo.",
     "errors": {
       "notPdf": "Nel lettore si aprono solo file PDF.",
@@ -749,7 +760,10 @@
       "delete": "Elimina",
       "empty": "Ancora nessuna evidenziazione o sottolineatura. Seleziona del testo nel documento per aggiungerne una.",
       "pageHeading": "Pagina {{page}}",
-      "jump": "Vai a: {{kind}} a pagina {{page}}"
+      "jump": "Vai a: {{kind}} a pagina {{page}}",
+      "stale": "Forse fuori posto: il file è cambiato",
+      "reconfirm": "La posizione è giusta",
+      "reconfirmHint": "La salva di nuovo sul file com'è adesso."
     },
     "notesList": {
       "empty": "Ancora nessuna nota su questo documento.",

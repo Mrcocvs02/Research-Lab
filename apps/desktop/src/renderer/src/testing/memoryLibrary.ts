@@ -97,6 +97,8 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     annotations: new Map<string, FakeAnnotation[]>(),
     /** Documents whose annotations are reported as made on another version of the file. */
     stale: new Set<string>(),
+    /** Annotations saved again after the file changed (re-confirmed): no longer stale. */
+    fresh: new Set<string>(),
     /** Thumbnails the (fake) operating system can give, by `docId`; the others fall back to drawing. */
     nativeThumbs: new Map<string, string>(),
     /** Thumbnail URLs stored by `thumbs:put`, by `docId`. */
@@ -404,7 +406,11 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
       emitEvent('library:changed', { kind: 'notes', ids: [p.docId] });
       return { note: note ? { docId: p.docId, ...(p.page ? { page: p.page } : {}), ...note } : null };
     },
-    'annotations:list': (p) => ({ annotations: structuredClone(state.annotations.get(p.docId) ?? []), stale: state.stale.has(p.docId) }),
+    'annotations:list': (p) => {
+      const all = state.annotations.get(p.docId) ?? [];
+      const staleIds = state.stale.has(p.docId) ? all.filter((a) => !state.fresh.has(a.id)).map((a) => a.id) : [];
+      return { annotations: structuredClone(all), stale: staleIds.length > 0, staleIds };
+    },
     'annotations:save': (p) => {
       const list = state.annotations.get(p.docId) ?? [];
       const a = p.annotation;
@@ -422,6 +428,7 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
         createdAt: prev?.createdAt ?? at,
         updatedAt: at,
       };
+      state.fresh.add(saved.id);
       state.annotations.set(p.docId, prev ? list.map((x) => (x.id === saved.id ? saved : x)) : [...list, saved]);
       const underlined = underlinedAfterAnnotations(p.docId);
       emitEvent('library:changed', { kind: 'annotations', ids: [p.docId] });

@@ -1,6 +1,8 @@
 import { loadPdfjs, pdfDocumentParams } from '../../lib/pdfjs';
 import 'pdfjs-dist/web/pdf_viewer.css';
-import { mergeRects, normaliseRect, type Rect } from './geometry';
+import { readFindMatch, readRange, type SelectionRead } from './selection';
+
+export type { SelectionPiece, SelectionRead } from './selection';
 
 /**
  * The only module that touches pdf.js. It is imported by the reader view, which is itself a lazy chunk, so pdf.js is
@@ -24,13 +26,6 @@ export interface FindState {
   total: number;
 }
 
-/** A piece of a text selection on one page: its text and its rectangles as fractions of the page. */
-export interface SelectionPiece {
-  page: number;
-  text: string;
-  rects: Rect[];
-}
-
 export interface ViewerHandlers {
   onPages(count: number): void;
   onPage(page: number): void;
@@ -49,8 +44,10 @@ export interface Viewer {
   fitWidth(): void;
   find(query: string, opts?: { again?: boolean; backwards?: boolean }): void;
   clearFind(): void;
-  /** The selected text of the document, split by page. */
-  readSelection(): SelectionPiece[];
+  /** The selected text of the document, split by page; `skipped` counts pages of the selection whose text is not drawn yet. */
+  readSelection(): SelectionRead;
+  /** The current find match (the one pdf.js marks in the text layer), measured exactly like a selection. */
+  readFindMatch(): SelectionRead;
   /** The page and position (fractions) under a mouse event, or `null` outside a page. */
   pointAt(event: { target: EventTarget | null; clientX: number; clientY: number }): { page: number; x: number; y: number } | null;
   destroy(): void;
@@ -176,6 +173,7 @@ export async function createViewer(container: HTMLDivElement, viewerEl: HTMLDivE
       : null;
   resizer?.observe(container);
 
+  const frameOf = (page: number, pageDiv: HTMLElement) => ensureLayer(page, pageDiv).getBoundingClientRect();
   const pageDivOf = (page: number): HTMLElement | null => container.querySelector<HTMLElement>(`.page[data-page-number="${page}"]`);
 
   return {
@@ -227,27 +225,13 @@ export async function createViewer(container: HTMLDivElement, viewerEl: HTMLDivE
     },
     readSelection() {
       const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return [];
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return { pieces: [], skipped: 0 };
       const range = sel.getRangeAt(0);
-      if (!container.contains(range.commonAncestorContainer)) return [];
-      const pieces: SelectionPiece[] = [];
-      for (const pageDiv of container.querySelectorAll<HTMLElement>('.page')) {
-        if (!range.intersectsNode(pageDiv)) continue;
-        const page = Number(pageDiv.dataset['pageNumber']);
-        const textLayer = pageDiv.querySelector('.textLayer');
-        if (!textLayer || !Number.isInteger(page)) continue;
-        // Only the part of the selection that lies in this page's text.
-        const clip = range.cloneRange();
-        const bounds = document.createRange();
-        bounds.selectNodeContents(textLayer);
-        if (clip.compareBoundaryPoints(Range.START_TO_START, bounds) < 0) clip.setStart(bounds.startContainer, bounds.startOffset);
-        if (clip.compareBoundaryPoints(Range.END_TO_END, bounds) > 0) clip.setEnd(bounds.endContainer, bounds.endOffset);
-        const frame = ensureLayer(page, pageDiv).getBoundingClientRect();
-        const rects = mergeRects([...clip.getClientRects()].map((r) => normaliseRect(r, frame)).filter((r): r is Rect => r !== null));
-        const text = clip.toString().replace(/\s+/g, ' ').trim();
-        if (rects.length > 0 && text !== '') pieces.push({ page, text, rects });
-      }
-      return pieces;
+      if (!container.contains(range.commonAncestorContainer)) return { pieces: [], skipped: 0 };
+      return readRange(container, range, frameOf);
+    },
+    readFindMatch() {
+      return readFindMatch(container, frameOf);
     },
     pointAt(event) {
       const pageDiv = (event.target as Element | null)?.closest?.<HTMLElement>('.page');

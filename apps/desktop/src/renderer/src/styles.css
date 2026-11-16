@@ -2033,6 +2033,20 @@ button.toggle.on {
 .ann.selected {
   outline: 2px solid var(--focus);
 }
+.ann-stale {
+  outline: 2px dashed var(--danger, #b3261e);
+  outline-offset: 1px;
+}
+.ann-item-stale,
+.ann-stale-note {
+  color: var(--danger, #b3261e);
+  font-size: 12px;
+}
+.ann-stale-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
 .ann-list h4 {
   margin: var(--space-3) 0 var(--space-1);
   font-size: 12px;

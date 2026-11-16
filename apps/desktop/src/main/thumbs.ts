@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError, THUMB_LIMITS, THUMB_SCHEME, type DocumentId } from '@rl/core';
-import { openPdfHandle, presentPdf } from './ipc/handlers/doc-files.js';
+import { openPdfHandle, presentPdf, stillTheSameFile } from './ipc/handlers/doc-files.js';
 import type { MainServices } from './ipc/handlers/services.js';
 
 /**
@@ -50,7 +50,7 @@ export async function listThumbs(s: ThumbServices, docIds: string[]): Promise<Th
       items.push({ docId, url: thumbUrl(docId, pdf.hash), drawable: false, hash: pdf.hash });
       continue;
     }
-    const opened = await openPdfHandle(pdf.abs);
+    const opened = await openPdfHandle(pdf.abs, pdf.root);
     if (typeof opened === 'string') {
       items.push({ docId, url: null, drawable: false });
       continue;
@@ -194,7 +194,7 @@ const nativeMemo = new Map<string, NativeReason>();
 export async function nativeThumb(s: ThumbServices, docId: string): Promise<{ url: string | null; reason: NativeReason }> {
   const rt = await s.runtime.require();
   const pdf = await presentPdf(s, docId as DocumentId); // refuses a non-PDF, a missing file, a path outside the root
-  const opened = await openPdfHandle(pdf.abs);
+  const opened = await openPdfHandle(pdf.abs, pdf.root);
   if (typeof opened === 'string') throw new AppError('PERMISSION_DENIED', 'Only PDF files have thumbnails', { reason: opened });
   await opened.fh.close().catch(() => {});
   const dir = thumbDir(s.localDataDir, rt.libraryId);
@@ -212,10 +212,21 @@ export async function nativeThumb(s: ThumbServices, docId: string): Promise<{ ur
   if (!ask) return remember('unsupported');
   let img: NativeImageLike | null;
   try {
-    img = await nativeOnce(() => {
+    img = await nativeOnce(async () => {
+      // The shell takes a path: the path is re-checked right before the call (an open handle) and again after it,
+      // so a file swapped for a link meanwhile is discarded (D-200).
+      const guard = await openPdfHandle(pdf.abs, pdf.root);
+      if (typeof guard === 'string') throw new Error('refused');
       let timer: ReturnType<typeof setTimeout> | undefined;
-      const timeout = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error('timeout')), nativeTuning.timeoutMs)));
-      return Promise.race([ask(pdf.abs, NATIVE_SIZE), timeout]).finally(() => clearTimeout(timer));
+      try {
+        const timeout = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error('timeout')), nativeTuning.timeoutMs)));
+        const got = await Promise.race([ask(pdf.abs, NATIVE_SIZE), timeout]);
+        if (!(await stillTheSameFile(pdf.abs, pdf.root, guard.fh))) throw new Error('swapped');
+        return got;
+      } finally {
+        clearTimeout(timer);
+        await guard.fh.close().catch(() => {});
+      }
     });
   } catch {
     return remember('failed');

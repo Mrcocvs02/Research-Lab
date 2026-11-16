@@ -1,4 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { flushAll } from './dirtyEditors';
+import { useNotify } from './notify';
 
 /** Where the reader should open: a page, and optionally the side panel tab to show. */
 export interface ReaderTarget {
@@ -14,10 +17,16 @@ interface ReaderValue {
   target: ReaderTarget | null;
   /** Opens the in-app reader on a document (a PDF), optionally at a page. Any view can call it; phase 4 links use it too. */
   openReader(docId: string, page?: number, opts?: { panel?: ReaderPanel }): void;
+  /**
+   * Closes the reader after every unsaved note has been saved; if one cannot be saved the reader stays open (the editor
+   * shows the error) and nothing typed is lost.
+   */
   closeReader(): void;
+  /** Closes at once, without saving: only for when the library the reader belongs to is already gone. */
+  dropReader(): void;
 }
 
-const NONE: ReaderValue = { target: null, openReader() {}, closeReader() {} };
+const NONE: ReaderValue = { target: null, openReader() {}, closeReader() {}, dropReader() {} };
 const Ctx = createContext<ReaderValue>(NONE);
 
 /** Holds what the reader shows. Only a few bytes of state: the reader itself (and pdf.js) loads when `target` is set. */
@@ -26,8 +35,16 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
   const openReader = useCallback<ReaderValue['openReader']>((docId, page, opts) => {
     setTarget((cur) => ({ docId, ...(page !== undefined ? { page } : {}), ...(opts?.panel ? { panel: opts.panel } : {}), nonce: (cur?.nonce ?? 0) + 1 }));
   }, []);
-  const closeReader = useCallback(() => setTarget(null), []);
-  const value = useMemo(() => ({ target, openReader, closeReader }), [target, openReader, closeReader]);
+  const { t } = useTranslation();
+  const { fail } = useNotify();
+  const dropReader = useCallback(() => setTarget(null), []);
+  const closeReader = useCallback(() => {
+    flushAll().then(
+      () => setTarget(null),
+      () => fail(t('notes.flushFailed')),
+    );
+  }, [fail, t]);
+  const value = useMemo(() => ({ target, openReader, closeReader, dropReader }), [target, openReader, closeReader, dropReader]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

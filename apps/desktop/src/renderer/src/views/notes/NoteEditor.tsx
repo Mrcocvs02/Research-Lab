@@ -2,6 +2,7 @@ import { useCallback, useDeferredValue, useEffect, useId, useRef, useState } fro
 import { useTranslation } from 'react-i18next';
 import { STUDY_LIMITS } from '@rl/core';
 import { Lazy, lazyRetry } from '../../components/Lazy';
+import { registerEditor } from '../../lib/dirtyEditors';
 import { useChangeVersion, useLibraryEvents } from '../../lib/events';
 import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
@@ -22,6 +23,11 @@ interface Props {
  * The Markdown note of a file or of one page: a text box with a safe preview, saved on demand and when the box loses
  * the focus or the editor goes away. When the note changed elsewhere (CONFLICT) the text of the user is kept and the
  * user chooses between the other version and their own. A blank text removes the note.
+ *
+ * Saves are chained: a save (blur, button, unmount, `flushAll`) waits for the one in flight and then saves the latest
+ * text, so typing during a save is never dropped. The editor is registered in `lib/dirtyEditors`, so the app can wait
+ * for it before a library switch, before the reader closes and before the window closes (D-197). A failed save keeps
+ * the text and shows an error in the editor.
  */
 export function NoteEditor({ docId, page, testId }: Props) {
   const { t } = useTranslation();
@@ -33,6 +39,7 @@ export function NoteEditor({ docId, page, testId }: Props) {
   const [text, setText] = useState('');
   const [saved, setSavedState] = useState('');
   const [conflict, setConflict] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [layout, setLayout] = useState<'edit' | 'preview'>('edit');
   const preview = useDeferredValue(text);
 
@@ -42,6 +49,8 @@ export function NoteEditor({ docId, page, testId }: Props) {
   const baseRef = useRef<string | null>(null);
   const conflictRef = useRef(false);
   const savingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const chainRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const pageArg = page === undefined ? {} : { page };
 
   const setBaseline = useCallback((body: string, base: string | null) => {
@@ -91,37 +100,65 @@ export function NoteEditor({ docId, page, testId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [docId, page],
   );
+  // What the chained saves and the unmount read: the closures of the render that scheduled them may be old.
+  const latest = useRef({ write, invalidate, reportError });
+  latest.current = { write, invalidate, reportError };
 
-  const save = useCallback(async () => {
-    if (savingRef.current || conflictRef.current || textRef.current === savedRef.current) return;
+  /** One save of the text as it is now. true: nothing unsaved is left. */
+  const saveNow = useCallback(async (): Promise<boolean> => {
+    if (textRef.current === savedRef.current) return true;
+    if (conflictRef.current) return false;
     const body = textRef.current;
     savingRef.current = true;
     try {
-      const r = await write(body, baseRef.current);
+      const r = await latest.current.write(body, baseRef.current);
       setBaseline(body, r.note?.updatedAt ?? null);
-      invalidate('notes');
+      setSaveError(false);
+      latest.current.invalidate('notes');
+      return true;
     } catch (e) {
-      if (RlError.from(e).code === 'CONFLICT') setConflictBoth(true);
-      else reportError(e);
+      if (RlError.from(e).code === 'CONFLICT') {
+        setConflictBoth(true);
+        // The editor is gone: the toast is the only place left to say that the text was not saved.
+        if (!mountedRef.current) latest.current.reportError(e);
+      } else {
+        setSaveError(true);
+        latest.current.reportError(e);
+      }
+      return false;
     } finally {
       savingRef.current = false;
     }
-  }, [write, invalidate, reportError, setBaseline, setConflictBoth]);
+  }, [setBaseline, setConflictBoth]);
 
-  // Leaving (another page, the reader closing): unsaved typing is saved, not lost.
-  const latest = useRef({ write, invalidate, reportError });
-  latest.current = { write, invalidate, reportError };
-  useEffect(
-    () => () => {
-      if (textRef.current === savedRef.current || conflictRef.current || savingRef.current) return;
-      const { write: w, invalidate: inv, reportError: report } = latest.current;
-      void w(textRef.current, baseRef.current).then(
-        () => inv('notes'),
-        (e: unknown) => report(e),
-      );
-    },
-    [],
-  );
+  /** Chains behind the save in flight, then saves the latest text. */
+  const save = useCallback((): Promise<boolean> => {
+    const next = chainRef.current.then(saveNow, saveNow);
+    chainRef.current = next;
+    return next;
+  }, [saveNow]);
+  const flush = useCallback(async () => {
+    await save();
+    return textRef.current === savedRef.current;
+  }, [save]);
+
+  // Registered while mounted. Leaving (another page, the reader closing) saves what is unsaved; the registration stays
+  // until that save is over, so a `flushAll` started meanwhile still waits for it.
+  const flushRef = useRef(flush);
+  flushRef.current = flush;
+  useEffect(() => {
+    mountedRef.current = true;
+    const unregister = registerEditor({
+      flush: () => flushRef.current(),
+      isDirty: () => textRef.current !== savedRef.current || savingRef.current,
+    });
+    return () => {
+      mountedRef.current = false;
+      if (textRef.current === savedRef.current && !savingRef.current) return unregister();
+      if (conflictRef.current) latest.current.reportError(new RlError('CONFLICT', 'The note was changed somewhere else'));
+      void flushRef.current().finally(unregister);
+    };
+  }, []);
 
   const reloadTheirs = async () => {
     try {
@@ -148,6 +185,11 @@ export function NoteEditor({ docId, page, testId }: Props) {
   if (!loaded) return <p className="hint">{t('common.loading')}</p>;
   return (
     <div className="note-editor" data-testid={testId} aria-label={page === undefined ? t('notes.fileTitle') : t('notes.pageTitle', { page })}>
+      {saveError && (
+        <p className="callout error" role="alert" data-testid={`${testId}-save-error`}>
+          {t('notes.saveFailed')}
+        </p>
+      )}
       <div className="notes-bar">
         <div className="radio-row" role="radiogroup" aria-label={t('notes.layout')}>
           {(['edit', 'preview'] as const).map((l) => (

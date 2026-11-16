@@ -31,7 +31,8 @@ const fake = vi.hoisted(() => {
     fitWidth: vi.fn(),
     find: vi.fn(),
     clearFind: vi.fn(),
-    readSelection: vi.fn((): any[] => []),
+    readSelection: vi.fn((): any => ({ pieces: [], skipped: 0 })),
+    readFindMatch: vi.fn((): any => ({ pieces: [], skipped: 0 })),
     pointAt: vi.fn((): any => null),
     destroy: vi.fn(),
   };
@@ -81,8 +82,8 @@ function drawLayer(page: number): HTMLElement {
 }
 
 const SEL = [{ page: 2, text: 'selected words', rects: [{ x: 0.1, y: 0.2, w: 0.3, h: 0.02 }] }];
-async function select(pieces = SEL) {
-  fake.viewer.readSelection.mockReturnValue(pieces);
+async function select(pieces = SEL, skipped = 0) {
+  fake.viewer.readSelection.mockReturnValue({ pieces, skipped });
   act(() => void document.dispatchEvent(new Event('selectionchange')));
   await screen.findByTestId('annotation-bar', undefined, { timeout: 2000 });
 }
@@ -92,7 +93,8 @@ beforeEach(async () => {
   fake.state.openError = null;
   fake.state.handlers = null;
   for (const f of Object.values(fake.viewer)) f.mockClear();
-  fake.viewer.readSelection.mockReturnValue([]);
+  fake.viewer.readSelection.mockReturnValue({ pieces: [], skipped: 0 });
+  fake.viewer.readFindMatch.mockReturnValue({ pieces: [], skipped: 0 });
   fake.viewer.pointAt.mockReturnValue(null);
   fake.createViewer.mockClear();
   try {
@@ -242,6 +244,8 @@ describe('ReaderView: opening and errors', () => {
   });
 });
 
+const mkAnn = (id: string, page: number) => ({ id, kind: 'highlight' as const, page, rects: [{ x: 0.1, y: 0.2, w: 0.3, h: 0.02 }], text: `text ${id}`, color: 'yellow', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' });
+
 describe('ReaderView: annotations', () => {
   it('creates a highlight from a selection with colour and comment, and draws it on the page', async () => {
     setup();
@@ -310,9 +314,174 @@ describe('ReaderView: annotations', () => {
   });
 
   it('warns when the file changed since the annotations were made', async () => {
-    setup({}, {}, (lib) => lib.state.stale.add(DOC));
+    setup({}, {}, (lib) => {
+      lib.state.stale.add(DOC);
+      lib.state.annotations.set(DOC, [mkAnn('a1', 2)]);
+    });
     await ready();
     expect((await screen.findByTestId('reader-stale')).textContent).toMatch(/changed after/);
+  });
+
+  it('marks each misplaced annotation, and re-confirming one saves it again and clears only that one', async () => {
+    setup({}, {}, (lib) => {
+      lib.state.stale.add(DOC);
+      lib.state.annotations.set(DOC, [mkAnn('a1', 2), mkAnn('a2', 3)]);
+    });
+    await ready();
+    const layer = drawLayer(2);
+    await waitFor(() => expect(screen.getAllByTestId('annotation-stale')).toHaveLength(2));
+    await waitFor(() => expect(layer.querySelector('[data-testid="annotation-mark"]')?.getAttribute('data-stale')).toBe('true'));
+    expect(layer.querySelector('[data-testid="annotation-mark"]')?.getAttribute('title')).toMatch(/misplaced/);
+    fireEvent.click(screen.getAllByTestId('annotation-item')[0]!);
+    const bar = await screen.findByTestId('annotation-bar');
+    expect(bar.querySelector('[data-testid="ann-stale"]')).not.toBeNull();
+    fireEvent.click(screen.getByTestId('ann-reconfirm'));
+    await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(1));
+    expect(callsTo('annotations:save')[0].annotation).toMatchObject({ id: 'a1', kind: 'highlight', page: 2, text: 'text a1' });
+    await waitFor(() => expect(screen.getAllByTestId('annotation-stale')).toHaveLength(1));
+    expect(screen.getByTestId('reader-stale')).toBeTruthy(); // a2 is still in doubt
+    expect(screen.queryByTestId('ann-reconfirm')).toBeNull(); // a1 is fine now
+    fireEvent.click(screen.getAllByTestId('annotation-item')[1]!);
+    fireEvent.click(await screen.findByTestId('ann-reconfirm'));
+    await waitFor(() => expect(screen.queryByTestId('reader-stale')).toBeNull());
+    expect(screen.queryAllByTestId('annotation-stale')).toHaveLength(0);
+  });
+
+  it('saves a comment that was typed when the bar is closed with Escape or the close button', async () => {
+    setup({}, {}, (lib) => lib.state.annotations.set(DOC, [mkAnn('a1', 2)]));
+    await ready();
+    await screen.findAllByTestId('annotation-item');
+    fake.viewer.pointAt.mockReturnValue({ page: 2, x: 0.2, y: 0.21 });
+    fireEvent.click(screen.getByTestId('reader-pages-area'));
+    const input = await screen.findByTestId('ann-comment');
+    fireEvent.change(input, { target: { value: 'typed, never blurred' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(1));
+    expect(callsTo('annotations:save')[0].annotation).toMatchObject({ id: 'a1', comment: 'typed, never blurred' });
+    await waitFor(() => expect(screen.queryByTestId('annotation-bar')).toBeNull());
+
+    // The close button does the same; an unchanged comment sends nothing.
+    fireEvent.click(screen.getByTestId('reader-pages-area'));
+    const again = await screen.findByTestId('ann-comment');
+    await waitFor(() => expect((again as HTMLInputElement).value).toBe('typed, never blurred'));
+    fireEvent.click(screen.getByTestId('ann-close'));
+    await waitFor(() => expect(screen.queryByTestId('annotation-bar')).toBeNull());
+    expect(callsTo('annotations:save')).toHaveLength(1);
+    fireEvent.click(screen.getByTestId('reader-pages-area'));
+    fireEvent.change(await screen.findByTestId('ann-comment'), { target: { value: 'edited again' } });
+    fireEvent.click(screen.getByTestId('ann-close'));
+    await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(2));
+    expect(callsTo('annotations:save')[1].annotation.comment).toBe('edited again');
+  });
+
+  it('does not send the same comment twice when the box blurs and the bar closes', async () => {
+    setup({}, {}, (lib) => lib.state.annotations.set(DOC, [mkAnn('a1', 2)]));
+    await ready();
+    await screen.findAllByTestId('annotation-item');
+    fake.viewer.pointAt.mockReturnValue({ page: 2, x: 0.2, y: 0.21 });
+    fireEvent.click(screen.getByTestId('reader-pages-area'));
+    const input = await screen.findByTestId('ann-comment');
+    fireEvent.change(input, { target: { value: 'once' } });
+    fireEvent.blur(input);
+    fireEvent.click(screen.getByTestId('ann-close'));
+    await waitFor(() => expect(screen.queryByTestId('annotation-bar')).toBeNull());
+    expect(callsTo('annotations:save')).toHaveLength(1);
+  });
+
+  it('stops at the first page that fails, keeps the bar with the pages not saved, and a retry saves only those', async () => {
+    let calls = 0;
+    let real: ((p: any) => unknown) | undefined;
+    const { lib } = setup(
+      {},
+      {
+        'annotations:save': (p: any) => {
+          calls++;
+          if (calls === 2) throw new AppError('IO_ERROR', 'disk');
+          return real!(p);
+        },
+      },
+    );
+    real = lib.handlers['annotations:save'] as (p: any) => unknown;
+    const pieces = [2, 3, 4].map((page) => ({ page, text: `words on ${page}`, rects: [{ x: 0.1, y: 0.2, w: 0.3, h: 0.02 }] }));
+    await ready();
+    await select(pieces);
+    fireEvent.click(screen.getByTestId('ann-highlight'));
+    await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(2));
+    await waitFor(() => expect((screen.getByTestId('ann-highlight') as HTMLButtonElement).disabled).toBe(false));
+    expect(callsTo('annotations:save')).toHaveLength(2); // page 4 was not tried
+    expect(screen.getByTestId('annotation-bar').getAttribute('data-mode')).toBe('new');
+    expect(screen.getByTestId('ann-text').textContent).toBe('words on 3 … words on 4'); // page 2 is saved
+    expect(screen.getByTestId('toasts').textContent).toMatch(/Stopped at page 3/);
+    expect(lib.state.annotations.get(DOC)).toHaveLength(1);
+    fireEvent.click(screen.getByTestId('ann-highlight'));
+    await waitFor(() => expect(screen.queryByTestId('annotation-bar')).toBeNull());
+    expect(callsTo('annotations:save').map((c) => c.annotation.page)).toEqual([2, 3, 3, 4]);
+    expect(lib.state.annotations.get(DOC)).toHaveLength(3);
+  });
+
+  it('tells the user when pages of the selection were not drawn yet and were left out', async () => {
+    setup();
+    await ready();
+    await select(SEL, 2);
+    expect(screen.getByTestId('ann-skipped').textContent).toMatch(/2 pages of the selection were not loaded/);
+    fireEvent.click(screen.getByTestId('ann-close'));
+    await select(SEL, 1);
+    expect(screen.getByTestId('ann-skipped').textContent).toMatch(/1 page of the selection was not loaded/);
+    fireEvent.click(screen.getByTestId('ann-close'));
+    await select(SEL, 0);
+    expect(screen.queryByTestId('ann-skipped')).toBeNull();
+  });
+
+  describe('from a find match (keyboard path)', () => {
+    const MATCH = { pieces: [{ page: 3, text: 'the match', rects: [{ x: 0.2, y: 0.3, w: 0.1, h: 0.02 }] }], skipped: 0 };
+    const openFindWithMatch = async () => {
+      await ready();
+      fireEvent.keyDown(screen.getByTestId('reader-pages-area'), { key: 'f', ctrlKey: true });
+      const input = await screen.findByTestId('reader-find-input');
+      fireEvent.change(input, { target: { value: 'match' } });
+      act(() => fake.state.handlers.onFind({ state: 'found', current: 1, total: 2 }));
+      return input;
+    };
+
+    it('creates a highlight or underline from the current match with the buttons', async () => {
+      setup();
+      fake.viewer.readFindMatch.mockReturnValue(MATCH);
+      await openFindWithMatch();
+      fireEvent.click(screen.getByTestId('reader-find-highlight'));
+      await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(1));
+      expect(callsTo('annotations:save')[0]).toEqual({ docId: DOC, annotation: { kind: 'highlight', page: 3, rects: MATCH.pieces[0]!.rects, text: 'the match', color: 'yellow' } });
+      fireEvent.click(screen.getByTestId('reader-find-underline'));
+      await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(2));
+      expect(callsTo('annotations:save')[1].annotation.kind).toBe('underline');
+    });
+
+    it('has a shortcut for each, working from the find box', async () => {
+      setup();
+      fake.viewer.readFindMatch.mockReturnValue(MATCH);
+      const input = await openFindWithMatch();
+      fireEvent.keyDown(input, { key: 'H', ctrlKey: true, shiftKey: true });
+      await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(1));
+      expect(callsTo('annotations:save')[0].annotation.kind).toBe('highlight');
+      fireEvent.keyDown(input, { key: 'U', ctrlKey: true, shiftKey: true });
+      await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(2));
+      expect(callsTo('annotations:save')[1].annotation.kind).toBe('underline');
+    });
+
+    it('says so when there is no current match and saves nothing', async () => {
+      setup();
+      const input = await openFindWithMatch();
+      fireEvent.keyDown(input, { key: 'H', ctrlKey: true, shiftKey: true });
+      await waitFor(() => expect(screen.getByTestId('toasts').textContent).toMatch(/no current match/));
+      expect(callsTo('annotations:save')).toHaveLength(0);
+    });
+
+    it('the shortcut does nothing while the find box is closed', async () => {
+      setup();
+      fake.viewer.readFindMatch.mockReturnValue(MATCH);
+      await ready();
+      fireEvent.keyDown(screen.getByTestId('reader-pages-area'), { key: 'H', ctrlKey: true, shiftKey: true });
+      expect(callsTo('annotations:save')).toHaveLength(0);
+    });
   });
 });
 

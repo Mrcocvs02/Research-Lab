@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { DEFAULT_DATA_DIR_NAME, dataDirNameSchema, userProfileSchema, type ImportJobStatus, type Language } from '@rl/core';
 import { CheckField, ErrorNote, LanguageSelect, ProgressBar, TextAreaField, TextField } from '../components/ui';
 import { FolderTree, type FolderEntry } from '../components/FolderTree';
+import { flushAll } from '../lib/dirtyEditors';
 import { errorMessage } from '../lib/errors';
 import { rl } from '../lib/rl';
 import { splitLines, validateWith, validationKey } from '../lib/validate';
@@ -189,6 +190,7 @@ export function Wizard({ onFinished, onCancel }: Props) {
         aiEnabledFolders: aiFolders,
         ...(taxonomy === 'file' && taxonomyFile && !importLegacy ? { taxonomyFilePath: taxonomyFile.path } : {}),
       });
+      await flushAll(); // unsaved notes belong to the library that is active until now
       await rl.invoke('library:setActive', { libraryId: profileRecord.id });
       await rl.invoke('settings:set', { firstRunDone: true });
       setCreatedId(profileRecord.id);

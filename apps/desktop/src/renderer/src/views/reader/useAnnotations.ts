@@ -13,7 +13,8 @@ type Underlined = { value: boolean; origin: 'annotations' | 'manual' };
 export function useAnnotations(docId: string, onUnderlined: (u: Underlined) => void, onError: (e: unknown) => void) {
   const version = useChangeVersion('annotations');
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [stale, setStale] = useState(false);
+  /** Annotations made on another version of the file (their own hash differs); saving one again re-confirms it. */
+  const [staleIds, setStaleIds] = useState<ReadonlySet<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
   const cb = useRef({ onUnderlined, onError });
   cb.current = { onUnderlined, onError };
@@ -24,7 +25,7 @@ export function useAnnotations(docId: string, onUnderlined: (u: Underlined) => v
       (r) => {
         if (!alive) return;
         setAnnotations(r.annotations);
-        setStale(r.stale);
+        setStaleIds(new Set(r.staleIds ?? []));
         setLoaded(true);
       },
       (e: unknown) => {
@@ -43,6 +44,13 @@ export function useAnnotations(docId: string, onUnderlined: (u: Underlined) => v
     async (annotation: AnnotationInput): Promise<Annotation | null> => {
       try {
         const r = await rl.invoke('annotations:save', { docId, annotation });
+        // Saved on the file as it is now: no longer in doubt.
+        setStaleIds((cur) => {
+          if (!cur.has(r.annotation.id)) return cur;
+          const next = new Set(cur);
+          next.delete(r.annotation.id);
+          return next;
+        });
         setAnnotations((cur) => (cur.some((a) => a.id === r.annotation.id) ? cur.map((a) => (a.id === r.annotation.id ? r.annotation : a)) : [...cur, r.annotation]));
         cb.current.onUnderlined(r.underlined);
         return r.annotation;
@@ -60,6 +68,12 @@ export function useAnnotations(docId: string, onUnderlined: (u: Underlined) => v
       try {
         const r = await rl.invoke('annotations:remove', { docId, id });
         setAnnotations((cur) => cur.filter((a) => a.id !== id));
+        setStaleIds((cur) => {
+          if (!cur.has(id)) return cur;
+          const next = new Set(cur);
+          next.delete(id);
+          return next;
+        });
         cb.current.onUnderlined(r.underlined);
         return r.removed;
       } catch (e) {
@@ -71,5 +85,5 @@ export function useAnnotations(docId: string, onUnderlined: (u: Underlined) => v
     [docId],
   );
 
-  return { annotations, stale, loaded, save, remove };
+  return { annotations, stale: staleIds.size > 0, staleIds, loaded, save, remove };
 }

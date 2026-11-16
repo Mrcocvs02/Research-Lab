@@ -16,8 +16,11 @@ export const readerHandlers = (s: MainServices): DomainHandlers<'reader'> => ({
   'reader:open': async ({ docId }) => {
     const pdf = await presentPdf(s, docId as DocumentId);
     // The file must also look like a PDF (a renamed file is refused here, not by the viewer).
-    const opened = await openPdfHandle(pdf.abs);
-    if (typeof opened === 'string') throw new AppError('PERMISSION_DENIED', opened === 'missing' ? 'The file of this document is missing' : 'Only PDF files open in the reader', { reason: opened });
+    const opened = await openPdfHandle(pdf.abs, pdf.root);
+    if (typeof opened === 'string') {
+      const message = opened === 'missing' ? 'The file of this document is missing' : opened === 'outside' ? 'The file is outside the library' : 'Only PDF files open in the reader';
+      throw new AppError('PERMISSION_DENIED', message, { reason: opened });
+    }
     await opened.fh.close().catch(() => {});
     return { url: `rl-doc://doc/${docId}?v=${pdf.hash.slice(0, 8)}`, hash: pdf.hash, title: pdf.title };
   },
@@ -166,7 +169,12 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
       const rt = await activeDocument(s, docId);
       const file = await rt.store.annotations.get(docId as DocumentId);
       const rec = await rt.getDocument(docId as DocumentId);
-      return { annotations: file?.annotations ?? [], stale: file?.forHash !== undefined && file.forHash !== rec.hash };
+      // Each annotation counts with its own hash; old files (no per-annotation hash) inherit the file-level one (D-198).
+      const staleIds = (file?.annotations ?? []).filter((a) => {
+        const h = a.forHash ?? file?.forHash;
+        return h !== undefined && h !== rec.hash;
+      }).map((a) => a.id);
+      return { annotations: file?.annotations ?? [], stale: staleIds.length > 0, staleIds };
     },
     'annotations:save': async ({ docId, annotation }) => {
       const r = await change(docId, async (rt) => {
@@ -181,18 +189,34 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
             const i = list.findIndex((a) => a.id === id);
             const old = list[i];
             if (!old) throw new AppError('NOT_FOUND', 'Unknown annotation');
-            saved = { ...old, ...fields, id: old.id, createdAt: old.createdAt, updatedAt: now };
+            // Absent fields keep their stored value; the hash is re-stamped (this is how an annotation is re-confirmed).
+            saved = {
+              ...old,
+              kind: fields.kind,
+              page: fields.page,
+              rects: fields.rects,
+              ...(fields.text !== undefined ? { text: fields.text } : {}),
+              ...(fields.color !== undefined ? { color: fields.color } : {}),
+              forHash: rec.hash,
+              updatedAt: now,
+            };
             if (fields.comment === undefined) delete saved.comment;
+            else saved.comment = fields.comment;
             list[i] = saved;
           } else {
             if (list.length >= STUDY_LIMITS.annotationsPerDoc) {
               throw new AppError('INVALID_REQUEST', 'Too many annotations on this document', { reason: 'annotations-limit', limit: STUDY_LIMITS.annotationsPerDoc });
             }
-            saved = { ...fields, id: `a-${randomUUID().replace(/-/g, '').slice(0, 20)}`, createdAt: now, updatedAt: now } as Annotation;
+            saved = { ...fields, text: fields.text ?? '', color: fields.color ?? 'yellow', forHash: rec.hash, id: `a-${randomUUID().replace(/-/g, '').slice(0, 20)}`, createdAt: now, updatedAt: now } as Annotation;
             list.push(saved);
           }
-          // The positions refer to the file as it is now.
-          return { ...base, forHash: rec.hash, annotations: list };
+          // The file-level hash stays as first written; each annotation carries its own.
+          const next = { ...base, forHash: base.forHash ?? rec.hash, annotations: list };
+          // Refused before anything is written: a file above the cap would make list and save fail for good.
+          if (Buffer.byteLength(JSON.stringify(next, null, 2)) > STUDY_LIMITS.annotationsFileBytes) {
+            throw new AppError('INVALID_REQUEST', 'The annotations of this document are too large', { reason: 'annotations-size', limit: STUDY_LIMITS.annotationsFileBytes });
+          }
+          return next;
         });
         const u = await rt.organizer.syncUnderlined(docId, file.annotations.length > 0);
         return { value: saved, changed: true, flagChanged: u.changed, underlined: u.underlined };

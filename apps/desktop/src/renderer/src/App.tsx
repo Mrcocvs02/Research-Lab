@@ -4,6 +4,7 @@ import { ErrorBoundary, Lazy, lazyRetry } from './components/Lazy';
 import { NoticeBanner } from './components/NoticeBanner';
 import { ErrorNote } from './components/ui';
 import { errorMessage } from './lib/errors';
+import { installWindowGuard } from './lib/dirtyEditors';
 import { LibraryEventsProvider } from './lib/events';
 import { HistoryProvider } from './lib/history';
 import { NotifyProvider } from './lib/notify';
@@ -43,10 +44,13 @@ function Root() {
   const [section, setSection] = useState<SectionId>('library');
   const [wizardOpen, setWizardOpen] = useState(false);
   const reader = useReader();
-  // A document id belongs to one library: the reader does not outlive a switch.
+  // A document id belongs to one library: the reader does not outlive a switch. The unsaved notes were already saved
+  // before the switch (`setActiveLibrary`, the library list, the wizard), so by now there is nothing left to wait for.
   const libraryId = app.activeLibraryId;
-  const { closeReader } = reader;
-  useEffect(() => closeReader(), [libraryId, closeReader]);
+  const { closeReader, dropReader } = reader;
+  useEffect(() => dropReader(), [libraryId, dropReader]);
+  // Closing the window waits for unsaved notes (only while there are any).
+  useEffect(() => installWindowGuard(), []);
 
   if (!app.ready) {
     return (

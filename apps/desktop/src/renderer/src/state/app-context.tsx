@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AppSettings, Language, LibraryConfig, LibraryProfile } from '@rl/core';
 import i18n from '../i18n';
+import { flushAll } from '../lib/dirtyEditors';
 import { rl } from '../lib/rl';
 
 export interface AppState {
@@ -81,6 +82,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setActiveLibrary = useCallback(
     async (libraryId: string) => {
+      // Unsaved notes belong to the library that is active now: they are saved first (rejects, and nothing switches, if one cannot be).
+      await flushAll();
       await rl.invoke('library:setActive', { libraryId });
       await refresh();
     },

@@ -2,11 +2,12 @@ import { useCallback, useDeferredValue, useEffect, useId, useRef, useState } fro
 import { useTranslation } from 'react-i18next';
 import { STUDY_LIMITS } from '@rl/core';
 import { Lazy, lazyRetry } from '../../components/Lazy';
-import { registerEditor } from '../../lib/dirtyEditors';
+import { draftKey, keepDraft, registerEditor, takeDraft } from '../../lib/dirtyEditors';
 import { useChangeVersion, useLibraryEvents } from '../../lib/events';
 import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
 import { RlError } from '../../lib/rl-error';
+import { useApp } from '../../state/app-context';
 
 // The Markdown renderer is loaded when the preview is first shown.
 const Markdown = lazyRetry(() => import('../../lib/markdown').then((m) => ({ default: m.Markdown })));
@@ -40,6 +41,7 @@ export function NoteEditor({ docId, page, testId }: Props) {
   const [saved, setSavedState] = useState('');
   const [conflict, setConflict] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [restored, setRestored] = useState(false);
   const [layout, setLayout] = useState<'edit' | 'preview'>('edit');
   const preview = useDeferredValue(text);
 
@@ -52,6 +54,9 @@ export function NoteEditor({ docId, page, testId }: Props) {
   const mountedRef = useRef(true);
   const chainRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const pageArg = page === undefined ? {} : { page };
+  // The library the editor was opened in: a draft left by a failed save belongs to it (D-201).
+  const { activeLibraryId } = useApp();
+  const keyRef = useRef(draftKey(activeLibraryId, docId, page));
 
   const setBaseline = useCallback((body: string, base: string | null) => {
     savedRef.current = body;
@@ -75,7 +80,14 @@ export function NoteEditor({ docId, page, testId }: Props) {
         if (!alive) return;
         const body = note?.body ?? '';
         const clean = textRef.current === savedRef.current;
-        if (clean) {
+        const draft = clean ? takeDraft(keyRef.current) : undefined;
+        if (draft !== undefined && draft.text !== body) {
+          // Text typed before a failed save: back in the box, unsaved, on the version it was typed on.
+          setBaseline(body, note?.updatedAt ?? null);
+          baseRef.current = draft.base;
+          changeText(draft.text);
+          setRestored(true);
+        } else if (clean) {
           setBaseline(body, note?.updatedAt ?? null);
           changeText(body);
         } else if (!savingRef.current && (note?.updatedAt ?? null) !== baseRef.current) {
@@ -114,6 +126,7 @@ export function NoteEditor({ docId, page, testId }: Props) {
       const r = await latest.current.write(body, baseRef.current);
       setBaseline(body, r.note?.updatedAt ?? null);
       setSaveError(false);
+      setRestored(false);
       latest.current.invalidate('notes');
       return true;
     } catch (e) {
@@ -156,7 +169,12 @@ export function NoteEditor({ docId, page, testId }: Props) {
       mountedRef.current = false;
       if (textRef.current === savedRef.current && !savingRef.current) return unregister();
       if (conflictRef.current) latest.current.reportError(new RlError('CONFLICT', 'The note was changed somewhere else'));
-      void flushRef.current().finally(unregister);
+      const base = baseRef.current;
+      void flushRef.current()
+        .then((ok) => {
+          if (!ok) keepDraft(keyRef.current, { text: textRef.current, base });
+        })
+        .finally(unregister);
     };
   }, []);
 
@@ -188,6 +206,11 @@ export function NoteEditor({ docId, page, testId }: Props) {
       {saveError && (
         <p className="callout error" role="alert" data-testid={`${testId}-save-error`}>
           {t('notes.saveFailed')}
+        </p>
+      )}
+      {restored && (
+        <p className="callout" role="status" data-testid={`${testId}-restored`}>
+          {t('notes.draftRestored')}
         </p>
       )}
       <div className="notes-bar">

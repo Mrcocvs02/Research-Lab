@@ -93,6 +93,31 @@ describe('NoteEditor: chained saves', () => {
     await act(async () => c.waiting[1]!.release());
     await waitFor(() => expect(hasDirtyEditors()).toBe(false));
   });
+
+  it('text whose save fails after the editor went away comes back when the note opens again (D-201)', async () => {
+    let fail = true;
+    const saves: string[] = [];
+    setup({
+      'notes:save': (p: { body: string }) => {
+        if (fail) throw new AppError('IO_ERROR', 'disk');
+        saves.push(p.body);
+        return { note: { docId: DOC, body: p.body, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:05.000Z' } };
+      },
+    });
+    const first = render(wrap(editor()));
+    fireEvent.change(await box(), { target: { value: 'typed, never saved' } });
+    first.unmount(); // the unmount save fails: the text must not be thrown away
+    await waitFor(() => expect(hasDirtyEditors()).toBe(false));
+    cleanup();
+
+    fail = false;
+    render(wrap(editor()));
+    await waitFor(async () => expect((await box()).value).toBe('typed, never saved'));
+    expect(screen.getByTestId('n-restored')).toBeTruthy();
+    fireEvent.blur(await box());
+    await waitFor(() => expect(saves).toEqual(['typed, never saved']));
+    await waitFor(() => expect(screen.queryByTestId('n-restored')).toBeNull());
+  });
 });
 
 describe('flushAll', () => {

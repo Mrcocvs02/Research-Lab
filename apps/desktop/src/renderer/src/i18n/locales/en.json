@@ -667,6 +667,7 @@
     "reloadTheirs": "Reload theirs",
     "keepMine": "Keep mine",
     "saveFailed": "The note could not be saved. Your text is still here: try again.",
+    "draftRestored": "Unsaved text restored: the earlier note could not be saved. Check it and save.",
     "flushFailed": "Some notes could not be saved, so nothing was closed or switched. Check the open note and try again."
   },
   "plan": {

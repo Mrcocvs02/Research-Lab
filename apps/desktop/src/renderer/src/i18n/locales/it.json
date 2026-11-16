@@ -667,6 +667,7 @@
     "reloadTheirs": "Ricarica l’altra",
     "keepMine": "Tieni la mia",
     "saveFailed": "Non è stato possibile salvare la nota. Il testo è ancora qui: riprova.",
+    "draftRestored": "Testo non salvato recuperato: la nota precedente non era stata salvata. Controllalo e salva.",
     "flushFailed": "Alcune note non si sono potute salvare, quindi non è stato chiuso né cambiato nulla. Controlla la nota aperta e riprova."
   },
   "plan": {

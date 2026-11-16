@@ -58,8 +58,32 @@ export function installWindowGuard(win: Window = window): void {
   });
 }
 
-/** Test hook: forget every registered editor and the window guard. */
+
+/**
+ * Text of a note whose editor went away before the text could be saved (D-201), with the version of the note it was
+ * typed on: kept for the session and given back when the same note of the same library opens again, so a failed save
+ * never throws typed text away. Saving it then follows the usual conflict rules.
+ */
+export interface NoteDraft {
+  text: string;
+  base: string | null;
+}
+const drafts = new Map<string, NoteDraft>();
+
+export const draftKey = (libraryId: string | null, docId: string, page: number | undefined): string => `${libraryId ?? ''}|${docId}|${page ?? 'file'}`;
+export function keepDraft(key: string, draft: NoteDraft): void {
+  drafts.set(key, draft);
+}
+/** The draft of a note, removed from the store (the editor owns it from now on). */
+export function takeDraft(key: string): NoteDraft | undefined {
+  const d = drafts.get(key);
+  drafts.delete(key);
+  return d;
+}
+
+/** Test hook: forget every registered editor, the window guard and the drafts. */
 export function resetEditorsForTests(): void {
   editors.clear();
   installed = false;
+  drafts.clear();
 }

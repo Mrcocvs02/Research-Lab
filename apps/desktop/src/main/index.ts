@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from 'electron';
 import path from 'node:path';
 import { backupDataDir, createLegacyImporter, createLibraryStore, createWatcher } from '@rl/data';
 import { createSearchIndex } from '@rl/search';
@@ -88,6 +88,7 @@ async function main(): Promise<void> {
     runtime: runtimeManager,
     libraries,
     secrets,
+    shell: { openPath: (p) => shell.openPath(p), showItemInFolder: (p) => shell.showItemInFolder(p) },
     async pickFolder(purpose, title) {
       // Test hook: only in a development run with RL_E2E=1 (see runtime.ts, dialog-override.ts).
       const override = e2eDialogOverride(process.env, app.isPackaged);

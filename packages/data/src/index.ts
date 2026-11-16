@@ -4,7 +4,9 @@ import { createTextExtractorImpl, type TextExtractorOptions } from './extract/te
 import { createLegacyImporterImpl, type LegacyImporterOptions, type LegacyImporterWithExtras } from './legacy-importer.js';
 
 export { backupDataDir, copyDataDir } from './backup.js';
-export { createLibraryStore, type FileLibraryStore, type LibraryStoreOptions, type LoadIssue } from './store.js';
+export { createLibraryStore, canonical, type ChangeContext, type FileLibraryStore, type LibraryStoreOptions, type LoadIssue } from './store.js';
+export { createOrganizer, type Organizer, type OrganizerDeps, type OrganizerStore, type DocInfo } from './organize/organizer.js';
+export { applyTaxonomyOps, expandTags, type OpsResult } from './organize/taxonomy-ops.js';
 export { NameIndex, normalizeName, slugify } from './normalize.js';
 export { withRetry, isTransientIoError, type RetryOptions } from './retry.js';
 export { createWatcher, type LibraryWatcher, type WatchBatch, type WatcherOptions } from './watcher.js';

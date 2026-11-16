@@ -18,6 +18,12 @@ export const changeEntrySchema = z.object({
     id: z.string().optional(),
   }),
   action: z.string().min(1),
+  /** Groups the entries written by one user operation (a bulk tag, a taxonomy batch): undo applies to the whole group. */
+  changeId: z.string().min(1).max(64).optional(),
+  /** Set on the entries of an undo/redo: the change group whose effect this one reverses. */
+  undoOf: z.string().min(1).max(64).optional(),
+  /** Readable one-line description of the whole operation (English; the UI translates from `action`). */
+  summary: z.string().max(500).optional(),
   /** JSON-serialisable before/after snapshots of the changed fields. */
   before: z.unknown().optional(),
   after: z.unknown().optional(),

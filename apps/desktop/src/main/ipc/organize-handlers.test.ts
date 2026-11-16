@@ -298,3 +298,46 @@ describe('history:list state and project events', () => {
     expect(events.some(([, e]) => (e as { kind: string }).kind === 'projects')).toBe(false);
   });
 });
+
+describe('a bulk change is one change with one undo (D-178)', () => {
+  /** `n` documents, every tenth already tagged; tag all, check the history, undo, redo. */
+  async function bulkRoundTrip(n: number): Promise<void> {
+    await store.writeTaxonomy(taxonomyFileSchema.parse({ nodes: [node('a')] }));
+    for (let i = 1; i <= n; i++) await store.documents.put(doc(i, i % 10 === 0 ? { tags: ['a'] } : {}));
+    const { call } = await harness();
+    const all = Array.from({ length: n }, (_, i) => hex(i + 1));
+    const todo = n - n / 10;
+
+    const tag = ok(await call('documents:tag', { docIds: all, add: ['a'] }));
+    expect(tag.changed).toBe(todo);
+    expect(tag.unchanged).toBe(n / 10);
+    expect((await store.documents.get(hex(1)))?.tags).toEqual(['a']);
+    expect((await store.documents.get(hex(n)))?.tags).toEqual(['a']);
+    // Too many ids for the event: the interface reloads everything.
+    expect(events.some(([k, e]) => k === 'library:changed' && (e as { kind: string }).kind === 'documents' && (e as { ids?: unknown }).ids === undefined)).toBe(n > 500);
+
+    // One entry in the history; the summary is in the log once, not on every line.
+    const items = ok(await call('history:list', { limit: 10 })).items as Array<{ changeId: string; counts: { documents: number }; summary: string; undoable: boolean }>;
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ changeId: tag.changeId, undoable: true, counts: { documents: todo } });
+    expect(items[0]!.summary).toContain(`Tags on ${todo} document(s)`);
+    const entries = (await store.readLog({ type: 'change' })).filter((e) => e.type === 'change' && e.changeId === tag.changeId);
+    expect(entries).toHaveLength(todo);
+    expect(entries.filter((e) => e.type === 'change' && e.summary !== undefined)).toHaveLength(1);
+
+    // One undo puts everything back (as one more change); one redo does it again.
+    const undo = ok(await call('history:undo', {}));
+    expect(undo.documentsChanged).toBe(todo);
+    expect((await store.documents.get(hex(1)))?.tags).toEqual([]);
+    expect((await store.documents.get(hex(10)))?.tags).toEqual(['a']);
+    expect(ok(await call('history:list', { limit: 10 })).items).toHaveLength(2);
+    ok(await call('history:redo', {}));
+    expect((await store.documents.get(hex(n - 1)))?.tags).toEqual(['a']);
+    expect((await store.documents.get(hex(1)))?.tags).toEqual(['a']);
+  }
+
+  it('tags a selection as one change, undoes it with one undo and redoes it (300 documents, summary logged once)', () => bulkRoundTrip(300), 60_000);
+
+  // About 40 s on a laptop (an fsync per document record): only with RL_HEAVY_TESTS=1.
+  it.skipIf(process.env.RL_HEAVY_TESTS !== '1')('does the same for more than 5000 documents (6000)', () => bulkRoundTrip(6000), 300_000);
+});

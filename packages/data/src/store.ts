@@ -230,6 +230,8 @@ class FileStore implements FileLibraryStore {
   private readonly queue: KeyedQueue;
   private readonly options: LibraryStoreOptions;
   private readonly change: ChangeContext | undefined;
+  /** Whether this change context already put its summary (and `undoOf`) on an entry: only the first one carries them. */
+  private changeHeadLogged = false;
 
   constructor(options: LibraryStoreOptions, shared?: SharedState, change?: ChangeContext) {
     this.change = change;
@@ -643,7 +645,14 @@ class FileStore implements FileLibraryStore {
   }
 
   async appendLog(entry: LogEntry): Promise<void> {
-    const withCtx = this.change && entry.type === 'change' && entry.changeId === undefined ? { ...entry, changeId: this.change.changeId, ...(this.change.summary ? { summary: this.change.summary } : {}), ...(this.change.undoOf ? { undoOf: this.change.undoOf } : {}) } : entry;
+    let withCtx: LogEntry = entry;
+    if (this.change && entry.type === 'change' && entry.changeId === undefined) {
+      // The summary and `undoOf` are a property of the group, not of each entry: a change on tens of thousands of documents
+      // would otherwise repeat them on every line and outgrow the part of the log that is read back (D-179).
+      const head = this.changeHeadLogged ? {} : { ...(this.change.summary ? { summary: this.change.summary } : {}), ...(this.change.undoOf ? { undoOf: this.change.undoOf } : {}) };
+      this.changeHeadLogged = true;
+      withCtx = { ...entry, changeId: this.change.changeId, ...head };
+    }
     const valid = logEntrySchema.parse(withCtx);
     const month = valid.at.slice(0, 7);
     const rel = dataPath.logFile(valid.type === 'change' ? 'changes' : 'ai-sends', this.deviceId, month);

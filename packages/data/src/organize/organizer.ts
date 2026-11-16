@@ -43,6 +43,9 @@ export interface FolderNode {
   total: number;
 }
 
+/** Records read at once when a bulk change looks for the documents it affects. */
+const READ_CHUNK = 32;
+
 const DOCUMENT_FIELD_KEYS = ['title', 'authors', 'year', 'type', 'ref', 'doi', 'arxivId', 'userDescription', 'study', 'extracted'] as const;
 const EXTRACTABLE = ['title', 'authors', 'year', 'doi', 'arxivId'] as const;
 
@@ -260,8 +263,17 @@ export class Organizer {
         for (const t of addSet) if (!kept.includes(t)) kept.push(t);
         return kept;
       };
-      const infos = new Map((await this.docInfos(true)).map((d) => [d.id, d]));
-      const todo = ids.filter((id) => canonical(compute(infos.get(id)?.tags ?? [])) !== canonical(infos.get(id)?.tags ?? []));
+      // Which documents would change: the selection is read a few records at a time and only ids are kept, so a
+      // selection of tens of thousands of documents never holds their records (nor the whole library) in memory (D-178).
+      const todo: string[] = [];
+      for (let i = 0; i < ids.length; i += READ_CHUNK) {
+        const part = ids.slice(i, i + READ_CHUNK);
+        const recs = await Promise.all(part.map((id) => store.documents.get(id)));
+        part.forEach((id, k) => {
+          const tags = recs[k]?.tags ?? [];
+          if (canonical(compute(tags)) !== canonical(tags)) todo.push(id);
+        });
+      }
       if (todo.length === 0) return { changeId: null, changed: 0, unchanged: ids.length, reindex: [] };
 
       const name = (t: string) => byId.get(t)?.label ?? t;

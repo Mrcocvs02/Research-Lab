@@ -5,6 +5,9 @@ import { clip, type DocInfo, type OrgCtx } from './common.js';
 type Status = Project['status'];
 type Kind = NonNullable<Project['kind']>;
 
+/** A project that would hold more documents than it can; the interface turns `details` into its own message. */
+const tooMany = (count: number) => new AppError('INVALID_REQUEST', 'Too many members', { reason: 'members-limit', limit: PROJECT_LIMITS.members, count });
+
 const uniq = <T>(xs: readonly T[]): T[] => [...new Set(xs)];
 
 export function countsOf(p: Project, info: ReadonlyMap<string, DocInfo>) {
@@ -145,7 +148,7 @@ export class ProjectService {
     let id = input.id ?? base;
     for (let i = 2; input.id === undefined && (taken.has(id) || !itemIdSchema.safeParse(id).success); i++) id = `${base.slice(0, 120)}-${i}`;
     const docIds = uniq(input.docIds ?? []);
-    if (docIds.length > PROJECT_LIMITS.members) throw new AppError('INVALID_REQUEST', 'Too many members');
+    if (docIds.length > PROJECT_LIMITS.members) throw tooMany(docIds.length);
     await this.requireDocs(docIds);
     const now = this.c.now().toISOString();
     const changeId = this.c.newChangeId();
@@ -211,7 +214,7 @@ export class ProjectService {
       const have = new Set(cur.members.map((m) => m.docId));
       const added = ids.filter((d) => !have.has(d));
       if (added.length === 0) return null;
-      if (cur.members.length + added.length > PROJECT_LIMITS.members) throw new AppError('INVALID_REQUEST', 'Too many members');
+      if (cur.members.length + added.length > PROJECT_LIMITS.members) throw tooMany(cur.members.length + added.length);
       return { ...cur, members: [...cur.members, ...added.map((docId) => ({ docId, addedAt: now, ...(note !== undefined ? { note } : {}) }))] };
     });
   }

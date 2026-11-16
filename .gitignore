@@ -12,3 +12,5 @@ tools/generality.local.json
 .env
 .env.*
 *.local.json
+CLAUDE.local.md
+.claude/settings.local.json

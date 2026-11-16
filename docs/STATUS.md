@@ -1,12 +1,14 @@
 # Stato
 
-- **Fase:** 1 — indice e ricerca
-- **Onda:** 1.2 — revisione indipendente e di sicurezza
+- **Fase:** 2 — navigazione, organizzazione, progetti (il sostituto di TagSpaces)
+- **Onda:** 2.1 — da avviare
 - **Fatto:**
   - Fase 0 chiusa (tag `phase-0`).
-  - Fase 1, onda 1.1: scanner incrementale, estrattore (pdfjs-dist, fflate), osservatore (`packages/data`); indice FTS5 con pagine nei risultati (`packages/search`); runtime nel main con worker thread; canali `scan:*`, `search:*`, `documents:*`, `index:rebuild`; vista di ricerca; corpus sintetico e spec e2e `qa-*`.
-  - Criterio fase 1 verificato: scansione da zero della libreria reale = importazione (id, percorsi, dimensioni 100%; DOI e arXiv presenti nel testo ritrovati al 100%; titoli simili in media 0,958); ricerca su 1000 documenti p95 8,8 ms nell'app e 68 ms nel benchmark dell'indice; prova offline verde (3 su 3).
-- **In corso:** reviewer e security sulla differenza `phase-0..main`
+  - Fase 1 chiusa (tag `phase-1`): scanner incrementale, estrattore (pdfjs-dist, fflate) indurito contro documenti ostili, osservatore, indice FTS5 con pagine nei risultati, runtime nel main con worker supervisionato (watchdog, rispawn, un solo scrittore dei record), canali `scan:*`, `search:*`, `documents:*`, `index:rebuild`, vista di ricerca.
+  - Criterio fase 1: scansione da zero della libreria reale = importazione (id, percorsi, dimensioni 100%; DOI/arXiv presenti nel testo ritrovati al 100%; titoli simili in media 0,958); ricerca su 1000 documenti p95 5,5 ms nell'app; prova offline verde.
+  - Revisioni fase 1: reviewer (7 importanti corretti), security (4 bloccanti corretti e ricontrollati).
+  - Verifiche al 2026-11-16: 577 unitari + 40 pesanti, 30 e2e + 2 pesanti, generalità, tutti verdi in locale con memoria misurata.
+- **In corso:** —
 - **Bloccato:** —
-- **Da ricordare:** per l'installer (fase 8) `pdfjs-dist` e `fflate` sono esterni al bundle del main e vanno tra le dipendenze del pacchetto (D-052); le fasi 2-3 devono chiamare `LibraryRuntime.reindexDocument(docId)` dopo modifiche a tag, note e annotazioni; i backup della cartella dati all'avvio si accumulano (serve una politica di conservazione).
-- **Prossimo:** correzioni dalla revisione, tag `phase-1`, fase 2 (navigazione, tassonomia con annulla, progetti)
+- **Da ricordare:** installer (fase 8): `pdfjs-dist` e `fflate` esterni al bundle del main (D-052); fasi 2-3 devono chiamare `LibraryRuntime.reindexDocument(docId)` dopo modifiche a tag, note, annotazioni; test pesanti solo uno alla volta (RULES, TESTING).
+- **Prossimo:** fase 2 — data-engineer (tassonomia a livelli, annulla/ripeti, progetti, modifica documenti, apertura file, canali IPC) poi frontend (albero cartelle, elenco/griglia, filtri, scheda documento, gestione tassonomia, progetti).

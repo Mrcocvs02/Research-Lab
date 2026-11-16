@@ -16,17 +16,21 @@ export const SEARCH_MARK_CLOSE = '\u0002';
 const value = z.string().min(1).max(300);
 export const searchFiltersSchema = z.object({
   tags: z.array(value).max(SEARCH_LIMITS.filterValues).optional(),
+  tagsAny: z.array(value).max(SEARCH_LIMITS.filterValues).optional(),
+  tagsExclude: z.array(value).max(SEARCH_LIMITS.filterValues).optional(),
   authors: z.array(value).max(SEARCH_LIMITS.filterValues).optional(),
   types: z.array(value).max(SEARCH_LIMITS.filterValues).optional(),
   venues: z.array(value).max(SEARCH_LIMITS.filterValues).optional(),
   studyStates: z.array(studyStateSchema).max(3).optional(),
   folders: z.array(relativePathSchema).max(SEARCH_LIMITS.filterValues).optional(),
+  folder: relativePathSchema.optional(),
+  includeSubfolders: z.boolean().optional(),
   yearFrom: z.number().int().min(1000).max(3000).optional(),
   yearTo: z.number().int().min(1000).max(3000).optional(),
 });
 
-export const searchSortSchema = z.enum(['relevance', 'title', 'year-desc', 'year-asc', 'added-desc', 'author']);
-export const listSortSchema = z.enum(['title', 'year-desc', 'year-asc', 'added-desc', 'author']);
+export const searchSortSchema = z.enum(['relevance', 'title', 'year-desc', 'year-asc', 'added-desc', 'author', 'size-desc', 'size-asc']);
+export const listSortSchema = z.enum(['title', 'year-desc', 'year-asc', 'added-desc', 'author', 'size-desc', 'size-asc']);
 
 const limit = z.number().int().min(1).max(SEARCH_LIMITS.listMax);
 const offset = z.number().int().min(0).max(1_000_000);
@@ -40,6 +44,10 @@ export const searchHitSchema = z.object({
   /** Relative to the library root. */
   path: relativePathSchema,
   studyState: studyStateSchema,
+  /** File size in bytes. */
+  size: z.number().int().nonnegative(),
+  /** Tag ids of the document, implied ones included. */
+  tags: z.array(z.string()),
   score: z.number(),
   field: z.enum(['title', 'summary', 'note', 'annotation', 'text']),
   /** Match markers are U+0001 (open) and U+0002 (close); render the text between them as emphasis, never as HTML. */

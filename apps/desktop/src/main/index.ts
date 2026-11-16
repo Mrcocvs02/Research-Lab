@@ -74,6 +74,7 @@ async function main(): Promise<void> {
     localDataDir: dirs.localData,
     log,
     emit: (status) => emit('scan:progress', status),
+    emitDocumentsChanged: () => emit('library:changed', { kind: 'documents' }),
     backupDataDir: backupLibraryData,
     createStore: ({ rootPath, dataDir, deviceId }) => createLibraryStore({ rootPath, dataDir, deviceId, logger: log }),
     createIndex: createSearchIndex,

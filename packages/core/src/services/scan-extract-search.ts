@@ -132,8 +132,15 @@ export interface TextExtractor {
 /* ---------------------------- Search ----------------------------- */
 
 export interface SearchFilters {
-  /** Taxonomy node ids; a document must carry ALL of them. */
+  /**
+   * Taxonomy node ids; a document must match ALL of them. A document matches a tag when it carries it, carries a
+   * tag that implies it, or carries a descendant of it (the same rule in `tagsAny` and `tagsExclude`).
+   */
   tags?: string[];
+  /** Taxonomy node ids; a document must match AT LEAST ONE of them. */
+  tagsAny?: string[];
+  /** Taxonomy node ids; a document must match NONE of them. */
+  tagsExclude?: string[];
   /** Author display names (case/accent-insensitive, exact); a document must have ALL of them. */
   authors?: string[];
   /** Document type ids or labels; ANY of them. */
@@ -143,11 +150,17 @@ export interface SearchFilters {
   studyStates?: Array<'to-read' | 'reading' | 'read'>;
   /** Folders relative to the library root; a document inside any of them (sub-folders included). */
   folders?: RelativePath[];
+  /**
+   * One folder relative to the library root ('' = the root itself). Separators are respected (`a/b` never includes
+   * `a/bc`). Sub-folders are included unless `includeSubfolders` is false.
+   */
+  folder?: RelativePath;
+  includeSubfolders?: boolean;
   yearFrom?: number;
   yearTo?: number;
 }
 
-export type SearchSort = 'relevance' | 'title' | 'year-desc' | 'year-asc' | 'added-desc' | 'author';
+export type SearchSort = 'relevance' | 'title' | 'year-desc' | 'year-asc' | 'added-desc' | 'author' | 'size-desc' | 'size-asc';
 
 export interface SearchQuery {
   /**
@@ -190,6 +203,10 @@ export interface SearchResultHit extends SearchHit {
   type: string | null;
   path: RelativePath;
   studyState: 'to-read' | 'reading' | 'read';
+  /** File size in bytes. */
+  size: number;
+  /** The document's tags (implied ones included, like `DocumentSummary.tags`). */
+  tags: string[];
 }
 
 export interface SearchResultPage {
@@ -228,6 +245,8 @@ export interface DocumentSummary {
   tags: string[];
   addedAt: string;
   missing: boolean;
+  /** File size in bytes. */
+  size: number;
 }
 
 export interface DocumentListQuery {
@@ -254,6 +273,8 @@ export interface IndexableDocument {
   tagTerms?: Record<string, string[]>;
   /** Human label of `record.type`, searchable and usable in `type:`. */
   typeLabel?: string;
+  /** Ancestors (by `parents`, transitively) of the document's tags that are not tags of it: they make `tags` filters find descendants. Not shown in facets or summaries. */
+  tagAncestors?: string[];
   /** Venue name when `record.ref.venue` is empty (resolved from the taxonomy). */
   venueName?: string;
   /** Hash of the file the pages come from (default `record.hash`); see `indexedState`. */

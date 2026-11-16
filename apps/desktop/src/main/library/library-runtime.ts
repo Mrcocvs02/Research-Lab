@@ -50,6 +50,8 @@ export interface RuntimeDeps {
   log: Logger;
   /** Called with every status change (progress is throttled). */
   onStatus(status: ScanStatus): void;
+  /** Called when a scan ended: the documents the interface lists may have changed (`library:changed`, kind documents). */
+  onDocumentsChanged?(): void;
   /** Copies the data folder aside before the scanner writes into an existing library (rule 1). */
   backup(): Promise<void>;
   /**
@@ -163,6 +165,11 @@ export class LibraryRuntime {
     return this.current;
   }
 
+  /** The scanner and the importer write records behind the organizer's back: its reused document list is stale. */
+  private recordsWritten(): void {
+    this.org?.invalidate();
+  }
+
   private update(patch: Partial<ScanStatus>, force = true): void {
     this.current = { ...this.current, ...patch };
     const now = Date.now();
@@ -240,6 +247,7 @@ export class LibraryRuntime {
   hold(): RuntimeHold {
     if (this.closed) throw new AppError('LIBRARY_NOT_ACTIVE', 'The library was closed');
     this.holds++;
+    this.recordsWritten();
     this.job?.controller.abort();
     const ready = (async () => {
       while (this.job) await this.job.done.catch(() => {});
@@ -251,6 +259,7 @@ export class LibraryRuntime {
         if (released) return;
         released = true;
         this.holds--;
+        this.recordsWritten(); // what the holder (an import) wrote
         if (this.holds > 0 || this.closed) return;
         // What the holder wrote has to reach the index: a scan runs now, together with what was asked meanwhile.
         const q = this.queued;
@@ -306,6 +315,7 @@ export class LibraryRuntime {
           if (expectedRevision !== 'any' && (cur ? cur.revision : null) !== expectedRevision) throw conflict;
           return record;
         });
+        this.recordsWritten();
         return { ok: true, record: written };
       } catch (e) {
         if (e === conflict) return { ok: false, reason: 'conflict' };
@@ -453,8 +463,13 @@ export class LibraryRuntime {
       const vanished = [...indexed.keys()].filter((id) => !live.has(id));
       if (vanished.length > 0) await worker.remove(vanished);
 
-      this.update({ state: 'done', phase: undefined, summary, indexed: await index.count(), finishedAt: this.nowIso(), total: undefined, processed: 0 });
+      const indexedCount = await index.count();
+      // The records the scan wrote are visible to the organizer before anybody hears the scan is over.
+      this.recordsWritten();
+      this.update({ state: 'done', phase: undefined, summary, indexed: indexedCount, finishedAt: this.nowIso(), total: undefined, processed: 0 });
+      this.announceDocuments();
     } catch (e) {
+      this.recordsWritten();
       if (isAbort(e) || signal.aborted) {
         this.update({ state: 'cancelled', phase: undefined, summary, indexed: await index.count().catch(() => this.current.indexed), finishedAt: this.nowIso() });
       } else {
@@ -468,6 +483,15 @@ export class LibraryRuntime {
           finishedAt: this.nowIso(),
         });
       }
+      this.announceDocuments();
+    }
+  }
+
+  private announceDocuments(): void {
+    try {
+      this.d.onDocumentsChanged?.();
+    } catch (e) {
+      this.d.log.warn('announcing the end of a scan failed', { error: e });
     }
   }
 

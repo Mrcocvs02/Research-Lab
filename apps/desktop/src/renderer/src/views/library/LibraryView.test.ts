@@ -107,6 +107,50 @@ describe('LibraryView: list, grid, search', () => {
     expect(rows().length).toBeLessThan(60);
   });
 
+  it('never asks for more than one page at a time, whatever the filters (5000 documents)', async () => {
+    const docs = makeDocs(5000);
+    for (let i = 0; i < docs.length; i++) docs[i]!.tags = i % 5 === 0 ? ['ml'] : i % 5 === 1 ? ['stats'] : [];
+    setup({ docs });
+    await ready();
+    const pick = (testId: string, text: string) => {
+      fireEvent.change(screen.getByTestId(testId), { target: { value: text } });
+      fireEvent.keyDown(screen.getByTestId(testId), { key: 'Enter' });
+    };
+    pick('filter-include-input', 'ML');
+    pick('filter-include-input', 'stat');
+    fireEvent.click(screen.getByTestId('tag-mode-any'));
+    await waitFor(() => expect(screen.getByTestId('search-summary').textContent).toContain('2000'));
+    pick('filter-exclude-input', 'stat');
+    await waitFor(() => expect(screen.getByTestId('search-summary').textContent).toContain('1000'));
+    type('search-input', 'Paper');
+    await waitFor(() => expect(screen.getByTestId('search-summary').textContent).toContain('1000'));
+    const asked = [...callsTo('documents:list'), ...callsTo('search:run'), ...callsTo('search:query')];
+    expect(asked.length).toBeGreaterThan(3);
+    for (const p of asked) expect(p.limit ?? 50).toBeLessThanOrEqual(100);
+    // The filters travel to the server instead of being applied here.
+    expect(callsTo('documents:list').some((p) => p.filters?.tagsAny?.length === 2)).toBe(true);
+    expect(callsTo('search:run').at(-1)?.filters).toMatchObject({ tags: ['ml'], tagsExclude: ['stats'] });
+    // Nothing is loaded in bulk: no request is made for the whole library.
+    expect(callsTo('documents:list').every((p) => p.offset === undefined || p.offset === 0)).toBe(true);
+  });
+
+  it('sorts by size and shows a readable size on each row', async () => {
+    const docs = makeDocs(4);
+    docs[0]!.size = 500;
+    docs[1]!.size = 3 * 1024 * 1024;
+    docs[2]!.size = 20 * 1024;
+    docs[3]!.size = 1536;
+    setup({ docs });
+    await ready();
+    const sizes = () => rows().map((r) => r.querySelector('[data-testid="doc-size"]')?.textContent);
+    expect(sizes()).toEqual(['500 B', '3 MB', '20 KB', '1.5 KB']);
+    type('search-sort', 'size-desc');
+    await waitFor(() => expect(titles()).toEqual(['Paper 0001', 'Paper 0002', 'Paper 0003', 'Paper 0000']));
+    expect(callsTo('documents:list').at(-1)?.sort).toBe('size-desc');
+    type('search-sort', 'size-asc');
+    await waitFor(() => expect(titles()).toEqual(['Paper 0000', 'Paper 0003', 'Paper 0002', 'Paper 0001']));
+  });
+
   it('reloads on library:changed', async () => {
     const lib = setup();
     await ready();
@@ -126,7 +170,7 @@ describe('LibraryView: folders', () => {
     expect(folder('beta').textContent).toContain('2');
     fireEvent.click(folder('beta'));
     await waitFor(() => expect(rows()).toHaveLength(2));
-    expect(callsTo('documents:list').at(-1)?.filters?.folders).toEqual(['beta']);
+    expect(callsTo('documents:list').at(-1)?.filters).toMatchObject({ folder: 'beta', includeSubfolders: true });
     // beta holds only beta/inner: "this folder only" leaves nothing
     fireEvent.click(screen.getByTestId('include-subfolders'));
     await screen.findByTestId('search-empty');

@@ -29,6 +29,8 @@ const hit = {
   type: null,
   path: 'papers/paper.pdf',
   studyState: 'to-read' as const,
+  size: 10,
+  tags: [] as string[],
 };
 const facets = { total: 1, tags: [], authors: [], types: [], venues: [], studyStates: [], years: [], folders: [{ value: 'papers', count: 1 }], labels: { tags: {}, types: {} } };
 
@@ -39,7 +41,7 @@ function setup() {
     facets: async () => (order.push('facets'), facets),
     list: async () => ({
       total: 1,
-      items: [{ docId: DOC, title: 'A paper', authors: [], year: null, type: null, venue: null, path: 'papers/paper.pdf', studyState: 'to-read' as const, tags: [], addedAt: '', missing: false }],
+      items: [{ docId: DOC, title: 'A paper', authors: [], year: null, type: null, venue: null, path: 'papers/paper.pdf', studyState: 'to-read' as const, tags: [], addedAt: '', missing: false, size: 10 }],
     }),
     getDocument: async (id: string) => {
       if (id !== DOC) throw new AppError('NOT_FOUND', 'no');

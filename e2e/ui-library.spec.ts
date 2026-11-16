@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { LaunchedApp } from './helpers/launch';
+import { ipc } from './helpers/phase1';
 import { backToList, clickRow, createTagInManager, openSyntheticLibrary, pickTag, rowByTitle, rows } from './helpers/ui';
 
 /**
@@ -57,6 +58,14 @@ test('folders with counts, list and grid, sorting, text search (points 1 and 2)'
     await window.getByTestId('search-sort').selectOption('added-desc');
     await window.getByTestId('search-sort').selectOption('author');
     await expect(rows(window).first()).toBeVisible();
+    // By size: the order and the readable size of the first row are the index's.
+    const bySize = (await ipc(window, 'documents:list', { sort: 'size-desc', limit: 3 })).data as { items: Array<{ size: number }> };
+    await window.getByTestId('search-sort').selectOption('size-desc');
+    await expect(rows(window).first().getByTestId('doc-size')).toHaveAttribute('title', `${bySize.items[0]!.size} bytes`);
+    await expect(rows(window).first().getByTestId('doc-size')).toHaveText(/^\d+(\.\d)? (B|KB|MB|GB)$/);
+    await window.getByTestId('search-sort').selectOption('size-asc');
+    const asc = (await ipc(window, 'documents:list', { sort: 'size-asc', limit: 1 })).data as { items: Array<{ size: number }> };
+    await expect(rows(window).first().getByTestId('doc-size')).toHaveAttribute('title', `${asc.items[0]!.size} bytes`);
 
     // Text search still works from the same view.
     const word = firstByTitle.split(/\s+/).sort((a, b) => b.length - a.length)[0]!.replace(/[^\p{L}\p{N}]/gu, '');

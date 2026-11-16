@@ -258,6 +258,104 @@ describe('search', () => {
   });
 });
 
+describe('size, tag and folder filters (D-130)', () => {
+  const list = async (filters: NonNullable<Parameters<SearchIndex['list']>[0]['filters']>, text = '') =>
+    (await index.search({ text, filters, sort: 'title' })).map((h) => h.title);
+
+  it('sorts by size, both ways, and reports it on rows and hits', async () => {
+    await index.upsertMany([
+      makeDoc({ seed: '1', title: 'Mid', size: 2000 }),
+      makeDoc({ seed: '2', title: 'Big', size: 90_000 }),
+      makeDoc({ seed: '3', title: 'Tiny', size: 10 }),
+    ]);
+    expect((await index.list({ sort: 'size-desc' })).items.map((i) => [i.title, i.size])).toEqual([['Big', 90_000], ['Mid', 2000], ['Tiny', 10]]);
+    expect((await index.list({ sort: 'size-asc' })).items.map((i) => i.title)).toEqual(['Tiny', 'Mid', 'Big']);
+    expect((await index.search({ text: '', sort: 'size-desc' })).map((h) => h.size)).toEqual([90_000, 2000, 10]);
+    // With text, the same sorts apply to the matches.
+    await index.upsert(makeDoc({ seed: '4', title: 'Mid two', size: 5 }));
+    expect((await index.search({ text: 'mid', sort: 'size-asc' })).map((h) => h.title)).toEqual(['Mid two', 'Mid']);
+  });
+
+  it('tagsAny keeps documents with at least one tag, tagsExclude drops documents with any of them', async () => {
+    await index.upsertMany([
+      makeDoc({ seed: 'a', title: 'A', tags: ['x'] }),
+      makeDoc({ seed: 'b', title: 'B', tags: ['y'] }),
+      makeDoc({ seed: 'c', title: 'C', tags: ['x', 'y'] }),
+      makeDoc({ seed: 'd', title: 'D', tags: ['z'] }),
+      makeDoc({ seed: 'e', title: 'E' }),
+    ]);
+    expect(await list({ tagsAny: ['x', 'y'] })).toEqual(['A', 'B', 'C']);
+    expect(await list({ tagsExclude: ['x'] })).toEqual(['B', 'D', 'E']);
+    expect(await list({ tagsExclude: ['x', 'y'] })).toEqual(['D', 'E']);
+    expect(await list({ tags: ['y'], tagsExclude: ['x'] })).toEqual(['B']);
+    expect(await list({ tagsAny: ['x', 'z'], tagsExclude: ['y'] })).toEqual(['A', 'D']);
+    expect(await list({ tagsAny: [], tagsExclude: [] })).toHaveLength(5);
+    // The same with text, and through the list channel and the facets.
+    expect(await list({ tagsAny: ['x', 'y'], tagsExclude: ['x'] }, 'b')).toEqual(['B']);
+    expect((await index.list({ filters: { tagsAny: ['x', 'z'] } })).total).toBe(3);
+    const f = await index.facets({ text: '', filters: { tagsAny: ['x', 'y'], tagsExclude: ['x'] } });
+    expect(f.total).toBe(1);
+    expect(f.tags).toEqual([{ value: 'y', count: 1 }]);
+  });
+
+  it('a tag filter also finds documents with a descendant of the tag, without listing the ancestor as a tag', async () => {
+    // "ml" is the parent of "nn"; "deep" implies "nn" (the caller expands implications into `record.tags`).
+    const terms = { nn: ['Neural nets'], ml: ['Machine learning', 'ML'] };
+    await index.upsertMany([
+      makeDoc({ seed: 'a', title: 'A', tags: ['nn'] }, { tagTerms: terms, tagAncestors: ['ml'] }),
+      makeDoc({ seed: 'b', title: 'B', tags: ['ml'] }, { tagTerms: terms }),
+      makeDoc({ seed: 'c', title: 'C', tags: ['deep', 'nn'] }, { tagTerms: { ...terms, deep: ['Deep'] }, tagAncestors: ['ml'] }),
+      makeDoc({ seed: 'd', title: 'D', tags: ['other'] }),
+    ]);
+    expect(await list({ tags: ['ml'] })).toEqual(['A', 'B', 'C']);
+    expect(await list({ tagsAny: ['ml', 'other'] })).toEqual(['A', 'B', 'C', 'D']);
+    expect(await list({ tagsExclude: ['ml'] })).toEqual(['D']);
+    expect(await list({ tags: ['nn'] })).toEqual(['A', 'C']);
+    expect(await list({ tags: ['deep'] })).toEqual(['C']);
+    // The summary and the facets keep to the document's own (expanded) tags.
+    expect((await index.list({ filters: { tags: ['nn'] } })).items.map((i) => i.tags)).toEqual([['nn'], ['deep', 'nn']]);
+    const f = await index.facets({ text: '', filters: { tags: ['ml'] } });
+    expect(f.tags).toEqual(expect.arrayContaining([{ value: 'nn', count: 2 }, { value: 'deep', count: 1 }, { value: 'ml', count: 1 }]));
+    expect(f.tags).toHaveLength(3);
+    // `tag:` in the text finds descendants by the ancestor's words, like the tag filter.
+    expect(await ids('tag:"machine learning"')).toHaveLength(3);
+    // Changing the ancestors on the next upsert replaces the old ones.
+    await index.upsert(makeDoc({ seed: 'a', title: 'A', tags: ['nn'] }, { tagTerms: terms, tagAncestors: [] }));
+    expect(await list({ tags: ['ml'] })).toEqual(['B', 'C']);
+  });
+
+  it('the folder filter respects separators, is confined, and can leave sub-folders out', async () => {
+    await index.upsertMany([
+      makeDoc({ seed: 'r', title: 'Root', path: 'r.pdf' }),
+      makeDoc({ seed: 'a', title: 'In a', path: 'a/x.pdf' }),
+      makeDoc({ seed: 'ab', title: 'In a/b', path: 'a/b/x.pdf' }),
+      makeDoc({ seed: 'abd', title: 'In a/b/d', path: 'a/b/d/x.pdf' }),
+      makeDoc({ seed: 'abc', title: 'In a/bc', path: 'a/bc/x.pdf' }),
+      makeDoc({ seed: 'a0', title: 'In a/b0', path: 'a/b0/x.pdf' }),
+      makeDoc({ seed: 'AB', title: 'In A/B', path: 'A/B/x.pdf' }),
+      makeDoc({ seed: 'pct', title: 'In 100%', path: '100%/x.pdf' }),
+    ]);
+    expect(await list({ folder: 'a/b' })).toEqual(['In a/b', 'In a/b/d']);
+    expect(await list({ folder: 'a/b', includeSubfolders: true })).toEqual(['In a/b', 'In a/b/d']);
+    expect(await list({ folder: 'a/b', includeSubfolders: false })).toEqual(['In a/b']);
+    expect(await list({ folder: 'a' })).toEqual(['In a', 'In a/b', 'In a/b/d', 'In a/b0', 'In a/bc']);
+    expect(await list({ folder: 'a', includeSubfolders: false })).toEqual(['In a']);
+    expect(await list({ folder: '', includeSubfolders: false })).toEqual(['Root']);
+    expect(await list({ folder: '' })).toHaveLength(8);
+    expect(await list({ folder: '/a//b/./' })).toEqual(['In a/b', 'In a/b/d']);
+    expect(await list({ folder: '100%' })).toEqual(['In 100%']);
+    expect(await list({ folder: 'a/b/d/e' })).toEqual([]);
+    // Case matters, like the paths themselves.
+    expect(await list({ folder: 'A' })).toEqual(['In A/B']);
+    // The older `folders` filter has the same separator rule.
+    expect(await list({ folders: ['a/b'] })).toEqual(['In a/b', 'In a/b/d']);
+    // Combined with text, facets and the list channel.
+    expect(await list({ folder: 'a/b', includeSubfolders: false }, 'in')).toEqual(['In a/b']);
+    expect((await index.list({ filters: { folder: 'a/b' } })).total).toBe(2);
+    expect((await index.facets({ text: '', filters: { folder: 'a/b', includeSubfolders: false } })).total).toBe(1);
+  });
+});
+
 describe('incremental updates and rebuild', () => {
   it('upserts replace the old content and keep what was not passed', async () => {
     await index.upsert(makeDoc({ seed: 'a', title: 'First title' }, { notes: 'keepnote', pages: [{ page: 1, text: 'oldbody' }] }));

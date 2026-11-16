@@ -1,7 +1,6 @@
 import type { SearchFilters } from '@rl/core';
-import { docMatchesTag, type TaxonomyModel } from './taxonomyModel';
 
-export const SORTS = ['relevance', 'title', 'author', 'year-desc', 'year-asc', 'added-desc'] as const;
+export const SORTS = ['relevance', 'title', 'author', 'year-desc', 'year-asc', 'added-desc', 'size-desc', 'size-asc'] as const;
 export type SortKey = (typeof SORTS)[number];
 
 export type TagMode = 'all' | 'any';
@@ -11,7 +10,7 @@ export interface BrowseState {
   text: string;
   sort: SortKey;
   /** Facet filters (authors, types, venues, study states, years); tags and folders live in the fields below. */
-  filters: Omit<SearchFilters, 'tags' | 'folders'>;
+  filters: Omit<SearchFilters, 'tags' | 'tagsAny' | 'tagsExclude' | 'folders' | 'folder' | 'includeSubfolders'>;
   tags: { include: string[]; exclude: string[]; mode: TagMode };
   /** Selected folder (relative path); '' = the library root; null = no folder chosen. */
   folder: string | null;
@@ -27,60 +26,31 @@ export const initialBrowse = (): BrowseState => ({
   includeSub: true,
 });
 
-/** The minimum a row must carry for the client-side filter. */
-export interface FilterableRow {
-  path: string;
-  tags: readonly string[] | null;
-}
-
 export interface QueryPlan {
-  /** What goes to the index. */
+  /** What goes to the index: every condition is decided by the server (D-122). */
   text: string;
   filters: SearchFilters;
-  sort: Exclude<SortKey, 'relevance'> | 'relevance';
-  /**
-   * The index cannot express "any of these tags", "not this tag" or "only this folder, not below it" (the contract
-   * has "all of" and "folder and below"), so those parts are decided here on the full result: the view then loads
-   * every page of the broader query and filters it.
-   */
-  client: ClientFilter | null;
+  sort: SortKey;
   /** Stable text of everything that changes the result, to reset the list when it changes. */
   key: string;
-}
-
-export interface ClientFilter {
-  anyTags: string[];
-  excludeTags: string[];
-  exactFolder: string | null;
 }
 
 export function planQuery(s: BrowseState): QueryPlan {
   const filters: SearchFilters = { ...s.filters };
   const { include, exclude, mode } = s.tags;
-  const anyTags = mode === 'any' && include.length > 1 ? include : [];
-  if (include.length > 0 && anyTags.length === 0) filters.tags = include;
-  if (s.folder) filters.folders = [s.folder];
-  const exactFolder = s.folder !== null && !s.includeSub ? s.folder : null;
-  const needsClient = anyTags.length > 0 || exclude.length > 0 || exactFolder !== null;
-  const client: ClientFilter | null = needsClient ? { anyTags, excludeTags: exclude, exactFolder } : null;
+  if (include.length > 0) {
+    // One tag is the same under "all" and "any".
+    if (mode === 'any' && include.length > 1) filters.tagsAny = include;
+    else filters.tags = include;
+  }
+  if (exclude.length > 0) filters.tagsExclude = exclude;
+  if (s.folder !== null) {
+    filters.folder = s.folder;
+    filters.includeSubfolders = s.includeSub;
+  }
   // An empty text has no relevance: the list falls back to the title order.
   const sort = s.sort === 'relevance' && s.text.trim() === '' ? 'title' : s.sort;
-  return { text: s.text, filters, sort, client, key: JSON.stringify({ t: s.text, f: filters, s: sort, c: client }) };
-}
-
-const dirOf = (path: string): string => {
-  const i = path.lastIndexOf('/');
-  return i < 0 ? '' : path.slice(0, i);
-};
-
-/** Applies the client-side part of a plan to one row (rows without known tags pass the tag tests only when the tests are empty). */
-export function passesClient(model: TaxonomyModel, c: ClientFilter, row: FilterableRow): boolean {
-  if (c.exactFolder !== null && dirOf(row.path) !== c.exactFolder) return false;
-  if (c.anyTags.length === 0 && c.excludeTags.length === 0) return true;
-  const tags = row.tags ?? [];
-  if (c.anyTags.length > 0 && !c.anyTags.some((t) => docMatchesTag(model, tags, t))) return false;
-  if (c.excludeTags.some((t) => docMatchesTag(model, tags, t))) return false;
-  return true;
+  return { text: s.text, filters, sort, key: JSON.stringify({ t: s.text, f: filters, s: sort }) };
 }
 
 export function hasAnyCondition(s: BrowseState): boolean {

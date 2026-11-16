@@ -1,8 +1,9 @@
 import { mkdir, mkdtemp, rm, unlink, utimes, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AppError, createMemoryLogger, defaultLibraryConfig, type ScanStatus } from '@rl/core';
+import { AppError, createMemoryLogger, defaultLibraryConfig, documentRecordSchema, type ScanStatus } from '@rl/core';
 import { createLibraryStore, createScanner, createTextExtractor } from '@rl/data';
 import { createSearchIndex } from '@rl/search';
 import { LibraryRuntime, localPaths } from './library-runtime.js';
@@ -37,7 +38,7 @@ async function put(rel: string, text: string) {
   await writeFile(file, text);
 }
 
-async function open(options: { backups?: string[]; worker?: LibraryWorker } = {}) {
+async function open(options: { backups?: string[]; worker?: LibraryWorker; changed?: string[] } = {}) {
   const dataDir = path.join(root, '.lab');
   const store = createLibraryStore({ rootPath: root, dataDir, deviceId: 'dev-test', logDocumentChanges: false });
   // The default scan settings look for PDF only; these tests use plain-text documents.
@@ -57,6 +58,7 @@ async function open(options: { backups?: string[]; worker?: LibraryWorker } = {}
     ...paths,
     log: createMemoryLogger(),
     onStatus: (s) => statuses.push(s),
+    onDocumentsChanged: () => void options.changed?.push(statuses.at(-1)?.state ?? 'none'),
     backup: async () => void options.backups?.push('backup'),
     progressIntervalMs: 0,
   });
@@ -132,6 +134,102 @@ describe('LibraryRuntime (real scanner, extractor and index; worker service in-p
       const undone = await org.undo();
       await rt.reindexDocuments(undone.reindex as never);
       expect((await rt.search({ text: 'manatee' })).total).toBe(0);
+    } finally {
+      await rt.close();
+    }
+  });
+
+  it('the organizer sees what a scan wrote at once, and the end of a scan announces the documents (D-130)', async () => {
+    await put('a/alpha.md', 'Alpha text about kelp.\n');
+    const changed: string[] = [];
+    const { rt, store } = await open({ changed });
+    try {
+      // The organizer reads the (still empty) library and keeps that answer for its reuse window.
+      expect((await rt.organizer.folderTree()).total).toBe(0);
+      rt.startScan();
+      await rt.whenIdle();
+      // Inside that window: the scan invalidated it, so the tree is not the old empty one.
+      expect((await rt.organizer.folderTree()).total).toBe(1);
+      // The announcement comes after the final status, once per scan.
+      expect(changed).toEqual(['done']);
+
+      // A targeted scan of the watcher (a new file) does the same.
+      await put('b/beta.md', 'Beta text about reefs.\n');
+      rt.startScan({ paths: ['b/beta.md'] });
+      await rt.whenIdle();
+      expect((await rt.organizer.folderTree()).total).toBe(2);
+      expect(changed).toEqual(['done', 'done']);
+      const ids = (await store.documents.listIds()) as string[];
+      // ...and a project can be made with the ids that scan found.
+      await expect(rt.organizer.createProject({ name: 'P', docIds: ids })).resolves.toBeTruthy();
+
+      // A cancelled scan still announces, with its own final status.
+      await put('c/gamma.md', 'Gamma\n');
+      rt.startScan({ full: true });
+      rt.cancel();
+      await rt.whenIdle();
+      expect(changed.length).toBe(3);
+      expect(['cancelled', 'done']).toContain(changed[2]);
+    } finally {
+      await rt.close();
+    }
+  });
+
+  it('a hold (an import writing records) drops the organizer cache on both ends', async () => {
+    const { rt, store } = await open();
+    try {
+      expect((await rt.organizer.folderTree()).total).toBe(0);
+      const hold = rt.hold();
+      await hold.ready;
+      const text = 'Imported text about fjords.';
+      await put('imp/old.md', text);
+      const hash = createHash('sha256').update(text).digest('hex');
+      const id = hash.slice(0, 16);
+      const now = '2026-01-01T00:00:00.000Z';
+      await store.documents.update(id as never, () => documentRecordSchema.parse({ id, hash, path: 'imp/old.md', size: text.length, mtimeMs: 1, addedAt: now, updatedAt: now }));
+      // Written behind the organizer's back, inside its reuse window: still seen at the next read.
+      hold.release();
+      await rt.whenIdle();
+      expect((await rt.organizer.folderTree()).total).toBe(1);
+    } finally {
+      await rt.close();
+    }
+  });
+
+  it('a tag filter finds the documents of its descendants and of tags that imply it, after indexing through the runtime', async () => {
+    await put('a/alpha.md', 'Alpha text about kelp.\n');
+    await put('b/beta.md', 'Beta text about reefs.\n');
+    await put('c/gamma.md', 'Gamma text about tides.\n');
+    const { rt, store } = await open();
+    try {
+      rt.startScan();
+      await rt.whenIdle();
+      const byPath = new Map((await store.documents.list()).map((d) => [d.path, d.id]));
+      const org = rt.organizer;
+      const made = await org.applyTaxonomy([
+        { op: 'create', id: 'science', label: 'Science' },
+        { op: 'create', id: 'biology', label: 'Biology', parents: ['science'] },
+        { op: 'create', id: 'ecology', label: 'Ecology', parents: ['biology'] },
+        { op: 'create', id: 'kelpy', label: 'Kelpy', implies: ['ecology'] },
+      ]);
+      await rt.reindexDocuments(made.reindex as never);
+      for (const [p, tag] of [['a/alpha.md', 'ecology'], ['b/beta.md', 'kelpy']] as const) {
+        const t = await org.tagDocuments([byPath.get(p) as string], [tag]);
+        await rt.reindexDocuments(t.reindex as never);
+      }
+      const paths = async (filters: Parameters<typeof rt.search>[0]['filters']) => (await rt.search({ text: '', filters })).hits.map((h) => h.path).sort();
+      expect(await paths({ tags: ['ecology'] })).toEqual(['a/alpha.md', 'b/beta.md']); // own tag and a tag that implies it
+      expect(await paths({ tags: ['science'] })).toEqual(['a/alpha.md', 'b/beta.md']); // ancestors, two levels up
+      expect(await paths({ tags: ['kelpy'] })).toEqual(['b/beta.md']);
+      expect(await paths({ tagsAny: ['biology', 'kelpy'] })).toEqual(['a/alpha.md', 'b/beta.md']);
+      expect(await paths({ tagsExclude: ['biology'] })).toEqual(['c/gamma.md']);
+      // Moving a node changes the ancestors of its documents: the entries are refreshed.
+      const moved = await org.applyTaxonomy([{ op: 'create', id: 'arts', label: 'Arts' }, { op: 'move', id: 'ecology', parents: ['arts'] }]);
+      await rt.reindexDocuments(moved.reindex as never);
+      expect(await paths({ tags: ['science'] })).toEqual([]);
+      expect(await paths({ tags: ['arts'] })).toEqual(['a/alpha.md', 'b/beta.md']);
+      // Facets list only the documents' own tags.
+      expect((await rt.facets({ text: '', filters: { tags: ['arts'] } })).tags.map((t) => t.value).sort()).toEqual(['ecology', 'kelpy']);
     } finally {
       await rt.close();
     }
@@ -268,6 +366,7 @@ describe('RuntimeManager', () => {
       localDataDir: local,
       log: mlog,
       emit: (s) => scans.push(`${s.libraryId}:${s.state}`),
+      emitDocumentsChanged: () => void scans.push('documents-changed'),
       backupDataDir: async () => null,
       createStore: (o) => {
         opened.push('store');
@@ -299,6 +398,8 @@ describe('RuntimeManager', () => {
       expect((await rt.search({ text: 'lichen' })).total).toBe(1);
       await expect(m.require('lib-b')).rejects.toMatchObject({ code: 'LIBRARY_NOT_ACTIVE' });
       expect(scans).toContain('lib-a:done');
+      // The end of the scan is announced to the interface, after its final status.
+      expect(scans.indexOf('documents-changed')).toBeGreaterThan(scans.indexOf('lib-a:done'));
 
       active.id = null;
       await m.sync();

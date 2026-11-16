@@ -1208,6 +1208,11 @@ button.toggle.on {
   align-items: flex-end;
   gap: 4px;
 }
+.doc-size {
+  font-size: 0.8em;
+  color: var(--text-muted, inherit);
+  font-variant-numeric: tabular-nums;
+}
 .doc-actions {
   display: none;
   gap: 2px;

@@ -12,6 +12,8 @@ export interface ManagerDeps {
   log: Logger;
   /** Pushes a status to the renderer (`scan:progress`). */
   emit(status: ScanStatus): void;
+  /** Tells the renderer the documents changed (`library:changed`, kind documents): a scan ended. */
+  emitDocumentsChanged?(): void;
   backupDataDir(libraryId: string, dataDir: string): Promise<unknown>;
   createStore(options: { rootPath: string; dataDir: string; deviceId: string }): LibraryStore;
   createIndex(): SearchIndex;
@@ -122,6 +124,7 @@ export class RuntimeManager {
         textCacheDir,
         log: this.d.log,
         onStatus: (s) => this.d.emit(s),
+        onDocumentsChanged: () => this.d.emitDocumentsChanged?.(),
         backup: async () => {
           const r = await this.d.backupDataDir(libraryId, dataDir);
           if (r) this.d.log.info('data folder backed up before the first scan write');

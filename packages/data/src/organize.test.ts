@@ -101,7 +101,8 @@ describe('taxonomy operations', () => {
     );
     const r = await org.applyTaxonomy(ops({ op: 'merge', from: 'old', into: 'new' }));
     expect(r.documentsChanged).toBe(2);
-    expect(r.reindex.sort()).toEqual([hex(1), hex(2)].sort());
+    // Document 3 keeps its tag but its ancestors changed (kid's parent is now `new`): its index entry is refreshed too.
+    expect(r.reindex.sort()).toEqual([hex(1), hex(2), hex(3)].sort());
     expect(await tagsOf(1)).toEqual(['new']);
     expect(await tagsOf(2)).toEqual(['new']);
     const t = await org.taxonomy();
@@ -112,6 +113,26 @@ describe('taxonomy operations', () => {
     expect(t.nodes.find((n) => n.id === 'kid')?.parents).toEqual(['new']);
     expect(t.nodes.find((n) => n.id === 'imp')?.implies).toEqual(['new']);
     expect(merged?.counts.direct).toBe(2);
+  });
+
+  it('a move refreshes the documents under the moved node (the index keeps their ancestors), and only them', async () => {
+    await seed(
+      [node('root1'), node('root2'), node('mid', { parents: ['root1'] }), node('leaf', { parents: ['mid'] }), node('imp', { implies: ['leaf'] }), node('other', { parents: ['root1'] })],
+      [doc(1, { tags: ['leaf'] }), doc(2, { tags: ['imp'] }), doc(3, { tags: ['other'] }), doc(4, { tags: ['root2'] }), doc(5)],
+    );
+    const r = await org.applyTaxonomy(ops({ op: 'move', id: 'mid', parents: ['root2'] }));
+    expect(r.reindex.sort()).toEqual([hex(1), hex(2)].sort());
+    expect(r.documentsChanged).toBe(0);
+  });
+
+  it('invalidate() drops the reused document list for writers that bypass the organizer', async () => {
+    const reuse = createOrganizer({ store, deviceId: 'dev-1', cacheTtlMs: 60_000 });
+    await seed([]);
+    expect((await reuse.folderTree()).total).toBe(0);
+    await store.documents.put(doc(1));
+    expect((await reuse.folderTree()).total).toBe(0); // still the old answer inside the window
+    reuse.invalidate();
+    expect((await reuse.folderTree()).total).toBe(1);
   });
 
   it('merge chains in one batch end on the last target', async () => {

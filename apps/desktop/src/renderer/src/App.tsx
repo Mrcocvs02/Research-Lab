@@ -1,5 +1,6 @@
-import { lazy, Suspense, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ErrorBoundary, Lazy, lazyRetry } from './components/Lazy';
 import { NoticeBanner } from './components/NoticeBanner';
 import { ErrorNote } from './components/ui';
 import { errorMessage } from './lib/errors';
@@ -11,21 +12,23 @@ import { Shell, type SectionId } from './shell/Shell';
 import { AppProvider, useApp } from './state/app-context';
 
 // Only the Library view is part of the first screen; the others load when they are opened (docs/RULES.md, lightness).
-const Settings = lazy(() => import('./settings/Settings').then((m) => ({ default: m.Settings })));
-const ProjectsView = lazy(() => import('./views/projects/ProjectsView').then((m) => ({ default: m.ProjectsView })));
-const Wizard = lazy(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })));
+const Settings = lazyRetry(() => import('./settings/Settings').then((m) => ({ default: m.Settings })));
+const ProjectsView = lazyRetry(() => import('./views/projects/ProjectsView').then((m) => ({ default: m.ProjectsView })));
+const Wizard = lazyRetry(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })));
 
 export function App() {
   return (
-    <AppProvider>
-      <LibraryEventsProvider>
-        <NotifyProvider>
-          <HistoryProvider>
-            <Root />
-          </HistoryProvider>
-        </NotifyProvider>
-      </LibraryEventsProvider>
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <LibraryEventsProvider>
+          <NotifyProvider>
+            <HistoryProvider>
+              <Root />
+            </HistoryProvider>
+          </NotifyProvider>
+        </LibraryEventsProvider>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
 
@@ -66,7 +69,7 @@ function Root() {
     <>
       <NoticeBanner />
       <Shell section={section} onSection={setSection} onNewLibrary={() => setWizardOpen(true)}>
-        <Suspense fallback={null}>
+        <Lazy>
         {section === 'settings' ? (
           <Settings onNewLibrary={() => setWizardOpen(true)} />
         ) : section === 'library' && app.activeProfile && !showWizard ? (
@@ -76,12 +79,12 @@ function Root() {
         ) : (
           <Placeholder section={section} />
         )}
-        </Suspense>
+        </Lazy>
       </Shell>
       {showWizard && (
-        <Suspense fallback={null}>
+        <Lazy>
           <Wizard key={wizardOpen ? 'new' : 'first'} onFinished={() => void finished()} onCancel={hasLibraries ? () => setWizardOpen(false) : undefined} />
-        </Suspense>
+        </Lazy>
       )}
     </>
   );

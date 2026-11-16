@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Lazy, lazyRetry } from '../../components/Lazy';
 import { useTranslation } from 'react-i18next';
 import { ErrorNote } from '../../components/ui';
+import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
 import { useChangeVersion } from '../../lib/events';
 import { HistoryControls } from '../../lib/history';
@@ -104,6 +105,12 @@ function LibraryInner() {
   }, [selection, list.version]);
 
   const selectedIds = useMemo(() => [...selection.ids], [selection]);
+  // The chat panel uses the selection as context; it is withdrawn when the library view goes away.
+  const { publishSelection } = useAiUi();
+  useEffect(() => {
+    publishSelection(selectedIds);
+  }, [selectedIds, publishSelection]);
+  useEffect(() => () => publishSelection([]), [publishSelection]);
   const loadAll = list.loadAll;
   const needRows = useCallback(() => void loadAll().catch(() => {}), [loadAll]);
   const single = selection.ids.size === 1 ? selectedIds[0]! : null;

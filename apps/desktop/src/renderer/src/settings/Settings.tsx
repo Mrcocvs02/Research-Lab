@@ -1,8 +1,12 @@
 import { useTranslation } from 'react-i18next';
+import { Lazy, lazyRetry } from '../components/Lazy';
 import { LibrariesSection } from './LibrariesSection';
 import { LibraryConfigSection } from './LibraryConfigSection';
 import { ProfileSection } from './ProfileSection';
 import { SecretsSection } from './SecretsSection';
+
+// The AI settings (and the log viewer) load when the Settings page opens, not with the first screen.
+const AiSection = lazyRetry(() => import('./AiSection').then((m) => ({ default: m.AiSection })));
 
 /** All settings in one scrollable page. */
 export function Settings({ onNewLibrary }: { onNewLibrary: () => void }) {
@@ -13,6 +17,9 @@ export function Settings({ onNewLibrary }: { onNewLibrary: () => void }) {
       <ProfileSection />
       <LibrariesSection onNew={onNewLibrary} />
       <LibraryConfigSection />
+      <Lazy>
+        <AiSection />
+      </Lazy>
       <SecretsSection />
     </div>
   );

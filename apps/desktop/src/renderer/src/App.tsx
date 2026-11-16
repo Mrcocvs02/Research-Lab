@@ -5,6 +5,7 @@ import { NoticeBanner } from './components/NoticeBanner';
 import { ErrorNote } from './components/ui';
 import { errorMessage } from './lib/errors';
 import { installWindowGuard } from './lib/dirtyEditors';
+import { AiUiProvider, useAiUi } from './lib/aiUi';
 import { LibraryEventsProvider } from './lib/events';
 import { HistoryProvider } from './lib/history';
 import { NotifyProvider } from './lib/notify';
@@ -28,7 +29,9 @@ export function App() {
           <NotifyProvider>
             <HistoryProvider>
               <ReaderProvider>
-                <Root />
+                <AiUiProvider>
+                  <Root />
+                </AiUiProvider>
               </ReaderProvider>
             </HistoryProvider>
           </NotifyProvider>
@@ -44,11 +47,25 @@ function Root() {
   const [section, setSection] = useState<SectionId>('library');
   const [wizardOpen, setWizardOpen] = useState(false);
   const reader = useReader();
+  const { navigation } = useAiUi();
   // A document id belongs to one library: the reader does not outlive a switch. The unsaved notes were already saved
   // before the switch (`setActiveLibrary`, the library list, the wizard), so by now there is nothing left to wait for.
   const libraryId = app.activeLibraryId;
   const { closeReader, dropReader } = reader;
   useEffect(() => dropReader(), [libraryId, dropReader]);
+  // A link of the chat to a project or to the settings, and a document opened from anywhere (the chat, say), show their section.
+  const navNonce = navigation?.nonce;
+  useEffect(() => {
+    if (!navigation) return;
+    closeReader();
+    setSection(navigation.to === 'settings' ? 'settings' : 'projects');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navNonce]);
+  const readerNonce = reader.target?.nonce;
+  useEffect(() => {
+    if (reader.target) setSection('library');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readerNonce]);
   // Closing the window waits for unsaved notes (only while there are any).
   useEffect(() => installWindowGuard(), []);
 

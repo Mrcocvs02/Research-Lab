@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as 
 import { useTranslation } from 'react-i18next';
 import { STUDY_LIMITS, type Annotation, type StudyState } from '@rl/core';
 import { ErrorNote } from '../../components/ui';
+import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
 import { useNotify } from '../../lib/notify';
 import type { ReaderPanel, ReaderTarget } from '../../lib/reader';
@@ -58,6 +59,12 @@ export function ReaderView({ target, onClose }: Props) {
   /** Pages inside the selection that were not drawn yet and so were left out (shown with the bar). */
   const [skipped, setSkipped] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The chat uses the open document and page as its context.
+  const { publishReader } = useAiUi();
+  useEffect(() => {
+    publishReader({ docId, page });
+  }, [docId, page, publishReader]);
+  useEffect(() => () => publishReader(null), [publishReader]);
   const [color, setColor] = useState<AnnotationColor>('yellow');
   const [comment, setComment] = useState('');
   const [editComment, setEditComment] = useState('');

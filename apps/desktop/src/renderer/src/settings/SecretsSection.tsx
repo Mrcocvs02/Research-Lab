@@ -6,8 +6,8 @@ import { errorMessage } from '../lib/errors';
 import { rl } from '../lib/rl';
 import { useApp } from '../state/app-context';
 
-/** Names of the keys the app knows about; the value never comes back from the main process. */
-export const SECRET_NAMES = ['anthropic-api-key', 'gemini-api-key'] as const;
+/** Names of the keys listed here; the value never comes back from the main process. The Anthropic key is in the AI settings. */
+export const SECRET_NAMES = ['gemini-api-key'] as const;
 type SecretName = (typeof SECRET_NAMES)[number];
 
 /** API keys for the active library profile: write-only, with an "is set" indicator. */

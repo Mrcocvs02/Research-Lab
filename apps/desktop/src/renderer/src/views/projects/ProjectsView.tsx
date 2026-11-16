@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
 import { ErrorNote } from '../../components/ui';
+import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
 import { useChangeVersion, useLibraryEvents } from '../../lib/events';
 import { HistoryControls } from '../../lib/history';
@@ -94,6 +95,9 @@ function ProjectRow({ p, onOpen }: { p: Summary; onOpen(): void }) {
 }
 
 /** The Projects section: list with state and reading summary, a form to create one, and the detail of the open one. */
+/** The last chat link to a project this view acted on, so that an old link does not reopen it later. */
+let consumedNavigation = 0;
+
 export function ProjectsView() {
   const { t } = useTranslation();
   const app = useApp();
@@ -104,6 +108,13 @@ export function ProjectsView() {
   const [error, setError] = useState<unknown>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const { navigation } = useAiUi();
+  useEffect(() => {
+    if (navigation?.to === 'project' && navigation.projectId && navigation.nonce !== consumedNavigation) {
+      consumedNavigation = navigation.nonce;
+      setOpenId(navigation.projectId);
+    }
+  }, [navigation]);
   const [name, setName] = useState('');
   const [kind, setKind] = useState<'project' | 'collection'>('project');
 

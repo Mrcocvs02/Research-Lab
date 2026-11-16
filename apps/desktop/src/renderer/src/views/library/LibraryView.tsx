@@ -70,6 +70,7 @@ function LibraryInner() {
   // The detail panel is the most used part loaded on demand: fetch it once the first screen is idle, so that the
   // first click on a document shows it at once (functionality before lightness, docs/RULES.md).
   useEffect(() => {
+    if (typeof requestIdleCallback !== 'function') return; // test DOMs have no idle callbacks
     const id = requestIdleCallback(() => void import('./DocPanel').catch(() => {}));
     return () => cancelIdleCallback(id);
   }, []);

@@ -29,7 +29,8 @@ Interfaccia in italiano e inglese (selezionabile), documentazione in italiano, c
 - Vitest usa al massimo 3 worker (`VITEST_MAX_WORKERS` per cambiarlo).
 
 ## Leggerezza ed efficienza (requisito dell'utente)
+- **La funzionalità viene prima della leggerezza.** Non si toglie, disattiva o peggiora nessuna funzione utile (opzioni dell'interfaccia, validazioni, messaggi di errore, accessibilità, lingue, annulla/ripeti, controlli di sicurezza) per risparmiare peso o memoria. Si alleggerisce solo cambiando *come* si fa: caricamento su richiesta, processi avviati e chiusi quando servono, codice morto eliminato, implementazioni più economiche con lo stesso comportamento. Se un budget non si rispetta senza togliere una funzione, si alza il budget e si motiva in `DECISIONS.md`.
 - Il codice deve essere il più leggero ed efficiente possibile: nessuna dipendenza che si possa evitare con poche righe, nessuna libreria pesante per funzioni marginali, nessun lavoro in background quando non serve.
 - Il renderer carica all'avvio solo ciò che serve alla prima vista; le altre viste (progetti, tassonomia, lettore PDF, grafo, chat) si caricano quando si aprono.
 - Processi e worker partono quando servono e si chiudono quando restano inattivi; niente polling dove basta un evento.
-- Ogni nuova dipendenza va motivata in `DECISIONS.md` con peso e alternativa scartata. Budget misurati automaticamente (dimensione dei bundle, memoria a riposo, tempo di avvio): un aumento oltre il budget è un difetto.
+- Ogni nuova dipendenza va motivata in `DECISIONS.md` con peso e alternativa scartata. Budget misurati automaticamente (dimensione dei bundle, memoria a riposo, tempo di avvio): un aumento oltre il budget è un difetto, salvo che serva a una funzione utile (in quel caso si aggiorna il budget con la motivazione).

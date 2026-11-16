@@ -46,7 +46,7 @@ interface FakeProject {
   archivedFrom?: string;
   revision: number;
   members: Array<{ docId: string; addedAt: string }>;
-  plan: Array<{ docId: string; order: number; status?: string }>;
+  plan: Array<{ docId: string; order: number }>;
 }
 
 const NOW = '2026-01-01T00:00:00.000Z';
@@ -138,6 +138,7 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
   const matches = (d: FakeDoc, text: string, f: any = {}) => {
     const t = (text ?? '').trim().toLowerCase();
     if (t && !`${d.title} ${d.authors.join(' ')}`.toLowerCase().includes(t)) return false;
+    if (d.missing && !f.includeMissing) return false;
     const has = (tag: string) => tagsWithImplied(d).some((x) => descendantsOf(tag).has(x));
     for (const tag of f.tags ?? []) if (!has(tag)) return false;
     if (f.tagsAny?.length && !f.tagsAny.some(has)) return false;
@@ -248,7 +249,7 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
         const d = doc(m.docId);
         return { docId: m.docId, addedAt: m.addedAt, known: Boolean(d), missing: false, title: d?.title ?? null, authors: d?.authors ?? [], year: d?.year ?? null, path: d?.path ?? null, studyState: d?.studyState ?? null };
       }),
-      readingPlan: [...p.plan].sort((a, b) => a.order - b.order).map((it) => ({ ...it, studyState: doc(it.docId)?.studyState ?? null, title: doc(it.docId)?.title ?? null, missing: false })),
+      readingPlan: [...p.plan].sort((a, b) => a.order - b.order).map((it) => ({ ...it, status: doc(it.docId)?.studyState ?? 'to-read', studyState: doc(it.docId)?.studyState ?? null, title: doc(it.docId)?.title ?? null, missing: false })),
     };
   };
   const project = (id: string) => {

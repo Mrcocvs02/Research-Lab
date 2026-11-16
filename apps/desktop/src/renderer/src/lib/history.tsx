@@ -63,7 +63,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      const r = (await rl.invoke('history:list', { limit: 100 })) as { items: HistoryItem[]; canUndo?: boolean; canRedo?: boolean };
+      const r = await rl.invoke('history:list', { limit: 100 });
       setItems(r.items);
       setFlags({ ...(r.canUndo === undefined ? {} : { canUndo: r.canUndo }), ...(r.canRedo === undefined ? {} : { canRedo: r.canRedo }) });
     } catch {

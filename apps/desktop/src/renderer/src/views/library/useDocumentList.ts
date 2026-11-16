@@ -45,14 +45,14 @@ const fromSummary = (s: SummaryItem): DocRow => ({
   path: s.path,
   studyState: s.studyState,
   tags: s.tags,
-  directTags: (s as { directTags?: string[] }).directTags ?? s.tags,
+  directTags: s.directTags ?? s.tags,
   addedAt: s.addedAt,
   missing: s.missing,
   size: s.size,
 });
 
 const fromHit = (h: Hit): DocRow => {
-  const row: DocRow = { docId: h.docId, title: h.title, authors: h.authors, year: h.year, type: h.type, path: h.path, studyState: h.studyState, tags: h.tags, directTags: (h as { directTags?: string[] }).directTags ?? h.tags, addedAt: '', missing: false, size: h.size, snippet: h.snippet, field: h.field };
+  const row: DocRow = { docId: h.docId, title: h.title, authors: h.authors, year: h.year, type: h.type, path: h.path, studyState: h.studyState, tags: h.tags, directTags: h.directTags ?? h.tags, addedAt: '', missing: false, size: h.size, snippet: h.snippet, field: h.field };
   if (h.pages) row.pages = h.pages;
   return row;
 };

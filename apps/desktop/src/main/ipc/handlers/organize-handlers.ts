@@ -8,13 +8,19 @@ import type { MainServices } from './services.js';
 
 /**
  * Pushes `library:changed` and refreshes the search index of the documents a change touched. An index failure never
- * fails the change (it is on disk): the next scan finds the stale entries by their record stamp and refreshes them.
+ * fails the change (it is on disk): the next scan finds the stale entries (their stamp holds the record version and a fingerprint of the taxonomy) and refreshes them.
  */
 async function settle(s: MainServices, rt: LibraryRuntime, touched: { reindex: string[] }, events: Array<{ kind: 'documents' | 'taxonomy' | 'projects'; ids?: string[] | undefined }>): Promise<void> {
   if (touched.reindex.length > 0) {
     await rt.reindexDocuments(touched.reindex as DocumentId[]).catch((e: unknown) => s.log.warn('index refresh after a change failed', { error: e }));
   }
-  for (const e of events) s.emit('library:changed', e.ids ? { kind: e.kind, ids: e.ids } : { kind: e.kind });
+  // A document edit changes what the projects that contain it show (title, study state, counts): tell them too.
+  const all = [...events];
+  if (touched.reindex.length > 0 && !events.some((e) => e.kind === 'projects' && e.ids === undefined)) {
+    const ids = await rt.organizer.projectsContaining(touched.reindex).catch(() => [] as string[]);
+    if (ids.length > 0) all.push({ kind: 'projects', ids: fewIds(ids) });
+  }
+  for (const e of all) s.emit('library:changed', e.ids ? { kind: e.kind, ids: e.ids } : { kind: e.kind });
 }
 
 /** Ids go into the event only when few (the interface reloads everything otherwise). */
@@ -40,7 +46,7 @@ export const historyHandlers = (s: MainServices): DomainHandlers<'history'> => {
     return { target: r.target, changeId: r.changeId, summary: r.summary, documentsChanged: r.documentsChanged };
   };
   return {
-    'history:list': async ({ limit }) => ({ items: await (await s.runtime.require()).organizer.listHistory(limit) }),
+    'history:list': async ({ limit }) => (await s.runtime.require()).organizer.historyView(limit),
     'history:undo': async ({ changeId }) => {
       const rt = await s.runtime.require();
       return done(rt, await rt.organizer.undo(changeId));

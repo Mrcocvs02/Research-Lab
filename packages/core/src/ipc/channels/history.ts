@@ -35,7 +35,14 @@ const target = z.object({ changeId: z.string().min(1).max(64).optional() });
 
 export const historyChannels = defineChannels('history', {
   /** Recent changes, newest first. */
-  list: { request: z.object({ limit: z.number().int().min(1).max(500).optional() }), response: z.object({ items: z.array(historyItemSchema) }) },
+  list: { request: z.object({ limit: z.number().int().min(1).max(500).optional() }), response: z.object({
+      items: z.array(historyItemSchema),
+      /** Whether `history:undo` without an id would find a change to undo (computed here, same rule). */
+      canUndo: z.boolean().optional(),
+      /** Whether `history:redo` without an id would find one to redo. */
+      canRedo: z.boolean().optional(),
+    }),
+  },
   /**
    * Applies the recorded inverse of a change (default: the latest undoable change of this device).
    * CONFLICT (`details.conflict` = `changed`) when one of the items has changed again since; nothing is applied then.

@@ -211,7 +211,7 @@ describe('big files from a synced folder (6)', () => {
     await appendFile(f, `${'y'.repeat(2 * MIB)}\n`); // one endless line
     await org.tagDocuments([hex(1)], ['a']);
     const log = await store.readLog({ type: 'change' });
-    expect(log.some((e) => e.action === 'tags.update')).toBe(true);
+    expect(log.some((e) => e.type === 'change' && e.action === 'tags.update')).toBe(true);
     expect(MAX_LOG_READ_BYTES).toBe(32 * MIB);
     expect(store.issues().map((i) => i.code)).toEqual(expect.arrayContaining(['LOG_TRUNCATED', 'LOG_LINES_SKIPPED']));
   });

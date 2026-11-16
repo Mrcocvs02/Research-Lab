@@ -148,6 +148,8 @@ export interface SearchFilters {
   /** Venue names (exact, case/accent-insensitive); ANY of them. */
   venues?: string[];
   studyStates?: Array<'to-read' | 'reading' | 'read'>;
+  /** Include documents whose file is missing (default false: lists, counts and filters leave them out). */
+  includeMissing?: boolean;
   /** Folders relative to the library root; a document inside any of them (sub-folders included). */
   folders?: RelativePath[];
   /**
@@ -207,6 +209,8 @@ export interface SearchResultHit extends SearchHit {
   size: number;
   /** The document's tags (implied ones included, like `DocumentSummary.tags`). */
   tags: string[];
+  /** Only the tags set on the document itself (no implied ones): the ones that can be removed from it. */
+  directTags?: string[];
 }
 
 export interface SearchResultPage {
@@ -243,6 +247,8 @@ export interface DocumentSummary {
   path: RelativePath;
   studyState: 'to-read' | 'reading' | 'read';
   tags: string[];
+  /** Only the tags set on the document itself (`tags` also holds the implied ones). */
+  directTags?: string[];
   addedAt: string;
   missing: boolean;
   /** File size in bytes. */
@@ -279,6 +285,13 @@ export interface IndexableDocument {
   venueName?: string;
   /** Hash of the file the pages come from (default `record.hash`); see `indexedState`. */
   textHash?: string;
+  /** The tags set on the document itself (`record.tags` may hold the expanded list). Default: `record.tags`. */
+  directTags?: string[];
+  /**
+   * Fingerprint of the taxonomy parts this entry depends on (tag words, implications, parents, type and venue names);
+   * appended to the stamp, so a taxonomy change made elsewhere makes the entry stale.
+   */
+  stampSuffix?: string;
 }
 
 /** Local, rebuildable SQLite FTS5 index (node:sqlite, see D-007). */
@@ -296,7 +309,7 @@ export interface SearchIndex {
   list(query: DocumentListQuery): Promise<{ total: number; items: DocumentSummary[] }>;
   /**
    * What is indexed for each document: the hash of the file its text comes from (null: metadata only) and a
-   * stamp of the record version (`<revision>:<updatedAt>`), to find documents whose index entry is stale.
+   * stamp of the record version (`<revision>:<updatedAt>`, plus `|<stampSuffix>` when given), to find documents whose index entry is stale.
    */
   indexedState(): Promise<Map<DocumentId, { textHash: string | null; stamp: string }>>;
   /** Drops and recreates everything. */

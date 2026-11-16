@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { AiField, DocumentId, DocumentRecord, IndexableDocument, LibraryStore, TaxonomyFile } from '@rl/core';
 
 /** Words of the taxonomy that make a document findable: tag labels and aliases, type labels, venue names. */
@@ -10,13 +11,19 @@ export interface TaxonomyLookup {
   tagLabel(id: string): string | undefined;
   typeLabel(id: string | null): string | undefined;
   venueName(id: string | undefined): string | undefined;
+  /**
+   * Fingerprint of the taxonomy parts the index entry of a document depends on (words, implications and parents of
+   * its tags and their ancestors, type label, venue name). It goes into the indexed stamp: a taxonomy edited from
+   * another device changes it, so the entry is found stale and refreshed.
+   */
+  stampOf(record: Pick<DocumentRecord, 'tags' | 'type' | 'ref'>): string;
 }
 
 export function makeTaxonomyLookup(tax: Pick<TaxonomyFile, 'nodes' | 'documentTypes' | 'venues'> | null): TaxonomyLookup {
   const nodes = new Map((tax?.nodes ?? []).map((n) => [n.id, n]));
   const types = new Map((tax?.documentTypes ?? []).map((t) => [t.id, t]));
   const venues = new Map((tax?.venues ?? []).map((v) => [v.id, v]));
-  return {
+  const self: TaxonomyLookup = {
     expandTags(ids) {
       const out = new Set<string>(ids);
       const stack = [...ids];
@@ -56,8 +63,23 @@ export function makeTaxonomyLookup(tax: Pick<TaxonomyFile, 'nodes' | 'documentTy
     tagLabel: (id) => nodes.get(id)?.label,
     typeLabel: (id) => (id ? types.get(id)?.label : undefined),
     venueName: (id) => (id ? venues.get(id)?.name : undefined),
+    stampOf(record) {
+      const tags = self.expandTags(record.tags);
+      const h = createHash('sha1');
+      for (const id of [...tags, ...self.ancestorsOf(tags)].sort()) {
+        const n = nodes.get(id);
+        h.update(n ? JSON.stringify([id, n.label, n.aliases, n.implies, n.parents]) : id);
+        h.update('|');
+      }
+      h.update(JSON.stringify([self.typeLabel(record.type) ?? '', self.venueName(record.ref.venueId) ?? '']));
+      return h.digest('base64url').slice(0, 16);
+    },
   };
+  return self;
 }
+
+/** The stamp the index keeps for a record: its version plus the fingerprint of the taxonomy it was indexed with. */
+export const indexStamp = (r: Pick<DocumentRecord, 'revision' | 'updatedAt' | 'tags' | 'type' | 'ref'>, taxonomy: TaxonomyLookup): string => `${r.revision}:${r.updatedAt}|${taxonomy.stampOf(r)}`;
 
 const usable = <T>(f: AiField<T> | undefined): T | undefined => (f && f.review.status !== 'rejected' ? f.value : undefined);
 
@@ -94,6 +116,8 @@ export async function buildIndexable(
   const ancestors = taxonomy.ancestorsOf(tags);
   const out: Omit<IndexableDocument, 'pages'> = {
     record: tags.length === record.tags.length ? record : { ...record, tags },
+    directTags: record.tags,
+    stampSuffix: taxonomy.stampOf(record),
     tagTerms: taxonomy.tagTerms([...tags, ...ancestors]),
     tagAncestors: ancestors,
     typeLabel: taxonomy.typeLabel(record.type),

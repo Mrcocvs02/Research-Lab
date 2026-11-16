@@ -25,6 +25,8 @@ export interface WatcherOptions {
   maxBatch?: number;
   includeHiddenFolders?: boolean;
   onBatch: (batch: WatchBatch) => void;
+  /** `taxonomy.json` inside the data dir changed (our own writes included: compare before acting). */
+  onTaxonomyChange?: () => void;
   onError?: (error: Error) => void;
 }
 
@@ -55,6 +57,8 @@ export function createWatcher(options: WatcherOptions): LibraryWatcher {
   let timer: NodeJS.Timeout | undefined;
   let firstAt = 0;
   let closed = false;
+  let taxonomyChanged = false;
+  const taxonomyKey = dataRel === null ? null : `${dataRel}/taxonomy.json`;
 
   const wanted = (rel: string): boolean => {
     const k = pathKey(rel);
@@ -83,7 +87,16 @@ export function createWatcher(options: WatcherOptions): LibraryWatcher {
   const flush = () => {
     timer = undefined;
     firstAt = 0;
-    if (closed || (pending.size === 0 && !overflow)) return;
+    if (closed) return;
+    if (taxonomyChanged) {
+      taxonomyChanged = false;
+      try {
+        options.onTaxonomyChange?.();
+      } catch (e) {
+        options.onError?.(e instanceof Error ? e : new Error(String(e)));
+      }
+    }
+    if (pending.size === 0 && !overflow) return;
     // A folder event next to events of files inside it only says "something in here changed": the files say more.
     const all = [...pending];
     const paths = all.filter((p) => !(p.lastIndexOf('.') <= p.lastIndexOf('/') + 1 && all.some((q) => q.startsWith(`${p}/`)))).sort();
@@ -113,6 +126,11 @@ export function createWatcher(options: WatcherOptions): LibraryWatcher {
       try {
         rel = normalizeRelativePath(String(filename));
       } catch {
+        return;
+      }
+      if (taxonomyKey !== null && options.onTaxonomyChange && pathKey(rel) === taxonomyKey) {
+        taxonomyChanged = true;
+        schedule();
         return;
       }
       if (!rel || !wanted(rel)) return;

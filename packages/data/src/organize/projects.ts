@@ -126,6 +126,13 @@ export class ProjectService {
       .map((p) => summaryOf(p, info));
   }
 
+  /** Ids of the projects (archived included) that have one of `docIds` as a member. */
+  async containing(docIds: readonly string[]): Promise<string[]> {
+    if (docIds.length === 0) return [];
+    const wanted = new Set(docIds);
+    return (await this.c.store.projects.list()).filter((p) => p.members.some((m) => wanted.has(m.docId))).map((p) => p.id);
+  }
+
   async get(id: string): Promise<ProjectDetail> {
     return detailOf(await this.load(id), await this.infoMap());
   }

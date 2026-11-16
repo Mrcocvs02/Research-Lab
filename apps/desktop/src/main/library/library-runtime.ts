@@ -1,6 +1,8 @@
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
   AppError,
+  dataPath,
   defaultLibraryConfig,
   type DocumentId,
   type DocumentListQuery,
@@ -19,7 +21,7 @@ import {
 } from '@rl/core';
 import { createOrganizer, type Organizer, type OrganizerStore } from '@rl/data';
 import { enrichFromExtraction } from './enrich.js';
-import { buildIndexable, makeTaxonomyLookup, type TaxonomyLookup } from './indexable.js';
+import { buildIndexable, indexStamp, makeTaxonomyLookup, type TaxonomyLookup } from './indexable.js';
 import type { ExtractResult, IndexJob, LibraryWorker, RecordHost } from './worker-protocol.js';
 
 /** Where the machine-local, rebuildable files of a library live (never in the library folder). */
@@ -52,6 +54,8 @@ export interface RuntimeDeps {
   onStatus(status: ScanStatus): void;
   /** Called when a scan ended: the documents the interface lists may have changed (`library:changed`, kind documents). */
   onDocumentsChanged?(): void;
+  /** Called after a scan with the projects that contain documents the scan changed, moved, lost or found again. */
+  onProjectsChanged?(ids: string[]): void;
   /** Copies the data folder aside before the scanner writes into an existing library (rule 1). */
   backup(): Promise<void>;
   /**
@@ -63,6 +67,8 @@ export interface RuntimeDeps {
     dataDir: string;
     config: () => ScanConfig;
     onBatch(batch: { paths: string[]; overflow: boolean }): void;
+    /** `taxonomy.json` was written (by this app or by another device through the synced folder). */
+    onTaxonomyChange?(): void;
     onError(error: Error): void;
   }): FileWatcher | Promise<FileWatcher>;
   now?(): Date;
@@ -126,7 +132,8 @@ export class LibraryRuntime {
   private watcher: FileWatcher | null = null;
   private backedUp = false;
   private org: Organizer | null = null;
-  private taxonomyCache: { at: number; lookup: TaxonomyLookup } | null = null;
+  /** The taxonomy as the index last saw it, with the signature (mtime and size) of the file it was read from. */
+  private taxonomyCache: { sig: string; lookup: TaxonomyLookup } | null = null;
 
   private constructor(private readonly d: RuntimeDeps) {
     this.current = { libraryId: d.libraryId, state: 'idle', seen: 0, processed: 0, indexed: 0 };
@@ -148,6 +155,7 @@ export class LibraryRuntime {
           dataDir: deps.dataDir,
           config: () => rt.scanConfig,
           onBatch: (b) => rt.onWatch(b),
+          onTaxonomyChange: () => void rt.onTaxonomyFile(),
           onError: (e) => deps.log.warn('file watcher error', { error: e }),
         });
       } catch (e) {
@@ -288,9 +296,26 @@ export class LibraryRuntime {
     this.request(batch.overflow ? { full: false, paths: null } : { full: false, paths: batch.paths });
   }
 
+  /** mtime and size of `taxonomy.json`: a change made by another device shows here (no polling, only asked when needed). */
+  private async taxonomySig(): Promise<string> {
+    const st = await stat(path.join(this.d.dataDir, dataPath.taxonomy)).catch(() => null);
+    return st ? `${Math.round(st.mtimeMs)}:${st.size}` : 'none';
+  }
+
+  /**
+   * The taxonomy file changed (watcher event): when it is not the version the index was filled with, the documents
+   * whose entries depend on it are refreshed by a scan of no file at all (only the stale-entry pass runs).
+   */
+  private async onTaxonomyFile(): Promise<void> {
+    if (this.closed) return;
+    if (this.taxonomyCache && this.taxonomyCache.sig === (await this.taxonomySig())) return;
+    this.request({ full: false, paths: [] });
+  }
+
   private async taxonomy(): Promise<TaxonomyLookup> {
+    const sig = await this.taxonomySig();
     const c = this.taxonomyCache;
-    if (c && Date.now() - c.at < 5000) return c.lookup;
+    if (c && c.sig === sig) return c.lookup;
     let tax: TaxonomyFile | null = null;
     try {
       tax = await this.d.store.readTaxonomy();
@@ -298,7 +323,7 @@ export class LibraryRuntime {
       this.d.log.warn('taxonomy could not be read for the index', { error: e });
     }
     const lookup = makeTaxonomyLookup(tax);
-    this.taxonomyCache = { at: Date.now(), lookup };
+    this.taxonomyCache = { sig, lookup };
     return lookup;
   }
 
@@ -368,6 +393,7 @@ export class LibraryRuntime {
         log.warn(`${what} failed for one document`, { error: AppError.from(e).toJSON() });
       }
     };
+    let touchedDocs: string[] = [];
     try {
       this.scanConfig = await store.readConfig();
       const known = await store.documents.listIds();
@@ -396,6 +422,7 @@ export class LibraryRuntime {
       summary.moved = result.moved.length;
       summary.missing = result.missing.length;
       summary.unchanged = result.unchanged;
+      touchedDocs = [...result.changed.map((c) => c.docId), ...result.moved.map((m) => m.docId), ...result.missing, ...result.restored, ...result.duplicates.map((d) => d.docId)];
       if (result.errors.length > 0) log.warn('some files or folders could not be scanned', { count: result.errors.length });
       if (signal.aborted || result.cancelled) throw abortError();
 
@@ -436,7 +463,7 @@ export class LibraryRuntime {
       const stale = (await store.documents.list()).filter((r) => {
         if (done.has(r.id)) return false;
         const st = indexed.get(r.id);
-        return !st || st.stamp !== `${r.revision}:${r.updatedAt}`;
+        return !st || st.stamp !== indexStamp(r, taxonomy);
       });
       this.update({ phase: 'indexing', total: stale.length, processed: 0 });
       const send = (jobs: IndexJob[]) => worker.index({ rootPath: this.d.rootPath, cacheDir: this.d.textCacheDir, jobs });
@@ -468,6 +495,7 @@ export class LibraryRuntime {
       this.recordsWritten();
       this.update({ state: 'done', phase: undefined, summary, indexed: indexedCount, finishedAt: this.nowIso(), total: undefined, processed: 0 });
       this.announceDocuments();
+      await this.announceProjects(touchedDocs);
     } catch (e) {
       this.recordsWritten();
       if (isAbort(e) || signal.aborted) {
@@ -484,6 +512,17 @@ export class LibraryRuntime {
         });
       }
       this.announceDocuments();
+    }
+  }
+
+  /** The projects that contain documents the scan touched are told to reload (a project view shows their title, state, path). */
+  private async announceProjects(docIds: string[]): Promise<void> {
+    if (docIds.length === 0 || !this.d.onProjectsChanged) return;
+    try {
+      const ids = await this.organizer.projectsContaining(docIds);
+      if (ids.length > 0) this.d.onProjectsChanged(ids);
+    } catch (e) {
+      this.d.log.warn('announcing the projects of a scan failed', { error: e });
     }
   }
 

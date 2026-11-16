@@ -325,6 +325,10 @@ export class Organizer {
   listProjects(q: Parameters<ProjectService['list']>[0]) {
     return this.projects.list(q);
   }
+  /** Projects that contain any of these documents: a change to the documents changes what those projects show. */
+  projectsContaining(docIds: readonly string[]): Promise<string[]> {
+    return this.projects.containing(docIds);
+  }
   getProject(id: string): Promise<ProjectDetail> {
     return this.projects.get(id);
   }

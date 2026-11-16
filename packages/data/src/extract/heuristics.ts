@@ -138,11 +138,13 @@ export function yearFromDate(raw: string | undefined | null): number | undefined
   return y >= 1950 && y <= new Date().getFullYear() + 1 ? y : undefined;
 }
 
+const MAX_ABSTRACT_SEARCH = 200_000;
 const ABSTRACT_START = /(?:^|\n)[ \t]*(?:abstract|riassunto|sommario|résumé|zusammenfassung)[ \t]*[:.—–-]*[ \t]*/i;
 const ABSTRACT_END = /\n[ \t]*(?:keywords?|key words|index terms|parole chiave|mots[- ]clés|ccs concepts|(?:1|i)[.\s]+(?:introduction|introduzione)|introduction|introduzione)\b/i;
 
 /** The abstract, when an "Abstract" heading is found in the given text (first pages). */
 export function abstractFromText(text: string, maxChars = 3000): string | undefined {
+  text = text.slice(0, MAX_ABSTRACT_SEARCH); // the abstract is at the start; the bound keeps the scans cheap on hostile text
   const start = ABSTRACT_START.exec(text);
   if (!start) return undefined;
   let rest = text.slice(start.index + start[0].length);

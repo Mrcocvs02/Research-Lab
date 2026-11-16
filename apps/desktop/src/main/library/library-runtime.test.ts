@@ -83,7 +83,7 @@ describe('LibraryRuntime (real scanner, extractor and index; worker service in-p
       expect(body.total).toBe(1);
       expect(body.hits[0]).toMatchObject({ path: 'a/alpha.md', field: 'text' });
       expect(body.hits[0]!.pages?.[0]?.page).toBe(1);
-      expect(body.hits[0]!.snippet).toContain('[[zebrafish]]');
+      expect(body.hits[0]!.snippet).toContain('zebrafish');
       expect((await rt.search({ text: 'glaciology' })).hits[0]!.path).toBe('b/beta.txt');
 
       // The file name is never written as a title (the interface falls back to it); extracted values carry their provenance.

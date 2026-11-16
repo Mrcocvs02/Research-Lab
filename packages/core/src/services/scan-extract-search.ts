@@ -103,8 +103,10 @@ export interface ExtractedText {
   format: 'pdf' | 'text' | 'markdown' | 'latex' | 'rst' | 'code' | 'csv' | 'notebook' | 'docx' | 'pptx';
   /** True when a limit (pages, characters) cut the text. */
   truncated: boolean;
-  /** Content hash (SHA-256) of the file the text comes from; the cache key. */
+  /** Content hash (SHA-256) of the bytes the text was actually extracted from (not the caller's hash); the cache key. */
   hash?: string;
+  /** True when the caller passed `options.hash` and the file read has a different one: the file changed since; store `hash`. */
+  hashMismatch?: boolean;
   /** True when the text came from the cache. */
   fromCache?: boolean;
 }
@@ -114,6 +116,11 @@ export interface ExtractOptions {
   signal?: AbortSignal;
   /** Content hash when the caller already knows it: allows a cache hit without reading the file. */
   hash?: string;
+  /**
+   * Progress signal for a watchdog (PDF only): `(0, total)` when the document is open, then `(page, total)` after each
+   * page. A supervisor that gets no signal for N seconds can kill the thread running the extraction.
+   */
+  onPage?: (page: number, total: number) => void;
 }
 
 /** The extracted text is DATA: nothing in it is ever interpreted as an instruction. */
@@ -158,7 +165,7 @@ export interface SearchQuery {
 /** A page of the document where the query matched. */
 export interface SearchPageHit {
   page: number;
-  /** Snippet with match markers `[[...]]`. */
+  /** Snippet with the match between the control characters U+0001 and U+0002 (see SEARCH_MARK_OPEN). */
   snippet: string;
 }
 
@@ -167,7 +174,7 @@ export interface SearchHit {
   score: number;
   /** Where it matched. */
   field: 'title' | 'summary' | 'note' | 'annotation' | 'text';
-  /** Short snippet with match markers `[[...]]`; may be empty. */
+  /** Short snippet, matches between U+0001 and U+0002 (SEARCH_MARK_OPEN, SEARCH_MARK_CLOSE); may be empty. */
   snippet: string;
   /** Best matching page of the full text. */
   page?: number;

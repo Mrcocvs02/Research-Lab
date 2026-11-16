@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { SearchFilters } from '@rl/core';
+import { safeText } from './safeText';
 import type { SearchFacetsData } from './useSearch';
 
 type Facet = 'tags' | 'authors' | 'types' | 'venues' | 'studyStates' | 'years' | 'folders';
@@ -43,7 +44,7 @@ export function Facets({ facets, filters, onChange }: { facets: SearchFacetsData
   const { t } = useTranslation();
   if (!facets) return null;
   const labelOf = (facet: Facet, b: { value: string; label?: string | undefined }) =>
-    facet === 'studyStates' ? t(`search.study.${b.value}`, { defaultValue: b.value }) : (b.label ?? b.value);
+    facet === 'studyStates' ? t(`search.study.${b.value}`, { defaultValue: b.value }) : safeText(b.label ?? b.value);
   return (
     <aside className="facets" aria-label={t('search.filters')} data-testid="search-facets">
       <div className="facets-head">

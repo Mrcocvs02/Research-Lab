@@ -29,6 +29,12 @@ export function normalizeText(s: string): string {
   return s.normalize('NFD').replace(/\p{M}+/gu, '').toLowerCase();
 }
 
+const CONTROL_RE = /[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F]/g;
+/** Removes control characters (the match markers among them) from a text before it is indexed. */
+export function stripControl(s: string): string {
+  return s.replace(CONTROL_RE, ' ');
+}
+
 const TOKEN_RE = /[\p{L}\p{N}\p{M}]+/gu;
 export function wordTokens(s: string): string[] {
   return s.match(TOKEN_RE) ?? [];

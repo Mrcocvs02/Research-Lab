@@ -6,6 +6,13 @@ import { scanStatusSchema } from './scan.js';
 
 export const SEARCH_LIMITS = { text: 500, listMax: 200, filterValues: 50 } as const;
 
+/**
+ * Match markers in snippets: control characters, removed from every indexed text, so document content can
+ * never forge them (D-080). Render the text between them as emphasis, still as text.
+ */
+export const SEARCH_MARK_OPEN = '\u0001';
+export const SEARCH_MARK_CLOSE = '\u0002';
+
 const value = z.string().min(1).max(300);
 export const searchFiltersSchema = z.object({
   tags: z.array(value).max(SEARCH_LIMITS.filterValues).optional(),
@@ -35,7 +42,7 @@ export const searchHitSchema = z.object({
   studyState: studyStateSchema,
   score: z.number(),
   field: z.enum(['title', 'summary', 'note', 'annotation', 'text']),
-  /** Match markers are `[[` and `]]`; render them as text, never as HTML. */
+  /** Match markers are U+0001 (open) and U+0002 (close); render the text between them as emphasis, never as HTML. */
   snippet: z.string(),
   /** Best matching page (1-based). */
   page: z.number().int().positive().optional(),
@@ -60,22 +67,27 @@ export const searchFacetsSchema = z.object({
   folders: z.array(facetBucketSchema),
 });
 
+const queryRequest = z.object({
+  text: z.string().max(SEARCH_LIMITS.text),
+  filters: searchFiltersSchema.optional(),
+  sort: searchSortSchema.optional(),
+  limit: limit.optional(),
+  offset: offset.optional(),
+});
+const queryResponse = z.object({ total: z.number().int().nonnegative(), hits: z.array(searchHitSchema), tookMs: z.number().nonnegative() });
+
 export const searchChannels = defineChannels('search', {
   /**
    * Offline full-text search of the active library (title, authors, abstract, keywords, tags, notes,
    * page text). Syntax: words, "phrases", prefix*, `a OR b`, `author:` `tag:` `type:` `year:` `venue:`.
    * Any text is valid; empty text lists the documents.
    */
-  query: {
-    request: z.object({
-      text: z.string().max(SEARCH_LIMITS.text),
-      filters: searchFiltersSchema.optional(),
-      sort: searchSortSchema.optional(),
-      limit: limit.optional(),
-      offset: offset.optional(),
-    }),
-    response: z.object({ total: z.number().int().nonnegative(), hits: z.array(searchHitSchema), tookMs: z.number().nonnegative() }),
-  },
+  query: { request: queryRequest, response: queryResponse },
+  /**
+   * `query` and `facets` in one request: the text is matched once and `tookMs` covers all the work.
+   * `offset` pages the hits; the facets always describe the whole result set.
+   */
+  run: { request: queryRequest, response: queryResponse.extend({ facets: searchFacetsSchema }) },
   /** Counts per tag, author, type, venue, study state, year and top-level folder for the same query. */
   facets: {
     request: z.object({ text: z.string().max(SEARCH_LIMITS.text), filters: searchFiltersSchema.optional() }),

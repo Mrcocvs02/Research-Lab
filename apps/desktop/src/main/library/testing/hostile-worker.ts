@@ -32,10 +32,10 @@ serveWorker(
           }
           if (name.startsWith('crash-')) process.exit(3);
           if (name.startsWith('slow-')) {
-            const onPage = (opts as { onPage?: (i: { page: number }) => void } | undefined)?.onPage;
+            const onPage = opts?.onPage;
             for (let page = 1; page <= 6; page++) {
               await new Promise((r) => setTimeout(r, 150));
-              onPage?.({ page });
+              onPage?.(page, 6);
             }
           }
           return real.extract(root, rel, opts);

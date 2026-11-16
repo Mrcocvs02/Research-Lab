@@ -1,4 +1,5 @@
 import { AppError, type DocumentRecord, type ExtractOptions, type LibraryStore, type ScanProgress, type Scanner, type SearchIndex, type TextExtractor } from '@rl/core';
+import { classifyExtractError } from '@rl/data';
 import type { ExtractArgs, ExtractProgress, ExtractResult, IndexJob, LibraryWorker, RecordHost, ScanArgs, WorkerHooks } from './worker-protocol.js';
 
 export interface WorkerDeps {
@@ -25,7 +26,7 @@ function describe(e: unknown): string {
 const reasonOf = (e: unknown): string | undefined => (e instanceof AppError && typeof e.details?.['reason'] === 'string' ? e.details['reason'] : undefined);
 
 /** Reasons of the extractor's typed errors for which a retry cannot help while the file stays the same. */
-const PERMANENT_REASONS = new Set(['malformed', 'encrypted', 'too-large', 'timeout', 'unsupported', 'crash']);
+const PERMANENT_REASONS = new Set(['malformed', 'encrypted', 'too-large', 'timeout', 'unsupported', 'crash']); // plus the extractor's own list
 
 /**
  * Permanent (a retry cannot help until the file changes) or transient (locked file, cloud file not yet
@@ -34,6 +35,7 @@ const PERMANENT_REASONS = new Set(['malformed', 'encrypted', 'too-large', 'timeo
  */
 export function isPermanentFailure(e: unknown): boolean {
   if (!(e instanceof AppError)) return false;
+  if (classifyExtractError(e) === 'permanent') return true;
   const flag = e.details?.['permanent'];
   if (typeof flag === 'boolean') return flag;
   const reason = reasonOf(e);
@@ -118,12 +120,8 @@ export function createWorkerService(deps: WorkerDeps): LibraryWorker {
       if (hooks.signal?.aborted) throw abortError();
       const extractor = extractorFor(cacheDir);
       try {
-        // `onPage` is optional on the extractor: when it reports pages, each one is a sign of life for the watchdog.
-        const options: ExtractOptions & { onPage?: (info: { page?: number }) => void } = {
-          hash: item.hash,
-          signal: hooks.signal,
-          onPage: (info) => hooks.onEvent?.({ page: info?.page ?? 0 }),
-        };
+        // Each page the extractor reports is a sign of life for the watchdog in the main process.
+        const options: ExtractOptions = { hash: item.hash, signal: hooks.signal, onPage: (page) => hooks.onEvent?.({ page }) };
         const text = await extractor.extract(rootPath, item.path, options);
         return { path: item.path, hash: item.hash, ok: true, cached: Boolean(text.fromCache), readHash: text.hash ?? item.hash, meta: text.meta, hasText: text.hasText };
       } catch (e) {

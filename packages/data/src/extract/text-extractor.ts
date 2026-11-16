@@ -49,6 +49,38 @@ interface CacheEntry {
   result: ExtractedText;
 }
 
+/** The cache is a plain file anyone can edit: what is read back is validated like any other untrusted input. */
+const MAX_CACHE_FILE_BYTES = 96 * 1024 * 1024;
+const MAX_CACHE_PAGES = 20_000;
+const FORMATS = new Set(['pdf', 'text', 'markdown', 'latex', 'rst', 'code', 'csv', 'notebook', 'docx', 'pptx']);
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const optStr = (v: unknown, max: number): boolean => v === undefined || (typeof v === 'string' && v.length <= max);
+const strList = (v: unknown, maxItems: number, maxLen: number): boolean =>
+  v === undefined || (Array.isArray(v) && v.length <= maxItems && v.every((x) => typeof x === 'string' && x.length <= maxLen));
+
+/** Returns the entry's result when it has exactly the shape (and sizes) we write, else undefined. */
+export function validCacheEntry(entry: unknown, maxPages: number, maxCharsPerPage: number, maxCharsPerFile: number): ExtractedText | undefined {
+  if (!isObj(entry) || entry['v'] !== CACHE_VERSION || entry['maxPages'] !== maxPages) return undefined;
+  const r = entry['result'];
+  if (!isObj(r) || !Array.isArray(r['pages']) || r['pages'].length > MAX_CACHE_PAGES) return undefined;
+  let chars = 0;
+  for (const p of r['pages'] as unknown[]) {
+    if (!isObj(p) || !Number.isInteger(p['page']) || (p['page'] as number) < 1 || typeof p['text'] !== 'string') return undefined;
+    if ((p['text'] as string).length > maxCharsPerPage) return undefined;
+    chars += (p['text'] as string).length;
+    if (chars > maxCharsPerFile) return undefined;
+  }
+  const m = r['meta'];
+  if (!isObj(m) || !Number.isInteger(m['pageCount']) || (m['pageCount'] as number) < 0) return undefined;
+  if (!optStr(m['title'], 2000) || !optStr(m['doi'], 300) || !optStr(m['arxivId'], 100) || !optStr(m['abstract'], 10_000)) return undefined;
+  if (!strList(m['authors'], 100, 500) || !strList(m['doiCandidates'], 50, 300) || !strList(m['arxivCandidates'], 50, 100)) return undefined;
+  if (m['year'] !== undefined && !Number.isInteger(m['year'])) return undefined;
+  if (m['arxivVersion'] !== undefined && !Number.isInteger(m['arxivVersion'])) return undefined;
+  for (const k of ['noTextLayer', 'hasText', 'needsOcr', 'truncated']) if (typeof r[k] !== 'boolean') return undefined;
+  if (typeof r['format'] !== 'string' || !FORMATS.has(r['format'])) return undefined;
+  return r as unknown as ExtractedText;
+}
+
 /**
  * Text and metadata extraction, offline and without AI. The text is data: nothing in it is executed or followed.
  * Failures (malformed or encrypted PDF, too large, too slow) throw `AppError('IO_ERROR', ..., { reason })`,
@@ -68,11 +100,13 @@ export function createTextExtractorImpl(options: TextExtractorOptions = {}): Tex
     const file = cacheFile(hash);
     if (!file) return undefined;
     try {
-      const entry = JSON.parse(await readFile(toFsPath(file), 'utf8')) as CacheEntry;
-      if (entry.v !== CACHE_VERSION || entry.maxPages !== maxPages || !Array.isArray(entry.result?.pages)) return undefined;
-      return { ...entry.result, fromCache: true };
+      const st = await stat(toFsPath(file));
+      if (!st.isFile() || st.size > MAX_CACHE_FILE_BYTES) return undefined;
+      const entry = JSON.parse(await readFile(toFsPath(file), 'utf8')) as unknown;
+      const result = validCacheEntry(entry, maxPages, maxCharsPerPage, maxCharsPerFile);
+      return result ? { ...result, hash, fromCache: true } : undefined;
     } catch {
-      return undefined; // missing or corrupt: regenerate
+      return undefined; // missing, unreadable, corrupt or not of our shape: regenerate
     }
   }
 
@@ -81,7 +115,7 @@ export function createTextExtractorImpl(options: TextExtractorOptions = {}): Tex
     if (!file || !options.cacheDir) return;
     try {
       await mkdir(toFsPath(options.cacheDir), { recursive: true });
-      const { fromCache: _f, ...clean } = result;
+      const { fromCache: _f, hashMismatch: _m, ...clean } = result;
       await atomicWriteFile(file, JSON.stringify({ v: CACHE_VERSION, maxPages, result: clean } satisfies CacheEntry));
     } catch {
       /* the cache is an optimisation: a failed write must not fail the extraction */
@@ -97,6 +131,9 @@ export function createTextExtractorImpl(options: TextExtractorOptions = {}): Tex
       if (!format) throw new AppError('INVALID_REQUEST', 'Unsupported file type for text extraction', { reason: 'unsupported-format' });
       if (signal?.aborted) throw new AppError('CANCELLED', 'Extraction cancelled');
 
+      // A caller-supplied hash only allows a cache hit without reading the file. It is never trusted as the hash of
+      // what is read below: the result carries the hash of the bytes actually extracted (`hash`), and `hashMismatch`
+      // tells the caller that the file is no longer the one it hashed. Callers must store `result.hash`.
       if (o.hash) {
         const hit = await readCache(o.hash, maxPages);
         if (hit) return hit;
@@ -107,31 +144,35 @@ export function createTextExtractorImpl(options: TextExtractorOptions = {}): Tex
       let data: Uint8Array;
       try {
         const st = await withRetry(() => stat(toFsPath(abs)), options.retry);
-        if (!st.isFile()) throw new AppError('NOT_FOUND', 'Not a regular file');
+        if (!st.isFile()) throw new AppError('NOT_FOUND', 'Not a regular file', { reason: 'not-found' });
         if (st.size > limit) throw new AppError('IO_ERROR', 'File too large for text extraction', { reason: 'too-large' });
         data = await withRetry(() => readFile(toFsPath(abs), signal ? { signal } : undefined), options.retry);
       } catch (e) {
         if (e instanceof AppError) throw e;
         const code = (e as NodeJS.ErrnoException).code;
         if ((e as Error).name === 'AbortError') throw new AppError('CANCELLED', 'Extraction cancelled');
-        throw new AppError(code === 'ENOENT' ? 'NOT_FOUND' : 'IO_ERROR', 'Cannot read file', { code: code ?? 'unknown' }, { cause: e });
+        const reason = code === 'ENOENT' ? 'not-found' : code !== undefined && ['EBUSY', 'EPERM', 'EACCES', 'EMFILE', 'ENFILE'].includes(code) ? 'busy' : 'io';
+        throw new AppError(code === 'ENOENT' ? 'NOT_FOUND' : 'IO_ERROR', 'Cannot read file', { code: code ?? 'unknown', reason }, { cause: e });
       }
+      // The text and the hash both come from `data`, the bytes read once above: they cannot disagree, whatever happens
+      // to the file meanwhile. The cache entry is written under THIS hash, never under the caller's.
       const hash = sha256Of(data);
-      if (o.hash === undefined) {
+      const mismatch = o.hash !== undefined && o.hash !== hash;
+      if (o.hash === undefined || mismatch) {
         const hit = await readCache(hash, maxPages);
-        if (hit) return hit;
+        if (hit) return mismatch ? { ...hit, hashMismatch: true } : hit;
       }
 
       let result: ExtractedText;
-      if (format === 'pdf') result = await fromPdf(data, hash, maxPages, signal);
+      if (format === 'pdf') result = await fromPdf(data, hash, maxPages, signal, o.onPage);
       else result = fromOther(format, data, hash);
       await writeCache(hash, maxPages, result);
-      return result;
+      return mismatch ? { ...result, hashMismatch: true } : result;
     },
   };
 
-  async function fromPdf(data: Uint8Array, hash: string, maxPages: number, signal?: AbortSignal): Promise<ExtractedText> {
-    const pdf = await extractPdf(data, { maxPages, timeoutMs, maxCharsPerPage }, signal);
+  async function fromPdf(data: Uint8Array, hash: string, maxPages: number, signal?: AbortSignal, onPage?: (page: number, total: number) => void): Promise<ExtractedText> {
+    const pdf = await extractPdf(data, { maxPages, timeoutMs, maxCharsPerPage, maxCharsPerFile, ...(onPage ? { onPage } : {}) }, signal);
     let chars = 0;
     let truncated = pdf.truncated;
     const pages = [];

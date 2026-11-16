@@ -9,6 +9,7 @@ import { historyHandlers, organizeDocumentsHandlers, projectsHandlers, taxonomyH
 import { indexHandlers, scanHandlers } from './scan-handlers.js';
 import { searchHandlers } from './search-handlers.js';
 import type { MainServices } from './services.js';
+import { aiHandlers, chatHandlers, commandsHandlers } from './ai-handlers.js';
 import { annotationsHandlers, notesHandlers, readerHandlers, thumbsHandlers } from './study-handlers.js';
 
 export type { MainServices } from './services.js';
@@ -33,5 +34,8 @@ export function buildHandlers(s: MainServices): HandlerMap<Channels> {
     ...notesHandlers(s),
     ...annotationsHandlers(s),
     ...thumbsHandlers(s),
+    ...aiHandlers(s),
+    ...chatHandlers(s),
+    ...commandsHandlers(s),
   };
 }

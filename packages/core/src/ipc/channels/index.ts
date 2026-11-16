@@ -3,8 +3,11 @@
  * (and optionally `defineEvents`), then add ONE import and ONE line to each merge below.
  */
 import { mergeRegistries } from '../registry.js';
+import { aiChannels } from './ai.js';
 import { annotationsChannels } from './annotations.js';
 import { appChannels, appEvents } from './app.js';
+import { chatChannels, chatEvents } from './chat.js';
+import { commandsChannels } from './commands.js';
 import { dialogChannels } from './dialog.js';
 import { documentsChannels } from './documents.js';
 import { importChannels, importEvents } from './import.js';
@@ -20,9 +23,9 @@ import { indexChannels, searchChannels } from './search.js';
 import { secretsChannels } from './secrets.js';
 import { settingsChannels } from './settings.js';
 
-export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels);
+export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels);
 
-export const events = mergeRegistries(appEvents, importEvents, scanEvents, libraryEvents);
+export const events = mergeRegistries(appEvents, importEvents, scanEvents, libraryEvents, chatEvents);
 
 export type Channels = typeof channels;
 export type Events = typeof events;
@@ -41,3 +44,5 @@ export { projectDetailSchema, projectSummarySchema, projectMemberViewSchema, rea
 export { noteViewSchema, noteListItemSchema, type NoteView } from './notes.js';
 export { annotationColorSchema, annotationInputSchema, type AnnotationInput } from './annotations.js';
 export { thumbItemSchema } from './thumbs.js';
+export { aiAuthSchema, aiPreviewSchema, aiSendViewSchema, aiStatusSchema } from './ai.js';
+export { chatCardSchema, chatConversationSummarySchema, chatTurnSchema, chatUsageSchema } from './chat.js';

@@ -21,9 +21,14 @@ export const modelConfigSchema = z.object({
 });
 export type ModelConfig = z.infer<typeof modelConfigSchema>;
 
+/**
+ * Haiku for tags, descriptions and bulk commands, Sonnet for complex questions, Opus as the strongest option (plan §5).
+ * Prices are hints for the estimates only (USD per million tokens, first-party API, 2026-11).
+ */
 export const DEFAULT_MODELS: ModelConfig[] = [
-  { id: 'claude-haiku-5-5', label: 'Haiku 5.5' },
-  { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5' },
+  { id: 'claude-haiku-5-5', label: 'Haiku 5.5', inputPerMTok: 0.1, outputPerMTok: 0.5 },
+  { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5', inputPerMTok: 2, outputPerMTok: 10 },
+  { id: 'claude-opus-5-5', label: 'Opus 5.5', inputPerMTok: 4, outputPerMTok: 20 },
 ];
 
 /* ------------------------------------------------------------------ */

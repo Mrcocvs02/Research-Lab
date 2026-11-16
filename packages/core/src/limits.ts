@@ -47,3 +47,17 @@ export const THUMB_LIMITS = {
   /** Documents asked about in one `thumbs:list`. */
   batch: 200,
 } as const;
+
+/** Upper bounds of the AI layer (phase 4). */
+export const AI_LIMITS = {
+  /** Characters of one chat message of the user. */
+  message: 20_000,
+  /** Documents given to the chat as context (the selection). */
+  contextDocs: 50,
+  /** Documents of one preview or one bulk job. */
+  jobDocs: 5_000,
+  /** Characters of a conversation title. */
+  title: 200,
+  /** Conversations listed at once. */
+  conversations: 500,
+} as const;

@@ -160,7 +160,7 @@ describe('library handlers', () => {
     const cfg = data(await call('library:setConfig', { patch: { aiEnabledFolders: ['papers'], ai: { defaultReasoning: 'high' }, mcp: { enabled: true } } }));
     expect(cfg.aiEnabledFolders).toEqual(['papers']);
     expect(cfg.ai.defaultReasoning).toBe('high');
-    expect(cfg.ai.models).toHaveLength(2);
+    expect(cfg.ai.models).toHaveLength(3);
     expect(cfg.mcp).toEqual({ enabled: true, writeEnabled: false });
     expect(data(await call('library:getConfig', { libraryId: pa.id })).aiEnabledFolders).toEqual([]);
 

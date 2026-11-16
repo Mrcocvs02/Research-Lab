@@ -37,7 +37,7 @@ describe('library config', () => {
     const c = defaultLibraryConfig();
     expect(c.aiEnabledFolders).toEqual([]);
     expect(c.ai.defaultModel).toBe('claude-haiku-5-5');
-    expect(c.ai.models.map((m) => m.id)).toEqual(['claude-haiku-5-5', 'claude-sonnet-5-5']);
+    expect(c.ai.models.map((m) => m.id)).toEqual(['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']);
     expect(c.ai.confirmBeforeSend).toBe(true);
     expect(c.mcp).toEqual({ enabled: false, writeEnabled: false });
     expect(c.ai.usageCap.monthlyUsd).toBeNull();
@@ -46,7 +46,7 @@ describe('library config', () => {
   it('does not share default model arrays between instances', () => {
     const a = defaultLibraryConfig();
     a.ai.models.push({ id: 'x', label: 'X' });
-    expect(defaultLibraryConfig().ai.models).toHaveLength(2);
+    expect(defaultLibraryConfig().ai.models).toHaveLength(3);
   });
 
   it('refuses a default model that is not in the list', () => {

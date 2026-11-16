@@ -7,7 +7,7 @@ import { Markdown, type LinkHook } from '../../lib/markdown';
 import { useReader } from '../../lib/reader';
 import { safeText } from '../library/safeText';
 import { formatTokens, formatUsd } from './format';
-import { parseLabLink, type LabLink } from './labLinks';
+import { labelNamesPage, parseLabLink, type LabLink } from './labLinks';
 import { useDocTitle, useProjectName } from './useLabels';
 
 export type Turn = ResponseOf<Channels, 'chat:get'>['turns'][number] & { streaming?: boolean };
@@ -24,7 +24,7 @@ export function LabChip({ link, label }: { link: LabLink; label?: string }) {
   const projectName = useProjectName(link.kind === 'project' ? link.id : null);
   const name = safeText(label?.trim() || title || projectName || (link.kind === 'project' ? short(link.id) : short(link.docId)));
   const text =
-    link.kind === 'doc' ? (link.page ? t('chat.chipDocPage', { name, page: link.page }) : name) : link.kind === 'note' ? t('chat.chipNote', { name }) : t('chat.chipProject', { name });
+    link.kind === 'doc' ? (link.page && !labelNamesPage(name, link.page) ? t('chat.chipDocPage', { name, page: link.page }) : name) : link.kind === 'note' ? t('chat.chipNote', { name }) : t('chat.chipProject', { name });
   const open = () => {
     if (link.kind === 'doc') openReader(link.docId, link.page);
     else if (link.kind === 'note') openReader(link.docId, undefined, { panel: 'fileNote' });

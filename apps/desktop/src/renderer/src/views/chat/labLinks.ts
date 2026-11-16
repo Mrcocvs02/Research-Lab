@@ -23,3 +23,11 @@ export function parseLabLink(href: string): LabLink | null {
   if (m) return { kind: 'project', id: m[1]! };
   return null;
 }
+
+/**
+ * True when the link text written by the model already names the page of the link ("…, p. 3", "page 3", "pag. 3"):
+ * the chip then shows the text as it is instead of adding the page a second time.
+ */
+export function labelNamesPage(label: string, page: number): boolean {
+  return new RegExp(String.raw`(?:^|[^\p{L}])(?:p|pp|pg|pag|page|pages|pagina|pagine)\.?\s*${page}(?![0-9])`, 'iu').test(label);
+}

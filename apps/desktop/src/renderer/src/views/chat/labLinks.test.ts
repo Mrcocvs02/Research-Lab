@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseLabLink } from './labLinks';
+import { labelNamesPage, parseLabLink } from './labLinks';
 
 const D = '0123456789abcdef';
 
@@ -39,5 +39,14 @@ describe('parseLabLink', () => {
     '',
   ])('refuses %s', (href) => {
     expect(parseLabLink(href)).toBeNull();
+  });
+});
+
+describe('labelNamesPage', () => {
+  it.each(['Title, 2024, p. 1', 'see page 1', 'pag. 1', 'Titolo (pagina 1)', 'pp. 1-3', 'P.1'])('finds the page in %s', (label) => {
+    expect(labelNamesPage(label, 1)).toBe(true);
+  });
+  it.each(['Title, 2024', 'p. 12', 'pp. 10', 'step 1', 'Map 1', 'chapter 1'])('does not find page 1 in %s', (label) => {
+    expect(labelNamesPage(label, 1)).toBe(false);
   });
 });

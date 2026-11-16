@@ -131,3 +131,9 @@ Ogni script controlla prima la memoria disponibile (`tools/mem-guard.mjs`: 1,2 G
 ## Studio (fase 3, dati)
 - Unit: `apps/desktop/src/main/doc-protocol.test.ts` (intervalli, 416, rifiuti, CORS) e `ipc/study-handlers.test.ts` (lettore, note, annotazioni, flag).
 - E2E: `e2e/study-data.spec.ts` (dopo `npm run build`): `fetch` con `Range` di `rl-doc://` dal renderer, id estraneo rifiutato, note e annotazioni dopo il riavvio, ricerca per una parola presente solo nella nota, SHA-256 dei PDF invariato.
+
+## Miniature della griglia (onda 3.2)
+
+- Unit: `apps/desktop/src/main/thumbs.test.ts` (list, put, pulizia, schema `rl-thumb`), `thumbs-native.test.ts` (`nativeImage` finto: successo, errore, scadenza, icona/vuota/uniforme, piattaforma non supportata, memo di sessione, confinamento), `renderer/src/lib/thumbs.test.ts` (coda, un disegno alla volta, ripiego da nativo a pdf.js), `thumbDraw.test.ts` (dimensioni, qualità, pulizia, worker), `views/library/thumbs.test.ts` (cablaggio della griglia).
+- E2E: `e2e/thumbs.spec.ts` (dopo `npm run build`): accetta come sorgente sia la miniatura del sistema sia il disegno con pdf.js (la macchina può non avere un gestore PDF); un'immagine `rl-thumb:` con `naturalWidth` > 0, dopo il riavvio `thumbs:list` dà URL e `drawable: false`, SHA-256 dei PDF invariato. Si lancia con `ui-library`, `study-ui` e `qa-security` (cambia la CSP), in serie.
+

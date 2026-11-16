@@ -4,6 +4,7 @@ import { RlError } from '../../lib/rl-error';
 import { VirtualList } from '../../components/VirtualList';
 import { rl } from '../../lib/rl';
 import { useNotify } from '../../lib/notify';
+import { canRead, useReader, type ReaderPanel } from '../../lib/reader';
 import type { DocList, DocRow } from './useDocumentList';
 import { clickSelect, emptySelection, indexOfId, moveSelect, rangeHasHoles, selectAll, toggleActive, type SelectionState } from './selection';
 import { formatSize } from './formatSize';
@@ -74,14 +75,19 @@ interface ItemProps {
   onDoubleClick(): void;
   onOpenFile(): void;
   onReveal(): void;
+  /** Opens the reader on this document, at a page and tab when given. */
+  onRead(page?: number, panel?: ReaderPanel): void;
+  /** Opens the card (the place of the file note). */
+  onDetail(): void;
 }
 
-const DocItem = memo(function DocItem({ row, view, selected, active, searching, onClick, onDoubleClick, onOpenFile, onReveal }: ItemProps) {
+const DocItem = memo(function DocItem({ row, view, selected, active, searching, onClick, onDoubleClick, onOpenFile, onReveal, onRead, onDetail }: ItemProps) {
   const { t } = useTranslation();
   if (!row) return <div className={`doc-${view === 'grid' ? 'card' : 'row'} skeleton`} aria-hidden="true" />;
   const title = safeText(row.title?.trim() || baseName(row.path));
   const authors = safeText(row.authors.slice(0, 3).join(', ')) + (row.authors.length > 3 ? ' …' : '');
   const meta = [authors, row.year, row.type === null ? null : safeText(row.type)].filter((x) => x !== '' && x !== null && x !== undefined);
+  const readable = canRead(row.path, row.missing);
   const cls = ['doc', view === 'grid' ? 'doc-card' : 'doc-row', selected ? 'selected' : '', active ? 'active' : '', row.missing ? 'missing' : ''].filter(Boolean).join(' ');
   return (
     <div
@@ -104,6 +110,24 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
         <Tags tags={row.tags} max={view === 'grid' ? 3 : 6} />
         {view === 'list' && searching && row.snippet && (
           <p className="result-snippet" data-testid="result-snippet" data-field={row.field}>
+            {(row.field === 'note' || row.field === 'annotation') && (
+              <button
+                type="button"
+                className="badge badge-hit"
+                tabIndex={-1}
+                title={row.page !== undefined && readable ? t('search.openAtPage', { page: row.page }) : t('search.openNotes')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (row.page !== undefined && readable) onRead(row.page, row.field === 'note' ? 'pageNote' : 'annotations');
+                  else if (row.field === 'note') onDetail();
+                  else if (readable) onRead(undefined, 'annotations');
+                }}
+                data-testid="hit-field"
+                data-field={row.field}
+              >
+                {t(`search.hitIn.${row.field}`)}
+              </button>
+            )}{' '}
             <Snippet text={row.snippet} />
           </p>
         )}
@@ -111,9 +135,15 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
           <p className="result-pages" data-testid="result-pages">
             <span className="result-pages-label">{t('search.pagesLabel')}</span>{' '}
             {row.pages.slice(0, 8).map((p) => (
-              <span key={p.page} className="page-chip" data-page={p.page} title={plainSnippet(p.snippet)}>
-                {t('search.page', { page: p.page })}
-              </span>
+              readable ? (
+                <button key={p.page} type="button" className="page-chip" tabIndex={-1} data-page={p.page} title={plainSnippet(p.snippet)} aria-label={t('search.openAtPage', { page: p.page })} onClick={(e) => { e.stopPropagation(); onRead(p.page); }}>
+                  {t('search.page', { page: p.page })}
+                </button>
+              ) : (
+                <span key={p.page} className="page-chip" data-page={p.page} title={plainSnippet(p.snippet)}>
+                  {t('search.page', { page: p.page })}
+                </span>
+              )
             ))}
           </p>
         )}
@@ -132,6 +162,11 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
         <StudyBadge state={row.studyState} />
         {row.missing && <span className="badge badge-warn">{t('docs.missing')}</span>}
         <span className="doc-actions">
+          {readable && (
+            <button type="button" className="icon-button" tabIndex={-1} title={t('docs.read')} aria-label={t('docs.read')} onClick={(e) => { e.stopPropagation(); onRead(); }} data-testid="row-read">
+              <span aria-hidden="true">▤</span>
+            </button>
+          )}
           <button type="button" className="icon-button" tabIndex={-1} title={t('docs.openFile')} aria-label={t('docs.openFile')} disabled={row.missing} onClick={(e) => { e.stopPropagation(); onOpenFile(); }} data-testid="row-open-file">
             <span aria-hidden="true">↗</span>
           </button>
@@ -161,6 +196,7 @@ interface Props {
 export function DocViews({ list, view, searching, selection, onSelection, onOpenDetail, onDeleteKey, ariaLabel }: Props) {
   const { reportError, fail, info } = useNotify();
   const { t } = useTranslation();
+  const { openReader } = useReader();
   const [columns, setColumns] = useState(1);
   const selRef = useRef(selection);
   selRef.current = selection;
@@ -250,6 +286,12 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
       e.preventDefault();
       const id = selRef.current.active;
       if (id) void (mods.ctrl ? openFile(id) : onOpenDetail(id));
+    } else if ((e.key === 'r' || e.key === 'R') && !mods.ctrl && !e.altKey) {
+      // R: read the active document in the app (PDFs only).
+      e.preventDefault();
+      const at = indexOfId(list.ids(), selRef.current.active);
+      const row = at >= 0 ? list.rowAt(at) : undefined;
+      if (row && canRead(row.path, row.missing)) openReader(row.docId);
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       onDeleteKey();
@@ -294,6 +336,8 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
             onDoubleClick={() => row && void openFile(row.docId)}
             onOpenFile={() => row && void openFile(row.docId)}
             onReveal={() => row && void reveal(row.docId)}
+            onRead={(page, panel) => row && openReader(row.docId, page, panel ? { panel } : undefined)}
+            onDetail={() => row && onOpenDetail(row.docId)}
           />
         );
       }}

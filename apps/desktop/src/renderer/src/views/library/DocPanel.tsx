@@ -6,10 +6,12 @@ import { SEARCH_LIMITS, type Channels, type DocumentPatch, type ResponseOf, type
 type DocumentView = ResponseOf<Channels, 'documents:get'>;
 import { useChangeVersion, useLibraryEvents } from '../../lib/events';
 import { useNotify } from '../../lib/notify';
+import { canRead, useReader } from '../../lib/reader';
 import { rl } from '../../lib/rl';
 import { splitLines } from '../../lib/validate';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
+import { NoteEditor } from '../notes/NoteEditor';
 import { baseName, TypeIcon } from './DocViews';
 import { safeText } from './safeText';
 import { TagChip, TagPicker } from './TagParts';
@@ -249,6 +251,7 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
   const docRef = useRef<DocumentView | null>(null);
   docRef.current = doc;
   const venueListId = useId();
+  const { openReader } = useReader();
 
   useEffect(() => {
     let alive = true;
@@ -317,6 +320,11 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
         </button>
       </header>
       <div className="panel-actions">
+        {canRead(doc.path, doc.missing) && (
+          <button type="button" className="primary" onClick={() => openReader(docId)} title={t('docs.readHint')} data-testid="open-reader">
+            {t('docs.read')}
+          </button>
+        )}
         <button type="button" onClick={() => void openFile()} disabled={doc.missing} data-testid="open-file">
           {t('docs.openFile')}
         </button>
@@ -379,8 +387,16 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
         <div className="check">
           <input id={`${venueListId}-ul`} type="checkbox" checked={doc.study.underlined.value} onChange={(e) => save({ underlined: e.target.checked })} data-testid="field-underlined" />
           <label htmlFor={`${venueListId}-ul`}>{t('doc.underlined')}</label>
+          <span className="badge" data-testid="underlined-origin" data-origin={doc.study.underlined.origin}>
+            {doc.study.underlined.origin === 'annotations' ? t('reader.underlinedOrigin_annotations') : t('reader.underlinedOrigin_manual')}
+          </span>
           {doc.study.underlined.origin === 'annotations' && <p className="hint">{t('doc.underlinedFromAnnotations')}</p>}
         </div>
+      </Section>
+
+      <Section title={t('doc.notes')} testId="doc-notes">
+        <p className="hint">{t('doc.notesHint')}</p>
+        <NoteEditor docId={docId} testId="card-note" />
       </Section>
 
       <Section title={t('doc.description')} testId="doc-description">

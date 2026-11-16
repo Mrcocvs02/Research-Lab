@@ -26,6 +26,8 @@ export interface DocRow {
   size: number;
   snippet?: string;
   field?: Hit['field'];
+  /** Best matching page of a search hit. */
+  page?: number;
   pages?: Hit['pages'];
 }
 
@@ -52,6 +54,7 @@ const fromSummary = (s: SummaryItem): DocRow => ({
 const fromHit = (h: Hit): DocRow => {
   const row: DocRow = { docId: h.docId, title: h.title, authors: h.authors, year: h.year, type: h.type, path: h.path, studyState: h.studyState, tags: h.tags, directTags: h.directTags ?? h.tags, addedAt: '', missing: false, size: h.size, snippet: h.snippet, field: h.field };
   if (h.pages) row.pages = h.pages;
+  if (h.page !== undefined) row.page = h.page;
   return row;
 };
 

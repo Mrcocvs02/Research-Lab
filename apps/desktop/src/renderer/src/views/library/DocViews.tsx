@@ -1,9 +1,10 @@
-import { memo, useCallback, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RlError } from '../../lib/rl-error';
 import { VirtualList } from '../../components/VirtualList';
 import { rl } from '../../lib/rl';
 import { useNotify } from '../../lib/notify';
+import { thumbs, useThumbUrl } from '../../lib/thumbs';
 import { canRead, useReader, type ReaderPanel } from '../../lib/reader';
 import type { DocList, DocRow } from './useDocumentList';
 import { clickSelect, emptySelection, indexOfId, moveSelect, rangeHasHoles, selectAll, toggleActive, type SelectionState } from './selection';
@@ -24,6 +25,20 @@ export const fileExt = (path: string): string => {
   return m ? m[1]!.toLowerCase() : '';
 };
 export const baseName = (path: string): string => path.slice(path.lastIndexOf('/') + 1);
+
+/**
+ * The first page of a PDF in the grid (D-196), or the type icon: while the image is not there yet, for every other
+ * format and for a missing file. The image is decoration (empty alt): the title stays the label of the card.
+ */
+function GridThumb({ docId, path, missing }: { docId: string; path: string; missing: boolean }) {
+  const url = useThumbUrl(fileExt(path) === 'pdf' && !missing ? docId : null);
+  const [broken, setBroken] = useState<string | null>(null);
+  return (
+    <span className="doc-thumb" data-testid="doc-thumb" data-has-image={url !== null && broken !== url ? 'true' : 'false'}>
+      {url !== null && broken !== url ? <img src={url} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setBroken(url)} /> : <TypeIcon path={path} large />}
+    </span>
+  );
+}
 
 /** A document glyph with the file format on it; the colour follows the format. */
 export function TypeIcon({ path, large }: { path: string; large?: boolean }) {
@@ -101,7 +116,7 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
       onClick={onClick}
       onDoubleClick={onDoubleClick}
     >
-      <TypeIcon path={row.path} large={view === 'grid'} />
+      {view === 'grid' ? <GridThumb docId={row.docId} path={row.path} missing={row.missing} /> : <TypeIcon path={row.path} />}
       <div className="doc-main">
         <h3 className="result-title" data-testid="result-title" title={title}>
           {title}
@@ -308,7 +323,30 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
   const activeIndex = useMemo(() => { const at = indexOfId(list.ids(), selection.active); return at >= 0 ? at : null; }, [list.version, list.total, selection.active]);
   const activeRow = activeIndex !== null ? list.rowAt(activeIndex) : undefined;
   const itemHeight = view === 'grid' ? ROW_HEIGHT.card : searching ? ROW_HEIGHT.search : ROW_HEIGHT.browse;
-  const range = useCallback((a: number, b: number) => list.ensure(a, b), [list]);
+  // The rows around the viewport, as the virtual list reports them: the PDFs among them get a thumbnail (grid only).
+  const [shown, setShown] = useState<readonly [number, number]>([0, -1]);
+  const range = useCallback(
+    (a: number, b: number) => {
+      list.ensure(a, b);
+      setShown((p) => (p[0] === a && p[1] === b ? p : [a, b]));
+    },
+    [list],
+  );
+  useEffect(() => {
+    if (view !== 'grid') return;
+    thumbs().setActive(true);
+    return () => thumbs().setActive(false);
+  }, [view]);
+  useEffect(() => {
+    if (view !== 'grid') return;
+    const ids: string[] = [];
+    for (let i = shown[0]; i <= shown[1]; i++) {
+      const row = list.rowAt(i);
+      if (row && !row.missing && fileExt(row.path) === 'pdf') ids.push(row.docId);
+    }
+    thumbs().want(ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, shown, list.version]);
 
   return (
     <VirtualList

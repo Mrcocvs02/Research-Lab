@@ -1,4 +1,5 @@
 import { AppError } from '@rl/core';
+import { clearThumbs } from '../../thumbs.js';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
 
@@ -15,5 +16,10 @@ export const scanHandlers = (s: MainServices): DomainHandlers<'scan'> => ({
 });
 
 export const indexHandlers = (s: MainServices): DomainHandlers<'index'> => ({
-  'index:rebuild': async ({ libraryId }) => (await s.runtime.require(libraryId, { retry: true })).rebuild(),
+  'index:rebuild': async ({ libraryId }) => {
+    const rt = await s.runtime.require(libraryId, { retry: true });
+    // The grid thumbnails are a cache of the same kind: a rebuild starts them over (they are drawn again when seen).
+    void clearThumbs(s.localDataDir, rt.libraryId);
+    return rt.rebuild();
+  },
 });

@@ -28,6 +28,7 @@ function setup(options: { cipher?: Cipher } = {}) {
   const secrets = new FileSecretStore(path.join(tmp, 'user'), options.cipher ?? goodCipher);
   const services: MainServices = {
     log,
+    localDataDir: tmp,
     emit: () => {},
     settings,
     approved,

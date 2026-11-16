@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, safeStorage, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, safeStorage, session, shell } from 'electron';
 import path from 'node:path';
 import { backupDataDir, createLegacyImporter, createLibraryStore, createWatcher } from '@rl/data';
 import { createSearchIndex } from '@rl/search';
@@ -15,6 +15,8 @@ import {
 import { createFileLogger } from '@rl/core/node';
 import { APP_NAME } from './app-info.js';
 import { createDocHandler } from './doc-protocol.js';
+import { createThumbHandler } from './thumb-protocol.js';
+import { thumbDir } from './thumbs.js';
 import { ApprovedPaths } from './approved-paths.js';
 import { e2eDialogOverride } from './dialog-override.js';
 import { resolveAppDirs } from './dirs.js';
@@ -27,7 +29,7 @@ import { LibraryService } from './library-service.js';
 import { applyResourceSwitches } from './resources.js';
 import { configureRuntime, resolveRuntimeConfig } from './runtime.js';
 import { FileSecretStore } from './secret-store.js';
-import { installGlobalSecurity, isTrustedUrl, registerPrivilegedSchemes, rendererOrigin, serveDocuments, serveRenderer } from './security.js';
+import { installGlobalSecurity, isTrustedUrl, registerPrivilegedSchemes, rendererOrigin, serveDocuments, serveRenderer, serveThumbnails } from './security.js';
 import { SettingsStore } from './settings-store.js';
 import { createMainWindow } from './window.js';
 
@@ -76,6 +78,10 @@ async function main(): Promise<void> {
     libraries,
     settings,
     localDataDir: dirs.localData,
+    // Windows and macOS have a shell thumbnail API (the PDF app's handler plus the system cache); elsewhere the renderer draws.
+    ...(typeof nativeImage.createThumbnailFromPath === 'function' && (process.platform === 'win32' || process.platform === 'darwin')
+      ? { nativeThumbnail: (abs: string, size: number) => nativeImage.createThumbnailFromPath(abs, { width: size, height: size }) }
+      : {}),
     log,
     emit: (status) => emit('scan:progress', status),
     emitDocumentsChanged: () => emit('library:changed', { kind: 'documents' }),
@@ -88,6 +94,7 @@ async function main(): Promise<void> {
   });
   const services: MainServices = {
     log,
+    localDataDir: dirs.localData,
     emit,
     settings,
     approved,
@@ -124,6 +131,15 @@ async function main(): Promise<void> {
 
   // The reader loads PDFs through rl-doc://; every request looks the document up in the active library again.
   serveDocuments(session.defaultSession, createDocHandler({ resolve: (id) => presentPdf(services, id as DocumentId), allowedOrigin: rendererOrigin }));
+
+  // Grid thumbnails through rl-thumb://: only files of the cache folder of the active library (D-196).
+  serveThumbnails(
+    session.defaultSession,
+    createThumbHandler({
+      dir: async () => thumbDir(dirs.localData, (await runtimeManager.require()).libraryId),
+      allowedOrigin: rendererOrigin,
+    }),
+  );
 
   const dispatch = createDispatcher(channels, buildHandlers(services), log);
   ipcMain.handle(IPC_INVOKE_CHANNEL, async (event, channel: unknown, payload: unknown) => {

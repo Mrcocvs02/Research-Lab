@@ -150,7 +150,12 @@ describe('lazy loading', () => {
       }
     };
     walk(root);
-    expect(offenders).toEqual(['views/reader/engine.ts']);
+    // The shared set-up (also used by the thumbnail drawer) and the reader engine: both only reached through dynamic imports.
+    expect(offenders).toEqual(['lib/pdfjs.ts', 'views/reader/engine.ts']);
+    // The thumbnail drawer (and so pdf.js) is fetched by a dynamic import only, when something must be drawn.
+    const store = readFileSync(path.join(root, 'lib', 'thumbs.ts'), 'utf8');
+    expect(store).not.toMatch(/^import .*thumbDraw/m);
+    expect(store).toMatch(/import\('\.\/thumbDraw'\)/);
   });
 });
 

@@ -21,6 +21,11 @@ export interface WatchdogOptions {
   abortGraceMs: number;
   /** `dispose()` asks the worker to close politely; after this it is killed. Default 3 s. */
   disposeMs: number;
+  /**
+   * The worker thread is closed after this long without a call in flight (it is started again by the next call and
+   * reopens the index). 0 keeps it alive until `dispose()`. Default 60 s.
+   */
+  idleCloseMs: number;
 }
 
 export const DEFAULT_WATCHDOG: WatchdogOptions = {
@@ -30,6 +35,7 @@ export const DEFAULT_WATCHDOG: WatchdogOptions = {
   indexMs: 60_000,
   abortGraceMs: 5_000,
   disposeMs: 3_000,
+  idleCloseMs: 60_000,
 };
 
 export interface SupervisedWorkerOptions {
@@ -61,6 +67,29 @@ export function createSupervisedWorker(options: SupervisedWorkerOptions): Librar
   let starting: Promise<RawWorker & { gone: boolean; killedByUs: boolean }> | null = null;
   let indexPath: string | null = null;
   let disposed = false;
+  let inFlight = 0;
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** Closes the idle worker politely (the thread's memory goes back to the system); the next call starts a new one. */
+  const closeIdle = async (): Promise<void> => {
+    const w = raw;
+    if (!w || inFlight > 0 || starting) return;
+    raw = null;
+    w.killedByUs = true;
+    try {
+      await withTimeout(w.client.dispose(), wd.disposeMs);
+    } catch {
+      // killed below
+    }
+    await w.terminate().catch(() => {});
+  };
+  const armIdle = () => {
+    clearTimeout(idleTimer);
+    if (wd.idleCloseMs <= 0 || disposed || !raw || inFlight > 0) return;
+    idleTimer = setTimeout(() => void closeIdle(), wd.idleCloseMs);
+    // An idle timer must never keep the process alive.
+    idleTimer.unref?.();
+  };
 
   const kill = async (w: NonNullable<typeof raw>): Promise<void> => {
     w.killedByUs = true;
@@ -105,7 +134,17 @@ export function createSupervisedWorker(options: SupervisedWorkerOptions): Librar
 
   /** Runs one call on the worker under the watchdog. */
   const run = async <T>(op: Op, hooks: WorkerHooks<any> | undefined, invoke: (w: RawWorker, hooks: WorkerHooks<any>) => Promise<T>): Promise<T> => {
-    const w = await ensure();
+    inFlight++;
+    clearTimeout(idleTimer);
+    try {
+      return await runOn(await ensure(), op, hooks, invoke);
+    } finally {
+      inFlight--;
+      armIdle();
+    }
+  };
+
+  const runOn = <T>(w: NonNullable<typeof raw>, op: Op, hooks: WorkerHooks<any> | undefined, invoke: (w: RawWorker, hooks: WorkerHooks<any>) => Promise<T>): Promise<T> => {
     return new Promise<T>((resolve, reject) => {
       let settled = false;
       let progressed = false;
@@ -157,7 +196,9 @@ export function createSupervisedWorker(options: SupervisedWorkerOptions): Librar
 
   return {
     async openIndex(dbPath) {
-      await run('openIndex', undefined, (w) => w.client.openIndex(dbPath));
+      // The main process opens (and, when needed, creates) the index itself, so nothing needs the worker yet:
+      // it starts with the first scan or index call, and reopens this file when it does.
+      if (raw) await run('openIndex', undefined, (w) => w.client.openIndex(dbPath));
       indexPath = dbPath;
     },
     resetIndex: () => run('resetIndex', undefined, (w) => w.client.resetIndex()),
@@ -167,6 +208,7 @@ export function createSupervisedWorker(options: SupervisedWorkerOptions): Librar
     remove: (ids) => run('remove', undefined, (w) => w.client.remove(ids)),
     async dispose() {
       disposed = true;
+      clearTimeout(idleTimer);
       const w = raw ?? (await starting?.catch(() => null)) ?? null;
       if (!w) return;
       try {

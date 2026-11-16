@@ -1812,3 +1812,8 @@ button.toggle.on {
 .results-pane {
   overflow: hidden;
 }
+
+.library-tools .check {
+  margin-bottom: 0;
+  align-items: center;
+}

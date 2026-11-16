@@ -308,6 +308,12 @@ export interface SearchIndex {
   facets(query: SearchQuery): Promise<SearchFacets>;
   list(query: DocumentListQuery): Promise<{ total: number; items: DocumentSummary[] }>;
   /**
+   * The ids of the documents `searchPage` would list for the same query, in the same order, up to `limit`
+   * (default and ceiling: `SEARCH_LIMITS.idsMax`), and the total number of matches. No row is built: this is what
+   * "select all" needs.
+   */
+  ids(query: SearchQuery): Promise<{ total: number; ids: DocumentId[] }>;
+  /**
    * What is indexed for each document: the hash of the file its text comes from (null: metadata only) and a
    * stamp of the record version (`<revision>:<updatedAt>`, plus `|<stampSuffix>` when given), to find documents whose index entry is stale.
    */

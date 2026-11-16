@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
@@ -7,18 +7,21 @@ import { HistoryControls } from '../../lib/history';
 import { useNotify } from '../../lib/notify';
 import { useLocalChoice } from '../../lib/useLocalString';
 import { useApp } from '../../state/app-context';
-import { AddToProject } from './AddToProject';
-import { BulkTagEditor, DocumentCard } from './DocPanel';
 import { DocViews, type ViewMode } from './DocViews';
-import { hasAnyCondition, initialBrowse, planQuery, SORTS, setTagFilter, type BrowseState } from './docQuery';
+import { hasAnyCondition, initialBrowse, planQuery, SORTS, setTagFilter, withMissing, type BrowseState } from './docQuery';
 import { Facets } from './Facets';
 import { ActiveFilters, TagFilterBar } from './FilterBar';
 import { FolderPane, TagTreePane } from './NavPanes';
 import { emptySelection, type SelectionState } from './selection';
-import { TaxonomyManager } from './TaxonomyManager';
 import { useDocumentList, type DocRow } from './useDocumentList';
 import { useScanStatus } from './useScanStatus';
 import { TaxonomyProvider } from './useTaxonomy';
+
+// The detail panel, the bulk tag editor, the taxonomy manager and the project dialog load when they are first used.
+const DocumentCard = lazy(() => import('./DocPanel').then((m) => ({ default: m.DocumentCard })));
+const BulkTagEditor = lazy(() => import('./DocPanel').then((m) => ({ default: m.BulkTagEditor })));
+const TaxonomyManager = lazy(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })));
+const AddToProject = lazy(() => import('./AddToProject').then((m) => ({ default: m.AddToProject })));
 
 type PaneTab = 'folders' | 'tags' | 'filters';
 const TABS: PaneTab[] = ['folders', 'tags', 'filters'];
@@ -42,6 +45,7 @@ function LibraryInner() {
   const inputId = useId();
   const helpId = useId();
   const sortId = useId();
+  const missingId = useId();
   const { status, start, cancel, rebuild } = useScanStatus();
   const docsVersion = useChangeVersion('documents');
 
@@ -62,6 +66,13 @@ function LibraryInner() {
       void start().catch(() => {});
     }
   }, [status?.state, app.activeLibraryId, start]);
+
+  // The detail panel is the most used part loaded on demand: fetch it once the first screen is idle, so that the
+  // first click on a document shows it at once (functionality before lightness, docs/RULES.md).
+  useEffect(() => {
+    const id = requestIdleCallback(() => void import('./DocPanel').catch(() => {}));
+    return () => cancelIdleCallback(id);
+  }, []);
 
   const refreshKey = `${status?.state ?? 'none'}:${status?.indexed ?? 0}:${docsVersion}`;
   const plan = useMemo(() => planQuery(browse), [browse]);
@@ -98,7 +109,8 @@ function LibraryInner() {
   const anything = hasAnyCondition(browse);
 
   const setIncludeSub = (v: boolean) => setBrowse((b) => ({ ...b, includeSub: v, folder: v && b.folder === '' ? null : b.folder }));
-  const clearAll = () => setBrowse((b) => ({ ...initialBrowse(), includeSub: b.includeSub }));
+  // "Show missing documents" is a view option, not a filter: clearing the filters leaves it as it is.
+  const clearAll = () => setBrowse((b) => ({ ...initialBrowse(), includeSub: b.includeSub, filters: withMissing({}, b.filters.includeMissing === true) }));
   const openDetail = useCallback((docId: string) => {
     setSelection((s) => (s.ids.has(docId) ? s : { ids: new Set([docId]), anchor: s.active, active: s.active }));
     setDetailOpen(true);
@@ -150,6 +162,16 @@ function LibraryInner() {
             </option>
           ))}
         </select>
+        <div className="check">
+          <input
+            id={missingId}
+            type="checkbox"
+            checked={browse.filters.includeMissing === true}
+            onChange={(e) => set({ filters: withMissing(browse.filters, e.target.checked) })}
+            data-testid="show-missing"
+          />
+          <label htmlFor={missingId}>{t('search.showMissing')}</label>
+        </div>
         <span className="spacer" />
         <button type="button" onClick={() => setMode(mode === 'taxonomy' ? 'browse' : 'taxonomy')} aria-pressed={mode === 'taxonomy'} data-testid="open-taxonomy">
           {t('tax.title')}
@@ -171,7 +193,9 @@ function LibraryInner() {
       </div>
 
       {mode === 'taxonomy' ? (
-        <TaxonomyManager onBack={() => setMode('browse')} />
+        <Suspense fallback={null}>
+          <TaxonomyManager onBack={() => setMode('browse')} />
+        </Suspense>
       ) : (
         <div className={showPanel ? 'library-grid with-detail' : 'library-grid'}>
           <aside className="library-nav" aria-label={t('docs.navigation')}>
@@ -238,12 +262,18 @@ function LibraryInner() {
 
           {showPanel && (
             <aside className="detail-pane" aria-label={t('docs.details')} data-testid="detail-pane" onKeyDown={(e) => e.key === 'Escape' && setDetailOpen(false)}>
-              {single ? <DocumentCard key={single} docId={single} onClose={() => setDetailOpen(false)} /> : <BulkTagEditor docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onClose={() => setDetailOpen(false)} />}
+              <Suspense fallback={null}>
+                {single ? <DocumentCard key={single} docId={single} onClose={() => setDetailOpen(false)} /> : <BulkTagEditor docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onClose={() => setDetailOpen(false)} />}
+              </Suspense>
             </aside>
           )}
         </div>
       )}
-      {addOpen && <AddToProject docIds={selectedIds} onClose={() => setAddOpen(false)} />}
+      {addOpen && (
+        <Suspense fallback={null}>
+          <AddToProject docIds={selectedIds} onClose={() => setAddOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }

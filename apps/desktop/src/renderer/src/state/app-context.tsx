@@ -48,7 +48,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSettings(s);
       setProfiles(list.profiles);
       setActiveId(list.activeLibraryId);
-      void applyLanguage(s.uiLanguage);
+      // The dictionary of the stored language loads (one small chunk) before the first screen is drawn.
+      await applyLanguage(s.uiLanguage);
       if (list.activeLibraryId) {
         setConfig(await rl.invoke('library:getConfig', {}).catch(() => null));
       } else {
@@ -56,6 +57,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       setLoadError(null);
     } catch (e) {
+      if (!i18n.language) await applyLanguage('it').catch(() => {});
       setLoadError(e);
     } finally {
       setReady(true);

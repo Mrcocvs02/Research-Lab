@@ -267,6 +267,10 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
       const all = sorted(state.docs.filter((d) => matches(d, '', p.filters)), p.sort ?? 'title');
       return { total: all.length, items: all.slice(p.offset ?? 0, (p.offset ?? 0) + (p.limit ?? 50)).map(summary) };
     },
+    'documents:ids': (p) => {
+      const rows = sorted(state.docs.filter((d) => matches(d, p.text ?? '', p.filters)), !p.sort || p.sort === 'relevance' ? 'title' : p.sort);
+      return { total: rows.length, ids: rows.slice(0, p.limit ?? 50_000).map((d) => d.docId) };
+    },
     'documents:get': (p) => {
       const d = state.docs.find((x) => x.docId === p.docId);
       if (!d) throw new AppError('NOT_FOUND', 'doc');

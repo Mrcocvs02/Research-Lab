@@ -170,6 +170,7 @@
       "read": "Letto"
     },
     "sort": "Ordina per",
+    "showMissing": "Mostra documenti mancanti",
     "sorts": {
       "relevance": "Pertinenza",
       "title": "Titolo",

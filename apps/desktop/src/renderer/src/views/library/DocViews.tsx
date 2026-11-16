@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppError } from '@rl/core';
+import { RlError } from '../../lib/rl-error';
 import { VirtualList } from '../../components/VirtualList';
 import { rl } from '../../lib/rl';
 import { useNotify } from '../../lib/notify';
@@ -167,7 +167,7 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
 
   const openFile = useCallback(
     (docId: string) =>
-      rl.invoke('documents:open', { docId }).catch((e: unknown) => (AppError.from(e).code === 'PERMISSION_DENIED' ? fail(t('docs.openRefused')) : reportError(e))),
+      rl.invoke('documents:open', { docId }).catch((e: unknown) => (RlError.from(e).code === 'PERMISSION_DENIED' ? fail(t('docs.openRefused')) : reportError(e))),
     [reportError, fail, t],
   );
   const reveal = useCallback((docId: string) => rl.invoke('documents:reveal', { docId }).catch(reportError), [reportError]);

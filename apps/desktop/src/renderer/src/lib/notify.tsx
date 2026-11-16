@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppError } from '@rl/core';
+import { RlError } from './rl-error';
 import { errorMessage } from './errors';
 import { useLibraryEvents } from './events';
 
@@ -47,7 +47,7 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
       info: (text) => push({ kind: 'info', text }),
       fail: (text) => push({ kind: 'error', text }),
       reportError: (error) => {
-        const conflict = AppError.from(error).code === 'CONFLICT';
+        const conflict = RlError.from(error).code === 'CONFLICT';
         push(
           conflict
             ? { kind: 'error', text: errorMessage(error, t), action: { label: t('notify.reload'), run: invalidateAll } }

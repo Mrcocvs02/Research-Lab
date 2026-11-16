@@ -118,3 +118,8 @@ I test pesanti girano solo con `RL_HEAVY_TESTS=1`, uno script alla volta e mai i
 
 Picchi di memoria misurati con `tools/mem-sample.mjs` (2026-11-16, macchina di sviluppo): `npm test` ~0,6 GiB; `npm run test:e2e` ~0,9 GiB (più la build); test pesanti ~1,1 GiB ciascuno.
 Ogni script controlla prima la memoria disponibile (`tools/mem-guard.mjs`: 1,2 GiB unitari, 2 GiB e2e, 2,5 GiB pesanti) e interrompe il comando se durante l'esecuzione la memoria disponibile scende sotto la soglia di `--abort-below` (`tools/mem-sample.mjs`). `RL_SKIP_MEM_GUARD=1` salta solo il controllo iniziale.
+
+## Budget di leggerezza
+- `tools/budgets.json` fissa le soglie: JS iniziale del renderer (script di `index.html`, import statici e dizionario della lingua attiva), JS e totale del renderer, JS del main, preload, memoria totale a riposo e tempo al primo contenuto. Valori misurati dopo l'ottimizzazione più il 15 %; alzarli richiede una decisione in `DECISIONS.md`.
+- `npm run check:budget` (dopo `npm run build`) controlla le dimensioni dei bundle e dice quale soglia è superata e quali chunk carica la prima schermata; `node tools/check-budget.mjs --json` stampa i valori misurati.
+- `e2e/qa-budget.spec.ts` (`npx playwright test -c e2e/playwright.config.ts qa-budget`, dopo la build): libreria sintetica di 40 documenti creata e scansionata, poi secondo avvio; misura il tempo dall'avvio del processo alle prime righe della vista Libreria e la somma dei working set di `app.getAppMetrics()` dopo 10 s di inattività (il worker si chiude dopo 3 s con `RL_WORKER_IDLE_MS`). Stampa `BUDGET-MEASURE {...}`. Le soglie di tempo dipendono dalla macchina: un superamento isolato va ripetuto prima di indagare.

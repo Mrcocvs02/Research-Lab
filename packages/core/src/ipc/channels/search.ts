@@ -4,7 +4,7 @@ import { studyStateSchema } from '../../model/document.js';
 import { defineChannels } from '../registry.js';
 import { scanStatusSchema } from './scan.js';
 
-export const SEARCH_LIMITS = { text: 500, listMax: 200, filterValues: 50 } as const;
+export const SEARCH_LIMITS = { text: 500, listMax: 200, filterValues: 50, idsMax: 50_000 } as const;
 
 /**
  * Match markers in snippets: control characters, removed from every indexed text, so document content can

@@ -523,6 +523,34 @@ describe('match markers and pagination (D-080)', () => {
   });
 });
 
+describe('ids (select all)', () => {
+  it('lists the same ids, in the same order and with the same total, as the pages of the same query', async () => {
+    await index.upsertMany([
+      makeDoc({ seed: '1', title: 'Beta zeta', year: 2020, tags: ['x'] }),
+      makeDoc({ seed: '2', title: 'alpha zeta zeta', year: 2022, tags: ['x'] }),
+      makeDoc({ seed: '3', title: 'Gamma', year: null, tags: ['y'] }),
+      { ...makeDoc({ seed: '4', title: 'Gone zeta', tags: ['x'] }), record: { ...makeDoc({ seed: '4', title: 'Gone zeta', tags: ['x'] }).record, missing: true } },
+    ]);
+    const queries = [
+      { text: '' },
+      { text: '', sort: 'year-asc' as const },
+      { text: 'zeta' },
+      { text: 'zeta', sort: 'year-desc' as const },
+      { text: '', filters: { tags: ['x'] } },
+      { text: 'zeta', filters: { includeMissing: true }, sort: 'title' as const },
+      { text: 'nothingmatches' },
+    ];
+    for (const q of queries) {
+      const page = await index.searchPage({ ...q, limit: 200 });
+      const r = await index.ids(q);
+      expect(r.ids, JSON.stringify(q)).toEqual(page.hits.map((h) => h.docId));
+      expect(r.total, JSON.stringify(q)).toBe(page.total);
+    }
+    expect((await index.ids({ text: '', limit: 2 })).ids).toHaveLength(2);
+    expect((await index.ids({ text: '', limit: 2 })).total).toBe(3);
+  });
+});
+
 describe('missing documents and direct tags', () => {
   it('lists, searches and counts leave missing documents out unless asked', async () => {
     await index.upsertMany([

@@ -195,6 +195,10 @@ export async function searchViaUi(window: Page, text: string): Promise<string[]>
   const input = window.getByTestId('search-input');
   await input.fill(text);
   await input.press('Enter').catch(() => {});
+  // Wait for the answer to this very text, not a list left over from an earlier query.
+  const pane = window.getByTestId('results-pane');
+  await expect(pane).toHaveAttribute('data-query', text, { timeout: 30_000 });
+  await expect(pane).toHaveAttribute('aria-busy', 'false', { timeout: 30_000 });
   const results = window.getByTestId('search-result');
   await expect(results.first()).toBeVisible({ timeout: 30_000 });
   return results.allTextContents();

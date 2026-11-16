@@ -34,7 +34,7 @@ export function LibraryView() {
   }, [status?.state, app.activeLibraryId, start]);
 
   const refreshKey = `${status?.state ?? 'none'}:${status?.indexed ?? 0}`;
-  const { results, facets, loading, error } = useSearch(state, Boolean(app.activeLibraryId), refreshKey);
+  const { results, facets, loading, error, forText } = useSearch(state, Boolean(app.activeLibraryId), refreshKey);
   const running = status?.state === 'running';
   // A new text, filter or sort starts again from the first page of results.
   const set = (patch: Partial<SearchState>) => setState((s) => ({ ...s, limit: PAGE_SIZE, ...patch }));
@@ -92,7 +92,7 @@ export function LibraryView() {
 
       <div className="library-body">
         <Facets facets={facets} filters={state.filters} onChange={(filters) => set({ filters })} />
-        <section className="results-pane" aria-live="polite" aria-busy={loading}>
+        <section className="results-pane" aria-live="polite" aria-busy={loading} data-testid="results-pane" data-query={forText ?? ''}>
           {results && (
             <p className="results-summary" data-testid="search-summary">
               {t('search.results', { count: results.total })} · {t('search.took', { ms: Math.round(results.tookMs) })}

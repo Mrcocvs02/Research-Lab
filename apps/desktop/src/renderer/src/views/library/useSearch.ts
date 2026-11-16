@@ -17,6 +17,8 @@ export interface SearchResultState {
   facets: SearchFacetsData | null;
   loading: boolean;
   error: unknown;
+  /** The text the current `results` answer (lets the view and tests tell stale results from fresh ones). */
+  forText?: string;
 }
 
 const DEBOUNCE_MS = 180;
@@ -41,7 +43,7 @@ export function useSearch(state: SearchState, enabled: boolean, refreshKey: stri
         rl.invoke('search:facets', { text: state.text, filters: state.filters }),
       ]).then(
         ([results, facets]) => {
-          if (mine === ticket.current) setOut({ results, facets, loading: false, error: null });
+          if (mine === ticket.current) setOut({ results, facets, loading: false, error: null, forText: state.text });
         },
         (error: unknown) => {
           if (mine === ticket.current) setOut((o) => ({ ...o, loading: false, error }));

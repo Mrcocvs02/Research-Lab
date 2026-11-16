@@ -30,6 +30,7 @@ describe('runtime switches are development-only', () => {
     RL_E2E: '1',
     RL_E2E_DIALOG_PATH: ABS('picked'),
     RL_E2E_OFFLINE: '1',
+    RL_E2E_HIDDEN: '1',
     RL_USER_DATA_DIR: ABS('u'),
     RL_LOCAL_DATA_DIR: ABS('l'),
     ELECTRON_RENDERER_URL: 'http://localhost:5173',
@@ -37,7 +38,7 @@ describe('runtime switches are development-only', () => {
 
   it('an installed app (isPackaged) ignores every one of them and says so', () => {
     const rt = resolveRuntimeConfig(hostile, true);
-    expect(rt).toMatchObject({ userDataDir: null, localDataDir: null, dialogPath: null, rendererDevUrl: null });
+    expect(rt).toMatchObject({ userDataDir: null, localDataDir: null, dialogPath: null, hiddenWindow: false, rendererDevUrl: null });
     for (const name of Object.keys(hostile)) expect(rt.warnings.join(' ')).toContain(name);
     expect(resolveRuntimeConfig({}, true).warnings).toEqual([]);
   });
@@ -54,6 +55,7 @@ describe('runtime switches are development-only', () => {
       userDataDir: ABS('u'),
       localDataDir: ABS('l'),
       dialogPath: ABS('picked'),
+      hiddenWindow: true,
       rendererDevUrl: 'http://localhost:5173',
       warnings: [],
     });

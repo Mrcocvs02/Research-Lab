@@ -174,6 +174,8 @@ export async function launchApp(options: LaunchOptions = {}): Promise<LaunchedAp
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.RL_FIXTURE_LIBRARY; // the app never sees where the real library lives
     Object.assign(env, { RL_USER_DATA_DIR: userDataDir, RL_LOCAL_DATA_DIR: localDataDir, NODE_ENV: 'production' });
+    // Test windows stay hidden (still rendered) unless RL_E2E_SHOW=1 is set to watch a run.
+    if (process.env.RL_E2E_SHOW !== '1') env.RL_E2E_HIDDEN = '1';
     if (options.dialogPath !== undefined) {
       const dialogPath = options.dialogPath === true ? libRoot : options.dialogPath;
       if (!dialogPath) throw new Error('dialogPath: true needs the `library` option');

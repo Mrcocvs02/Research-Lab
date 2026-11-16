@@ -24,7 +24,7 @@ export const settingsHandlers = (s: MainServices): DomainHandlers<'settings'> =>
   'settings:set': (patch) => s.settings.update((cur) => applyPatch(cur, patch)),
 });
 
-export const libraryHandlers = (s: MainServices): DomainHandlers<'library'> => ({
+export const libraryHandlers = (s: MainServices): Omit<DomainHandlers<'library'>, 'library:tree'> => ({
   'library:create': (req) => s.libraries.create(req),
   'library:list': () => s.libraries.list(),
   'library:setActive': async ({ libraryId }) => {

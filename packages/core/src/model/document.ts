@@ -11,6 +11,7 @@ export const DOCUMENT_LIMITS = {
   venueRef: 500,
   identifier: 300,
   shortText: 100,
+  userDescription: 2000,
   tags: 5000,
   paths: 1000,
   pathHistory: 200,
@@ -119,6 +120,8 @@ export const documentRecordSchema = z.object({
   ref: documentRefSchema.prefault({}),
   doi: z.string().max(L.identifier).nullable().default(null),
   arxivId: z.string().max(L.identifier).nullable().default(null),
+  /** The user's short description of the file (TagSpaces' per-file description); searchable, never written by the AI. */
+  userDescription: z.string().max(L.userDescription).optional(),
   publication: z
     .object({
       status: publicationStatusSchema.default('unknown'),

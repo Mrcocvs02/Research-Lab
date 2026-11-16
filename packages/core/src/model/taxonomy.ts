@@ -18,6 +18,10 @@ export const taxonomyNodeSchema = z.object({
   implies: z.array(itemIdSchema).default([]),
   status: taxonomyNodeStatusSchema.default('active'),
   origin: taxonomyOriginSchema.default('user'),
+  /** Display colour, `#rrggbb`. */
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  /** Ids of nodes merged into this one: a stale reference to them still resolves here. */
+  mergedFrom: z.array(itemIdSchema).optional(),
   /** Free grouping hint (e.g. imported "macro" | "micro" | "extra:<group>"). Not semantic. */
   group: z.string().optional(),
   createdAt: isoDateSchema.optional(),

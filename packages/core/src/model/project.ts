@@ -1,9 +1,7 @@
 import { z } from 'zod';
 import { studyStateSchema } from './document.js';
 import { documentIdSchema, isoDateSchema, itemIdSchema, schemaVersionSchema } from '../common.js';
-
-/** Upper bounds of the free text of a project. */
-export const PROJECT_LIMITS = { name: 200, description: 5000, notes: 200_000, note: 2000, members: 20_000 } as const;
+import { PROJECT_LIMITS } from '../limits.js';
 
 export const projectKindSchema = z.enum(['project', 'collection']);
 export const projectStatusSchema = z.enum(['active', 'paused', 'done', 'archived']);

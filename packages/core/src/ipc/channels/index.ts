@@ -27,7 +27,7 @@ export type EventName = keyof Events & string;
 
 export { appNoticeSchema, type AppNotice } from './app.js';
 export { scanStatusSchema, scanSummarySchema, type ScanStatus, type ScanSummary } from './scan.js';
-export { searchFiltersSchema, searchFacetsSchema, searchHitSchema, SEARCH_LIMITS, SEARCH_MARK_OPEN, SEARCH_MARK_CLOSE } from './search.js';
+export { searchFiltersSchema, searchFacetsSchema, searchHitSchema, SEARCH_MARK_OPEN, SEARCH_MARK_CLOSE } from './search.js';
 export { documentSummarySchema, documentViewSchema } from './documents.js';
 export { documentPatchSchema, type DocumentPatch } from './documents.js';
 export { folderNodeSchema } from './library.js';

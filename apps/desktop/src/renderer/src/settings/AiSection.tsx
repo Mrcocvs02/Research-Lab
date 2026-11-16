@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { libraryConfigSchema, type LibraryConfig, type ModelConfig, type ReasoningLevel } from '@rl/core';
 import { FolderTree, type FolderEntry } from '../components/FolderTree';
@@ -178,10 +178,13 @@ export function AiSection() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [logKey, setLogKey] = useState(0);
+  // The config that our own save produced comes back through `app.refresh()`: it must not hide the "Saved" note.
+  const ownSave = useRef(false);
 
   useEffect(() => {
     setDraft(config ? toDraft(config) : null);
-    setSaved(false);
+    if (ownSave.current) ownSave.current = false;
+    else setSaved(false);
   }, [config, libraryId]);
 
   const check = useMemo(() => {
@@ -228,6 +231,7 @@ export function AiSection() {
     setError(null);
     try {
       await rl.invoke('library:setConfig', { libraryId, patch: { aiEnabledFolders: check.data.aiEnabledFolders, ai: check.data.ai } });
+      ownSave.current = true;
       await app.refresh();
       setSaved(true);
       setLogKey((k) => k + 1);

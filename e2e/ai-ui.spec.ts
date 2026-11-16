@@ -101,7 +101,8 @@ test('enable a folder, preview and confirm, streamed answer with card and chip, 
     second = await electron.launch({ args: [DESKTOP_DIR], env });
     window = await second.firstWindow();
     await window.getByTestId('search-result').first().waitFor({ state: 'visible', timeout: 60_000 });
-    await window.getByTestId('chat-toggle').click(); // the panel starts closed; opening it is the first AI use
+    // The panel remembers whether it was left open (`rl.chatOpen`): open it only if it is closed.
+    if (!(await window.getByTestId('chat-content').isVisible())) await window.getByTestId('chat-toggle').click();
     await expect(window.getByTestId('chat-content')).toBeVisible({ timeout: 30_000 });
     await window.getByTestId('chat-history-toggle').click();
     const item = window.getByTestId('history-item').first();

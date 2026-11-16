@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { libraryConfigSchema, type ExportPreset, type Language, type LibraryConfig } from '@rl/core';
 import { FolderTree, type FolderEntry } from '../components/FolderTree';
@@ -51,9 +51,12 @@ export function LibraryConfigSection() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
+  // The config that our own save produced comes back through `app.refresh()`: it must not hide the "Saved" note.
+  const ownSave = useRef(false);
   useEffect(() => {
     setDraft(config ? toDraft(config) : null);
-    setSaved(false);
+    if (ownSave.current) ownSave.current = false;
+    else setSaved(false);
   }, [config, libraryId]);
 
   const check = useMemo(() => {
@@ -110,6 +113,7 @@ export function LibraryConfigSection() {
           mcp: c.mcp,
         },
       });
+      ownSave.current = true;
       await app.refresh();
       setSaved(true);
     } catch (e) {

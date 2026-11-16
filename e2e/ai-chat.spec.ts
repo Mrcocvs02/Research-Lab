@@ -62,11 +62,11 @@ test('chat with the mock provider: stream, gate, log, persistence, untouched ori
     const hashBefore = sha(await readFile(path.join(root, allowedRel)));
 
     // Nothing is enabled yet: nothing may go.
-    expect((await ipcData<{ enabledFolders: string[] }>(window, 'ai:status')).enabledFolders).toEqual([]);
+    expect((await ipcData<{ enabledFolders: string[] }>(window, 'ai:status', {})).enabledFolders).toEqual([]);
     expect((await ipc(window, 'chat:send', { text: 'Summarize this paper', model: 'claude-haiku-5-5', reasoning: 'low', contextDocIds: [allowed] })).error?.code).toBe('FOLDER_NOT_AI_ENABLED');
 
     await ipcData(window, 'library:setConfig', { patch: { aiEnabledFolders: ['papers'], ai: { confirmBeforeSend: false } } });
-    const status = await ipcData<{ provider: string; available: boolean; enabledFolders: string[] }>(window, 'ai:status');
+    const status = await ipcData<{ provider: string; available: boolean; enabledFolders: string[] }>(window, 'ai:status', {});
     expect(status).toMatchObject({ provider: 'mock', available: true, enabledFolders: ['papers'] });
 
     const preview = await ipcData<{ allowed: string[]; refused: Array<{ docId: string; reason: string }> }>(window, 'ai:preview', {
@@ -118,7 +118,7 @@ test('chat with the mock provider: stream, gate, log, persistence, untouched ori
     const again = await ipcData<{ turns: Array<{ text: string }> }>(w2, 'chat:get', { conversationId: sent.conversationId });
     expect(again.turns[1]!.text).toBe(text);
     expect((await ipcData<{ items: unknown[] }>(w2, 'ai:log', {})).items.length).toBeGreaterThanOrEqual(1);
-    expect((await ipcData<{ enabledFolders: string[] }>(w2, 'ai:status')).enabledFolders).toEqual(['papers']);
+    expect((await ipcData<{ enabledFolders: string[] }>(w2, 'ai:status', {})).enabledFolders).toEqual(['papers']);
     expect(await ipcData(w2, 'chat:delete', { conversationId: sent.conversationId })).toEqual({ deleted: true });
     expect((await ipcData<{ items: unknown[] }>(w2, 'chat:list', {})).items).toEqual([]);
 

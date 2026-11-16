@@ -2,7 +2,7 @@
  * Layout of the search index file. The file is local and rebuildable (never synced): when
  * `INDEX_SCHEMA_VERSION` differs from the one stored in the file, everything is dropped and refilled.
  */
-export const INDEX_SCHEMA_VERSION = 2;
+export const INDEX_SCHEMA_VERSION = 3;
 
 /** Page rows of `page_fts` have rowid = docs.id * PAGE_ROWID_BASE + page, so a document's pages are one rowid range. */
 export const PAGE_ROWID_BASE = 1_000_000;
@@ -40,14 +40,16 @@ CREATE TABLE docs (
   missing INTEGER NOT NULL DEFAULT 0,
   text_hash TEXT,
   stamp TEXT NOT NULL DEFAULT '',
-  page_count INTEGER NOT NULL DEFAULT 0
+  page_count INTEGER NOT NULL DEFAULT 0,
+  size INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX docs_year ON docs(year);
 CREATE INDEX docs_folder ON docs(folder);
 CREATE TABLE doc_author (doc INTEGER NOT NULL, name TEXT NOT NULL, norm TEXT NOT NULL);
 CREATE INDEX doc_author_doc ON doc_author(doc);
 CREATE INDEX doc_author_norm ON doc_author(norm);
-CREATE TABLE doc_tag (doc INTEGER NOT NULL, tag TEXT NOT NULL, terms TEXT NOT NULL);
+-- up = 1: not a tag of the document but an ancestor of one (found by tag filters, never listed in facets)
+CREATE TABLE doc_tag (doc INTEGER NOT NULL, tag TEXT NOT NULL, terms TEXT NOT NULL, up INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX doc_tag_doc ON doc_tag(doc);
 CREATE INDEX doc_tag_tag ON doc_tag(tag);
 CREATE VIRTUAL TABLE doc_fts USING fts5(${DOC_FTS_COLUMNS.join(', ')}, ${TOKENIZER}, ${DOC_PREFIX});

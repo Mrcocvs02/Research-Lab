@@ -61,12 +61,13 @@ export function buildTaxonomyView(tax: TaxonomyFile, docs: readonly DocInfo[]): 
 }
 
 /**
- * Nodes whose search terms or implications changed between two taxonomies: the changed nodes themselves and
- * every node that implies one of them (directly or not), seen in either version.
+ * Nodes whose index entry may differ between two taxonomies: the changed ones (search terms, implications, parents)
+ * and every node whose indexed tag set (itself, what it implies, and the ancestors of those) contains one of them,
+ * seen in either version.
  */
 export function affectedNodeIds(before: TaxonomyFile, after: TaxonomyFile): Set<string> {
-  // Only what the index reads: the label and aliases (search terms) and the implications (indexed tags).
-  const key = (n: TaxonomyFile['nodes'][number]) => canonical({ label: n.label, aliases: n.aliases, implies: n.implies });
+  // Only what the index reads: the label and aliases (search terms), the implications (indexed tags) and the parents (ancestor tags).
+  const key = (n: TaxonomyFile['nodes'][number]) => canonical({ label: n.label, aliases: n.aliases, implies: n.implies, parents: n.parents });
   const b = new Map(before.nodes.map((n) => [n.id, key(n)]));
   const a = new Map(after.nodes.map((n) => [n.id, key(n)]));
   const changed = new Set<string>();
@@ -75,8 +76,25 @@ export function affectedNodeIds(before: TaxonomyFile, after: TaxonomyFile): Set<
   if (changed.size === 0) return changed;
   const out = new Set(changed);
   for (const tax of [before, after]) {
+    const byId = new Map(tax.nodes.map((n) => [n.id, n]));
     for (const n of tax.nodes) {
-      if (expandTags(tax.nodes, [n.id]).some((x) => changed.has(x))) out.add(n.id);
+      const own = expandTags(tax.nodes, [n.id]);
+      const seen = new Set<string>(own);
+      const stack = [...own];
+      while (stack.length > 0) {
+        for (const p of byId.get(stack.pop() as string)?.parents ?? []) {
+          if (!seen.has(p)) {
+            seen.add(p);
+            stack.push(p);
+          }
+        }
+      }
+      for (const x of seen) {
+        if (changed.has(x)) {
+          out.add(n.id);
+          break;
+        }
+      }
     }
   }
   return out;

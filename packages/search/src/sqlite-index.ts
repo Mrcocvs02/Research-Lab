@@ -47,6 +47,7 @@ interface DocRow {
   tags: string;
   added_at: string;
   missing: number;
+  size: number;
 }
 
 interface Where {
@@ -65,7 +66,15 @@ function buildWhere(f: SearchFilters | undefined, t: TextFilters | undefined): W
     cond.push(`EXISTS (SELECT 1 FROM ${table} x WHERE x.doc = d.id AND ${inner})`);
     params.push(...p);
   };
+  // A tag filter matches the document's tags (implications already expanded) and ancestors of them (`up` rows).
   for (const tag of f?.tags ?? []) exists('doc_tag', 'x.tag = ?', tag.toLowerCase());
+  const any = (f?.tagsAny ?? []).map((x) => x.toLowerCase());
+  if (any.length) exists('doc_tag', `x.tag IN (${any.map(() => '?').join(',')})`, ...any);
+  const none = (f?.tagsExclude ?? []).map((x) => x.toLowerCase());
+  if (none.length) {
+    cond.push(`NOT EXISTS (SELECT 1 FROM doc_tag x WHERE x.doc = d.id AND x.tag IN (${none.map(() => '?').join(',')}))`);
+    params.push(...none);
+  }
   for (const name of f?.authors ?? []) exists('doc_author', 'x.norm = ?', normalizeText(name));
   for (const term of t?.tags ?? []) exists('doc_tag', "(x.tag = ? OR x.terms LIKE ? ESCAPE '\\')", term, `%${likeEscape(term)}%`);
   for (const term of t?.authors ?? []) exists('doc_author', "x.norm LIKE ? ESCAPE '\\'", `%${likeEscape(term)}%`);
@@ -89,10 +98,23 @@ function buildWhere(f: SearchFilters | undefined, t: TextFilters | undefined): W
     cond.push(`d.study IN (${f.studyStates.map(() => '?').join(',')})`);
     params.push(...f.studyStates);
   }
-  const folders = (f?.folders ?? []).map((p) => p.replace(/^\/+|\/+$/g, '')).filter(Boolean);
+  const folders = (f?.folders ?? []).map(cleanFolder).filter(Boolean);
   if (folders.length) {
-    cond.push(`(${folders.map(() => "d.folder = ? OR d.folder LIKE ? ESCAPE '\\'").join(' OR ')})`);
-    for (const folder of folders) params.push(folder, `${likeEscape(folder)}/%`);
+    cond.push(`(${folders.map(() => 'd.folder = ? OR (d.folder >= ? AND d.folder < ?)').join(' OR ')})`);
+    for (const folder of folders) params.push(folder, `${folder}/`, `${folder}0`);
+  }
+  if (f?.folder !== undefined) {
+    const folder = cleanFolder(f.folder);
+    const sub = f.includeSubfolders !== false;
+    if (folder === '') {
+      if (!sub) cond.push("d.folder = ''");
+    } else if (sub) {
+      cond.push('(d.folder = ? OR (d.folder >= ? AND d.folder < ?))');
+      params.push(folder, `${folder}/`, `${folder}0`);
+    } else {
+      cond.push('d.folder = ?');
+      params.push(folder);
+    }
   }
   const from = Math.max(f?.yearFrom ?? -Infinity, t?.yearFrom ?? -Infinity);
   const to = Math.min(f?.yearTo ?? Infinity, t?.yearTo ?? Infinity);
@@ -107,12 +129,18 @@ function buildWhere(f: SearchFilters | undefined, t: TextFilters | undefined): W
   return { sql: cond.join(' AND '), params };
 }
 
+/** A folder path as stored in the index: no empty or `.` segments, no outer slashes. */
+const cleanFolder = (p: string): string => p.split('/').filter((x) => x !== '' && x !== '.').join('/');
+
+/** Everything below `a/b` has a folder in ["a/b/", "a/b0") ('0' is the character after '/'), so `a/bc` is outside it. */
 const ORDER: Record<Exclude<SearchSort, 'relevance'>, string> = {
   title: "d.title_sort = '', d.title_sort, d.id",
   'year-desc': 'd.year IS NULL, d.year DESC, d.title_sort, d.id',
   'year-asc': 'd.year IS NULL, d.year ASC, d.title_sort, d.id',
   'added-desc': 'd.added_at DESC, d.title_sort, d.id',
   author: "d.author_sort = '', d.author_sort, d.title_sort, d.id",
+  'size-desc': 'd.size DESC, d.title_sort, d.id',
+  'size-asc': 'd.size ASC, d.title_sort, d.id',
 };
 
 const clampLimit = (n: number | undefined) => Math.max(1, Math.min(MAX_LIMIT, Math.floor(n ?? DEFAULT_LIMIT)));
@@ -269,7 +297,7 @@ export class SqliteSearchIndex implements SearchIndex {
     const folder = slash === -1 ? '' : r.path.slice(0, slash);
     db.prepare(
       `UPDATE docs SET title=?, title_sort=?, authors=?, author_sort=?, year=?, type=?, type_norm=?, type_label_norm=?,
-       venue=?, venue_norm=?, path=?, folder=?, study=?, tags=?, added_at=?, missing=?, stamp=? WHERE id=?`,
+       venue=?, venue_norm=?, path=?, folder=?, study=?, tags=?, added_at=?, missing=?, stamp=?, size=? WHERE id=?`,
     ).run(
       title,
       normalizeText(title ?? ''),
@@ -288,6 +316,7 @@ export class SqliteSearchIndex implements SearchIndex {
       r.addedAt,
       r.missing ? 1 : 0,
       `${r.revision}:${r.updatedAt}`,
+      r.size,
       id,
     );
 
@@ -299,12 +328,18 @@ export class SqliteSearchIndex implements SearchIndex {
       seenAuthors.add(norm);
       insAuthor.run(id, name, norm);
     }
-    const insTag = db.prepare('INSERT INTO doc_tag(doc, tag, terms) VALUES (?, ?, ?)');
+    const insTag = db.prepare('INSERT INTO doc_tag(doc, tag, terms, up) VALUES (?, ?, ?, ?)');
     const tagWords: string[] = [];
     for (const tag of r.tags) {
       const terms = doc.tagTerms?.[tag] ?? [tag];
       tagWords.push(...terms.map(stripControl));
-      insTag.run(id, tag, `|${terms.map((x) => normalizeText(x)).join('|')}|`);
+      insTag.run(id, tag, `|${terms.map((x) => normalizeText(x)).join('|')}|`, 0);
+    }
+    const own = new Set(r.tags);
+    for (const tag of doc.tagAncestors ?? []) {
+      if (own.has(tag)) continue;
+      const terms = doc.tagTerms?.[tag] ?? [tag];
+      insTag.run(id, tag, `|${terms.map((x) => normalizeText(x)).join('|')}|`, 1);
     }
 
     db.prepare(
@@ -536,6 +571,8 @@ export class SqliteSearchIndex implements SearchIndex {
       type: r.type,
       path: r.path,
       studyState: studyOf(r.study),
+      size: r.size,
+      tags: parseJsonArray(r.tags),
     };
   }
 
@@ -559,7 +596,7 @@ export class SqliteSearchIndex implements SearchIndex {
     return {
       total,
       tags: buckets(
-        `SELECT t.tag AS value, count(*) AS count FROM doc_tag t WHERE t.doc IN (${from}) GROUP BY t.tag ORDER BY count DESC, value LIMIT ${FACET_LIMITS.tags}`,
+        `SELECT t.tag AS value, count(*) AS count FROM doc_tag t WHERE t.up = 0 AND t.doc IN (${from}) GROUP BY t.tag ORDER BY count DESC, value LIMIT ${FACET_LIMITS.tags}`,
       ),
       authors: buckets(
         `SELECT min(a.name) AS value, count(*) AS count FROM doc_author a WHERE a.doc IN (${from}) GROUP BY a.norm ORDER BY count DESC, value LIMIT ${FACET_LIMITS.authors}`,
@@ -601,6 +638,7 @@ export class SqliteSearchIndex implements SearchIndex {
         tags: parseJsonArray(r.tags),
         addedAt: r.added_at,
         missing: r.missing === 1,
+        size: r.size,
       })),
     };
   }

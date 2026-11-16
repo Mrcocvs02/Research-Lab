@@ -14,6 +14,7 @@ export interface FakeDoc {
   studyState: 'to-read' | 'reading' | 'read';
   tags: string[];
   addedAt: string;
+  size?: number;
   missing?: boolean;
   revision?: number;
   userDescription?: string;
@@ -62,6 +63,7 @@ export function makeDocs(n: number): FakeDoc[] {
     studyState: (['to-read', 'reading', 'read'] as const)[i % 3]!,
     tags: [],
     addedAt: `2026-01-${String((i % 28) + 1).padStart(2, '0')}T00:00:00.000Z`,
+    size: 1000 + ((i * 7919) % 5000) * 37,
   }));
 }
 
@@ -128,12 +130,20 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     tags: tagsWithImplied(d),
     addedAt: d.addedAt,
     missing: Boolean(d.missing),
+    size: d.size ?? 1234,
   });
   const matches = (d: FakeDoc, text: string, f: any = {}) => {
     const t = (text ?? '').trim().toLowerCase();
     if (t && !`${d.title} ${d.authors.join(' ')}`.toLowerCase().includes(t)) return false;
-    for (const tag of f.tags ?? []) if (!tagsWithImplied(d).some((x) => descendantsOf(tag).has(x))) return false;
-    if (f.folders?.length && !f.folders.some((p: string) => d.path === p || d.path.startsWith(`${p}/`))) return false;
+    const has = (tag: string) => tagsWithImplied(d).some((x) => descendantsOf(tag).has(x));
+    for (const tag of f.tags ?? []) if (!has(tag)) return false;
+    if (f.tagsAny?.length && !f.tagsAny.some(has)) return false;
+    if (f.tagsExclude?.some(has)) return false;
+    const dir = d.path.includes('/') ? d.path.slice(0, d.path.lastIndexOf('/')) : '';
+    const inside = (p: string) => dir === p || dir.startsWith(`${p}/`);
+    if (f.folders?.length && !f.folders.some(inside)) return false;
+    if (f.folder !== undefined && f.folder !== '' && !(f.includeSubfolders === false ? dir === f.folder : inside(f.folder))) return false;
+    if (f.folder === '' && f.includeSubfolders === false && dir !== '') return false;
     if (f.studyStates?.length && !f.studyStates.includes(d.studyState)) return false;
     if (f.authors?.length && !f.authors.every((a: string) => d.authors.includes(a))) return false;
     if (f.yearFrom && (d.year ?? 0) < f.yearFrom) return false;
@@ -145,6 +155,8 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
       if (sort === 'year-desc') return (b.year ?? 0) - (a.year ?? 0);
       if (sort === 'year-asc') return (a.year ?? 0) - (b.year ?? 0);
       if (sort === 'added-desc') return b.addedAt.localeCompare(a.addedAt);
+      if (sort === 'size-desc') return (b.size ?? 1234) - (a.size ?? 1234);
+      if (sort === 'size-asc') return (a.size ?? 1234) - (b.size ?? 1234);
       if (sort === 'author') return (a.authors[0] ?? '').localeCompare(b.authors[0] ?? '');
       return (a.title ?? '').localeCompare(b.title ?? '');
     });
@@ -163,7 +175,7 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     years: bucket(docs.filter((d) => d.year).map((d) => String(d.year))),
     folders: [],
   });
-  const hit = (d: FakeDoc) => ({ docId: d.docId, title: d.title, authors: d.authors, year: d.year, type: d.type, path: d.path, studyState: d.studyState, score: 1, field: 'title', snippet: d.title ?? '' });
+  const hit = (d: FakeDoc) => ({ docId: d.docId, title: d.title, authors: d.authors, year: d.year, type: d.type, path: d.path, studyState: d.studyState, score: 1, field: 'title', snippet: d.title ?? '', size: d.size ?? 1234, tags: tagsWithImplied(d) });
 
   const counts = (n: FakeNode) => {
     const direct = state.docs.filter((d) => d.tags.includes(n.id)).length;

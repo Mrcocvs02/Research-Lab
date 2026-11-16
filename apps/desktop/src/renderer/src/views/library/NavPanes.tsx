@@ -67,12 +67,8 @@ export function FolderPane({ folder, includeSub, onSelect, onIncludeSub, reloadK
         (e: unknown) => alive && setError(e),
       );
     void load();
-    // The main process reuses its document list for about a second and a half: ask once more after that, so a
-    // change that landed inside the window (the end of a scan) is not missed.
-    const again = setTimeout(() => void load(), 1800);
     return () => {
       alive = false;
-      clearTimeout(again);
     };
   }, [version, reloadKey]);
 

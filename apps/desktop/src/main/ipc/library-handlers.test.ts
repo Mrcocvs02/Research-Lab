@@ -29,6 +29,8 @@ function setup() {
             type: null,
             path: 'x/y.pdf',
             studyState: 'to-read' as const,
+            size: 10,
+            tags: [],
           },
         ],
       };
@@ -97,6 +99,14 @@ describe('scan, index, search and documents handlers', () => {
     expect(code(await call('search:query', { text: 'x', limit: 5000 }))).toBe('INVALID_REQUEST');
     expect(code(await call('search:query', { text: 'x', filters: { folders: ['/abs'] } }))).toBe('INVALID_REQUEST');
     expect(code(await call('search:query', { text: 'x', sort: 'random' }))).toBe('INVALID_REQUEST');
+    // New in D-130: a folder filter is confined like any path; tag lists are bounded; size is a sort.
+    expect(code(await call('search:query', { text: 'x', filters: { folder: '/abs' } }))).toBe('INVALID_REQUEST');
+    expect(code(await call('search:query', { text: 'x', filters: { folder: 'a/../..' } }))).toBe('INVALID_REQUEST');
+    expect(code(await call('search:query', { text: 'x', filters: { tagsAny: Array.from({ length: 51 }, (_, i) => `t${i}`) } }))).toBe('INVALID_REQUEST');
+    expect(code(await call('search:query', { text: 'x', filters: { tagsExclude: [''] } }))).toBe('INVALID_REQUEST');
+    expect(code(await call('documents:list', { sort: 'random' }))).toBe('INVALID_REQUEST');
+    expect(code(await call('documents:list', { sort: 'size-desc', filters: { folder: 'a/b', includeSubfolders: false, tagsAny: ['t'], tagsExclude: ['u'] } }))).toBe('ok');
+    expect(code(await call('search:query', { text: 'x', sort: 'size-asc', filters: { folder: '' } }))).toBe('ok');
     expect(code(await call('search:query', { text: 'x', extra: 1 }))).toBe('ok'); // unknown keys are dropped, not trusted
     expect(code(await call('scan:start', { libraryId: '../x' }))).toBe('INVALID_REQUEST');
     expect(code(await call('documents:get', { docId: 'nothex' }))).toBe('INVALID_REQUEST');

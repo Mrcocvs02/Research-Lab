@@ -176,7 +176,9 @@
       "year-desc": "Anno, dal più recente",
       "year-asc": "Anno, dal più vecchio",
       "added-desc": "Aggiunti di recente",
-      "author": "Autore"
+      "author": "Autore",
+      "size-desc": "Dimensione, più grandi prima",
+      "size-asc": "Dimensione, più piccoli prima"
     },
     "more": "Mostra altri",
     "unavailable": "La ricerca non è disponibile per questa libreria: {{message}}"
@@ -419,6 +421,7 @@
     }
   },
   "docs": {
+    "sizeTitle": "{{bytes}} byte",
     "view": "Vista",
     "view_list": "Elenco",
     "view_grid": "Griglia",

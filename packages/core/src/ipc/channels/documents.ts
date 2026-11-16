@@ -16,6 +16,8 @@ export const documentSummarySchema = z.object({
   tags: z.array(z.string()),
   addedAt: isoDateSchema.or(z.literal('')),
   missing: z.boolean(),
+  /** File size in bytes. */
+  size: z.number().int().nonnegative(),
 });
 
 /**

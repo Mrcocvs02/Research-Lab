@@ -176,7 +176,9 @@
       "year-desc": "Year, newest first",
       "year-asc": "Year, oldest first",
       "added-desc": "Recently added",
-      "author": "Author"
+      "author": "Author",
+      "size-desc": "Size, largest first",
+      "size-asc": "Size, smallest first"
     },
     "more": "Show more",
     "unavailable": "Search is not available for this library: {{message}}"
@@ -419,6 +421,7 @@
     }
   },
   "docs": {
+    "sizeTitle": "{{bytes}} bytes",
     "view": "View",
     "view_list": "List",
     "view_grid": "Grid",

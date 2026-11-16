@@ -125,6 +125,14 @@ export class Organizer {
     this.history = new HistoryService(this.ctx);
   }
 
+  /**
+   * Drops the reused document list. For whoever writes records without going through this class (the scanner, an
+   * import): the next read lists the store again.
+   */
+  invalidate(): void {
+    this.cache = null;
+  }
+
   private run<T>(fn: () => Promise<T>): Promise<T> {
     const next = this.chain.then(fn, fn);
     this.chain = next.then(

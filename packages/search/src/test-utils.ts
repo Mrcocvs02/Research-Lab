@@ -16,6 +16,7 @@ export interface RecordInit {
   tags?: string[];
   state?: 'to-read' | 'reading' | 'read';
   addedAt?: string;
+  size?: number;
 }
 
 export function makeRecord(init: RecordInit): DocumentRecord {
@@ -24,7 +25,7 @@ export function makeRecord(init: RecordInit): DocumentRecord {
     id: hash.slice(0, 16),
     hash,
     path: init.path ?? `papers/${init.seed}.pdf`,
-    size: 100,
+    size: init.size ?? 100,
     mtimeMs: 1,
     type: init.type ?? null,
     title: init.title === undefined ? `Title ${init.seed}` : init.title,

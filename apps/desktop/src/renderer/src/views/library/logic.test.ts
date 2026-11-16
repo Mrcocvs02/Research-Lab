@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TaxonomyNodeView } from '@rl/core';
-import { initialBrowse, passesClient, planQuery, setTagFilter } from './docQuery';
+import { initialBrowse, planQuery, setTagFilter } from './docQuery';
 import { clickSelect, emptySelection, moveSelect, rangeHasHoles, selectAll, toggleActive } from './selection';
 import { canCreateTag, exactNode, suggestTags } from './tagSuggest';
 import { buildModel, canDelete, parentsAfterDrop, docMatchesTag, flattenTree, impliedClosure, impliesCycle, pathLabel, wouldCycle } from './taxonomyModel';
@@ -132,34 +132,24 @@ describe('taxonomy model', () => {
 });
 
 describe('query plan', () => {
-  const model = buildModel([node('a'), node('b', { parents: ['a'] }), node('c')]);
-  it('sends "all of" tags and the folder to the index', () => {
+  it('sends every condition to the index: all-of tags, folder with sub-folders', () => {
     const s = { ...initialBrowse(), folder: 'x/y', tags: { include: ['a', 'c'], exclude: [], mode: 'all' as const } };
-    const p = planQuery(s);
-    expect(p.filters).toMatchObject({ tags: ['a', 'c'], folders: ['x/y'] });
-    expect(p.client).toBeNull();
+    expect(planQuery(s).filters).toEqual({ tags: ['a', 'c'], folder: 'x/y', includeSubfolders: true });
   });
-  it('decides "any of", exclusion and "this folder only" on the client', () => {
-    const any = planQuery({ ...initialBrowse(), tags: { include: ['a', 'c'], exclude: [], mode: 'any' } });
-    expect(any.filters.tags).toBeUndefined();
-    expect(any.client?.anyTags).toEqual(['a', 'c']);
-    expect(passesClient(model, any.client!, { path: 'p.pdf', tags: ['b'] })).toBe(true);
-    expect(passesClient(model, any.client!, { path: 'p.pdf', tags: [] })).toBe(false);
-    const ex = planQuery({ ...initialBrowse(), tags: { include: ['a'], exclude: ['c'], mode: 'all' } });
-    expect(ex.filters.tags).toEqual(['a']);
-    expect(passesClient(model, ex.client!, { path: 'p.pdf', tags: ['b', 'c'] })).toBe(false);
-    expect(passesClient(model, ex.client!, { path: 'p.pdf', tags: ['b'] })).toBe(true);
-    const exact = planQuery({ ...initialBrowse(), folder: 'x', includeSub: false });
-    expect(passesClient(model, exact.client!, { path: 'x/p.pdf', tags: [] })).toBe(true);
-    expect(passesClient(model, exact.client!, { path: 'x/y/p.pdf', tags: [] })).toBe(false);
-    expect(passesClient(model, planQuery({ ...initialBrowse(), folder: '', includeSub: false }).client!, { path: 'p.pdf', tags: [] })).toBe(true);
+  it('maps "any of", exclusion and "this folder only" to server filters', () => {
+    expect(planQuery({ ...initialBrowse(), tags: { include: ['a', 'c'], exclude: [], mode: 'any' } }).filters).toEqual({ tagsAny: ['a', 'c'] });
+    expect(planQuery({ ...initialBrowse(), tags: { include: ['a'], exclude: ['c'], mode: 'all' } }).filters).toEqual({ tags: ['a'], tagsExclude: ['c'] });
+    expect(planQuery({ ...initialBrowse(), folder: 'x', includeSub: false }).filters).toEqual({ folder: 'x', includeSubfolders: false });
+    expect(planQuery({ ...initialBrowse(), folder: '', includeSub: false }).filters).toEqual({ folder: '', includeSubfolders: false });
+    expect(planQuery(initialBrowse()).filters).toEqual({});
   });
   it('a single "any" tag is the same as "all"; relevance without text is title order', () => {
     const p = planQuery({ ...initialBrowse(), tags: { include: ['a'], exclude: [], mode: 'any' } });
     expect(p.filters.tags).toEqual(['a']);
-    expect(p.client).toBeNull();
+    expect(p.filters.tagsAny).toBeUndefined();
     expect(planQuery(initialBrowse()).sort).toBe('title');
     expect(planQuery({ ...initialBrowse(), text: 'q' }).sort).toBe('relevance');
+    expect(planQuery({ ...initialBrowse(), sort: 'size-desc' }).sort).toBe('size-desc');
   });
   it('a tag is in the include or the exclude list, never both', () => {
     const t = setTagFilter({ include: ['a'], exclude: [], mode: 'all' }, 'a', 'exclude');

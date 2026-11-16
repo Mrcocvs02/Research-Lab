@@ -1,6 +1,6 @@
 import { expect, type Page, type TestInfo } from '@playwright/test';
 import { launchApp, type LaunchedApp } from './launch';
-import { createLibraryViaWizard, ipc, skipUnlessChannels, waitForScan } from './phase1';
+import { createLibraryViaWizard, skipUnlessChannels, waitForScan } from './phase1';
 
 /** Channels the phase 2 interface needs; a spec is skipped cleanly when the runtime does not have them yet. */
 export const PHASE2_CHANNELS = ['taxonomy:get', 'history:list', 'projects:list', 'library:tree', 'documents:tag', 'documents:update'];
@@ -17,10 +17,6 @@ export async function openSyntheticLibrary(testInfo: TestInfo, kind: 'papers' | 
   const total = ctx.library!.manifest!.files.length;
   await waitForScan(window, total);
   await expect(window.getByTestId('section-library')).toBeVisible();
-  // The organizer reuses its document list for a moment: wait until it has seen every document, or edits by id are refused.
-  await expect
-    .poll(async () => ((await ipc(window, 'library:tree', {})).data as { total?: number } | undefined)?.total, { timeout: 30_000 })
-    .toBe(total);
   await expect(window.getByTestId('scan-status')).toHaveAttribute('data-state', 'done', { timeout: 180_000 });
   await expect(window.getByTestId('search-summary')).toContainText(String(total), { timeout: 60_000 });
   return { ctx, window, total };

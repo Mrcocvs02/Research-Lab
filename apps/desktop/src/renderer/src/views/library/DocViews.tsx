@@ -6,6 +6,7 @@ import { rl } from '../../lib/rl';
 import { useNotify } from '../../lib/notify';
 import type { DocList, DocRow } from './useDocumentList';
 import { clickSelect, emptySelection, moveSelect, rangeHasHoles, selectAll, toggleActive, type SelectionState } from './selection';
+import { formatSize } from './formatSize';
 import { safeText } from './safeText';
 import { plainSnippet, Snippet } from './Snippet';
 import { TagChip } from './TagParts';
@@ -123,6 +124,11 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
         )}
       </div>
       <div className="doc-side">
+        {view === 'list' && (
+          <span className="doc-size" data-testid="doc-size" title={t('docs.sizeTitle', { bytes: row.size })}>
+            {formatSize(row.size)}
+          </span>
+        )}
         <StudyBadge state={row.studyState} />
         {row.missing && <span className="badge badge-warn">{t('docs.missing')}</span>}
         <span className="doc-actions">

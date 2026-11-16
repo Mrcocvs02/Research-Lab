@@ -16,9 +16,9 @@ import { ActiveFilters, TagFilterBar } from './FilterBar';
 import { FolderPane, TagTreePane } from './NavPanes';
 import { emptySelection, type SelectionState } from './selection';
 import { TaxonomyManager } from './TaxonomyManager';
-import { useDocumentList, useTagLookup, type DocRow } from './useDocumentList';
+import { useDocumentList, type DocRow } from './useDocumentList';
 import { useScanStatus } from './useScanStatus';
-import { TaxonomyProvider, useTaxonomy } from './useTaxonomy';
+import { TaxonomyProvider } from './useTaxonomy';
 
 type PaneTab = 'folders' | 'tags' | 'filters';
 const TABS: PaneTab[] = ['folders', 'tags', 'filters'];
@@ -39,7 +39,6 @@ function LibraryInner() {
   const { t } = useTranslation();
   const app = useApp();
   const { info } = useNotify();
-  const { model } = useTaxonomy();
   const inputId = useId();
   const helpId = useId();
   const sortId = useId();
@@ -66,8 +65,7 @@ function LibraryInner() {
 
   const refreshKey = `${status?.state ?? 'none'}:${status?.indexed ?? 0}:${docsVersion}`;
   const plan = useMemo(() => planQuery(browse), [browse]);
-  const lookup = useTagLookup(refreshKey);
-  const list = useDocumentList(plan, Boolean(app.activeLibraryId), refreshKey, model, lookup);
+  const list = useDocumentList(plan, Boolean(app.activeLibraryId), refreshKey);
   const running = status?.state === 'running';
   const searching = (list.forText ?? '').trim() !== '';
   const shownSort = browse.sort === 'relevance' && browse.text.trim() === '' ? 'title' : browse.sort;
@@ -90,7 +88,7 @@ function LibraryInner() {
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection, list.version, lookup.version]);
+  }, [selection, list.version]);
 
   const selectedIds = useMemo(() => [...selection.ids], [selection]);
   const single = selection.ids.size === 1 ? selectedIds[0]! : null;

@@ -5,6 +5,8 @@ export interface TaxonomyLookup {
   tagTerms(ids: string[]): Record<string, string[]>;
   /** The tags plus everything they imply, transitively (computed here, never stored on the record). */
   expandTags(ids: readonly string[]): string[];
+  /** Ancestors (by `parents`, transitively) of `ids` that are not in `ids`: a filter for a tag finds its descendants (D-130). */
+  ancestorsOf(ids: readonly string[]): string[];
   tagLabel(id: string): string | undefined;
   typeLabel(id: string | null): string | undefined;
   venueName(id: string | undefined): string | undefined;
@@ -27,6 +29,21 @@ export function makeTaxonomyLookup(tax: Pick<TaxonomyFile, 'nodes' | 'documentTy
         }
       }
       return [...out];
+    },
+    ancestorsOf(ids) {
+      const seen = new Set<string>(ids);
+      const out: string[] = [];
+      const stack = [...ids];
+      while (stack.length > 0) {
+        for (const parent of nodes.get(stack.pop() as string)?.parents ?? []) {
+          if (!seen.has(parent)) {
+            seen.add(parent);
+            out.push(parent);
+            stack.push(parent);
+          }
+        }
+      }
+      return out;
     },
     tagTerms(ids) {
       const out: Record<string, string[]> = {};
@@ -74,9 +91,11 @@ export async function buildIndexable(
 ): Promise<Omit<IndexableDocument, 'pages'>> {
   // Implied tags are searchable and filterable like the document's own (D-103): the index sees the expanded list.
   const tags = taxonomy.expandTags(record.tags);
+  const ancestors = taxonomy.ancestorsOf(tags);
   const out: Omit<IndexableDocument, 'pages'> = {
     record: tags.length === record.tags.length ? record : { ...record, tags },
-    tagTerms: taxonomy.tagTerms(tags),
+    tagTerms: taxonomy.tagTerms([...tags, ...ancestors]),
+    tagAncestors: ancestors,
     typeLabel: taxonomy.typeLabel(record.type),
     venueName: taxonomy.venueName(record.ref.venueId),
     abstract: abstractOf(record, extraction),

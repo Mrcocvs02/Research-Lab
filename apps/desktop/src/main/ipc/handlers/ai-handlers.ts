@@ -1,30 +1,72 @@
 /**
- * Phase 4 (AI): status, preview, usage and log of the AI layer, the chat with Claude, the user's commands.
- * Contracts: `packages/core/src/ipc/channels/{ai,chat,commands}.ts`. NOT_IMPLEMENTED until built.
+ * Phase 4 (AI): status, preview, usage and log of the AI layer, the chat with Claude, the user's commands (D-204..).
+ * Contracts: `packages/core/src/ipc/channels/{ai,chat,commands}.ts`. The logic lives in `main/ai/`.
  */
 import { AppError } from '@rl/core';
+import { ChatStore } from '../../ai/chat-store.js';
+import { listUserCommands } from '../../ai/guide-files.js';
+import { abortAllChatTurns, cancelTurn, computePreview, computeStatus, discardConversationTurns, loadCtx, monthUsage, startChatTurn } from '../../ai/service.js';
+import { aiSends, monthOf } from '../../ai/usage.js';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
 
-const notYet = (channel: string) => () => {
-  throw new AppError('NOT_IMPLEMENTED', `${channel} is not implemented yet`);
+export { abortAllChatTurns };
+
+export const aiHandlers = (s: MainServices): DomainHandlers<'ai'> => ({
+  'ai:status': () => computeStatus(s),
+  'ai:preview': async ({ purpose, model, docIds, promptChars }) => {
+    const ctx = await loadCtx(s);
+    return (await computePreview(s, ctx, { purpose, model, docIds, promptChars })).preview;
+  },
+  'ai:usage': async ({ month }) => {
+    const rt = await s.runtime.require();
+    return monthUsage(rt, month ?? monthOf(new Date()));
+  },
+  'ai:log': async ({ limit, before }) => {
+    const rt = await s.runtime.require();
+    const entries = aiSends(await rt.store.readLog({ type: 'ai-send' }))
+      .filter((e) => before === undefined || e.at < before)
+      .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+      .slice(0, limit);
+    return {
+      items: entries.map((e) => ({
+        at: e.at,
+        provider: e.provider,
+        model: e.model,
+        purpose: e.purpose,
+        docIds: e.docIds,
+        folders: e.folders,
+        approxInputTokens: e.approxInputTokens,
+        ...(e.approxOutputTokens !== undefined ? { approxOutputTokens: e.approxOutputTokens } : {}),
+        ...(e.estimatedCostUsd !== undefined ? { estimatedCostUsd: e.estimatedCostUsd } : {}),
+        confirmed: e.confirmed,
+      })),
+    };
+  },
+});
+
+export const chatHandlers = (s: MainServices): DomainHandlers<'chat'> => {
+  const store = async () => new ChatStore(s.localDataDir, (await s.runtime.require()).libraryId);
+  return {
+    'chat:send': (req) => startChatTurn(s, req),
+    'chat:cancel': async ({ turnId }) => ({ cancelled: cancelTurn(turnId) }),
+    'chat:list': async ({ limit }) => ({ items: await (await store()).list(limit) }),
+    'chat:get': async ({ conversationId }) => {
+      const c = await (await store()).get(conversationId);
+      if (!c) throw new AppError('NOT_FOUND', 'Unknown conversation');
+      return { id: c.id, title: c.title, turns: c.turns };
+    },
+    'chat:delete': async ({ conversationId }) => {
+      const st = await store();
+      discardConversationTurns(conversationId);
+      return { deleted: await st.delete(conversationId) };
+    },
+  };
 };
 
-export const aiHandlers = (_s: MainServices): DomainHandlers<'ai'> => ({
-  'ai:status': notYet('ai:status'),
-  'ai:preview': notYet('ai:preview'),
-  'ai:usage': notYet('ai:usage'),
-  'ai:log': notYet('ai:log'),
-});
-
-export const chatHandlers = (_s: MainServices): DomainHandlers<'chat'> => ({
-  'chat:send': notYet('chat:send'),
-  'chat:cancel': notYet('chat:cancel'),
-  'chat:list': notYet('chat:list'),
-  'chat:get': notYet('chat:get'),
-  'chat:delete': notYet('chat:delete'),
-});
-
-export const commandsHandlers = (_s: MainServices): DomainHandlers<'commands'> => ({
-  'commands:list': notYet('commands:list'),
+export const commandsHandlers = (s: MainServices): DomainHandlers<'commands'> => ({
+  'commands:list': async () => {
+    const rt = await s.runtime.require();
+    return { items: await listUserCommands(await s.libraries.dataDir(rt.libraryId)) };
+  },
 });

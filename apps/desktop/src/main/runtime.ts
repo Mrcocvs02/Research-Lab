@@ -15,13 +15,15 @@ export interface RuntimeConfig {
   dialogPath: string | null;
   /** Tests: keep the window hidden (still rendered, not throttled) so test runs do not pop up on screen. */
   hiddenWindow: boolean;
+  /** Tests and development: `'mock'` makes the AI layer use the deterministic mock provider (never a real Claude call). */
+  aiProvider: 'mock' | null;
   /** Origin (`http://localhost:<port>`) of the Vite dev server, or null: load the built renderer. */
   rendererDevUrl: string | null;
   /** Human-readable notes about variables that were present but not honoured. */
   warnings: string[];
 }
 
-const HOOK_VARIABLES = ['RL_E2E', 'RL_E2E_DIALOG_PATH', 'RL_E2E_OFFLINE', 'RL_E2E_HIDDEN', 'RL_USER_DATA_DIR', 'RL_LOCAL_DATA_DIR', 'ELECTRON_RENDERER_URL'] as const;
+const HOOK_VARIABLES = ['RL_E2E', 'RL_E2E_DIALOG_PATH', 'RL_E2E_OFFLINE', 'RL_E2E_HIDDEN', 'RL_USER_DATA_DIR', 'RL_LOCAL_DATA_DIR', 'RL_AI_PROVIDER', 'ELECTRON_RENDERER_URL'] as const;
 
 /**
  * Accepts only `http://localhost:<port>` or `http://127.0.0.1:<port>` (no credentials, no
@@ -49,24 +51,26 @@ export function resolveRuntimeConfig(env: NodeJS.ProcessEnv, isPackaged: boolean
   const present = HOOK_VARIABLES.filter((k) => env[k] !== undefined && env[k] !== '');
   if (isPackaged) {
     if (present.length) warnings.push(`Ignored development/test variables in the installed app: ${present.join(', ')}`);
-    return { userDataDir: null, localDataDir: null, dialogPath: null, hiddenWindow: false, rendererDevUrl: null, warnings };
+    return { userDataDir: null, localDataDir: null, dialogPath: null, hiddenWindow: false, aiProvider: null, rendererDevUrl: null, warnings };
   }
   const rendererDevUrl = parseDevServerUrl(env.ELECTRON_RENDERER_URL);
   if (env.ELECTRON_RENDERER_URL && !rendererDevUrl) {
     warnings.push('Ignored ELECTRON_RENDERER_URL: only http://localhost:<port> or http://127.0.0.1:<port> is accepted');
   }
+  if (env.RL_AI_PROVIDER && env.RL_AI_PROVIDER !== 'mock') warnings.push('Ignored RL_AI_PROVIDER: only "mock" is accepted');
   return {
     userDataDir: absolute(env.RL_USER_DATA_DIR),
     localDataDir: absolute(env.RL_LOCAL_DATA_DIR),
     // The dialog path variable alone never does anything: RL_E2E=1 must be set as well.
     dialogPath: env.RL_E2E === '1' ? absolute(env.RL_E2E_DIALOG_PATH) : null,
     hiddenWindow: env.RL_E2E_HIDDEN === '1',
+    aiProvider: env.RL_AI_PROVIDER === 'mock' ? 'mock' : null,
     rendererDevUrl,
     warnings,
   };
 }
 
-let current: RuntimeConfig = { userDataDir: null, localDataDir: null, dialogPath: null, hiddenWindow: false, rendererDevUrl: null, warnings: [] };
+let current: RuntimeConfig = { userDataDir: null, localDataDir: null, dialogPath: null, hiddenWindow: false, aiProvider: null, rendererDevUrl: null, warnings: [] };
 
 /** Called once, first thing in the main entry point. */
 export function configureRuntime(config: RuntimeConfig): RuntimeConfig {

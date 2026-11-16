@@ -141,3 +141,9 @@ Ogni script controlla prima la memoria disponibile (`tools/mem-guard.mjs`: 1,2 G
 - Unit: `apps/desktop/src/main/thumbs.test.ts` (list, put, pulizia, schema `rl-thumb`), `thumbs-native.test.ts` (`nativeImage` finto: successo, errore, scadenza, icona/vuota/uniforme, piattaforma non supportata, memo di sessione, confinamento), `renderer/src/lib/thumbs.test.ts` (coda, un disegno alla volta, ripiego da nativo a pdf.js), `thumbDraw.test.ts` (dimensioni, qualità, pulizia, worker), `views/library/thumbs.test.ts` (cablaggio della griglia).
 - E2E: `e2e/thumbs.spec.ts` (dopo `npm run build`): accetta come sorgente sia la miniatura del sistema sia il disegno con pdf.js (la macchina può non avere un gestore PDF); un'immagine `rl-thumb:` con `naturalWidth` > 0, dopo il riavvio `thumbs:list` dà URL e `drawable: false`, SHA-256 dei PDF invariato. Si lancia con `ui-library`, `study-ui` e `qa-security` (cambia la CSP), in serie.
 
+
+## Livello AI (fase 4, onda 4.1)
+
+- Unitari: `packages/ai/src/*.test.ts` (strumenti e cancello, mock, opzioni dell'Agent SDK, traduzione dei messaggi con un SDK finto) e `apps/desktop/src/main/ai/ai.test.ts` (stato, anteprima, uso, registro, chat con il mock, guida, comandi, gancio `RL_AI_PROVIDER`). Nessuna chiamata a Claude.
+- E2E: `e2e/ai-chat.spec.ts` con `RL_AI_PROVIDER=mock` (solo in sviluppo): flusso degli eventi, cartella non abilitata rifiutata, registro, cronologia dopo il riavvio, originali invariati. Si lancia con `node tools/mem-guard.mjs 2 e2e && node tools/mem-sample.mjs --abort-below=0.8 -- npx playwright test -c e2e/playwright.config.ts ai-chat smoke qa-security` dopo `npm run build`.
+- Prova dal vivo (non automatica, saltata di norma): serve la CLI Claude Code con login, oppure una chiave API salvata come segreto `anthropic-api-key` (ambito `app`); si abilita con `RL_LIVE_AI=1`. Lo smoke test è `packages/ai/src/live.test.ts` (una domanda di una parola).

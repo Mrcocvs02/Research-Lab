@@ -1,4 +1,5 @@
 import type { LegacyImporter, LibraryConfig, Logger, SecretStore } from '@rl/core';
+import type { AiProviderFactory } from '../../ai/provider-factory.js';
 import type { ApprovedPaths } from '../../approved-paths.js';
 import type { RuntimeManager } from '../../library/runtime-manager.js';
 import type { LibraryService } from '../../library-service.js';
@@ -44,4 +45,8 @@ export interface MainServices {
    * Resolves null when the data folder does not exist yet.
    */
   backupDataDir(libraryId: string, dataDir: string): Promise<{ backupDir: string; files: number } | null>;
+  /** The AI provider for a library's configuration (D-204); absent in tests that do not use the AI layer. */
+  aiProvider?: AiProviderFactory;
+  /** Whether the machine has a network connection (`net.isOnline()`); absent: assumed online. Not used by the mock provider. */
+  isOnline?: () => boolean;
 }

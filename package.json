@@ -3,18 +3,25 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "apps/*", "e2e", "tools"],
-  "engines": { "node": ">=24" },
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "e2e",
+    "tools"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "npm run dev -w @rl/desktop",
     "build": "npm run build -w @rl/desktop",
     "typecheck": "tsc -p tsconfig.json && tsc -p apps/desktop/tsconfig.node.json && tsc -p apps/desktop/tsconfig.web.json && tsc -p e2e/tsconfig.json",
-    "test": "vitest run",
+    "test": "node tools/mem-guard.mjs 1.5 \"unit tests\" && vitest run",
     "test:watch": "vitest",
-    "test:e2e": "npm run build && playwright test -c e2e/playwright.config.ts",
+    "test:e2e": "node tools/mem-guard.mjs 3 \"the e2e suite\" && npm run build && playwright test -c e2e/playwright.config.ts",
     "check:generality": "node tools/check-generality.mjs",
     "check:nondestructive": "node tools/check-nondestructive.mjs",
-    "test:phase1": "npm run build && playwright test -c e2e/playwright.config.ts qa-offline qa-scan-nondestructive qa-search-perf qa-watcher"
+    "test:phase1": "node tools/mem-guard.mjs 3 \"the phase 1 e2e specs\" && npm run build && playwright test -c e2e/playwright.config.ts qa-offline qa-scan-nondestructive qa-search-perf qa-watcher"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",

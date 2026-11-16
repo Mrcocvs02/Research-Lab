@@ -17,8 +17,9 @@ import { ApprovedPaths } from './approved-paths.js';
 import { e2eDialogOverride } from './dialog-override.js';
 import { resolveAppDirs } from './dirs.js';
 import { buildHandlers, type MainServices } from './ipc/handlers/index.js';
+import { createBackupPolicy } from './library/backup-policy.js';
 import { RuntimeManager } from './library/runtime-manager.js';
-import { spawnScanWorker } from './library/worker-host.js';
+import { spawnScanWorker, watchdogFromEnv } from './library/worker-host.js';
 import { LibraryService } from './library-service.js';
 import { configureRuntime, resolveRuntimeConfig } from './runtime.js';
 import { FileSecretStore } from './secret-store.js';
@@ -63,7 +64,9 @@ async function main(): Promise<void> {
     decrypt: (data) => safeStorage.decryptString(data),
   });
   const libraries = new LibraryService(settings, approved, secrets);
-  const backupLibraryData = (libraryId: string, dataDir: string) => backupDataDir(dataDir, path.join(dirs.localData, 'backups', libraryId));
+  // At most one backup per library per day, the last five kept (D-074); an import asks for its own (force).
+  const backupPolicy = createBackupPolicy({ backup: (dataDir, root) => backupDataDir(dataDir, root), backupsDir: path.join(dirs.localData, 'backups') });
+  const backupLibraryData = (libraryId: string, dataDir: string) => backupPolicy(libraryId, dataDir);
   // Scan, text extraction and index writes run in a worker thread (bundled next to this file, see electron.vite.config.ts).
   const runtimeManager = new RuntimeManager({
     libraries,
@@ -74,7 +77,7 @@ async function main(): Promise<void> {
     backupDataDir: backupLibraryData,
     createStore: ({ rootPath, dataDir, deviceId }) => createLibraryStore({ rootPath, dataDir, deviceId, logger: log }),
     createIndex: createSearchIndex,
-    spawnWorker: () => spawnScanWorker(path.join(import.meta.dirname, 'scan-worker.js')),
+    spawnWorker: () => spawnScanWorker(path.join(import.meta.dirname, 'scan-worker.js'), { log, watchdog: watchdogFromEnv(process.env, app.isPackaged) }),
     watch: (o) => createWatcher({ rootPath: o.rootPath, dataDir: o.dataDir, config: o.config, onBatch: o.onBatch, onError: o.onError }),
   });
   const services: MainServices = {
@@ -109,7 +112,7 @@ async function main(): Promise<void> {
     },
     appInfo: () => ({ name: APP_NAME, version: app.getVersion(), platform: process.platform, electron: process.versions.electron ?? '' }),
     createImporter: (options) => createLegacyImporter(options),
-    backupDataDir: backupLibraryData,
+    backupDataDir: (libraryId, dataDir) => backupPolicy(libraryId, dataDir, { force: true }),
   };
 
   const dispatch = createDispatcher(channels, buildHandlers(services), log);
@@ -137,7 +140,12 @@ async function main(): Promise<void> {
     if (quitting) return;
     event.preventDefault();
     quitting = true;
-    void runtimeManager.closeAll().finally(() => app.quit());
+    // A worker stuck in a synchronous loop must not keep the app from quitting: after a limit it is killed.
+    const limit = new Promise<void>((resolve) => setTimeout(resolve, 15_000).unref());
+    void Promise.race([runtimeManager.closeAll(), limit])
+      .then(() => runtimeManager.terminateAll())
+      .catch((e: unknown) => log.warn('closing the library runtime failed', { error: e }))
+      .finally(() => app.quit());
   });
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();

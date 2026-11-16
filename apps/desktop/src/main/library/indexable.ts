@@ -29,6 +29,20 @@ export function makeTaxonomyLookup(tax: Pick<TaxonomyFile, 'nodes' | 'documentTy
 
 const usable = <T>(f: AiField<T> | undefined): T | undefined => (f && f.review.status !== 'rejected' ? f.value : undefined);
 
+/**
+ * The abstract to index. `undefined` keeps what the index has; `''` clears it. The AI summary/description win when
+ * the user has not rejected them; otherwise the abstract found in the file (right after an extraction, `extraction`
+ * is given and "none found" means `''`). Without an extraction, a rejected or withdrawn AI text must not stay in
+ * the index: `''` when the record still carries AI text that is rejected, else the index keeps its abstract
+ * (the one found in the file's text).
+ */
+function abstractOf(record: DocumentRecord, extraction: { abstract?: string } | undefined): string | undefined {
+  const ai = [usable(record.ai.summary), usable(record.ai.description)].filter(Boolean).join('\n\n');
+  if (ai) return ai;
+  if (extraction) return extraction.abstract || '';
+  return record.ai.summary || record.ai.description ? '' : undefined;
+}
+
 type Source = Pick<LibraryStore, 'notes' | 'annotations'>;
 
 /**
@@ -37,14 +51,18 @@ type Source = Pick<LibraryStore, 'notes' | 'annotations'>;
  * in `record.ai`, the index just reads them). Notes or annotations that cannot be read are left out of
  * the update (the index keeps what it has).
  */
-export async function buildIndexable(src: Source, taxonomy: TaxonomyLookup, record: DocumentRecord, extractedAbstract?: string): Promise<Omit<IndexableDocument, 'pages'>> {
+export async function buildIndexable(
+  src: Source,
+  taxonomy: TaxonomyLookup,
+  record: DocumentRecord,
+  extraction?: { abstract?: string },
+): Promise<Omit<IndexableDocument, 'pages'>> {
   const out: Omit<IndexableDocument, 'pages'> = {
     record,
     tagTerms: taxonomy.tagTerms(record.tags),
     typeLabel: taxonomy.typeLabel(record.type),
     venueName: taxonomy.venueName(record.ref.venueId),
-    // Empty means "nothing known here": the index then keeps the abstract it has (found in the file's text).
-    abstract: [usable(record.ai.summary), usable(record.ai.description)].filter(Boolean).join('\n\n') || extractedAbstract || undefined,
+    abstract: abstractOf(record, extraction),
     keywords: [...(usable(record.ai.keywords) ?? []), ...(usable(record.ai.synonyms) ?? [])],
   };
   try {

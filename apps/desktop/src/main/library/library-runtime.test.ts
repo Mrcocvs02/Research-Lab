@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, unlink, utimes, writeFile } from 'node:fs/promises'
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createMemoryLogger, defaultLibraryConfig, type ScanStatus } from '@rl/core';
+import { AppError, createMemoryLogger, defaultLibraryConfig, type ScanStatus } from '@rl/core';
 import { createLibraryStore, createScanner, createTextExtractor } from '@rl/data';
 import { createSearchIndex } from '@rl/search';
 import { LibraryRuntime, localPaths } from './library-runtime.js';
@@ -86,9 +86,11 @@ describe('LibraryRuntime (real scanner, extractor and index; worker service in-p
       expect(body.hits[0]!.snippet).toContain('[[zebrafish]]');
       expect((await rt.search({ text: 'glaciology' })).hits[0]!.path).toBe('b/beta.txt');
 
-      // Documents got a title (from the file) without anything being written to the originals.
+      // The file name is never written as a title (the interface falls back to it); extracted values carry their provenance.
       const docs = await store.documents.list();
-      expect(docs.every((d) => d.title)).toBe(true);
+      expect(docs.find((d) => d.path === 'b/beta.txt')?.title).toBeNull();
+      const alpha = docs.find((d) => d.path === 'a/alpha.md')!;
+      if (alpha.title !== null) expect(alpha.extracted?.title).toBe(alpha.title);
       expect((await rt.list({})).total).toBe(2);
       const facets = await rt.facets({ text: '' });
       expect(facets.folders.map((f) => f.value).sort()).toEqual(['a', 'b']);
@@ -182,7 +184,7 @@ describe('worker transport', () => {
     const service: LibraryWorker = {
       openIndex: async () => {},
       resetIndex: async () => {
-        throw new Error('nope');
+        throw new AppError('IO_ERROR', 'nope');
       },
       scan: async (_a, hooks) => {
         hooks?.onEvent?.({ phase: 'walking', seen: 3 });
@@ -192,7 +194,7 @@ describe('worker transport', () => {
         });
         return {} as never;
       },
-      extract: async () => {},
+      extract: async (a) => ({ path: a.item.path, hash: a.item.hash, ok: true, cached: true }),
       index: async () => {},
       remove: async () => {},
       dispose: async () => {},
@@ -249,6 +251,7 @@ describe('RuntimeManager', () => {
     const { m, scans } = manager(active);
     try {
       const release = m.hold('lib-a');
+      await release.ready;
       await m.sync({ autoScan: true });
       expect(m.status()).toMatchObject({ libraryId: 'lib-a', state: 'idle' }); // held: no scan yet
       release();

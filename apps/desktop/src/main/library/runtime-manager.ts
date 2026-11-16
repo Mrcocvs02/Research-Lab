@@ -1,7 +1,7 @@
 import { AppError, type LibraryStore, type Logger, type ScanStatus, type SearchIndex } from '@rl/core';
 import type { LibraryService } from '../library-service.js';
 import type { SettingsStore } from '../settings-store.js';
-import { LibraryRuntime, localPaths, type RuntimeDeps } from './library-runtime.js';
+import { LibraryRuntime, localPaths, type RuntimeDeps, type RuntimeHold } from './library-runtime.js';
 import type { LibraryWorker } from './worker-protocol.js';
 
 export interface ManagerDeps {
@@ -28,10 +28,11 @@ export interface ManagerDeps {
  */
 export class RuntimeManager {
   private rt: LibraryRuntime | null = null;
+  private closing: LibraryRuntime | null = null;
   private chain: Promise<unknown> = Promise.resolve();
   private openError: { libraryId: string; error: AppError } | null = null;
   /** Libraries where something else is writing the data folder (the legacy import): no scan meanwhile. */
-  private readonly holds = new Map<string, number>();
+  private readonly holds = new Map<string, { count: number; rt: RuntimeHold | null }>();
 
   constructor(private readonly d: ManagerDeps) {}
 
@@ -48,10 +49,12 @@ export class RuntimeManager {
       const old = this.rt;
       this.rt = null;
       this.openError = null;
+      for (const h of this.holds.values()) h.rt = null; // those were holds on the runtime that is closing
       await old?.close().catch((e: unknown) => this.d.log.warn('closing the previous library failed', { error: e }));
       if (!activeLibraryId) return;
       try {
         this.rt = await this.open(activeLibraryId);
+        this.attachHold(activeLibraryId);
         if (options.autoScan && !this.isHeld(activeLibraryId)) this.rt.startScan();
       } catch (e) {
         this.d.log.error('library runtime could not start', { error: e, libraryId: activeLibraryId });
@@ -66,28 +69,38 @@ export class RuntimeManager {
   }
 
   private isHeld(libraryId: string): boolean {
-    return (this.holds.get(libraryId) ?? 0) > 0;
+    return (this.holds.get(libraryId)?.count ?? 0) > 0;
+  }
+
+  /** Puts the runtime of `libraryId` (when it is open) under the hold; returns when its running scan has stopped. */
+  private attachHold(libraryId: string): Promise<void> {
+    const h = this.holds.get(libraryId);
+    if (!h || !this.rt || this.rt.libraryId !== libraryId) return Promise.resolve();
+    h.rt ??= this.rt.hold();
+    return h.rt.ready;
   }
 
   /**
-   * Keeps scans of `libraryId` from starting until the returned function is called (the legacy import writes the
-   * same records; scanning meanwhile would race it). Releasing starts the scan the hold postponed.
+   * Keeps scans of `libraryId` from running until `release()` (the legacy import writes the same records; scanning
+   * meanwhile would race it): a scan in progress is cancelled and the returned function's `ready` resolves when it has stopped; requests
+   * (watcher, user) wait. Releasing runs one scan, so that what the importer wrote reaches the index.
    */
-  hold(libraryId: string): () => void {
-    this.holds.set(libraryId, (this.holds.get(libraryId) ?? 0) + 1);
+  hold(libraryId: string): (() => void) & { ready?: Promise<void> } {
+    const h = this.holds.get(libraryId) ?? { count: 0, rt: null };
+    h.count++;
+    this.holds.set(libraryId, h);
+    const ready = this.attachHold(libraryId);
     let released = false;
-    return () => {
+    const release = () => {
       if (released) return;
       released = true;
-      const n = (this.holds.get(libraryId) ?? 1) - 1;
-      if (n <= 0) this.holds.delete(libraryId);
-      else this.holds.set(libraryId, n);
-      if (n <= 0) {
-        void this.sync({ autoScan: true }).then(() => {
-          if (this.rt?.libraryId === libraryId) this.rt.startScan();
-        });
-      }
+      h.count--;
+      if (h.count > 0) return;
+      this.holds.delete(libraryId);
+      if (h.rt) h.rt.release();
+      else void this.sync({ autoScan: true });
     };
+    return Object.assign(release, { ready });
   }
 
   private async open(libraryId: string): Promise<LibraryRuntime> {
@@ -148,6 +161,12 @@ export class RuntimeManager {
     await this.chain;
     const rt = this.rt;
     this.rt = null;
+    this.closing = rt;
     await rt?.close();
+  }
+
+  /** Kills the worker of the open runtime at once (last resort when `closeAll` takes too long at quit). */
+  async terminateAll(): Promise<void> {
+    await (this.rt ?? this.closing)?.terminate();
   }
 }

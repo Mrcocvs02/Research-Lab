@@ -430,3 +430,13 @@ describe('folder tree', () => {
     expect(JSON.stringify(t)).not.toMatch(/[A-Za-z]:[\\/]/);
   });
 });
+
+describe('projects: too many members (D-178)', () => {
+  it('a project over the member limit is refused with the numbers the interface needs', async () => {
+    await seed([]);
+    const ids = Array.from({ length: 20_001 }, (_, i) => hex(i + 1));
+    const e = await code(org.createProject({ name: 'Big', docIds: ids }));
+    expect(e?.code).toBe('INVALID_REQUEST');
+    expect(e?.details).toMatchObject({ reason: 'members-limit', limit: 20_000, count: 20_001 });
+  });
+});

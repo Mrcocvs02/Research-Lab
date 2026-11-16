@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { documentIdSchema, isoDateSchema, itemIdSchema, relativePathSchema } from '../../common.js';
 import { studyStateSchema } from '../../model/document.js';
-import { PROJECT_LIMITS, projectKindSchema, projectStatusSchema } from '../../model/project.js';
+import { PROJECT_LIMITS } from '../../limits.js';
+import { projectKindSchema, projectStatusSchema } from '../../model/project.js';
 import { defineChannels } from '../registry.js';
 
 export const studyCountsSchema = z.object({
@@ -64,7 +65,7 @@ export const projectDetailSchema = z.object({
 export type ProjectDetail = z.infer<typeof projectDetailSchema>;
 
 const name = z.string().trim().min(1).max(PROJECT_LIMITS.name);
-const docIds = z.array(documentIdSchema).min(1).max(5000);
+const docIds = z.array(documentIdSchema).min(1).max(PROJECT_LIMITS.members);
 const projectId = z.object({ projectId: itemIdSchema });
 
 export const projectsChannels = defineChannels('projects', {
@@ -83,7 +84,7 @@ export const projectsChannels = defineChannels('projects', {
       notes: z.string().max(PROJECT_LIMITS.notes).optional(),
       status: projectStatusSchema.optional(),
       /** Initial members (any folder). */
-      docIds: z.array(documentIdSchema).max(5000).optional(),
+      docIds: z.array(documentIdSchema).max(PROJECT_LIMITS.members).optional(),
     }),
     response: projectDetailSchema,
   },

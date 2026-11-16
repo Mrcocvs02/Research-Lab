@@ -159,7 +159,7 @@ interface Props {
 
 /** The documents as a virtualised list or grid with multi-selection and keyboard navigation. */
 export function DocViews({ list, view, searching, selection, onSelection, onOpenDetail, onDeleteKey, ariaLabel }: Props) {
-  const { reportError, fail } = useNotify();
+  const { reportError, fail, info } = useNotify();
   const { t } = useTranslation();
   const [columns, setColumns] = useState(1);
   const selRef = useRef(selection);
@@ -238,7 +238,11 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
     if ((e.key === 'a' || e.key === 'A') && mods.ctrl) {
       e.preventDefault();
       // Ids only: the rows that are not loaded stay on the server.
-      void list.allIds().then((ids) => onSelection(selectAll(ids)), reportError);
+      // The server returns at most `idsMax` ids: when the result is longer, say how much of it is selected (D-178).
+      void list.allIds().then((ids) => {
+        onSelection(selectAll(ids));
+        if (list.total > ids.length) info(t('docs.selectCapped', { selected: ids.length, total: list.total }));
+      }, reportError);
     } else if (e.key === ' ' && mods.ctrl) {
       e.preventDefault();
       onSelection(toggleActive(selRef.current, list.ids()));

@@ -245,6 +245,9 @@ export class HistoryService {
         g = { changeId: id, order: byId.size, at: e.at, deviceId: e.deviceId, actor: e.actor, entries: [], ...(e.undoOf ? { undoOf: e.undoOf } : {}), ...(e.summary ? { summary: e.summary } : {}) };
         byId.set(id, g);
       }
+      // Only one entry of a group carries the summary and `undoOf` (D-179): take them from whichever has them.
+      if (e.summary && !g.summary) g.summary = e.summary;
+      if (e.undoOf && !g.undoOf) g.undoOf = e.undoOf;
       g.entries.push(e);
     }
     return [...byId.values()];

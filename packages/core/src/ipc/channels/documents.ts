@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { documentIdSchema, isoDateSchema, itemIdSchema, relativePathSchema } from '../../common.js';
 import { DOCUMENT_LIMITS, documentRecordSchema, studyStateSchema } from '../../model/document.js';
 import { defineChannels } from '../registry.js';
-import { listSortSchema, searchFiltersSchema, searchSortSchema, SEARCH_LIMITS } from './search.js';
+import { listSortSchema, searchFiltersSchema, searchSortSchema } from './search.js';
+import { SEARCH_LIMITS } from '../../limits.js';
 
 export const documentSummarySchema = z.object({
   docId: documentIdSchema,
@@ -103,7 +104,7 @@ export const documentsChannels = defineChannels('documents', {
    */
   tag: {
     request: z.object({
-      docIds: z.array(documentIdSchema).min(1).max(5000),
+      docIds: z.array(documentIdSchema).min(1).max(SEARCH_LIMITS.idsMax),
       add: z.array(itemIdSchema).max(100).optional(),
       remove: z.array(itemIdSchema).max(100).optional(),
     }),

@@ -49,13 +49,15 @@ interface PickerProps {
   ariaLabel: string;
   testId?: string;
   autoFocus?: boolean;
+  /** An action is running: the input waits. */
+  disabled?: boolean;
 }
 
 /**
  * Tag entry with completion from the taxonomy: matches labels and aliases (a hit on an alias says so), and can
  * create a tag on the fly. Combobox pattern: the input keeps the focus, arrows move the highlight, Enter picks.
  */
-export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaLabel, testId, autoFocus }: PickerProps) {
+export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaLabel, testId, autoFocus, disabled }: PickerProps) {
   const { t } = useTranslation();
   const listId = useId();
   const [text, setText] = useState('');
@@ -130,7 +132,7 @@ export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaL
         autoFocus={autoFocus}
         value={text}
         placeholder={placeholder}
-        disabled={busy}
+        disabled={busy || disabled === true}
         maxLength={200}
         data-testid={testId ?? 'tag-input'}
         onChange={(e) => {

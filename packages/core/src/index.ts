@@ -5,6 +5,7 @@ export * from './fs-names.js';
 export * from './import-job.js';
 export * from './ipc/index.js';
 export * from './log.js';
+export * from './limits.js';
 export * from './model/index.js';
 export * from './security.js';
 export * from './services/index.js';

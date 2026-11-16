@@ -38,6 +38,7 @@ async function harness() {
   const rt = {
     libraryId: 'lib-1',
     organizer,
+    scanExtensions: async () => ['pdf', 'md', 'txt', 'exe', 'bat', 'docm'],
     reindexDocuments: async (ids: string[]) => {
       reindexed.push([...ids]);
       await refresh(ids);

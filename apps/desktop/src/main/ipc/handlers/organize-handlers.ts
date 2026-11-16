@@ -1,9 +1,9 @@
 import { stat } from 'node:fs/promises';
-import path from 'node:path';
 import { AppError, type DocumentId } from '@rl/core';
 import { resolveInRoot } from '@rl/core/node';
 import type { LibraryRuntime } from '../../library/library-runtime.js';
 import type { DomainHandlers } from '../types.js';
+import { openVerdict } from './open-policy.js';
 import type { MainServices } from './services.js';
 
 /**
@@ -98,16 +98,13 @@ export const projectsHandlers = (s: MainServices): DomainHandlers<'projects'> =>
   };
 };
 
-/** File types that would run code when "opened" by the system: refused by `documents:open` (the file can still be revealed). */
-const RUNNABLE = new Set(['.exe', '.com', '.bat', '.cmd', '.msi', '.scr', '.pif', '.lnk', '.url', '.ps1', '.psm1', '.vbs', '.vbe', '.js', '.jse', '.wsf', '.wsh', '.hta', '.cpl', '.reg', '.jar', '.sh', '.app', '.command', '.appimage', '.dll']);
-
 const missingFile = () => new AppError('NOT_FOUND', 'The file of this document is missing', { reason: 'missing' });
 
 /**
  * Absolute path of a present document, resolved and confined to the library root. Only the id comes from the
  * renderer. Errors never carry the path.
  */
-async function documentFile(s: MainServices, docId: DocumentId): Promise<string> {
+async function documentFile(s: MainServices, docId: DocumentId): Promise<{ abs: string; rel: string }> {
   const rt = await s.runtime.require();
   const rec = await rt.getDocument(docId); // NOT_FOUND for an unknown id
   if (rec.missing) throw missingFile();
@@ -118,7 +115,7 @@ async function documentFile(s: MainServices, docId: DocumentId): Promise<string>
   });
   const st = await stat(abs).catch(() => null);
   if (!st?.isFile()) throw missingFile();
-  return abs;
+  return { abs, rel: rec.path };
 }
 
 export const organizeDocumentsHandlers = (
@@ -139,14 +136,15 @@ export const organizeDocumentsHandlers = (
     return { changeId: r.changeId, changed: r.changed, unchanged: r.unchanged };
   },
   'documents:open': async ({ docId }) => {
-    const abs = await documentFile(s, docId as DocumentId);
-    if (RUNNABLE.has(path.extname(abs).toLowerCase())) throw new AppError('PERMISSION_DENIED', 'This kind of file is not opened from the app');
+    const { abs, rel } = await documentFile(s, docId as DocumentId);
+    const rt = await s.runtime.require();
+    if (openVerdict(rel, abs, await rt.scanExtensions()) !== 'ok') throw new AppError('PERMISSION_DENIED', 'This kind of file is not opened from the app');
     const err = await s.shell.openPath(abs);
     if (err) throw new AppError('IO_ERROR', 'The system could not open the file');
     return { ok: true as const };
   },
   'documents:reveal': async ({ docId }) => {
-    s.shell.showItemInFolder(await documentFile(s, docId as DocumentId));
+    s.shell.showItemInFolder((await documentFile(s, docId as DocumentId)).abs);
     return { ok: true as const };
   },
   'library:tree': async () => (await s.runtime.require()).organizer.folderTree(),

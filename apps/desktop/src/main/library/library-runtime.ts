@@ -555,6 +555,12 @@ export class LibraryRuntime {
     return this.d.index.list(query);
   }
 
+  /** Extensions the library scans (`library.json > scan.extensions`): the ceiling of what `documents:open` may open. */
+  async scanExtensions(): Promise<string[]> {
+    const cfg = await this.d.store.readConfig().catch(() => this.scanConfig);
+    return cfg.scan.extensions;
+  }
+
   async getDocument(docId: DocumentId): Promise<DocumentRecord> {
     const rec = await this.d.store.documents.get(docId);
     if (!rec) throw new AppError('NOT_FOUND', 'Unknown document');

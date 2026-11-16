@@ -12,7 +12,8 @@ const pct = (n: number) => `${Math.round(Math.min(1, Math.max(0, Number(n) || 0)
  * are fractions of the page, so they follow the zoom with no work. The colour is a name from our own palette (a CSS class),
  * never a value taken from the data.
  */
-export function AnnotationLayers({ layers, annotations, selectedId }: { layers: ReadonlyMap<number, HTMLElement>; annotations: readonly Annotation[]; selectedId: string | null }) {
+export function AnnotationLayers({ layers, annotations, selectedId, staleIds }: { layers: ReadonlyMap<number, HTMLElement>; annotations: readonly Annotation[]; selectedId: string | null; staleIds: ReadonlySet<string> }) {
+  const { t } = useTranslation();
   const byPage = useMemo(() => {
     const m = new Map<number, Annotation[]>();
     for (const a of annotations) m.set(a.page, [...(m.get(a.page) ?? []), a]);
@@ -27,7 +28,9 @@ export function AnnotationLayers({ layers, annotations, selectedId }: { layers: 
                 a.rects.map((r, i) => (
                   <div
                     key={`${a.id}:${i}`}
-                    className={`ann ann-${a.kind} ann-${colorOf(a.color)}${a.id === selectedId ? ' selected' : ''}`}
+                    className={`ann ann-${a.kind} ann-${colorOf(a.color)}${a.id === selectedId ? ' selected' : ''}${staleIds.has(a.id) ? ' ann-stale' : ''}`}
+                    title={staleIds.has(a.id) ? t('reader.ann.stale') : undefined}
+                    data-stale={staleIds.has(a.id) ? 'true' : undefined}
                     style={{ left: pct(r.x), top: pct(r.y), width: pct(r.w), height: pct(r.h) }}
                     data-testid="annotation-mark"
                     data-annotation-id={a.id}
@@ -65,6 +68,8 @@ interface NewProps {
   color: AnnotationColor;
   comment: string;
   busy: boolean;
+  /** Something to tell the user about this selection (pages that were left out). */
+  notice?: string;
   onColor(c: AnnotationColor): void;
   onComment(v: string): void;
   onCreate(kind: 'highlight' | 'underline'): void;
@@ -75,6 +80,9 @@ interface EditProps {
   annotation: Annotation;
   comment: string;
   busy: boolean;
+  /** Made on another version of the file: may be misplaced; `onReconfirm` saves it again on the file as it is now. */
+  stale: boolean;
+  onReconfirm(): void;
   onColor(c: AnnotationColor): void;
   onKind(k: 'highlight' | 'underline'): void;
   onComment(v: string): void;
@@ -99,6 +107,19 @@ export function AnnotationBar(props: NewProps | EditProps) {
         <p className="ann-bar-text" data-testid="ann-text">
           {safeText(excerpt(text, 140))}
         </p>
+      )}
+      {props.mode === 'new' && props.notice && (
+        <p className="callout" role="status" data-testid="ann-skipped">
+          {props.notice}
+        </p>
+      )}
+      {props.mode === 'edit' && props.stale && (
+        <div className="callout ann-stale-note" role="status" data-testid="ann-stale">
+          <span>{t('reader.ann.stale')}</span>
+          <button type="button" disabled={props.busy} onClick={props.onReconfirm} title={t('reader.ann.reconfirmHint')} data-testid="ann-reconfirm">
+            {t('reader.ann.reconfirm')}
+          </button>
+        </div>
       )}
       <div className="ann-bar-row">
         {props.mode === 'new' ? (
@@ -162,7 +183,7 @@ export function AnnotationBar(props: NewProps | EditProps) {
 }
 
 /** The annotations of the document by page; each entry takes the reader to it. */
-export function AnnotationList({ annotations, selectedId, onPick }: { annotations: readonly Annotation[]; selectedId: string | null; onPick(a: Annotation): void }) {
+export function AnnotationList({ annotations, selectedId, staleIds, onPick }: { annotations: readonly Annotation[]; selectedId: string | null; staleIds: ReadonlySet<string>; onPick(a: Annotation): void }) {
   const { t } = useTranslation();
   const pages = useMemo(() => {
     const m = new Map<number, Annotation[]>();
@@ -189,6 +210,11 @@ export function AnnotationList({ annotations, selectedId, onPick }: { annotation
                   <span className="ann-item-body">
                     <span className="ann-item-text">{safeText(excerpt(a.text, 100)) || t(`reader.kind.${a.kind}`)}</span>
                     {a.comment && <span className="ann-item-comment">{safeText(excerpt(a.comment, 100))}</span>}
+                    {staleIds.has(a.id) && (
+                      <span className="ann-item-stale" data-testid="annotation-stale">
+                        {t('reader.ann.stale')}
+                      </span>
+                    )}
                   </span>
                 </button>
               </li>

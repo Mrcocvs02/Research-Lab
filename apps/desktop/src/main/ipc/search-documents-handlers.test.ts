@@ -3,8 +3,8 @@ import { AppError, channels, createDispatcher, createMemoryLogger, documentRecor
 import { buildHandlers, type MainServices } from './handlers/index.js';
 
 const DOC = 'abcdef0123456789';
-const ABS_WIN = 'C:\Users\someone\Papers\old\paper.pdf';
-const ABS_POSIX = '/home/someone/papers/old/paper.pdf';
+const ABS_WIN = String.raw`C:\Users\%USERNAME%\Papers\old\paper.pdf`;
+const ABS_POSIX = '/home/<user>/papers/old/paper.pdf';
 
 const record = documentRecordSchema.parse({
   id: DOC,

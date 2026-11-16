@@ -240,6 +240,29 @@ export class Organizer {
     });
   }
 
+  /**
+   * Keeps the "underlined" flag in step with the annotations of a document (D-184): with origin "annotations" the value
+   * is "there is at least one annotation"; a manual true stays; a manual false becomes an annotations true as soon as there is
+   * one. Read and written under the queue, no change log entry (annotation edits are not part of undo/redo).
+   */
+  syncUnderlined(docId: string, hasAnnotations: boolean): Promise<{ underlined: { value: boolean; origin: 'annotations' | 'manual' }; changed: boolean }> {
+    return this.run(async () => {
+      const store = this.d.store;
+      const cur = await store.documents.get(docId);
+      if (!cur) throw new AppError('NOT_FOUND', 'Unknown document');
+      const u = cur.study.underlined;
+      const next = u.origin === 'annotations' ? { value: hasAnnotations, origin: 'annotations' as const } : !u.value && hasAnnotations ? { value: true, origin: 'annotations' as const } : u;
+      if (next.value === u.value && next.origin === u.origin) return { underlined: u, changed: false };
+      const now = this.ctx.now().toISOString();
+      await store.documents.update(docId, (c) => {
+        if (!c) throw new AppError('NOT_FOUND', 'Unknown document');
+        return { ...c, study: { ...c.study, underlined: next }, updatedAt: now };
+      });
+      this.ctx.invalidate();
+      return { underlined: next, changed: true };
+    });
+  }
+
   tagDocuments(docIds: readonly string[], add: readonly string[] = [], remove: readonly string[] = []): Promise<{ changeId: string | null; changed: number; unchanged: number } & Touched> {
     return this.run(async () => {
       const store = this.d.store;

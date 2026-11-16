@@ -1,29 +1,213 @@
 /**
- * Phase 3 (study): the in-app reader, notes per file and per page, PDF annotations.
- * Contracts: `packages/core/src/ipc/channels/{reader,notes,annotations}.ts`. Until a domain is implemented its
- * channels answer NOT_IMPLEMENTED.
+ * Phase 3 (study): the in-app reader, notes per file and per page, PDF annotations (D-184, D-185..).
+ * Contracts: `packages/core/src/ipc/channels/{reader,notes,annotations}.ts`.
+ * Everything is written to the data folder of the library; the PDF itself is only ever read.
  */
-import { AppError } from '@rl/core';
+import { randomUUID } from 'node:crypto';
+import { AppError, STUDY_LIMITS, annotationFileSchema, type Annotation, type DocumentId, type Note } from '@rl/core';
+import type { LibraryRuntime } from '../../library/library-runtime.js';
 import type { DomainHandlers } from '../types.js';
+import { openPdfHandle, presentPdf } from './doc-files.js';
 import type { MainServices } from './services.js';
 
-const notYet = (channel: string) => () => {
-  throw new AppError('NOT_IMPLEMENTED', `${channel} is not implemented yet`);
+export const readerHandlers = (s: MainServices): DomainHandlers<'reader'> => ({
+  'reader:open': async ({ docId }) => {
+    const pdf = await presentPdf(s, docId as DocumentId);
+    // The file must also look like a PDF (a renamed file is refused here, not by the viewer).
+    const opened = await openPdfHandle(pdf.abs);
+    if (typeof opened === 'string') throw new AppError('PERMISSION_DENIED', opened === 'missing' ? 'The file of this document is missing' : 'Only PDF files open in the reader', { reason: opened });
+    await opened.fh.close().catch(() => {});
+    return { url: `rl-doc://doc/${docId}?v=${pdf.hash.slice(0, 8)}`, hash: pdf.hash, title: pdf.title };
+  },
+  'reader:openLink': async ({ url }) => {
+    let u: URL;
+    try {
+      u = new URL(url);
+    } catch {
+      throw new AppError('PERMISSION_DENIED', 'Only http and https links open in the browser');
+    }
+    // A link with credentials is a classic way to dress up a hostile address.
+    if ((u.protocol !== 'http:' && u.protocol !== 'https:') || u.username || u.password) throw new AppError('PERMISSION_DENIED', 'Only http and https links open in the browser');
+    await s.shell.openExternal(u.href).catch(() => {
+      throw new AppError('IO_ERROR', 'The system could not open the link');
+    });
+    return { ok: true as const };
+  },
+});
+
+/** Runs the tasks of one key one after the other; a failed task does not stop the next. */
+class KeyedQueue {
+  private readonly tails = new Map<string, Promise<unknown>>();
+  run<T>(key: string, task: () => Promise<T>): Promise<T> {
+    const prev = this.tails.get(key) ?? Promise.resolve();
+    const next = prev.then(task, task);
+    const tail = next.catch(() => {});
+    this.tails.set(key, tail);
+    void tail.then(() => {
+      if (this.tails.get(key) === tail) this.tails.delete(key);
+    });
+    return next;
+  }
+}
+
+/** Markdown to a short plain text: no markers, one line. */
+export function plainExcerpt(markdown: string, max: number = STUDY_LIMITS.excerpt): string {
+  const t = markdown
+    .replace(/```[^\n]*\n?/g, ' ')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/^\s{0,3}(?:#{1,6}|>|[-*+]|\d+[.)])\s+/gm, '')
+    .replace(/[*_`~]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return [...t].slice(0, max).join('');
+}
+
+const noteView = (n: Note) => ({
+  docId: n.frontmatter.docId,
+  ...(n.frontmatter.scope === 'page' && n.frontmatter.page !== undefined ? { page: n.frontmatter.page } : {}),
+  body: n.body,
+  createdAt: n.frontmatter.createdAt,
+  updatedAt: n.frontmatter.updatedAt,
+});
+
+/** The document must exist in the active library; unknown ids are NOT_FOUND before anything is read or written. */
+async function activeDocument(s: MainServices, docId: string): Promise<LibraryRuntime> {
+  const rt = await s.runtime.require();
+  await rt.getDocument(docId as DocumentId);
+  return rt;
+}
+
+/** The index refresh never fails a change that is already on disk: the next scan finds the stale entry. */
+async function refreshIndex(s: MainServices, rt: LibraryRuntime, docId: string): Promise<void> {
+  await rt.reindexDocuments([docId as DocumentId]).catch((e: unknown) => s.log.warn('index refresh after a note or annotation change failed', { error: e }));
+}
+
+export const notesHandlers = (s: MainServices): DomainHandlers<'notes'> => {
+  const queue = new KeyedQueue();
+  return {
+    'notes:get': async ({ docId, page }) => {
+      const rt = await activeDocument(s, docId);
+      const note = await rt.store.notes.get(docId as DocumentId, page);
+      return { note: note ? noteView(note) : null };
+    },
+    'notes:list': async ({ docId }) => {
+      const rt = await activeDocument(s, docId);
+      const notes = await rt.store.notes.listForDocument(docId as DocumentId);
+      // The store already lists the file note first, then the page notes by page.
+      const items = notes.map((n) => ({
+        page: n.frontmatter.scope === 'page' ? (n.frontmatter.page ?? null) : null,
+        updatedAt: n.frontmatter.updatedAt,
+        excerpt: plainExcerpt(n.body),
+      }));
+      return { items };
+    },
+    'notes:save': async ({ docId, page, body, expectedUpdatedAt }) => {
+      const rt = await activeDocument(s, docId);
+      // One queue per note file (and library): the read, the conflict check and the write are one step.
+      const key = `${rt.libraryId}|${docId}|${page ?? 'file'}`;
+      const result = await queue.run(key, async () => {
+        const store = rt.store;
+        const cur = await store.notes.get(docId as DocumentId, page);
+        if ((cur?.frontmatter.updatedAt ?? null) !== expectedUpdatedAt) {
+          throw new AppError('CONFLICT', 'The note was changed somewhere else', { current: cur ? noteView(cur) : null });
+        }
+        if (body.trim() === '') {
+          if (!cur) return { note: null, changed: false };
+          await store.notes.remove(docId as DocumentId, page);
+          return { note: null, changed: true };
+        }
+        // `updatedAt` always moves forward, so a stale editor can never match a newer note by chance.
+        const prev = cur ? Date.parse(cur.frontmatter.updatedAt) : 0;
+        const stamp = new Date(Math.max(Date.now(), prev + 1)).toISOString();
+        const note: Note = {
+          frontmatter: {
+            docId: docId as DocumentId,
+            scope: page === undefined ? 'file' : 'page',
+            ...(page === undefined ? {} : { page }),
+            createdAt: cur?.frontmatter.createdAt ?? stamp,
+            updatedAt: stamp,
+          },
+          body,
+        };
+        await store.notes.put(note);
+        return { note: noteView(note), changed: true };
+      });
+      if (result.changed) {
+        await refreshIndex(s, rt, docId);
+        s.emit('library:changed', { kind: 'notes', ids: [docId] });
+      }
+      return { note: result.note };
+    },
+  };
 };
 
-export const readerHandlers = (_s: MainServices): DomainHandlers<'reader'> => ({
-  'reader:open': notYet('reader:open'),
-  'reader:openLink': notYet('reader:openLink'),
-});
+type Underlined = { value: boolean; origin: 'annotations' | 'manual' };
 
-export const notesHandlers = (_s: MainServices): DomainHandlers<'notes'> => ({
-  'notes:get': notYet('notes:get'),
-  'notes:list': notYet('notes:list'),
-  'notes:save': notYet('notes:save'),
-});
-
-export const annotationsHandlers = (_s: MainServices): DomainHandlers<'annotations'> => ({
-  'annotations:list': notYet('annotations:list'),
-  'annotations:save': notYet('annotations:save'),
-  'annotations:remove': notYet('annotations:remove'),
-});
+export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotations'> => {
+  const queue = new KeyedQueue();
+  /** The annotations of one document change one at a time, together with the flag that follows them. */
+  const change = async <T>(docId: string, fn: (rt: LibraryRuntime) => Promise<{ value: T; changed: boolean; flagChanged: boolean; underlined: Underlined }>) => {
+    const rt = await activeDocument(s, docId);
+    const r = await queue.run(`${rt.libraryId}|${docId}`, () => fn(rt));
+    if (r.changed) {
+      await refreshIndex(s, rt, docId);
+      s.emit('library:changed', { kind: 'annotations', ids: [docId] });
+      // The "underlined" flag lives in the document record: lists showing it reload that document.
+      if (r.flagChanged) s.emit('library:changed', { kind: 'documents', ids: [docId] });
+    }
+    return r;
+  };
+  return {
+    'annotations:list': async ({ docId }) => {
+      const rt = await activeDocument(s, docId);
+      const file = await rt.store.annotations.get(docId as DocumentId);
+      const rec = await rt.getDocument(docId as DocumentId);
+      return { annotations: file?.annotations ?? [], stale: file?.forHash !== undefined && file.forHash !== rec.hash };
+    },
+    'annotations:save': async ({ docId, annotation }) => {
+      const r = await change(docId, async (rt) => {
+        const rec = await rt.getDocument(docId as DocumentId);
+        const now = new Date().toISOString();
+        let saved!: Annotation;
+        const file = await rt.store.annotations.update(docId as DocumentId, (current) => {
+          const base = current ?? annotationFileSchema.parse({ docId });
+          const list = [...base.annotations];
+          const { id, ...fields } = annotation;
+          if (id !== undefined) {
+            const i = list.findIndex((a) => a.id === id);
+            const old = list[i];
+            if (!old) throw new AppError('NOT_FOUND', 'Unknown annotation');
+            saved = { ...old, ...fields, id: old.id, createdAt: old.createdAt, updatedAt: now };
+            if (fields.comment === undefined) delete saved.comment;
+            list[i] = saved;
+          } else {
+            if (list.length >= STUDY_LIMITS.annotationsPerDoc) {
+              throw new AppError('INVALID_REQUEST', 'Too many annotations on this document', { reason: 'annotations-limit', limit: STUDY_LIMITS.annotationsPerDoc });
+            }
+            saved = { ...fields, id: `a-${randomUUID().replace(/-/g, '').slice(0, 20)}`, createdAt: now, updatedAt: now } as Annotation;
+            list.push(saved);
+          }
+          // The positions refer to the file as it is now.
+          return { ...base, forHash: rec.hash, annotations: list };
+        });
+        const u = await rt.organizer.syncUnderlined(docId, file.annotations.length > 0);
+        return { value: saved, changed: true, flagChanged: u.changed, underlined: u.underlined };
+      });
+      return { annotation: r.value, underlined: r.underlined };
+    },
+    'annotations:remove': async ({ docId, id }) => {
+      const r = await change(docId, async (rt) => {
+        const current = await rt.store.annotations.get(docId as DocumentId);
+        const list = (current?.annotations ?? []).filter((a) => a.id !== id);
+        const removed = current !== null && list.length !== current.annotations.length;
+        // Nothing to remove: nothing is written (not even an empty file).
+        if (current && removed) await rt.store.annotations.put({ ...current, annotations: list });
+        const u = await rt.organizer.syncUnderlined(docId, list.length > 0);
+        return { value: removed, changed: removed || u.changed, flagChanged: u.changed, underlined: u.underlined };
+      });
+      return { removed: r.value, underlined: r.underlined };
+    },
+  };
+};

@@ -119,7 +119,15 @@ I test pesanti girano solo con `RL_HEAVY_TESTS=1`, uno script alla volta e mai i
 Picchi di memoria misurati con `tools/mem-sample.mjs` (2026-11-16, macchina di sviluppo): `npm test` ~0,6 GiB; `npm run test:e2e` ~0,9 GiB (più la build); test pesanti ~1,1 GiB ciascuno.
 Ogni script controlla prima la memoria disponibile (`tools/mem-guard.mjs`: 1,2 GiB unitari, 2 GiB e2e, 2,5 GiB pesanti) e interrompe il comando se durante l'esecuzione la memoria disponibile scende sotto la soglia di `--abort-below` (`tools/mem-sample.mjs`). `RL_SKIP_MEM_GUARD=1` salta solo il controllo iniziale.
 
+## Fase 3, dati dello studio
+- Unitari: `apps/desktop/src/main/doc-protocol.test.ts` (intervalli, 416, 404/403 senza percorsi, altra libreria, giunzione fuori radice, CORS solo per `rl-app://app`, OPTIONS) e `apps/desktop/src/main/ipc/study-handlers.test.ts` (`reader:open`, `reader:openLink`, note: conflitto, corpo vuoto, concorrenza, reindicizzazione ed evento; annotazioni: limite, `stale`, flag "sottolineato", file originale mai scritto).
+- E2E: `e2e/study-data.spec.ts` (una libreria sintetica `papers`): `fetch` con `Range` dal renderer verso `rl-doc`, rifiuti, note e annotazioni che sopravvivono a chiusura e riapertura, ricerca per una parola presente solo in una nota o in un'annotazione, SHA-256 dei PDF identico prima e dopo. Si lancia da solo, più `smoke` e `qa-security` quando cambia la CSP.
+
 ## Budget di leggerezza
 - `tools/budgets.json` fissa le soglie: JS iniziale del renderer (script di `index.html`, import statici e dizionario della lingua attiva), JS e totale del renderer, JS del main, preload, memoria totale a riposo e tempo al primo contenuto. Valori misurati dopo l'ottimizzazione più il 15 %; alzarli richiede una decisione in `DECISIONS.md`.
 - `npm run check:budget` (dopo `npm run build`) controlla le dimensioni dei bundle e dice quale soglia è superata e quali chunk carica la prima schermata; `node tools/check-budget.mjs --json` stampa i valori misurati.
 - `e2e/qa-budget.spec.ts` (`npx playwright test -c e2e/playwright.config.ts qa-budget`, dopo la build): libreria sintetica di 40 documenti creata e scansionata, poi secondo avvio; misura il tempo dall'avvio del processo alle prime righe della vista Libreria e la somma dei working set di `app.getAppMetrics()` dopo 10 s di inattività (il worker si chiude dopo 3 s con `RL_WORKER_IDLE_MS`). Stampa `BUDGET-MEASURE {...}`. Le soglie di tempo dipendono dalla macchina: un superamento isolato va ripetuto prima di indagare.
+
+## Studio (fase 3, dati)
+- Unit: `apps/desktop/src/main/doc-protocol.test.ts` (intervalli, 416, rifiuti, CORS) e `ipc/study-handlers.test.ts` (lettore, note, annotazioni, flag).
+- E2E: `e2e/study-data.spec.ts` (dopo `npm run build`): `fetch` con `Range` di `rl-doc://` dal renderer, id estraneo rifiutato, note e annotazioni dopo il riavvio, ricerca per una parola presente solo nella nota, SHA-256 dei PDF invariato.

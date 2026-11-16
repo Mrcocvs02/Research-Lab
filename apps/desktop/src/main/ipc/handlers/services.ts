@@ -9,6 +9,8 @@ export interface ShellService {
   /** Opens a file with the default application; resolves '' on success, else an error text (Electron's `shell.openPath`). */
   openPath(absolutePath: string): Promise<string>;
   showItemInFolder(absolutePath: string): void;
+  /** Opens an http(s) URL in the system browser (Electron's `shell.openExternal`); the handler has already checked the scheme. */
+  openExternal(url: string): Promise<void>;
 }
 
 /**

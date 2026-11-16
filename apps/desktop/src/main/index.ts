@@ -75,11 +75,12 @@ async function main(): Promise<void> {
     log,
     emit: (status) => emit('scan:progress', status),
     emitDocumentsChanged: () => emit('library:changed', { kind: 'documents' }),
+    emitProjectsChanged: (ids) => emit('library:changed', ids.length <= 500 ? { kind: 'projects', ids } : { kind: 'projects' }),
     backupDataDir: backupLibraryData,
     createStore: ({ rootPath, dataDir, deviceId }) => createLibraryStore({ rootPath, dataDir, deviceId, logger: log }),
     createIndex: createSearchIndex,
     spawnWorker: () => spawnScanWorker(path.join(import.meta.dirname, 'scan-worker.js'), { log, watchdog: watchdogFromEnv(process.env, app.isPackaged) }),
-    watch: (o) => createWatcher({ rootPath: o.rootPath, dataDir: o.dataDir, config: o.config, onBatch: o.onBatch, onError: o.onError }),
+    watch: (o) => createWatcher({ rootPath: o.rootPath, dataDir: o.dataDir, config: o.config, onBatch: o.onBatch, onTaxonomyChange: o.onTaxonomyChange, onError: o.onError }),
   });
   const services: MainServices = {
     log,

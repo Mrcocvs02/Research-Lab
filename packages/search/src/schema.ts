@@ -2,7 +2,7 @@
  * Layout of the search index file. The file is local and rebuildable (never synced): when
  * `INDEX_SCHEMA_VERSION` differs from the one stored in the file, everything is dropped and refilled.
  */
-export const INDEX_SCHEMA_VERSION = 3;
+export const INDEX_SCHEMA_VERSION = 4;
 
 /** Page rows of `page_fts` have rowid = docs.id * PAGE_ROWID_BASE + page, so a document's pages are one rowid range. */
 export const PAGE_ROWID_BASE = 1_000_000;
@@ -36,6 +36,7 @@ CREATE TABLE docs (
   folder TEXT NOT NULL DEFAULT '',
   study TEXT NOT NULL DEFAULT 'to-read',
   tags TEXT NOT NULL DEFAULT '[]',
+  direct_tags TEXT NOT NULL DEFAULT '[]',
   added_at TEXT NOT NULL DEFAULT '',
   missing INTEGER NOT NULL DEFAULT 0,
   text_hash TEXT,

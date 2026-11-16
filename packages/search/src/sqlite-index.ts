@@ -45,6 +45,7 @@ interface DocRow {
   path: string;
   study: string;
   tags: string;
+  direct_tags: string;
   added_at: string;
   missing: number;
   size: number;
@@ -60,7 +61,8 @@ const studyOf = (s: string): 'to-read' | 'reading' | 'read' => (s === 'reading' 
 
 /** Structured filters (from the caller and from `author:`-style words in the text) as one SQL condition on `docs d`. */
 function buildWhere(f: SearchFilters | undefined, t: TextFilters | undefined): Where {
-  const cond: string[] = [];
+  // Documents whose file is gone are left out unless asked for (counts, lists and filters agree).
+  const cond: string[] = f?.includeMissing ? [] : ['d.missing = 0'];
   const params: Param[] = [];
   const exists = (table: 'doc_author' | 'doc_tag', inner: string, ...p: Param[]) => {
     cond.push(`EXISTS (SELECT 1 FROM ${table} x WHERE x.doc = d.id AND ${inner})`);
@@ -297,7 +299,7 @@ export class SqliteSearchIndex implements SearchIndex {
     const folder = slash === -1 ? '' : r.path.slice(0, slash);
     db.prepare(
       `UPDATE docs SET title=?, title_sort=?, authors=?, author_sort=?, year=?, type=?, type_norm=?, type_label_norm=?,
-       venue=?, venue_norm=?, path=?, folder=?, study=?, tags=?, added_at=?, missing=?, stamp=?, size=? WHERE id=?`,
+       venue=?, venue_norm=?, path=?, folder=?, study=?, tags=?, direct_tags=?, added_at=?, missing=?, stamp=?, size=? WHERE id=?`,
     ).run(
       title,
       normalizeText(title ?? ''),
@@ -313,9 +315,10 @@ export class SqliteSearchIndex implements SearchIndex {
       folder,
       r.study.state,
       JSON.stringify(r.tags),
+      JSON.stringify(doc.directTags ?? r.tags),
       r.addedAt,
       r.missing ? 1 : 0,
-      `${r.revision}:${r.updatedAt}`,
+      `${r.revision}:${r.updatedAt}${doc.stampSuffix ? `|${doc.stampSuffix}` : ''}`,
       r.size,
       id,
     );
@@ -573,6 +576,7 @@ export class SqliteSearchIndex implements SearchIndex {
       studyState: studyOf(r.study),
       size: r.size,
       tags: parseJsonArray(r.tags),
+      directTags: parseJsonArray(r.direct_tags),
     };
   }
 
@@ -636,6 +640,7 @@ export class SqliteSearchIndex implements SearchIndex {
         path: r.path,
         studyState: studyOf(r.study),
         tags: parseJsonArray(r.tags),
+        directTags: parseJsonArray(r.direct_tags),
         addedAt: r.added_at,
         missing: r.missing === 1,
         size: r.size,

@@ -522,3 +522,33 @@ describe('match markers and pagination (D-080)', () => {
     expect((await index.facets({ text: 'alpha' })).total).toBe(1);
   });
 });
+
+describe('missing documents and direct tags', () => {
+  it('lists, searches and counts leave missing documents out unless asked', async () => {
+    await index.upsertMany([
+      makeDoc({ seed: 'a', title: 'Present zeta', tags: ['x'] }),
+      { ...makeDoc({ seed: 'b', title: 'Gone zeta', tags: ['x'] }), record: { ...makeDoc({ seed: 'b', title: 'Gone zeta', tags: ['x'] }).record, missing: true } },
+    ]);
+    expect((await index.list({})).items.map((i) => i.title)).toEqual(['Present zeta']);
+    expect((await index.list({ filters: { includeMissing: true } })).total).toBe(2);
+    expect((await index.search({ text: 'zeta' })).map((h) => h.docId)).toHaveLength(1);
+    expect((await index.search({ text: 'zeta', filters: { includeMissing: true } })).length).toBe(2);
+    expect((await index.facets({ text: '' })).total).toBe(1);
+    expect((await index.facets({ text: '', filters: { includeMissing: true } })).total).toBe(2);
+  });
+
+  it('rows carry directTags next to the tags that include the implied ones', async () => {
+    await index.upsert({ ...makeDoc({ seed: 'a', title: 'Alpha', tags: ['nn', 'ml'] }), directTags: ['nn'] });
+    const row = (await index.list({})).items[0];
+    expect(row).toMatchObject({ tags: ['nn', 'ml'], directTags: ['nn'] });
+    expect((await index.search({ text: 'alpha' }))[0]).toMatchObject({ tags: ['nn', 'ml'], directTags: ['nn'] });
+    await index.upsert(makeDoc({ seed: 'b', title: 'Beta', tags: ['q'] }));
+    expect((await index.search({ text: 'beta' }))[0]?.directTags).toEqual(['q']);
+  });
+
+  it('the stamp carries the taxonomy fingerprint', async () => {
+    const d = makeDoc({ seed: 'a', title: 'A' });
+    await index.upsert({ ...d, stampSuffix: 'abc' });
+    expect([...(await index.indexedState()).values()][0]?.stamp).toBe(`${d.record.revision}:${d.record.updatedAt}|abc`);
+  });
+});

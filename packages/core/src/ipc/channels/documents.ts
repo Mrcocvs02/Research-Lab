@@ -13,7 +13,10 @@ export const documentSummarySchema = z.object({
   venue: z.string().nullable(),
   path: relativePathSchema,
   studyState: studyStateSchema,
+  /** Tag ids of the document, implied ones included. */
   tags: z.array(z.string()),
+  /** Only the tags set on the document itself (no implied ones): the ones the user can remove. */
+  directTags: z.array(z.string()).optional(),
   addedAt: isoDateSchema.or(z.literal('')),
   missing: z.boolean(),
   /** File size in bytes. */

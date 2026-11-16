@@ -56,6 +56,8 @@ export interface LibraryStoreOptions {
   /** Log tag changes of single documents (default true). The importer turns it off and logs one summary. */
   logDocumentChanges?: boolean;
   logger?: Logger;
+  /** Bytes of a log file read from its end (default `MAX_LOG_READ_BYTES`); tests lower it. */
+  maxLogReadBytes?: number;
   atomic?: AtomicWriteOptions;
   retry?: RetryOptions;
 }
@@ -85,12 +87,28 @@ export interface FileLibraryStore extends LibraryStore {
    * changes, which the plain store does not log (only tags and taxonomy).
    */
   withChange(ctx: ChangeContext): FileLibraryStore;
+  /**
+   * `readLog` plus the ids of the change groups that may be incomplete because the part of a log file that was read
+   * starts in the middle of the group (D-182). Such a group must never be undone.
+   */
+  readLogReport(query?: { type?: LogEntry['type']; since?: string; limit?: number }): Promise<LogReport>;
+}
+
+export interface LogReport {
+  entries: LogEntry[];
+  /** Change groups that may have lost entries to a truncated read. */
+  partialChangeIds: ReadonlySet<string>;
 }
 
 export interface ChangeContext {
   changeId: string;
   summary?: string;
   undoOf?: string;
+  /**
+   * Whether the summary was written already. One mutable object per change, shared by every store made from it
+   * (`withChange`, `withActor`): the group logs its summary once, whichever instance writes first (D-182).
+   */
+  head?: { logged: boolean };
 }
 
 /** The user-owned document fields whose before/after are logged when a change context is set (undo restores them). */
@@ -230,8 +248,6 @@ class FileStore implements FileLibraryStore {
   private readonly queue: KeyedQueue;
   private readonly options: LibraryStoreOptions;
   private readonly change: ChangeContext | undefined;
-  /** Whether this change context already wrote its summary on an entry: the next entries go without it (D-179). */
-  private changeHeadLogged = false;
 
   constructor(options: LibraryStoreOptions, shared?: SharedState, change?: ChangeContext) {
     this.change = change;
@@ -259,7 +275,7 @@ class FileStore implements FileLibraryStore {
   }
 
   withChange(ctx: ChangeContext): FileLibraryStore {
-    return new FileStore(this.options, { issues: this.loadIssues, queue: this.queue }, ctx);
+    return new FileStore(this.options, { issues: this.loadIssues, queue: this.queue }, { ...ctx, head: ctx.head ?? { logged: false } });
   }
 
   /* ---------------------------- low level ---------------------------- */
@@ -650,12 +666,19 @@ class FileStore implements FileLibraryStore {
       // The summary is a property of the group, not of each entry: a change on tens of thousands of documents would
       // otherwise repeat it on every line and outgrow the part of the log that is read back (D-179). `undoOf` is short and
       // stays on every entry, so that a group whose first lines fall outside that part is still known as an undo.
-      const head = !this.changeHeadLogged && this.change.summary ? { summary: this.change.summary } : {};
-      if ('summary' in head) this.changeHeadLogged = true;
+      const state = (this.change.head ??= { logged: false });
+      const head = !state.logged && this.change.summary ? { summary: this.change.summary } : {};
+      if ('summary' in head) state.logged = true;
       withCtx = { ...entry, changeId: this.change.changeId, ...head, ...(this.change.undoOf ? { undoOf: this.change.undoOf } : {}) };
     }
     const carriesHead = this.change !== undefined && 'summary' in withCtx && withCtx.summary !== undefined && withCtx.changeId === this.change.changeId;
-    const valid = logEntrySchema.parse(withCtx);
+    let valid: LogEntry;
+    try {
+      valid = logEntrySchema.parse(withCtx);
+    } catch (e) {
+      if (carriesHead && this.change?.head) this.change.head.logged = false;
+      throw e;
+    }
     const month = valid.at.slice(0, 7);
     const rel = dataPath.logFile(valid.type === 'change' ? 'changes' : 'ai-sends', this.deviceId, month);
     const file = await this.abs(rel, true);
@@ -668,26 +691,32 @@ class FileStore implements FileLibraryStore {
       }, this.retry),
     ).catch((e: unknown) => {
       // The entry that should have carried the summary was not written: the next one carries it instead.
-      if (carriesHead) this.changeHeadLogged = false;
+      if (carriesHead && this.change?.head) this.change.head.logged = false;
       throw e instanceof AppError ? e : new AppError('IO_ERROR', 'Cannot append to the log', { code: (e as NodeJS.ErrnoException).code ?? 'unknown' }, { cause: e });
     });
   }
 
   async readLog(query: { type?: LogEntry['type']; since?: string; limit?: number } = {}): Promise<LogEntry[]> {
+    return (await this.readLogReport(query)).entries;
+  }
+
+  async readLogReport(query: { type?: LogEntry['type']; since?: string; limit?: number } = {}): Promise<LogReport> {
     const entries: LogEntry[] = [];
+    const partialChangeIds = new Set<string>();
     for (const name of await this.listNames('log')) {
       if (!/^(changes|ai-sends)-\d{4}-\d{2}\..+\.jsonl$/.test(name)) continue;
       let invalid = 0;
       let truncated = false;
+      const fromFile: LogEntry[] = [];
       try {
         const file = await this.abs(`log/${name}`);
         const res = await withRetry(
           () =>
-            readLogLines(file, (line) => {
+            readLogLines(file, this.options.maxLogReadBytes ?? MAX_LOG_READ_BYTES, (line) => {
               if (!line.trim()) return;
               try {
                 const parsed = logEntrySchema.safeParse(JSON.parse(line));
-                if (parsed.success) entries.push(parsed.data);
+                if (parsed.success) fromFile.push(parsed.data);
                 else invalid++;
               } catch {
                 invalid++; // a torn line must not hide the rest
@@ -695,12 +724,14 @@ class FileStore implements FileLibraryStore {
             }),
           this.retry,
         );
+        entries.push(...fromFile);
         invalid += res.skipped;
         truncated = res.truncated;
       } catch (e) {
         this.noteIssue(`log/${name}`, e);
         continue;
       }
+      if (truncated) for (const id of possiblyPartial(fromFile)) partialChangeIds.add(id);
       if (truncated) this.loadIssues.push({ file: `log/${name}`, code: 'LOG_TRUNCATED', message: 'only the newest part of a very large log was read' });
       if (invalid > 0) {
         this.loadIssues.push({
@@ -717,7 +748,7 @@ class FileStore implements FileLibraryStore {
     let result = entries.filter((e) => (query.type === undefined || e.type === query.type) && (query.since === undefined || e.at >= query.since));
     result.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
     if (query.limit !== undefined) result = result.slice(-query.limit);
-    return result;
+    return { entries: result, partialChangeIds };
   }
 
   /** Fingerprint of the change-log files: when it is the same, `readLog` would return the same entries. */
@@ -741,14 +772,36 @@ class FileStore implements FileLibraryStore {
 }
 
 /**
- * Reads a log file line by line without holding it whole: at most `MAX_LOG_READ_BYTES` from its end (a partial first
+ * Change groups of a log file read from the middle (its oldest lines were cut) that may have lost entries (D-182).
+ * Two independent signals, either is enough:
+ * - the group owns the first entry that was read (or an entry written in the same millisecond): the cut fell inside it
+ *   or right before it;
+ * - the group has no summary at all: the summary sits only on the first entry of a group (D-179), so the head is
+ *   missing. A group that was never given a summary in a truncated file is treated the same way (cautious).
+ * Groups entirely inside the read part, with their summary, are not flagged.
+ */
+function possiblyPartial(entries: readonly LogEntry[]): Set<string> {
+  const out = new Set<string>();
+  const first = entries.find((e) => e.type === 'change');
+  if (!first) return out;
+  const withSummary = new Set<string>();
+  for (const e of entries) if (e.type === 'change' && e.changeId !== undefined && e.summary) withSummary.add(e.changeId);
+  for (const e of entries) {
+    if (e.type !== 'change' || e.changeId === undefined) continue;
+    if (e.at <= first.at || !withSummary.has(e.changeId)) out.add(e.changeId);
+  }
+  return out;
+}
+
+/**
+ * Reads a log file line by line without holding it whole: at most `maxBytes` from its end (a partial first
  * line is dropped), and a line over `MAX_LOG_LINE_BYTES` is skipped. Returns how many lines were skipped.
  */
-async function readLogLines(file: string, onLine: (line: string) => void): Promise<{ skipped: number; truncated: boolean }> {
+async function readLogLines(file: string, maxBytes: number, onLine: (line: string) => void): Promise<{ skipped: number; truncated: boolean }> {
   const handle = await open(file, 'r');
   try {
     const size = (await handle.stat()).size;
-    const start = Math.max(0, size - MAX_LOG_READ_BYTES);
+    const start = Math.max(0, size - maxBytes);
     const truncated = start > 0;
     const decoder = new StringDecoder('utf8');
     const buf = Buffer.allocUnsafe(256 * 1024);

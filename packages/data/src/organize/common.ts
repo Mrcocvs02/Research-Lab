@@ -1,11 +1,13 @@
 import type { DocumentRecord, LibraryStore, StudyState } from '@rl/core';
-import type { ChangeContext } from '../store.js';
+import type { ChangeContext, LogReport } from '../store.js';
 
 /** A store that can credit its changes to one user operation (the file store of `@rl/data`). */
 export interface OrganizerStore extends LibraryStore {
   withChange(ctx: ChangeContext): LibraryStore;
   /** Cheap fingerprint of the change-log files (names, sizes, mtimes): equal fingerprints, equal logs. */
   logSignature?(): Promise<string>;
+  /** `readLog` plus the change groups that may be incomplete (the file store of `@rl/data`; D-182). */
+  readLogReport?(query?: { type?: 'change' | 'ai-send'; since?: string; limit?: number }): Promise<LogReport>;
 }
 
 /** What the organizer keeps in memory about each document (not the whole record). */

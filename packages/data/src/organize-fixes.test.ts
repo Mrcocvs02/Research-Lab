@@ -244,7 +244,7 @@ describe('history canUndo / canRedo and its cache (7)', () => {
     let reads = 0;
     const counting = new Proxy(store, {
       get(t, prop) {
-        if (prop === 'readLog') return (...a: never[]) => (reads++, (t.readLog as (...x: unknown[]) => unknown)(...a));
+        if (prop === 'readLogReport') return (...a: never[]) => (reads++, (t.readLogReport as (...x: unknown[]) => unknown)(...a));
         const v = Reflect.get(t, prop, t);
         return typeof v === 'function' ? v.bind(t) : v;
       },

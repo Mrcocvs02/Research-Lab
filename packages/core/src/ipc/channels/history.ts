@@ -20,6 +20,8 @@ export const historyItemSchema = z.object({
   undone: z.boolean(),
   /** Written by this device. */
   mine: z.boolean(),
+  /** True when the log could only be read in part and this change may have lost entries: it is never undone. */
+  incomplete: z.boolean().optional(),
 });
 
 export const historyResultSchema = z.object({
@@ -46,6 +48,7 @@ export const historyChannels = defineChannels('history', {
   /**
    * Applies the recorded inverse of a change (default: the latest undoable change of this device).
    * CONFLICT (`details.conflict` = `changed`) when one of the items has changed again since; nothing is applied then.
+   * CONFLICT with `details.reason` = `partial-group` when the change may be incomplete in the log; nothing is applied.
    * NOT_FOUND when there is nothing to undo.
    */
   undo: { request: target, response: historyResultSchema },

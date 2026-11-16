@@ -35,6 +35,11 @@ export function HistoryPanel({ id, onClose }: { id: string; onClose(): void }) {
                 {item.kind !== 'change' && <span className="badge">{t(`history.kind.${item.kind}`)}</span>}
                 {item.undone && <span className="badge">{t('history.undoneBadge')}</span>}
                 {!item.mine && <span className="badge">{t('history.otherDevice')}</span>}
+                {item.incomplete && (
+                  <span className="badge" title={t('history.incompleteWhy')} data-testid="history-incomplete">
+                    {t('history.incompleteBadge')}
+                  </span>
+                )}
                 {item.undoable && !item.undone && item.mine && (
                   <button type="button" className="link" disabled={h.busy} onClick={() => void h.undo(item.changeId)} data-testid="history-undo-item">
                     {t('history.undoThis')}

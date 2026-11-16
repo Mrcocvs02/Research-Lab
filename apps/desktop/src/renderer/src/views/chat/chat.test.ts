@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { createElement, useEffect } from 'react';
+import { createElement, useEffect, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError, type LibraryProfile } from '@rl/core';
 import i18n from '../../i18n';
@@ -68,7 +68,7 @@ function setup(o: Opts = {}) {
     'documents:get': (p: any) => ({ id: p.docId, title: TITLES[p.docId] ?? null }),
     'projects:get': (p: any) => ({ project: { id: p.id, name: 'My Project' } }),
   });
-  const kids = [createElement(Context, { key: 'c', ...(o.selection ? { selection: o.selection } : {}), ...(o.reader ? { reader: o.reader } : {}) }), createElement(ChatPanel, { key: 'p' }), createElement(Probe, { key: 'q' })];
+  const kids: ReactElement[] = [createElement(Context, { key: 'c', ...(o.selection ? { selection: o.selection } : {}), ...(o.reader ? { reader: o.reader } : {}) }), createElement(ChatPanel, { key: 'p' }), createElement(Probe, { key: 'q' })];
   if (o.palette) kids.push(createElement(Palette, { key: 'pal', onClose: () => {} }));
   render(createElement(AppProvider, null, createElement(ReaderProvider, null, createElement(AiUiProvider, null, ...kids))));
   return ai;

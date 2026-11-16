@@ -29,7 +29,7 @@ function setup() {
     createElement(
       AppProvider,
       null,
-      createElement(LibraryEventsProvider, null, createElement(NotifyProvider, null, createElement(ReaderProvider, null, createElement(AiUiProvider, null, createElement(Shell, { section: 'library', onSection() {}, onNewLibrary() {} }, createElement('p', null, 'main')))))),
+      createElement(LibraryEventsProvider, null, createElement(NotifyProvider, null, createElement(ReaderProvider, null, createElement(AiUiProvider, null, createElement(Shell, { section: 'library', onSection() {}, onNewLibrary() {}, children: createElement('p', null, 'main') }))))),
     ),
   );
 }

@@ -29,6 +29,13 @@ export interface FakeTurn {
   error?: { code: string; message: string };
 }
 
+interface FakeConversation {
+  id: string;
+  title: string;
+  updatedAt: string;
+  turns: FakeTurn[];
+}
+
 export type StreamEvent =
   | { type: 'text-delta'; text: string }
   | { type: 'card'; card: { id: string; name: string; status: 'running' | 'done' | 'failed'; summary: string; docIds: string[] } }
@@ -56,7 +63,7 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
     /** Ask for a confirmation on a send with documents (what `ai.confirmBeforeSend` does in main). */
     confirm: true,
     log: [] as FakeSend[],
-    conversations: new Map<string, { id: string; title: string; updatedAt: string; turns: FakeTurn[] }>(),
+    conversations: new Map<string, FakeConversation>(),
     sends: [] as any[],
     previews: [] as any[],
     cancels: [] as string[],
@@ -152,7 +159,7 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
       const conversationId = p.conversationId ?? `conv-${n}`;
       const turnId = `turn-${n}`;
       const at = new Date(Date.UTC(2026, 10, 16, 10, n)).toISOString();
-      const conv = state.conversations.get(conversationId) ?? { id: conversationId, title: String(p.text).slice(0, 60), updatedAt: at, turns: [] };
+      const conv: FakeConversation = state.conversations.get(conversationId) ?? { id: conversationId, title: String(p.text).slice(0, 60), updatedAt: at, turns: [] };
       conv.turns.push({ id: `user-${n}`, role: 'user', text: p.text, at, cards: [], contextDocIds: p.contextDocIds ?? [] });
       conv.turns.push({ id: turnId, role: 'assistant', text: '', at, model: p.model, reasoning: p.reasoning, cards: [], contextDocIds: [] });
       conv.updatedAt = at;

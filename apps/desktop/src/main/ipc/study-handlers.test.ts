@@ -247,7 +247,7 @@ const ann = (over: Record<string, unknown> = {}) => ({ kind: 'highlight', page: 
 describe('annotations', () => {
   it('creates, updates by id, lists and removes', async () => {
     const call = await harness();
-    expect(ok(await call('annotations:list', { docId: hex(1) }))).toEqual({ annotations: [], stale: false });
+    expect(ok(await call('annotations:list', { docId: hex(1) }))).toEqual({ annotations: [], stale: false, staleIds: [] });
     const a = ok(await call('annotations:save', { docId: hex(1), annotation: ann() })).annotation;
     expect(a).toMatchObject({ kind: 'highlight', page: 1, color: 'yellow', text: 'important finding' });
     expect(a.id).toMatch(/^[a-z0-9]/);
@@ -289,16 +289,75 @@ describe('annotations', () => {
     ok(await call('annotations:save', { docId: hex(1), annotation: ann({ id: 'a0', color: 'blue' }) }));
   });
 
-  it('marks the list stale when the file hash differs from the one annotated', async () => {
+  it('judges staleness per annotation: a new save does not hide the older misaligned ones (D-198)', async () => {
     const call = await harness();
-    ok(await call('annotations:save', { docId: hex(1), annotation: ann() }));
+    const NEW = 'cd'.repeat(32);
+    const a = ok(await call('annotations:save', { docId: hex(1), annotation: ann() })).annotation;
+    expect(a.forHash).toBe(HASH);
+    expect(ok(await call('annotations:list', { docId: hex(1) }))).toMatchObject({ stale: false, staleIds: [] });
+    await store.documents.update(hex(1) as DocumentId, (c) => ({ ...c!, hash: NEW }));
+    expect(ok(await call('annotations:list', { docId: hex(1) }))).toMatchObject({ stale: true, staleIds: [a.id] });
+    // A new annotation is made on the file as it is now; the old one stays flagged, and the file-level hash is kept.
+    const b = ok(await call('annotations:save', { docId: hex(1), annotation: ann({ page: 2 }) })).annotation;
+    expect(b.forHash).toBe(NEW);
     expect((await store.annotations.get(hex(1) as DocumentId))?.forHash).toBe(HASH);
+    expect(ok(await call('annotations:list', { docId: hex(1) }))).toMatchObject({ stale: true, staleIds: [a.id] });
+    // Re-confirming the old one (saving it again) stamps the current hash.
+    ok(await call('annotations:save', { docId: hex(1), annotation: ann({ id: a.id }) }));
+    expect(ok(await call('annotations:list', { docId: hex(1) }))).toMatchObject({ stale: false, staleIds: [] });
+  });
+
+  it('an old file without per-annotation hashes inherits the file-level one', async () => {
+    const call = await harness();
+    const old = { id: 'old1', kind: 'highlight', page: 1, rects: [rect], text: 'x', color: 'yellow', createdAt: NOW, updatedAt: NOW };
+    await store.annotations.put({ schemaVersion: 1, docId: hex(1), forHash: 'ee'.repeat(32), annotations: [old] } as never);
+    expect(ok(await call('annotations:list', { docId: hex(1) }))).toMatchObject({ stale: true, staleIds: ['old1'] });
+    await store.annotations.put({ schemaVersion: 1, docId: hex(1), forHash: HASH, annotations: [old] } as never);
+    expect(ok(await call('annotations:list', { docId: hex(1) }))).toMatchObject({ stale: false, staleIds: [] });
+    // No hash anywhere (never recorded): nothing is claimed.
+    await store.annotations.put({ schemaVersion: 1, docId: hex(1), annotations: [old] } as never);
     expect(ok(await call('annotations:list', { docId: hex(1) })).stale).toBe(false);
-    await store.documents.update(hex(1) as DocumentId, (c) => ({ ...c!, hash: 'cd'.repeat(32) }));
-    expect(ok(await call('annotations:list', { docId: hex(1) })).stale).toBe(true);
-    // A new annotation is made on the file as it is now.
-    ok(await call('annotations:save', { docId: hex(1), annotation: ann() }));
-    expect(ok(await call('annotations:list', { docId: hex(1) })).stale).toBe(false);
+  });
+
+  it('an update that names only the comment keeps the colour and the text (D-198)', async () => {
+    const call = await harness();
+    const a = ok(await call('annotations:save', { docId: hex(1), annotation: ann({ color: 'pink', text: 'kept text' }) })).annotation;
+    const upd = ok(await call('annotations:save', { docId: hex(1), annotation: { id: a.id, kind: 'highlight', page: 1, rects: [rect], comment: 'only this' } })).annotation;
+    expect(upd).toMatchObject({ color: 'pink', text: 'kept text', comment: 'only this' });
+    const stored = (await store.annotations.get(hex(1) as DocumentId))!.annotations[0];
+    expect(stored).toMatchObject({ color: 'pink', text: 'kept text' });
+    // On create the missing fields take their defaults.
+    const c = ok(await call('annotations:save', { docId: hex(1), annotation: { kind: 'underline', page: 2, rects: [rect] } })).annotation;
+    expect(c).toMatchObject({ color: 'yellow', text: '' });
+  });
+
+  it('refuses a save that would make the file larger than the cap, and writes nothing (D-198)', async () => {
+    const call = await harness();
+    const text = 'x'.repeat(STUDY_LIMITS.annotationText);
+    // Close to the cap (a few KB below it): annotations of about 10 KB each, written directly.
+    const item = (i: number) => ({ id: `a${i}`, kind: 'highlight', page: 1, rects: [rect], text, color: 'yellow', createdAt: NOW, updatedAt: NOW });
+    const each = Buffer.byteLength(JSON.stringify(item(0), null, 2)) + 100;
+    const count = Math.floor((STUDY_LIMITS.annotationsFileBytes - 20_000) / each);
+    const list = Array.from({ length: count }, (_, i) => item(i));
+    await store.annotations.put({ schemaVersion: 1, docId: hex(1), forHash: HASH, annotations: list } as never);
+    const file = path.join(root, '.lab', 'annotations', `${hex(1)}.json`);
+    const before = await readFile(file);
+    expect(before.length).toBeLessThan(STUDY_LIMITS.annotationsFileBytes);
+    const bigRects = Array.from({ length: STUDY_LIMITS.rectsPerAnnotation }, () => rect);
+    let refused = false;
+    for (let i = 0; i < 6 && !refused; i++) {
+      const r = await call('annotations:save', { docId: hex(1), annotation: ann({ text, rects: bigRects, comment: 'c'.repeat(STUDY_LIMITS.annotationComment) }) });
+      if (!r.ok) {
+        refused = true;
+        expect(r.error).toMatchObject({ code: 'INVALID_REQUEST', details: { reason: 'annotations-size', limit: STUDY_LIMITS.annotationsFileBytes } });
+      }
+    }
+    expect(refused).toBe(true);
+    // The file on disk is valid, under the cap, and still readable and listable.
+    const after = await readFile(file);
+    expect(after.length).toBeLessThanOrEqual(STUDY_LIMITS.annotationsFileBytes);
+    expect(after.length).toBeGreaterThan(before.length - 1);
+    expect(ok(await call('annotations:list', { docId: hex(1) })).annotations.length).toBeGreaterThanOrEqual(count);
   });
 
   it('reindexes, emits library:changed and makes the annotated text searchable', async () => {

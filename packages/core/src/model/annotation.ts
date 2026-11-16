@@ -19,6 +19,11 @@ export const annotationSchema = z.object({
   text: z.string().default(''),
   color: z.string().default('yellow'),
   comment: z.string().optional(),
+  /**
+   * Hash of the PDF this annotation was placed on (set at every save). Files written before this field existed have
+   * none: such an annotation inherits the file-level `forHash`.
+   */
+  forHash: sha256Schema.optional(),
   createdAt: isoDateSchema,
   updatedAt: isoDateSchema,
 });
@@ -28,7 +33,7 @@ export type Annotation = z.infer<typeof annotationSchema>;
 export const annotationFileSchema = z.object({
   schemaVersion: schemaVersionSchema,
   docId: documentIdSchema,
-  /** Hash of the PDF the annotations were made on. */
+  /** Hash of the PDF when the file was first written; per-annotation `forHash` is the one that counts once present. Never overwritten after it is set. */
   forHash: sha256Schema.optional(),
   annotations: z.array(annotationSchema).default([]),
 });

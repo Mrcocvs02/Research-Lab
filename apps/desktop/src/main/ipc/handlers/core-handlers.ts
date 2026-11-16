@@ -94,10 +94,12 @@ export const importHandlers = (s: MainServices): DomainHandlers<'import'> => {
       // Claim the library synchronously, before any await, so two concurrent starts cannot both pass.
       if (running.has(libraryId)) throw new AppError('ALREADY_EXISTS', 'An import is already running for this library');
       running.add(libraryId);
-      // No scan of this library while the importer writes its records (released when the job ends).
+      // No scan of this library while the importer writes its records (released when the job ends): a scan in
+      // progress is cancelled and awaited before anything is written (D-073).
       const releaseScan = s.runtime.hold(libraryId);
       let started = false;
       try {
+        await releaseScan.ready;
         const profile = await s.libraries.profile(libraryId);
         // The source is a folder picked for this purpose or, as in the first-run wizard, the
         // library's own root (where the old index sits). Never a folder approved for something else.

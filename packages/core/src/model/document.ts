@@ -64,6 +64,20 @@ export const documentAiSchema = z.object({
 });
 export type DocumentAi = z.infer<typeof documentAiSchema>;
 
+/**
+ * Values the app took from the file itself (heuristics, never verified), kept apart from what the user or an
+ * import set (D-071). A field is "extracted" while the record still holds the very value written here; a key that
+ * is present was filled once and is never filled again, so a value the user clears does not come back.
+ */
+export const extractedMetaSchema = z.object({
+  title: z.string().max(L.title).optional(),
+  authors: z.array(z.string().max(L.author)).max(L.authors).optional(),
+  year: z.number().int().min(1000).max(3000).optional(),
+  doi: z.string().max(L.identifier).optional(),
+  arxivId: z.string().max(L.identifier).optional(),
+});
+export type ExtractedFields = z.infer<typeof extractedMetaSchema>;
+
 /** `<dataDir>/documents/<id>.json` */
 export const documentRecordSchema = z.object({
   schemaVersion: schemaVersionSchema,
@@ -123,5 +137,7 @@ export const documentRecordSchema = z.object({
   updatedAt: isoDateSchema,
   /** Verbatim leftovers from imports (e.g. the old index) that have no native field. */
   legacy: legacySchema.optional(),
+  /** What the extractor found in the file for the empty fields it filled (see `extractedMetaSchema`). */
+  extracted: extractedMetaSchema.optional(),
 });
 export type DocumentRecord = z.infer<typeof documentRecordSchema>;

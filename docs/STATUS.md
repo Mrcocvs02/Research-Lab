@@ -1,14 +1,15 @@
 # Stato
 
 - **Fase:** 2 — navigazione, organizzazione, progetti (il sostituto di TagSpaces)
-- **Onda:** 2.1 — da avviare
+- **Onda:** 2.4 — chiusura fase
 - **Fatto:**
-  - Fase 0 chiusa (tag `phase-0`).
-  - Fase 1 chiusa (tag `phase-1`): scanner incrementale, estrattore (pdfjs-dist, fflate) indurito contro documenti ostili, osservatore, indice FTS5 con pagine nei risultati, runtime nel main con worker supervisionato (watchdog, rispawn, un solo scrittore dei record), canali `scan:*`, `search:*`, `documents:*`, `index:rebuild`, vista di ricerca.
-  - Criterio fase 1: scansione da zero della libreria reale = importazione (id, percorsi, dimensioni 100%; DOI/arXiv presenti nel testo ritrovati al 100%; titoli simili in media 0,958); ricerca su 1000 documenti p95 5,5 ms nell'app; prova offline verde.
-  - Revisioni fase 1: reviewer (7 importanti corretti), security (4 bloccanti corretti e ricontrollati).
-  - Verifiche al 2026-11-16: 577 unitari + 40 pesanti, 30 e2e + 2 pesanti, generalità, tutti verdi in locale con memoria misurata.
+  - Fasi 0 e 1 chiuse (tag `phase-0`, `phase-1`).
+  - Fase 2: backend (tassonomia a livelli liberi, tag in blocco, modifica documenti, apertura file con lista permessa, annulla/ripeti, progetti e collezioni, albero cartelle), interfaccia completa, ordinamento per dimensione, filtri lato server, correzioni da reviewer e security.
+  - Verifiche al 2026-11-16: 715 test unitari verdi; suite e2e 37/37 (inclusa importazione reale) con finestre fuori schermo in ~1,5 min, picco ~0,9 GB.
 - **In corso:** —
 - **Bloccato:** —
-- **Da ricordare:** installer (fase 8): `pdfjs-dist` e `fflate` esterni al bundle del main (D-052); fasi 2-3 devono chiamare `LibraryRuntime.reindexDocument(docId)` dopo modifiche a tag, note, annotazioni; test pesanti solo uno alla volta (RULES, TESTING).
-- **Prossimo:** fase 2 — data-engineer (tassonomia a livelli, annulla/ripeti, progetti, modifica documenti, apertura file, canali IPC) poi frontend (albero cartelle, elenco/griglia, filtri, scheda documento, gestione tassonomia, progetti).
+- **Prossimo (in ordine):**
+  1. Giro di leggerezza: viste del renderer caricate su richiesta (oggi bundle unico da 1,2 MB), meno zod nel renderer, worker di scansione avviato su richiesta e chiuso quando inattivo, canale `documents:ids` per Ctrl+A senza trasferire righe, interruttore "mostra mancanti" (`includeMissing`), budget misurati in automatico (dimensione bundle, memoria a riposo, tempo di avvio).
+  2. Suite completa, aggiornamento docs, tag `phase-2`.
+  3. Fase 3: lettore PDF con evidenziazioni e note per pagina, stato di studio, miniature della griglia.
+- **Da ricordare:** installer (fase 8): `pdfjs-dist` e `fflate` esterni al bundle del main (D-052), Fuses di Electron; test pesanti solo uno alla volta.

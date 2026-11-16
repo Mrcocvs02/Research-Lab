@@ -5,7 +5,7 @@ export const PROD_CSP = [
   "style-src 'self'",
   // React `style={...}` props; inline <style> and scripts stay blocked.
   "style-src-attr 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: rl-thumb:",
   "font-src 'self'",
   "connect-src 'self' rl-doc:",
   "worker-src 'self' blob:",
@@ -21,7 +21,7 @@ export const DEV_CSP = [
   "default-src 'none'",
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: rl-thumb:",
   "font-src 'self'",
   "connect-src 'self' rl-doc: ws://localhost:* http://localhost:*",
   "worker-src 'self' blob:",

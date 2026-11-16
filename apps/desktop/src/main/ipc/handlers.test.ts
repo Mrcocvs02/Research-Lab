@@ -28,6 +28,7 @@ function setup() {
   });
   const services: MainServices = {
     log,
+    localDataDir: tmp,
     emit: (e, p) => void events.push([e, p]),
     settings,
     approved,

@@ -8,9 +8,7 @@ import { AppError, STUDY_LIMITS, annotationFileSchema, type Annotation, type Doc
 import type { LibraryRuntime } from '../../library/library-runtime.js';
 import type { DomainHandlers } from '../types.js';
 
-const notYet = (channel: string) => () => {
-  throw new AppError('NOT_IMPLEMENTED', `${channel} is not implemented yet`);
-};
+import { listThumbs, pruneThumbs, putThumb } from '../../thumbs.js';
 import { openPdfHandle, presentPdf } from './doc-files.js';
 import type { MainServices } from './services.js';
 
@@ -216,8 +214,22 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
   };
 };
 
-/** Grid thumbnails (wave 3.2): NOT_IMPLEMENTED until built. */
-export const thumbsHandlers = (_s: MainServices): DomainHandlers<'thumbs'> => ({
-  'thumbs:list': notYet('thumbs:list'),
-  'thumbs:put': notYet('thumbs:put'),
-});
+/** Grid thumbnails (D-194, D-195): the renderer draws, main stores and serves (`thumbs.ts`, `thumb-protocol.ts`). */
+export const thumbsHandlers = (s: MainServices): DomainHandlers<'thumbs'> => {
+  const pruned = new Set<string>();
+  return {
+    'thumbs:list': async ({ docIds }) => {
+      const rt = await s.runtime.require();
+      const items = await listThumbs(s, docIds);
+      // Once per library and session, in the background: thumbnails of documents that no longer exist go away.
+      if (!pruned.has(rt.libraryId)) {
+        pruned.add(rt.libraryId);
+        void pruneThumbs(s.localDataDir, rt.libraryId, (id) => rt.getDocument(id as DocumentId).then(() => true, (e: unknown) => !(e instanceof AppError && e.code === 'NOT_FOUND'))).catch((e: unknown) =>
+          s.log.warn('thumbnail cleanup failed', { error: e }),
+        );
+      }
+      return { items };
+    },
+    'thumbs:put': async ({ docId, hash, webp }) => ({ url: await putThumb(s, docId, hash, webp) }),
+  };
+};

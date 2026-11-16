@@ -19,6 +19,8 @@ export interface ShellService {
  */
 export interface MainServices {
   log: Logger;
+  /** Machine-local, non-synced app folder (caches such as the grid thumbnails). */
+  localDataDir: string;
   emit: EmitFn;
   settings: SettingsStore;
   libraries: LibraryService;

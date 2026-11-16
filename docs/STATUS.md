@@ -1,7 +1,7 @@
 # Stato
 
 - **Fase:** 4 — chat con Claude e AI (da avviare)
-- **Onda:** 4.0 — pianificazione e contratti
+- **Onda:** 4.1 — strato AI e chat (contratti D-202, D-203 su main)
 - **Fatto:**
   - Fasi 0, 1, 2 e 3 chiuse (tag `phase-0`, `phase-1`, `phase-2`, `phase-3`).
   - Fase 2: backend (tassonomia a livelli liberi, tag in blocco, modifica documenti, apertura file con lista permessa, annulla/ripeti, progetti e collezioni, albero cartelle), interfaccia completa, ordinamento per dimensione, filtri lato server, correzioni da reviewer e security.
@@ -11,8 +11,12 @@
   - Verifiche finali di fase 2 (2026-11-16): 747 test unitari verdi; e2e 38/38 (inclusa importazione reale); budget rispettati (JS iniziale 353 KiB, memoria a riposo ~435 MB, primo contenuto ~430 ms, misurato come il migliore di due avvii).
   - Fase 3, onda 3.1 unita (D-184..D-193): lettore pdf.js su richiesta (pagine virtualizzate, Ctrl+F, link interni ed esterni su clic), evidenziazioni e sottolineature salvate a parte con flag sottolineato, note per file e per pagina con conflitto, stato di studio nel lettore, risultati di ricerca "nelle note" / "nelle evidenziazioni"; risorse di pdf.js (font, CMap, decodificatori JS) servite su richiesta. Criterio verificato in e2e: si evidenzia, si chiude, si riapre e si ritrova; hash del PDF identico. Verifiche: 806 unitari, e2e 40/40, budget rispettati (JS iniziale 358 KiB, memoria a riposo ~430 MB, avvio ~410 ms).
   - Fase 3, onda 3.2 e chiusura (D-194..D-201): miniature della griglia (prima quella di Windows, ripiego pdf.js, cache locale legata all'hash); correzioni della revisione: note mai perse (salvataggi in catena, editor svuotati prima di cambio libreria, chiusura del lettore e della finestra, bozze recuperate se il salvataggio fallisce), evidenziazione da tastiera dalla ricerca (Ctrl+Maiusc+H/U), avviso pagine saltate, tetto del file delle annotazioni, hash per annotazione con riconferma, aggiornamenti parziali, TOCTOU ristretto. Verifiche finali (2026-11-16): 907 unitari, e2e 42/42, budget rispettati (JS iniziale 365 KiB, memoria a riposo ~440 MB, primo contenuto ~450 ms).
-- **In corso:** —
+- **In corso:** due subagent (`node_modules` di junction nei worktree, da rimuovere con `rmdir` prima di toglierli):
+  - `p4-main` (`../rl-wt/p4-main`): `packages/ai` (fornitore Agent SDK e simulato, strumenti della libreria con controllo delle cartelle abilitate e registro degli invii), gestori `ai:*`, `chat:*`, `commands:list`, guida `CLAUDE.md` nella cartella dati, cronologia locale; unico che esegue e2e (`ai-chat`, fornitore simulato). Decisioni D-204..D-212.
+  - `p4-ui` (`../rl-wt/p4-ui`): pannello chat, tavolozza dei comandi, anteprima con conferma, impostazioni AI (cartelle abilitate, modelli, tetto, chiave API), registro degli invii; scrive `e2e/ai-ui.spec.ts` senza eseguirlo. Decisioni da D-213.
 - **Bloccato:** —
 - **Prossimo (in ordine):**
-  1. Fase 4: leggere il piano §4 (fase 4) e §5 (AI, costi, privacy), caricare la skill `claude-api` prima di scrivere i contratti (Agent SDK, modelli, streaming, cache); contratti di chat, coda, cache e contatore d'uso, tag proposti, cartella di arrivo, domande sulla libreria; invio all'AI solo per cartelle abilitate.
-- **Da ricordare:** installer (fase 8): `pdfjs-dist` e `fflate` esterni al bundle del main (D-052), Fuses di Electron; test pesanti solo uno alla volta; con poca RAM libera la suite e2e si ferma da sola (mem-sample): far liberare memoria all'utente e rieseguire solo i test mancanti.
+  1. Merge di `p4-main` e `p4-ui`, e2e `ai-chat` e `ai-ui`, suite completa.
+  2. Onda 4.2: tag proposti, descrizioni e parole chiave con revisione (accetta/rifiuta), lavori in blocco con stima; cartella di arrivo (arXiv/DOI, metadati, duplicati e versioni).
+  3. Onda 4.3: domande sulla libreria con pagine citate, ricerca avanzata, comportamento senza rete; criteri di fase 4 (serve l'utente per i 5 paper campione e per l'accesso a Claude: CLI con login o chiave API).
+- **Da ricordare:** installer (fase 8): `pdfjs-dist` e `fflate` esterni al bundle del main (D-052), Fuses di Electron; test pesanti solo uno alla volta; con poca RAM libera la suite e2e si ferma da sola (mem-sample): far liberare memoria all'utente e rieseguire solo i test mancanti. Installer: non includere l'eseguibile di Claude Code da ~356 MB dell'Agent SDK senza conferma dell'utente (D-203).

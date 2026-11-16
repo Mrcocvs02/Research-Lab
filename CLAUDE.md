@@ -11,7 +11,11 @@ App desktop (Electron + React + TypeScript, monorepo npm) che organizza librerie
 
 ## Come si lavora
 - L'agente principale coordina: scrive gli incarichi, integra, verifica, fa commit e push. Le funzioni le scrivono i subagent.
-- Subagent: modello Sonnet; Haiku solo per compiti molto semplici e meccanici. Ogni incarico è autosufficiente (obiettivo, contesto, proprietà dei file, criteri, vincoli, rapporto breve).
+- Modelli, scelti per compito:
+  - **Haiku** per il lavoro meccanico e ripetitivo, invece di farlo con il modello principale: preparare e ripulire i worktree (junction di `node_modules`), eseguire suite di test e riportare solo i fallimenti, aggiornare STATUS/HISTORY/DECISIONS da un elenco di fatti dato dall'agente principale, tradurre stringhe it ↔ en, controlli di generalità e budget, ritocchi ripetitivi su più file.
+  - **Sonnet** per tutto ciò che scrive logica o interfacce, tocca la sicurezza, e per revisioni e security. Nel dubbio, Sonnet: mai Haiku dove serve giudizio.
+  - **L'agente principale** per coordinamento, contratti e verifica dei diff.
+- Ogni incarico è autosufficiente (obiettivo, contesto, proprietà dei file, criteri, vincoli, rapporto breve).
 - Ogni subagent lavora in un worktree `../rl-wt/<ramo>` su un ramo dedicato; l'agente principale fa il merge su `main`, rieseque i test e pubblica.
 - Al massimo 2 subagent insieme; uno solo esegue test e2e o pesanti. Mai test pesanti in parallelo con altro lavoro pesante.
 - A fine di ogni fase: reviewer indipendente e security (potere di blocco), correzioni, suite completa, tag `phase-N`.
@@ -40,6 +44,6 @@ Quando compatti il contesto conserva, in quest'ordine:
 - fase e onda correnti, ultimo commit su `main` e tag di fase già creati;
 - subagent in corso (ruolo, ramo/worktree, cosa stanno facendo) e rami non ancora uniti;
 - difetti aperti dalle revisioni e lavoro non verificato;
-- preferenze dell'utente: subagent Sonnet (Haiku per cose semplici), niente coautore Claude nei commit, push a ogni passo, test pesanti uno alla volta, finestre di test fuori schermo, app leggera ma senza togliere funzioni utili;
+- preferenze dell'utente: subagent Sonnet per logica e revisioni, Haiku per lavoro meccanico (worktree, test, docs di stato, traduzioni), niente coautore Claude nei commit, push a ogni passo, test pesanti uno alla volta, finestre di test fuori schermo, app leggera ma senza togliere funzioni utili;
 - decisioni prese nella sessione ma non ancora scritte in `docs/DECISIONS.md`.
 Tralascia l'output completo di test, diff e log: restano in git e nei file `docs/`.

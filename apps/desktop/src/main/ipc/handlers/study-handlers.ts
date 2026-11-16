@@ -16,8 +16,11 @@ export const readerHandlers = (s: MainServices): DomainHandlers<'reader'> => ({
   'reader:open': async ({ docId }) => {
     const pdf = await presentPdf(s, docId as DocumentId);
     // The file must also look like a PDF (a renamed file is refused here, not by the viewer).
-    const opened = await openPdfHandle(pdf.abs);
-    if (typeof opened === 'string') throw new AppError('PERMISSION_DENIED', opened === 'missing' ? 'The file of this document is missing' : 'Only PDF files open in the reader', { reason: opened });
+    const opened = await openPdfHandle(pdf.abs, pdf.root);
+    if (typeof opened === 'string') {
+      const message = opened === 'missing' ? 'The file of this document is missing' : opened === 'outside' ? 'The file is outside the library' : 'Only PDF files open in the reader';
+      throw new AppError('PERMISSION_DENIED', message, { reason: opened });
+    }
     await opened.fh.close().catch(() => {});
     return { url: `rl-doc://doc/${docId}?v=${pdf.hash.slice(0, 8)}`, hash: pdf.hash, title: pdf.title };
   },

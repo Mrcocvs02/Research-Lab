@@ -195,4 +195,9 @@ describe('rl-doc protocol', () => {
     expect((await h(new Request(`rl-doc://doc/${hex(1)}/extra`, { headers: { origin: ORIGIN } }))).status).toBe(404);
     expect((await h(new Request(`rl-doc://doc/`, { headers: { origin: ORIGIN } }))).status).toBe(404);
   });
+
+  it('refuses with 403 a file that is not inside the root once it is open (swapped after the check, D-197)', async () => {
+    const h = createDocHandler({ resolve: async () => ({ abs: path.join(outside, 'secret.pdf'), root }), allowedOrigin: () => ORIGIN });
+    expect((await h(new Request(`rl-doc://doc/${hex(1)}?v=aaaaaaaa`, { headers: { origin: ORIGIN } }))).status).toBe(403);
+  });
 });

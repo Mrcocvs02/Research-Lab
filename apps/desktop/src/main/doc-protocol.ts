@@ -4,7 +4,7 @@ import { openPdfHandle } from './ipc/handlers/doc-files.js';
 
 export interface DocProtocolDeps {
   /** Absolute path of the present PDF of the ACTIVE library, looked up at every request; throws an AppError otherwise. */
-  resolve(docId: string): Promise<{ abs: string }>;
+  resolve(docId: string): Promise<{ abs: string; root?: string }>;
   /** The one origin the renderer is loaded from (`rl-app://app` in the packaged app). */
   allowedOrigin(): string;
 }
@@ -64,15 +64,16 @@ export function createDocHandler(deps: DocProtocolDeps): (request: Request) => P
     }
 
     let abs: string;
+    let root: string | undefined;
     try {
-      abs = (await deps.resolve(docId)).abs;
+      ({ abs, root } = await deps.resolve(docId));
     } catch (e) {
       const code = e instanceof AppError ? e.code : '';
       return code === 'PERMISSION_DENIED' || code === 'PATH_OUTSIDE_ROOT' || code === 'INVALID_PATH' ? text(403, 'Forbidden', cors) : text(404, 'Not found', cors);
     }
-    const opened = await openPdfHandle(abs);
+    const opened = await openPdfHandle(abs, root);
     if (opened === 'missing') return text(404, 'Not found', cors);
-    if (opened === 'not-pdf') return text(403, 'Forbidden', cors);
+    if (opened === 'not-pdf' || opened === 'outside') return text(403, 'Forbidden', cors);
     const { fh, size } = opened;
 
     const range = parseRange(request.headers.get('range'), size);

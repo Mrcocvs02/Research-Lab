@@ -97,6 +97,8 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     annotations: new Map<string, FakeAnnotation[]>(),
     /** Documents whose annotations are reported as made on another version of the file. */
     stale: new Set<string>(),
+    /** Thumbnail URLs stored by `thumbs:put`, by `docId`. */
+    thumbs: new Map<string, string>(),
     /** Documents `reader:open` refuses, with the reason (`details.reason`). */
     readerRefusal: new Map<string, string>(),
     /** Fields added to the search hit of a document (`field`, `page`, `snippet`). */
@@ -356,6 +358,19 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
       const reason = state.readerRefusal.get(d.docId) ?? (d.missing ? 'missing' : /\.pdf$/i.test(d.path) ? null : 'not-pdf');
       if (reason) throw new AppError('PERMISSION_DENIED', 'refused', { reason });
       return { url: `rl-doc://doc/${d.docId}?v=aaaaaaaa`, hash: 'a'.repeat(64), title: d.title };
+    },
+    'thumbs:list': (p) => ({
+      items: (p.docIds as string[]).map((id) => {
+        const d = state.docs.find((x) => x.docId === id);
+        if (!d || d.missing || !/\.pdf$/i.test(d.path)) return { docId: id, url: null, drawable: false };
+        const url = state.thumbs.get(id) ?? null;
+        return { docId: id, url, drawable: url === null, hash: 'a'.repeat(64) };
+      }),
+    }),
+    'thumbs:put': (p) => {
+      const url = `rl-thumb://thumb/${p.docId}?v=${String(p.hash).slice(0, 8)}`;
+      state.thumbs.set(p.docId, url);
+      return { url };
     },
     'reader:openLink': () => ({ ok: true }),
     'notes:get': (p) => {

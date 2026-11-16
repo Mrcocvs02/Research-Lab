@@ -229,6 +229,12 @@ let shared: ThumbStore | null = null;
 /** The one store of the window, created when the grid first needs it. */
 export const thumbs = (): ThumbStore => (shared ??= createThumbStore(defaultDeps()));
 
+/** Tests: forgets everything the store knows. */
+export function resetThumbs(): void {
+  shared?.setActive(false);
+  shared = null;
+}
+
 const noop = () => {};
 /** The thumbnail URL of a document (or `null`: the type icon stays). `docId` is `null` where thumbnails are not used. */
 export function useThumbUrl(docId: string | null): string | null {

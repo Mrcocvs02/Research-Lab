@@ -67,6 +67,13 @@ function LibraryInner() {
     }
   }, [status?.state, app.activeLibraryId, start]);
 
+  // The detail panel is the most used part loaded on demand: fetch it once the first screen is idle, so that the
+  // first click on a document shows it at once (functionality before lightness, docs/RULES.md).
+  useEffect(() => {
+    const id = requestIdleCallback(() => void import('./DocPanel').catch(() => {}));
+    return () => cancelIdleCallback(id);
+  }, []);
+
   const refreshKey = `${status?.state ?? 'none'}:${status?.indexed ?? 0}:${docsVersion}`;
   const plan = useMemo(() => planQuery(browse), [browse]);
   const list = useDocumentList(plan, Boolean(app.activeLibraryId), refreshKey);

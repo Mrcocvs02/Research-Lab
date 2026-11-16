@@ -8,8 +8,9 @@ const workspacePackages = ['@rl/core', '@rl/data', '@rl/search', '@rl/ai', '@rl/
 export default defineConfig({
   main: {
     build: {
-      // electron-vite builds main, preload and renderer unminified by default; minified code is smaller to read from disk and to parse.
-      minify: 'oxc',
+      // Main and worker stay unminified (dead code is still dropped) so that stack traces in the logs stay readable:
+      // diagnostics come before ~250 KB on disk, which cost about 1 MB and a few ms at start (D-177).
+      minify: false,
       externalizeDeps: { exclude: workspacePackages },
       // `scan-worker` is the worker thread of the library runtime (scan, text extraction, index writes).
       rollupOptions: {

@@ -14,12 +14,13 @@ import { notesChannels } from './notes.js';
 import { projectsChannels } from './projects.js';
 import { readerChannels } from './reader.js';
 import { taxonomyChannels } from './taxonomy.js';
+import { thumbsChannels } from './thumbs.js';
 import { scanChannels, scanEvents } from './scan.js';
 import { indexChannels, searchChannels } from './search.js';
 import { secretsChannels } from './secrets.js';
 import { settingsChannels } from './settings.js';
 
-export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels);
+export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels);
 
 export const events = mergeRegistries(appEvents, importEvents, scanEvents, libraryEvents);
 
@@ -39,3 +40,4 @@ export { historyItemSchema, historyResultSchema } from './history.js';
 export { projectDetailSchema, projectSummarySchema, projectMemberViewSchema, readingPlanItemViewSchema, studyCountsSchema, type ProjectDetail } from './projects.js';
 export { noteViewSchema, noteListItemSchema, type NoteView } from './notes.js';
 export { annotationColorSchema, annotationInputSchema, type AnnotationInput } from './annotations.js';
+export { thumbItemSchema } from './thumbs.js';

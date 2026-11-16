@@ -31,3 +31,17 @@ export const ANNOTATION_COLORS = ['yellow', 'green', 'blue', 'pink', 'orange'] a
  * hash>`. Main resolves the id to a present PDF of the active library, confined to its root, and answers byte ranges.
  */
 export const DOC_SCHEME = 'rl-doc';
+
+/**
+ * First-page thumbnails of the grid (phase 3, wave 3.2). Drawn by the renderer with pdf.js, kept by main in the local
+ * cache of the app (never in the synced data folder), served as `rl-thumb://thumb/<docId>?v=<first 8 hex of the hash>`.
+ */
+export const THUMB_SCHEME = 'rl-thumb';
+export const THUMB_LIMITS = {
+  /** Largest WebP image accepted from the renderer. */
+  maxBytes: 96 * 1024,
+  /** Largest side of a thumbnail, in pixels. */
+  maxSide: 512,
+  /** Documents asked about in one `thumbs:list`. */
+  batch: 200,
+} as const;

@@ -7,6 +7,10 @@ import { randomUUID } from 'node:crypto';
 import { AppError, STUDY_LIMITS, annotationFileSchema, type Annotation, type DocumentId, type Note } from '@rl/core';
 import type { LibraryRuntime } from '../../library/library-runtime.js';
 import type { DomainHandlers } from '../types.js';
+
+const notYet = (channel: string) => () => {
+  throw new AppError('NOT_IMPLEMENTED', `${channel} is not implemented yet`);
+};
 import { openPdfHandle, presentPdf } from './doc-files.js';
 import type { MainServices } from './services.js';
 
@@ -211,3 +215,9 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
     },
   };
 };
+
+/** Grid thumbnails (wave 3.2): NOT_IMPLEMENTED until built. */
+export const thumbsHandlers = (_s: MainServices): DomainHandlers<'thumbs'> => ({
+  'thumbs:list': notYet('thumbs:list'),
+  'thumbs:put': notYet('thumbs:put'),
+});

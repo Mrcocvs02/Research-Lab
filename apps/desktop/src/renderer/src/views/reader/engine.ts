@@ -1,4 +1,4 @@
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { loadPdfjs, pdfDocumentParams } from '../../lib/pdfjs';
 import 'pdfjs-dist/web/pdf_viewer.css';
 import { mergeRects, normaliseRect, type Rect } from './geometry';
 
@@ -80,15 +80,11 @@ function toViewerError(e: unknown): ViewerError {
 
 const isWebUrl = (url: string) => /^https?:\/\//i.test(url);
 
-/** URL of a pdf.js resource folder copied next to the page at build time (`pdfjs/`, see electron.vite.config.ts). */
-const resourceUrl = (folder: string) => new URL(`pdfjs/${folder}`, document.baseURI).href;
-
 export async function createViewer(container: HTMLDivElement, viewerEl: HTMLDivElement, handlers: ViewerHandlers): Promise<Viewer> {
-  const pdfjs = await import('pdfjs-dist');
+  const pdfjs = await loadPdfjs();
   // pdf_viewer reads the core library from this global when it loads.
   (globalThis as { pdfjsLib?: unknown }).pdfjsLib = pdfjs;
   const lib = await import('pdfjs-dist/web/pdf_viewer.mjs');
-  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
   const eventBus = new lib.EventBus();
   /** External links never navigate the window: they are marked here and opened (on the user's click) by the main process. */
@@ -185,22 +181,7 @@ export async function createViewer(container: HTMLDivElement, viewerEl: HTMLDivE
   return {
     async open(url, page = 1) {
       pendingPage = page;
-      // `isEvalSupported` exists at run time but not in the shipped types.
-      const params: Parameters<typeof pdfjs.getDocument>[0] & { isEvalSupported: boolean } = {
-        url,
-        isEvalSupported: false, // no eval in the renderer (CSP)
-        enableXfa: false,
-        disableAutoFetch: true, // read the ranges that are needed, not the whole file in the background
-        verbosity: 0,
-        // Fetched only when a PDF needs them (D-193): non-embedded standard fonts, CMaps of CJK text, ICC profiles, and
-        // the JavaScript decoders of JBIG2/JPEG 2000 scans (no WebAssembly: the CSP has no 'wasm-unsafe-eval').
-        cMapUrl: resourceUrl('cmaps/'),
-        cMapPacked: true,
-        standardFontDataUrl: resourceUrl('standard_fonts/'),
-        iccUrl: resourceUrl('iccs/'),
-        wasmUrl: resourceUrl('wasm/'),
-        useWasm: false,
-      };
+      const params = pdfDocumentParams(url);
       task = pdfjs.getDocument(params);
       const t = task;
       try {

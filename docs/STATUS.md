@@ -9,9 +9,7 @@
   - Azioni in blocco su selezioni grandi (D-178..D-181): tag fino a 50000 documenti in una sola modifica con un solo annulla, progetti fino a 20000 membri con messaggio chiaro, avviso se Ctrl+A supera 50000, stato di attesa; nel registro il riassunto compare una volta per gruppo, `undoOf` su ogni voce.
   - Revisione del delta (leggerezza e azioni in blocco): nessun bloccante; corretti gruppi del registro letti a metà (mai annullati a metà, D-182), ErrorBoundary e un nuovo tentativo per le viste su richiesta, ciclo di vita del worker (D-183).
   - Verifiche finali di fase 2 (2026-11-16): 747 test unitari verdi; e2e 38/38 (inclusa importazione reale); budget rispettati (JS iniziale 353 KiB, memoria a riposo ~435 MB, primo contenuto ~430 ms, misurato come il migliore di due avvii).
-- **In corso:** due subagent in parallelo, ripresi il 2026-11-16 dopo la chiusura della sessione (p3-main aveva il commit 28ad084 con schema `rl-doc` e gestori; p3-ui solo due file non committati) (junction in `node_modules` da rimuovere con `rmdir` prima di togliere i worktree):
-  - `p3-main` (`../rl-wt/p3-main`): main e dati — schema `rl-doc` con intervalli e confinamento, `reader:open`/`openLink`, note con conflitto, annotazioni con flag sottolineato, reindicizzazione, e2e `study-data` (unico che esegue e2e). Decisioni D-185..D-189.
-  - `p3-ui` (`../rl-wt/p3-ui`): renderer — lettore pdf.js su richiesta, evidenziazioni/sottolineature, note per file e pagina, stato di studio, etichette dei risultati nelle note; scrive `e2e/study-ui.spec.ts` senza eseguirlo. Decisioni da D-190.
+- **In corso:** `p3-main` unito in locale (non ancora pubblicato: si pubblica dopo la verifica completa con `p3-ui`). Subagent renderer sul ramo `p3-ui` (`../rl-wt/p3-ui`, `node_modules` di junction): lettore pdf.js, annotazioni, note, stato di studio; scrive `e2e/study-ui.spec.ts` senza eseguirlo. Decisioni da D-190.
 - **Bloccato:** —
 - **Prossimo (in ordine):**
   1. Merge di `p3-main` e `p3-ui`, e2e `study-data` e `study-ui`, suite completa; poi onda 3.2: miniature della griglia (contratti da scrivere), revisione e security di fase 3, tag `phase-3`.

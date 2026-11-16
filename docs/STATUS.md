@@ -10,7 +10,7 @@
   - Revisione del delta (leggerezza e azioni in blocco): nessun bloccante; corretti gruppi del registro letti a metà (mai annullati a metà, D-182), ErrorBoundary e un nuovo tentativo per le viste su richiesta, ciclo di vita del worker (D-183).
   - Verifiche finali di fase 2 (2026-11-16): 747 test unitari verdi; e2e 38/38 (inclusa importazione reale); budget rispettati (JS iniziale 353 KiB, memoria a riposo ~435 MB, primo contenuto ~430 ms, misurato come il migliore di due avvii).
   - Fase 3, onda 3.1 unita (D-184..D-193): lettore pdf.js su richiesta (pagine virtualizzate, Ctrl+F, link interni ed esterni su clic), evidenziazioni e sottolineature salvate a parte con flag sottolineato, note per file e per pagina con conflitto, stato di studio nel lettore, risultati di ricerca "nelle note" / "nelle evidenziazioni"; risorse di pdf.js (font, CMap, decodificatori JS) servite su richiesta. Criterio verificato in e2e: si evidenzia, si chiude, si riapre e si ritrova; hash del PDF identico. Verifiche: 806 unitari, e2e 40/40, budget rispettati (JS iniziale 358 KiB, memoria a riposo ~430 MB, avvio ~410 ms).
-- **In corso:** —
+- **In corso:** due subagent: `p3-thumbs` (`../rl-wt/p3-thumbs`, `node_modules` di junction da rimuovere con `rmdir`): miniature della griglia, contratti D-194, decisioni da D-195, unico che esegue e2e; revisione indipendente e security della fase 3 (`phase-2..main`, sola lettura).
 - **Bloccato:** —
 - **Prossimo (in ordine):**
   1. Onda 3.2: miniature della prima pagina nella griglia (contratti da scrivere: generazione nel renderer, cache locale non sincronizzata).

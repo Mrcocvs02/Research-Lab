@@ -8,7 +8,7 @@
   - Giro di leggerezza (D-170..D-177) unito: JS iniziale del renderer 1202 -> 350 KiB, viste su richiesta, dizionario solo della lingua attiva, worker avviato su richiesta e chiuso dopo 60 s di inattività, canale `documents:ids`, interruttore "Mostra documenti mancanti", budget automatici (`npm run check:budget`, `e2e/qa-budget.spec.ts`). Nessuna funzione tolta; main non minificato per stack trace leggibili; pannello di dettaglio prelevato a riposo.
   - Azioni in blocco su selezioni grandi (D-178..D-181): tag fino a 50000 documenti in una sola modifica con un solo annulla, progetti fino a 20000 membri con messaggio chiaro, avviso se Ctrl+A supera 50000, stato di attesa; nel registro il riassunto compare una volta per gruppo, `undoOf` su ogni voce.
   - Verifiche al 2026-11-16 dopo i merge: 734 test unitari verdi; suite e2e 38/38 (1,6 min, picco ~0,8 GB); budget rispettati.
-- **In corso:** revisione indipendente (correttezza e sicurezza) delle modifiche successive alle revisioni di fase 2 (`a4dc519..main`: leggerezza e azioni in blocco).
+- **In corso:** subagent sul ramo `p2-fix` (worktree `../rl-wt/p2-fix`, `node_modules` fatto di junction da rimuovere con `rmdir` prima di togliere il worktree): correzioni della revisione del delta (nessun bloccante; 1 importante: gruppi del registro letti a metà non devono essere annullati a metà; 4 minori: ErrorBoundary per le viste su richiesta, flag del riassunto condiviso tra istanze, `dispose` durante la chiusura per inattività, `openIndex` durante l'avvio del worker). Decisioni da D-182.
 - **Bloccato:** —
 - **Prossimo (in ordine):**
   1. Correzioni dalla revisione, se servono; tag `phase-2`.

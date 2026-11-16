@@ -16,12 +16,14 @@
     "dev": "npm run dev -w @rl/desktop",
     "build": "npm run build -w @rl/desktop",
     "typecheck": "tsc -p tsconfig.json && tsc -p apps/desktop/tsconfig.node.json && tsc -p apps/desktop/tsconfig.web.json && tsc -p e2e/tsconfig.json",
-    "test": "node tools/mem-guard.mjs 1.5 \"unit tests\" && vitest run",
+    "test": "node tools/mem-guard.mjs 1.2 \"unit tests\" && node tools/mem-sample.mjs --abort-below=0.7 -- vitest run",
     "test:watch": "vitest",
-    "test:e2e": "node tools/mem-guard.mjs 3 \"the e2e suite\" && npm run build && playwright test -c e2e/playwright.config.ts",
+    "test:e2e": "node tools/mem-guard.mjs 2 \"the e2e suite\" && npm run build && node tools/mem-sample.mjs --abort-below=0.8 -- playwright test -c e2e/playwright.config.ts",
     "check:generality": "node tools/check-generality.mjs",
     "check:nondestructive": "node tools/check-nondestructive.mjs",
-    "test:phase1": "node tools/mem-guard.mjs 3 \"the phase 1 e2e specs\" && npm run build && playwright test -c e2e/playwright.config.ts qa-offline qa-scan-nondestructive qa-search-perf qa-watcher"
+    "test:phase1": "node tools/mem-guard.mjs 2 \"the phase 1 e2e specs\" && npm run build && node tools/mem-sample.mjs --abort-below=0.8 -- playwright test -c e2e/playwright.config.ts qa-offline qa-scan-nondestructive qa-search-perf qa-watcher",
+    "test:heavy": "node tools/mem-guard.mjs 2.5 \"heavy unit tests\" && node tools/mem-sample.mjs --abort-below=1 -- node tools/with-env.mjs RL_HEAVY_TESTS=1 VITEST_MAX_WORKERS=1 -- vitest run packages/search/src/bench.test.ts apps/desktop/src/main/library/watchdog.test.ts packages/data/src/extract-hostile.test.ts",
+    "test:e2e:heavy": "node tools/mem-guard.mjs 2.5 \"heavy e2e specs\" && npm run build && node tools/mem-sample.mjs --abort-below=1 -- node tools/with-env.mjs RL_HEAVY_TESTS=1 -- playwright test -c e2e/playwright.config.ts --grep @heavy"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",

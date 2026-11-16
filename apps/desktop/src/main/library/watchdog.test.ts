@@ -165,7 +165,7 @@ describe('watchdog (real worker thread)', () => {
     expect(Date.now() - t0).toBeLessThan(8000);
   }, 60_000);
 
-  it('survives a worker that runs out of memory or exits, and starts a new one for the next scan', async () => {
+  it.skipIf(process.env.RL_HEAVY_TESTS !== '1')('survives a worker that runs out of memory or exits, and starts a new one for the next scan', async () => {
     await put('a-ok.md', 'Healthy document about basalt.\n');
     await put('oom-big.md', 'eats all memory\n');
     await put('crash-now.md', 'ends the thread\n');

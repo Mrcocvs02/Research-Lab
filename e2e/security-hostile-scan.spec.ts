@@ -47,7 +47,7 @@ async function writeHostilePdf(file: string, operators: number): Promise<void> {
  * are searchable, and the app quits. The watchdog times are shortened for the run (test hook, ignored by an
  * installed app); the file may also be handled by the extractor's own limits, either way the scan must finish.
  */
-test('a hostile PDF does not stop the scan: normal documents are indexed and searchable, the app closes', async () => {
+test('a hostile PDF does not stop the scan: normal documents are indexed and searchable, the app closes @heavy', async () => {
   test.setTimeout(300_000);
   let ctx: LaunchedApp | undefined;
   try {

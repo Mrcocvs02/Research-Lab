@@ -109,3 +109,12 @@ Helper in `e2e/helpers/phase1.ts`: `ipc`/`ipcData` (chiamata dal renderer con `w
 - `generateIndexableDocuments(n, opts)` → `{ documents: IndexableDocument[], manifest }`: gli stessi documenti come oggetti per benchmark dell'indice, senza disco. `generateCorpusManifest(n, opts)` dà solo il manifest.
 
 `apps/desktop/src/main/library/watchdog.test.ts` lancia un VERO worker thread (compilato al volo con vite in `apps/desktop/out/test-worker`) con un estrattore finto che si blocca in un ciclo sincrono (`hang-*`), esaurisce la memoria (`oom-*`) o termina il thread (`crash-*`): watchdog, cancel, close e ripartenza del worker.
+
+## Test leggeri e pesanti, memoria
+
+I test pesanti girano solo con `RL_HEAVY_TESTS=1`, uno script alla volta e mai in parallelo con altro lavoro pesante:
+- `npm run test:heavy`: benchmark dell'indice (1000 documenti + 25 lunghi), worker che esaurisce la memoria, file ostili che si gonfiano a 64-256 MiB;
+- `npm run test:e2e:heavy`: spec con tag `@heavy` (ricerca su 1000 documenti, scansione con PDF ostile).
+
+Picchi di memoria misurati con `tools/mem-sample.mjs` (2026-11-16, macchina di sviluppo): `npm test` ~0,6 GiB; `npm run test:e2e` ~0,9 GiB (più la build); test pesanti ~1,1 GiB ciascuno.
+Ogni script controlla prima la memoria disponibile (`tools/mem-guard.mjs`: 1,2 GiB unitari, 2 GiB e2e, 2,5 GiB pesanti) e interrompe il comando se durante l'esecuzione la memoria disponibile scende sotto la soglia di `--abort-below` (`tools/mem-sample.mjs`). `RL_SKIP_MEM_GUARD=1` salta solo il controllo iniziale.

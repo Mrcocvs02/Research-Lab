@@ -9,7 +9,7 @@ const P95_LIMIT_MS = 200;
  * Phase 1 criterion: search answers in under 200 ms on a thousand documents. The scan time is reported
  * (no threshold); the 20 typical queries are timed from the renderer, round trip included.
  */
-test(`search p95 < ${P95_LIMIT_MS} ms on ${COUNT} documents (scan time reported)`, async ({}, testInfo) => {
+test(`search p95 < ${P95_LIMIT_MS} ms on ${COUNT} documents (scan time reported) @heavy`, async ({}, testInfo) => {
   test.setTimeout(900_000);
   let ctx: LaunchedApp | undefined;
   try {

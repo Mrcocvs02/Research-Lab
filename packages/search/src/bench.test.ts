@@ -178,7 +178,7 @@ const pct = (xs: number[], p: number) => {
   return s[Math.min(s.length - 1, Math.ceil((p / 100) * s.length) - 1)]!;
 };
 
-describe(`search benchmark (${DOCS} documents x ${PAGES} pages + ${LONG_DOCS} long documents of ${LONG_PAGES}+ pages)`, () => {
+describe.skipIf(process.env.RL_HEAVY_TESTS !== '1')(`search benchmark (${DOCS} documents x ${PAGES} pages + ${LONG_DOCS} long documents of ${LONG_PAGES}+ pages)`, () => {
   it('indexes everything', async () => {
     expect(await index.count()).toBe(DOCS + LONG_DOCS);
   });

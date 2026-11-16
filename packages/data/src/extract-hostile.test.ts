@@ -302,7 +302,7 @@ describe('hostile input: zip bombs', () => {
     await expectTooLarge('sum.pptx', rawZip(entries), 1000, 150);
   });
 
-  it('docx with a 64 MiB document.xml, and with a lie about the size', async () => {
+  it.skipIf(process.env.RL_HEAVY_TESTS !== '1')('docx with a 64 MiB document.xml, and with a lie about the size', async () => {
     await expectTooLarge('big.docx', rawZip([{ name: 'word/document.xml', ...blob64 }]), 1000, 150);
     // Declares 1000 bytes, inflates to 64 MiB: must not be trusted to be small. Any clean failure or a bounded result is fine.
     const lie = rawZip([{ name: 'word/document.xml', deflated: blob64.deflated, size: 1000 }]);
@@ -403,7 +403,7 @@ describe('hostile input: PDF', () => {
     expect(value.truncated).toBe(true);
   });
 
-  it('a content stream that inflates to 256 MiB stays within time and memory', async () => {
+  it.skipIf(process.env.RL_HEAVY_TESTS !== '1')('a content stream that inflates to 256 MiB stays within time and memory', async () => {
     const bomb = deflateSync(Buffer.alloc(256 * MiB, 32), { level: 9 });
     const body = bomb.toString('latin1');
     const pdf = buildPdf([

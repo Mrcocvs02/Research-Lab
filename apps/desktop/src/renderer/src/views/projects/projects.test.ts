@@ -2,14 +2,14 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LibraryProfile } from '@rl/core';
+import { AppError, type LibraryProfile } from '@rl/core';
 import i18n from '../../i18n';
 import { LibraryEventsProvider } from '../../lib/events';
 import { parseBlocks, renderBlocks } from '../../lib/markdown';
 import { NotifyProvider } from '../../lib/notify';
 import { AppProvider } from '../../state/app-context';
 import { makeDocs, memoryLibrary } from '../../testing/memoryLibrary';
-import { callsTo, memoryBackend, setHandlers } from '../../testing/mockRl';
+import { callsTo, emitEvent, memoryBackend, setHandlers } from '../../testing/mockRl';
 import { moveItem, notInPlan, planProgress, sortPlan, toRequestItems, type PlanItemView } from './readingPlan';
 import { ProjectsView } from './ProjectsView';
 
@@ -27,14 +27,14 @@ describe('reading plan logic', () => {
     expect(sortPlan([item('x', 5), item('y', 1)]).map((i) => i.docId)).toEqual(['y', 'x']);
   });
   it('builds the request without view-only fields and finds members missing from the plan', () => {
-    const body = toRequestItems([item('a', 7, { status: 'read' }), item('b', 9)]);
+    const body = toRequestItems([item('a', 7, { status: 'read', studyState: 'read' }), item('b', 9)]);
     expect(body).toEqual([
-      { docId: 'a', order: 0, status: 'read' },
+      { docId: 'a', order: 0 },
       { docId: 'b', order: 1 },
     ]);
     const members = [{ docId: 'a' }, { docId: 'z' }] as never;
     expect(notInPlan(members, [item('a', 0)]).map((m) => m.docId)).toEqual(['z']);
-    expect(planProgress([item('a', 0, { status: 'read' }), item('b', 1, { studyState: 'reading' }), item('c', 2)])).toEqual({ total: 3, read: 1, reading: 1, 'to-read': 1 });
+    expect(planProgress([item('a', 0, { status: 'read', studyState: 'read' }), item('b', 1, { studyState: 'reading' }), item('c', 2, { status: 'read' })])).toEqual({ total: 3, read: 1, reading: 1, 'to-read': 1 });
   });
 });
 
@@ -72,10 +72,10 @@ describe('markdown', () => {
   });
 });
 
-function setup(init: Parameters<typeof memoryLibrary>[0] = {}) {
+function setup(init: Parameters<typeof memoryLibrary>[0] = {}, override: Record<string, (p: any) => unknown> = {}) {
   const lib = memoryLibrary({ docs: makeDocs(4), ...init });
   const { handlers } = memoryBackend({ profiles: [profile] });
-  setHandlers({ ...handlers, ...lib.handlers });
+  setHandlers({ ...handlers, ...lib.handlers, ...override });
   render(createElement(AppProvider, null, createElement(LibraryEventsProvider, null, createElement(NotifyProvider, null, createElement(ProjectsView)))));
   return lib;
 }
@@ -149,10 +149,66 @@ describe('ProjectsView', () => {
 
     items = await screen.findAllByTestId('plan-item');
     fireEvent.change(within(items[0]!).getByTestId('plan-status'), { target: { value: 'read' } });
-    await waitFor(() => expect(lib.state.projects[0]?.plan[0]?.status).toBe('read'));
+    // The state of an item is its document's: the document is updated, the plan keeps no state of its own.
+    await waitFor(() => expect(lib.state.docs.find((d) => d.docId === docs[0]!.docId)?.studyState).toBe('read'));
+    expect(callsTo('documents:update').at(-1)).toMatchObject({ docId: docs[0]!.docId, patch: { studyState: 'read' } });
+    expect(lib.state.projects[0]?.plan[0]).not.toHaveProperty('status');
+    await waitFor(() => expect(screen.getByTestId('plan-progress').textContent).toContain('1 read'));
+    expect(screen.getByTestId('project-counts').textContent).toContain('1 read');
 
     fireEvent.click(screen.getByTestId('plan-add-all'));
     await waitFor(() => expect(lib.state.projects[0]?.plan).toHaveLength(3));
     expect(callsTo('projects:setReadingPlan').every((c) => typeof c.expectedRevision === 'number')).toBe(true);
+  });
+
+  const twoDocs = () => {
+    const docs = makeDocs(3);
+    return { docs, projects: [{ id: 'p1', kind: 'project' as const, name: 'Plan', description: '', notes: '', status: 'active' as const, revision: 0, members: [docs[0]!, docs[1]!].map((d) => ({ docId: d.docId, addedAt: '' })), plan: [{ docId: docs[0]!.docId, order: 0 }] }] };
+  };
+
+  it('follows library:changed for its own members and its own id, and ignores the rest', async () => {
+    const init = twoDocs();
+    const lib = setup(init);
+    fireEvent.click(await screen.findByTestId('project-open'));
+    const states = async () => (await screen.findAllByTestId('member-state')).map((s) => (s as HTMLSelectElement).value);
+    expect(await states()).toEqual(['to-read', 'reading']);
+    const gets = () => callsTo('projects:get').length;
+
+    // A document that is not a member: no reload.
+    lib.state.docs[2]!.studyState = 'read';
+    await new Promise((r) => setTimeout(r, 30));
+    const before = gets();
+    emitEvent('library:changed', { kind: 'documents', ids: [init.docs[2]!.docId] });
+    emitEvent('library:changed', { kind: 'projects', ids: ['other'] });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(gets()).toBe(before);
+
+    // A member changed behind the view's back (a scan, the document panel).
+    lib.state.docs[0]!.studyState = 'read';
+    emitEvent('library:changed', { kind: 'documents', ids: [init.docs[0]!.docId] });
+    await waitFor(async () => expect(await states()).toEqual(['read', 'reading']));
+
+    lib.state.docs[1]!.studyState = 'read';
+    emitEvent('library:changed', { kind: 'projects', ids: ['p1'] });
+    await waitFor(async () => expect(await states()).toEqual(['read', 'read']));
+  });
+
+  it('reports "removed" only when the write succeeded', async () => {
+    const init = twoDocs();
+    let fail = true;
+    let lib: ReturnType<typeof setup>;
+    lib = setup(init, { 'projects:removeMembers': (p: any) => { if (fail) throw new AppError('INTERNAL', 'boom'); return lib.handlers['projects:removeMembers']!(p); } });
+    fireEvent.click(await screen.findByTestId('project-open'));
+    fireEvent.click((await screen.findAllByRole('checkbox'))[0]!);
+    fireEvent.click(screen.getByTestId('members-remove'));
+    fireEvent.click(screen.getByTestId('members-remove-confirm'));
+    await screen.findAllByTestId('toast');
+    expect(screen.getAllByTestId('toast').every((t) => t.dataset.kind === 'error')).toBe(true);
+    expect(screen.queryByText(/removed from the project/)).toBeNull();
+    fail = false;
+    fireEvent.click((await screen.findAllByRole('checkbox'))[0]!);
+    fireEvent.click(screen.getByTestId('members-remove'));
+    fireEvent.click(screen.getByTestId('members-remove-confirm'));
+    await screen.findByText(/removed from the project/);
   });
 });

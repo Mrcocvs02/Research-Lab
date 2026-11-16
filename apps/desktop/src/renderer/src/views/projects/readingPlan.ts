@@ -17,11 +17,10 @@ export function moveItem(items: readonly PlanItemView[], from: number, to: numbe
 
 export const renumber = (items: readonly PlanItemView[]): PlanItemView[] => items.map((it, i) => ({ ...it, order: i }));
 
-/** Body of `projects:setReadingPlan` for these items (the view-only fields are left out). */
+/** Body of `projects:setReadingPlan` for these items (the view-only fields are left out; the state of a document is the document's own, not the plan's). */
 export function toRequestItems(items: readonly PlanItemView[]) {
   return renumber(items).map((it) => {
-    const out: { docId: string; order: number; status?: StudyState; due?: string; note?: string } = { docId: it.docId, order: it.order };
-    if (it.status) out.status = it.status;
+    const out: { docId: string; order: number; due?: string; note?: string } = { docId: it.docId, order: it.order };
     if (it.due) out.due = it.due;
     if (it.note) out.note = it.note;
     return out;
@@ -34,8 +33,8 @@ export function notInPlan(members: readonly MemberView[], plan: readonly PlanIte
   return members.filter((m) => !planned.has(m.docId));
 }
 
-/** The state of an item: its own, else the document's, else "to read". */
-export const effectiveStatus = (it: Pick<PlanItemView, 'status' | 'studyState'>): StudyState => it.status ?? it.studyState ?? 'to-read';
+/** The state of an item is the study state of its document ("to read" when the document is unknown). */
+export const effectiveStatus = (it: Pick<PlanItemView, 'studyState'>): StudyState => it.studyState ?? 'to-read';
 
 /** A new plan item for a member, at the end. */
 export function appendMembers(plan: readonly PlanItemView[], members: readonly MemberView[]): PlanItemView[] {

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { ProjectDetail, StudyState } from '@rl/core';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
-import { useChangeVersion, useLibraryEvents } from '../../lib/events';
+import { useLibraryEvents } from '../../lib/events';
 import { Markdown } from '../../lib/markdown';
 import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
@@ -73,24 +73,47 @@ function NotesEditor({ detail, onSave }: { detail: ProjectDetail; onSave(notes: 
 /** A project: name, state, members with their study state, notes, and the reading plan. */
 export function ProjectDetailView({ id, onBack }: { id: string; onBack(): void }) {
   const { t } = useTranslation();
-  const version = useChangeVersion('projects');
   const { invalidate } = useLibraryEvents();
   const { info, reportError } = useNotify();
-  const [detail, setDetail] = useState<ProjectDetail | null>(null);
+  const [detail, setDetailState] = useState<ProjectDetail | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [tab, setTab] = useState<Tab>('members');
   const [name, setName] = useState('');
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [confirmRemove, setConfirmRemove] = useState(false);
   const detailRef = useRef<ProjectDetail | null>(null);
-  detailRef.current = detail;
+  /** The ref is what writes read their revision from; it moves with the state, never back to an older render. */
+  const setDetail = useCallback((d: ProjectDetail) => {
+    detailRef.current = d;
+    setDetailState(d);
+  }, []);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const writes = useRef(0);
+  /** A read was dropped because a write was in flight: read again when the writes are done. */
+  const stale = useRef(false);
+
+  // Own writes answer with the new detail; what comes from elsewhere arrives as `library:changed` (a scan, the document panel, undo): reload only when it names this project or one of its members.
+  const [pushed, setPushed] = useState(0);
+  const memberIds = useRef<Set<string>>(new Set());
+  memberIds.current = new Set(detail?.members.map((m) => m.docId));
+  useEffect(
+    () =>
+      rl.on('library:changed', (e) => {
+        if (e.kind === 'projects' ? !e.ids || e.ids.includes(id) : e.kind === 'documents' && (!e.ids || e.ids.some((d) => memberIds.current.has(d)))) setPushed((n) => n + 1);
+      }),
+    [id],
+  );
 
   useEffect(() => {
     let alive = true;
     rl.invoke('projects:get', { id }).then(
       (d) => {
+        // A write is in flight: its answer is newer than this read (which may be the echo of an earlier write).
         if (!alive) return;
+        if (writes.current > 0) {
+          stale.current = true;
+          return;
+        }
         setDetail(d);
         setName(d.project.name);
         setError(null);
@@ -100,34 +123,45 @@ export function ProjectDetailView({ id, onBack }: { id: string; onBack(): void }
     return () => {
       alive = false;
     };
-  }, [id, version]);
+  }, [id, pushed]);
 
   /** Runs one write after the previous one, so each uses the revision the last answer carried. */
   const run = useCallback(
-    (op: (current: ProjectDetail) => Promise<ProjectDetail>) => {
-      const job = queue.current.then(async () => {
+    (op: (current: ProjectDetail) => Promise<ProjectDetail>): Promise<boolean> => {
+      writes.current++;
+      const job = queue.current.then(async (): Promise<boolean> => {
         const current = detailRef.current;
-        if (!current) return;
         try {
+          if (!current) return false;
           const next = await op(current);
-          detailRef.current = next;
-          setDetail(next);
-          setName(next.project.name);
+          // Later writes are queued: keep what the user sees (their optimistic order) until the last answer; only the revision moves on.
+          if (writes.current > 1) detailRef.current = next;
+          else {
+            setDetail(next);
+            setName(next.project.name);
+          }
           invalidate('projects');
+          return true;
         } catch (e) {
           reportError(e);
+          return false;
+        } finally {
+          if (--writes.current === 0 && stale.current) {
+            stale.current = false;
+            setPushed((n) => n + 1);
+          }
         }
       });
       queue.current = job;
       return job;
     },
-    [invalidate, reportError],
+    [invalidate, reportError, setDetail],
   );
 
   const update = (patch: Record<string, unknown>) => run((d) => rl.invoke('projects:update', { id, patch, expectedRevision: d.project.revision }));
   const savePlan = (items: PlanItemView[]) => {
     // Show the new order at once; the answer replaces it.
-    setDetail((d) => (d ? { ...d, readingPlan: items } : d));
+    if (detailRef.current) setDetail({ ...detailRef.current, readingPlan: items });
     return run((d) => rl.invoke('projects:setReadingPlan', { projectId: id, items: toRequestItems(items), expectedRevision: d.project.revision }));
   };
   const setDocState = async (docId: string, state: StudyState) => {
@@ -135,6 +169,7 @@ export function ProjectDetailView({ id, onBack }: { id: string; onBack(): void }
       await rl.invoke('documents:update', { docId, patch: { studyState: state } });
       invalidate('projects');
       invalidate('documents');
+      setPushed((n) => n + 1);
     } catch (e) {
       reportError(e);
     }
@@ -143,8 +178,8 @@ export function ProjectDetailView({ id, onBack }: { id: string; onBack(): void }
     const docIds = [...picked];
     setConfirmRemove(false);
     setPicked(new Set());
-    await run(() => rl.invoke('projects:removeMembers', { projectId: id, docIds }));
-    info(t('projects.removed', { count: docIds.length }));
+    const ok = await run(() => rl.invoke('projects:removeMembers', { projectId: id, docIds }));
+    if (ok) info(t('projects.removed', { count: docIds.length }));
   };
 
   if (error && !detail) return <ErrorNote>{errorMessage(error, t)}</ErrorNote>;
@@ -294,8 +329,8 @@ export function ProjectDetailView({ id, onBack }: { id: string; onBack(): void }
             )}
           </div>
         )}
-        {tab === 'notes' && <NotesEditor detail={detail} onSave={(notes) => update({ notes })} />}
-        {tab === 'plan' && <ReadingPlanPanel detail={detail} onChange={(items) => void savePlan(items)} />}
+        {tab === 'notes' && <NotesEditor detail={detail} onSave={async (notes) => void (await update({ notes }))} />}
+        {tab === 'plan' && <ReadingPlanPanel detail={detail} onChange={(items) => void savePlan(items)} onStudyState={(docId, state) => void setDocState(docId, state)} />}
       </div>
     </div>
   );

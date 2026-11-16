@@ -51,18 +51,24 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
   const { versions, invalidateAll } = useLibraryEvents();
   const { info, reportError } = useNotify();
   const [items, setItems] = useState<HistoryItem[]>([]);
+  // `canUndo` / `canRedo` as the main process computes them; absent (older main) the list is used to estimate them.
+  const [flags, setFlags] = useState<{ canUndo?: boolean; canRedo?: boolean }>({});
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!activeLibraryId) {
       setItems([]);
+      setFlags({});
       return;
     }
     try {
-      setItems((await rl.invoke('history:list', { limit: 100 })).items);
+      const r = (await rl.invoke('history:list', { limit: 100 })) as { items: HistoryItem[]; canUndo?: boolean; canRedo?: boolean };
+      setItems(r.items);
+      setFlags({ ...(r.canUndo === undefined ? {} : { canUndo: r.canUndo }), ...(r.canRedo === undefined ? {} : { canRedo: r.canRedo }) });
     } catch {
       setItems([]);
+      setFlags({});
     }
   }, [activeLibraryId]);
 
@@ -113,14 +119,14 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
     const mine = items.filter((i) => i.mine);
     return {
       items,
-      canUndo: mine.some((i) => i.undoable && !i.undone && i.kind !== 'undo'),
-      canRedo: mine.some((i) => i.undone),
+      canUndo: flags.canUndo ?? mine.some((i) => i.undoable && !i.undone && i.kind !== 'undo'),
+      canRedo: flags.canRedo ?? mine.some((i) => i.undone),
       busy,
       undo,
       redo,
       refresh,
     };
-  }, [items, busy, undo, redo, refresh]);
+  }, [items, flags, busy, undo, redo, refresh]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

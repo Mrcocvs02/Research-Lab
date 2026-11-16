@@ -555,3 +555,111 @@ describe('LibraryView: add to project', () => {
     expect(lib.state.projects[1]!.members).toHaveLength(2);
   });
 });
+
+describe('LibraryView: phase 2 review fixes', () => {
+  const countText = () => screen.queryByTestId('selection-count')?.textContent ?? '';
+  const addTag = async (testId: string, text: string) => {
+    const input = await screen.findByTestId(testId);
+    fireEvent.change(input, { target: { value: text } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+  };
+
+  it('bulk tags act on every selected id, also after a refresh that reloads only the first page (250 documents)', async () => {
+    const lib = setup({ docs: makeDocs(250) });
+    await ready();
+    fireEvent.click(rowOf('Paper 0000'));
+    fireEvent.keyDown(screen.getByTestId('search-results'), { key: 'a', ctrlKey: true });
+    await waitFor(() => expect(countText()).toBe('250 selected'));
+    fireEvent.click(screen.getByTestId('selection-details'));
+    await addTag('bulk-tag-input', 'stats');
+    await waitFor(() => expect(callsTo('documents:tag')).toHaveLength(1));
+    expect(callsTo('documents:tag')[0].docIds).toHaveLength(250);
+    await waitFor(() => expect(lib.state.docs.filter((d) => d.tags.includes('stats'))).toHaveLength(250));
+    // the change reloaded the list; the selection and its count survive
+    await waitFor(() => expect(callsTo('documents:list').length).toBeGreaterThan(3));
+    expect(countText()).toBe('250 selected');
+    await addTag('bulk-tag-input', 'appren');
+    await waitFor(() => expect(callsTo('documents:tag')).toHaveLength(2));
+    expect(callsTo('documents:tag')[1].docIds).toHaveLength(250);
+    expect(callsTo('documents:tag')[1]).toMatchObject({ add: ['ml'] });
+    await waitFor(() => expect(lib.state.docs.filter((d) => d.tags.includes('ml'))).toHaveLength(250));
+    expect(countText()).toBe('250 selected');
+    expect(screen.getByTestId('bulk-title').textContent).toContain('250');
+  });
+
+  it('Ctrl+A asks the server for ids in big pages and does not keep the rows', async () => {
+    setup({ docs: makeDocs(1000) });
+    await ready();
+    fireEvent.click(rowOf('Paper 0000'));
+    fireEvent.keyDown(screen.getByTestId('search-results'), { key: 'a', ctrlKey: true });
+    await waitFor(() => expect(countText()).toBe('1000 selected'));
+    const sizes = callsTo('documents:list').map((c) => c.limit);
+    expect(sizes.filter((n) => n === 200)).toHaveLength(5);
+    expect(sizes.filter((n) => n === 100).length).toBeLessThanOrEqual(2);
+  });
+
+  it('keeps Enter and the arrows on the same document when the list changes under the focus', async () => {
+    const lib = setup({ docs: makeDocs(6) });
+    await ready();
+    fireEvent.click(rowOf('Paper 0002'));
+    // Paper 0000 moves to the end of the title order: every index above it shifts by one
+    lib.state.docs[0]!.title = 'Zzz last';
+    emitEvent('library:changed', { kind: 'documents' });
+    await waitFor(() => expect(titles().at(-1)).toBe('Zzz last'));
+    const list = screen.getByTestId('search-results');
+    fireEvent.keyDown(list, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByTestId('panel-title').textContent).toBe('Paper 0002'));
+    fireEvent.keyDown(list, { key: 'ArrowDown' });
+    await waitFor(() => expect(rowOf('Paper 0003').getAttribute('aria-selected')).toBe('true'));
+  });
+
+  it('offers to remove only the tags put by hand and marks the implied ones', async () => {
+    const nodes = [node('ml', 'Machine learning', { implies: ['stats'] }), node('stats', 'Statistics')];
+    const docs = makeDocs(3);
+    docs[0]!.tags = ['ml'];
+    docs[1]!.tags = ['ml'];
+    const lib = setup({ docs, nodes });
+    await ready();
+    fireEvent.click(rowOf('Paper 0000'));
+    fireEvent.click(rowOf('Paper 0001'), { ctrlKey: true });
+    fireEvent.click(screen.getByTestId('selection-details'));
+    const items = await screen.findAllByTestId('bulk-tag');
+    const byTag = (id: string) => items.find((i) => i.dataset.tag === id)!;
+    expect(within(byTag('ml')).getByTestId('bulk-remove')).toBeTruthy();
+    expect(within(byTag('stats')).getByTestId('bulk-implied')).toBeTruthy();
+    expect(within(byTag('stats')).queryByTestId('bulk-remove')).toBeNull();
+    expect(byTag('ml').textContent).toContain('on 2 of 2');
+    void lib;
+  });
+
+  it('turns Redo off after an undo followed by a new change', async () => {
+    const lib = setup();
+    await ready();
+    fireEvent.click(rowOf('Paper 0000'));
+    fireEvent.click(screen.getByTestId('selection-details'));
+    await addTag('tag-input', 'stats');
+    await waitFor(() => expect(lib.state.docs[0]!.tags).toEqual(['stats']));
+    await waitFor(() => expect((screen.getByTestId('undo-button') as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('undo-button'));
+    await waitFor(() => expect((screen.getByTestId('redo-button') as HTMLButtonElement).disabled).toBe(false));
+    await addTag('tag-input', 'appren');
+    await waitFor(() => expect(lib.state.docs[0]!.tags).toEqual(['ml']));
+    // the undone entry is still listed as undone, but the main process says it cannot be redone any more
+    await waitFor(() => expect((screen.getByTestId('redo-button') as HTMLButtonElement).disabled).toBe(true));
+  });
+
+  it('applies taxonomy operations one after the other: a blur and a click right after it do not conflict', async () => {
+    const lib = setup({ nodes: [node('methods', 'Methods')] });
+    fireEvent.click(await screen.findByTestId('open-taxonomy'));
+    fireEvent.click(await screen.findByText('Methods'));
+    const aliases = await screen.findByTestId('node-aliases');
+    fireEvent.change(aliases, { target: { value: 'meth' } });
+    fireEvent.blur(aliases);
+    fireEvent.click(screen.getAllByTestId('color-swatch')[3]!);
+    await waitFor(() => expect(lib.state.nodes[0]?.color).toBe('#2f9e44'));
+    expect(lib.state.nodes[0]?.aliases).toEqual(['meth']);
+    expect(screen.queryAllByTestId('toast')).toHaveLength(0);
+    const revs = callsTo('taxonomy:apply').map((c) => c.expectedRevision);
+    expect(new Set(revs).size).toBe(revs.length);
+  });
+});

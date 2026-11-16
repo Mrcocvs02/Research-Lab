@@ -478,6 +478,8 @@
     "currentTags": "Tag della selezione",
     "noTags": "Nessun documento selezionato ha tag.",
     "onCount": "su {{count}} di {{total}}",
+    "implied": "implicito",
+    "impliedHint": "Implicito da un altro tag: si toglie quello.",
     "remove": "Togli…",
     "removeConfirm_one": "Togli da {{count}} documento",
     "removeConfirm_other": "Togli da {{count}} documenti"

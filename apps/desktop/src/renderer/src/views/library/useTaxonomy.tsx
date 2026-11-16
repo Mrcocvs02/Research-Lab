@@ -63,20 +63,28 @@ export function TaxonomyProvider({ children }: { children: ReactNode }) {
     void reload();
   }, [reload, version]);
 
+  /** Applies run one after the other: each takes the revision the previous answer carried (a blur and a click right after it must not both use the same one). */
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
   const apply = useCallback(
-    async (ops: TaxonomyOp[]) => {
-      const request: ApplyRequest = { ops };
-      if (viewRef.current) request.expectedRevision = viewRef.current.revision;
-      try {
-        const result = await rl.invoke('taxonomy:apply', request);
-        setView(result.taxonomy);
-        invalidate('taxonomy');
-        if (result.documentsChanged > 0) invalidate('documents');
-        return result;
-      } catch (e) {
-        reportError(e);
-        return null;
-      }
+    (ops: TaxonomyOp[]): Promise<ApplyResult | null> => {
+      const job = queue.current.then(async (): Promise<ApplyResult | null> => {
+        const request: ApplyRequest = { ops };
+        if (viewRef.current) request.expectedRevision = viewRef.current.revision;
+        try {
+          const result = await rl.invoke('taxonomy:apply', request);
+          viewRef.current = result.taxonomy;
+          setView(result.taxonomy);
+          invalidate('taxonomy');
+          if (result.documentsChanged > 0) invalidate('documents');
+          return result;
+        } catch (e) {
+          // A real conflict (another source changed the taxonomy) is shown with the invitation to reload.
+          reportError(e);
+          return null;
+        }
+      });
+      queue.current = job;
+      return job;
     },
     [invalidate, reportError],
   );

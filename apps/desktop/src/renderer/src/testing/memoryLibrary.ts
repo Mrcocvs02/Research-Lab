@@ -97,6 +97,8 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
     annotations: new Map<string, FakeAnnotation[]>(),
     /** Documents whose annotations are reported as made on another version of the file. */
     stale: new Set<string>(),
+    /** Thumbnails the (fake) operating system can give, by `docId`; the others fall back to drawing. */
+    nativeThumbs: new Map<string, string>(),
     /** Thumbnail URLs stored by `thumbs:put`, by `docId`. */
     thumbs: new Map<string, string>(),
     /** Documents `reader:open` refuses, with the reason (`details.reason`). */
@@ -367,6 +369,11 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
         return { docId: id, url, drawable: url === null, hash: 'a'.repeat(64) };
       }),
     }),
+    'thumbs:native': (p) => {
+      const url = state.nativeThumbs.get(p.docId) ?? null;
+      if (url) state.thumbs.set(p.docId, url);
+      return { url, reason: url ? 'ok' : 'unsupported' };
+    },
     'thumbs:put': (p) => {
       const url = `rl-thumb://thumb/${p.docId}?v=${String(p.hash).slice(0, 8)}`;
       state.thumbs.set(p.docId, url);

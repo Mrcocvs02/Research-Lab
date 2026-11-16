@@ -3,8 +3,9 @@ import { THUMB_LIMITS, type Channels, type ResponseOf } from '@rl/core';
 import { rl } from './rl';
 
 /**
- * Grid thumbnails, renderer side (D-195). A small store keeps what main said about the documents on screen
- * (`thumbs:list`), draws the missing ones ONE at a time and shows each `rl-thumb://` URL as soon as it exists.
+ * Grid thumbnails, renderer side (D-196). A small store keeps what main said about the documents on screen
+ * (`thumbs:list`), gets the missing ones ONE at a time (first from the operating system, `thumbs:native`, and only when
+ * it has none by drawing page 1 here)  and shows each `rl-thumb://` URL as soon as it exists.
  * This file has no pdf.js: the drawing code (`thumbDraw.ts`) is a dynamic import, fetched when the first image must be
  * drawn. Nothing runs unless the grid is shown (`setActive`).
  */
@@ -12,6 +13,8 @@ export type ThumbItem = ResponseOf<Channels, 'thumbs:list'>['items'][number];
 
 export interface ThumbDeps {
   list(docIds: string[]): Promise<ThumbItem[]>;
+  /** Asks main for the thumbnail of the operating system (cached by main); `null` when the page must be drawn here. */
+  native(docId: string): Promise<string | null>;
   /** The `rl-doc://` URL and the hash of the current content. */
   open(docId: string): Promise<{ url: string; hash: string }>;
   draw(url: string): Promise<Uint8Array>;
@@ -124,6 +127,14 @@ export function createThumbStore(deps: ThumbDeps) {
     const entry = entries.get(id);
     if (!entry || entry.url || !entry.drawable) return;
     try {
+      // The system's own thumbnail first (D-195): no pdf.js, no page rendering. Any problem there means: draw it here.
+      const native = await deps.native(id).catch(() => null);
+      if (!active || mine !== epoch) return;
+      if (native) {
+        entries.set(id, { url: native, drawable: false, hash: entry.hash, stale: false });
+        notify(id);
+        return;
+      }
       const opened = await deps.open(id);
       if (!active || mine !== epoch) return;
       drawn = true;
@@ -211,6 +222,7 @@ const defaultDeps = (): ThumbDeps => {
   let drawer: Promise<typeof import('./thumbDraw')> | null = null;
   return {
     list: async (docIds) => (await rl.invoke('thumbs:list', { docIds })).items,
+    native: async (docId) => (await rl.invoke('thumbs:native', { docId })).url,
     open: async (docId) => {
       const o = await rl.invoke('reader:open', { docId });
       return { url: o.url, hash: o.hash };

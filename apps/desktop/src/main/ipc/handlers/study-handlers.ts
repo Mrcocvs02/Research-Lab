@@ -8,7 +8,7 @@ import { AppError, STUDY_LIMITS, annotationFileSchema, type Annotation, type Doc
 import type { LibraryRuntime } from '../../library/library-runtime.js';
 import type { DomainHandlers } from '../types.js';
 
-import { listThumbs, pruneThumbs, putThumb } from '../../thumbs.js';
+import { listThumbs, nativeThumb, pruneThumbs, putThumb } from '../../thumbs.js';
 import { openPdfHandle, presentPdf } from './doc-files.js';
 import type { MainServices } from './services.js';
 
@@ -214,7 +214,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
   };
 };
 
-/** Grid thumbnails (D-194, D-195): the renderer draws, main stores and serves (`thumbs.ts`, `thumb-protocol.ts`). */
+/** Grid thumbnails (D-194, D-196): the renderer draws, main stores and serves (`thumbs.ts`, `thumb-protocol.ts`). */
 export const thumbsHandlers = (s: MainServices): DomainHandlers<'thumbs'> => {
   const pruned = new Set<string>();
   return {
@@ -230,6 +230,7 @@ export const thumbsHandlers = (s: MainServices): DomainHandlers<'thumbs'> => {
       }
       return { items };
     },
+    'thumbs:native': ({ docId }) => nativeThumb(s, docId),
     'thumbs:put': async ({ docId, hash, webp }) => ({ url: await putThumb(s, docId, hash, webp) }),
   };
 };

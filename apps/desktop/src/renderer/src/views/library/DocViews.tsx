@@ -27,7 +27,7 @@ export const fileExt = (path: string): string => {
 export const baseName = (path: string): string => path.slice(path.lastIndexOf('/') + 1);
 
 /**
- * The first page of a PDF in the grid (D-195), or the type icon: while the image is not there yet, for every other
+ * The first page of a PDF in the grid (D-196), or the type icon: while the image is not there yet, for every other
  * format and for a missing file. The image is decoration (empty alt): the title stays the label of the card.
  */
 function GridThumb({ docId, path, missing }: { docId: string; path: string; missing: boolean }) {

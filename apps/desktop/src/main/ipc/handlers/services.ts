@@ -19,6 +19,8 @@ export interface ShellService {
  */
 export interface MainServices {
   log: Logger;
+  /** Asks the OS shell for a thumbnail of a file (`nativeImage.createThumbnailFromPath`); absent where the platform has no such API. */
+  nativeThumbnail?: (absPath: string, size: number) => Promise<import('../../thumbs.js').NativeImageLike>;
   /** Machine-local, non-synced app folder (caches such as the grid thumbnails). */
   localDataDir: string;
   emit: EmitFn;

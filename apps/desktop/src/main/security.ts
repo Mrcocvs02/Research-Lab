@@ -13,7 +13,7 @@ export function registerPrivilegedSchemes(): void {
     { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
     // Bytes of the PDFs for the reader (range requests, fetched from the renderer origin). No bypassCSP: connect-src names it.
     { scheme: DOC_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
-    // Grid thumbnails (images from the local cache, D-195). No bypassCSP: img-src names it.
+    // Grid thumbnails (images from the local cache, D-196). No bypassCSP: img-src names it.
     { scheme: THUMB_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
   ]);
 }

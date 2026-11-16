@@ -20,7 +20,9 @@ let broken: Set<string>;
 let active: number;
 let maxActive: number;
 let changed: Array<() => void>;
-let deps: ThumbDeps & { list: ReturnType<typeof vi.fn>; open: ReturnType<typeof vi.fn>; draw: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn>; release: ReturnType<typeof vi.fn> };
+type Fn = ReturnType<typeof vi.fn>;
+let deps: Pick<ThumbDeps, 'onDocumentsChanged'> & { list: Fn; native: Fn; open: Fn; draw: Fn; put: Fn; release: Fn };
+let nativeUrls: Map<string, string>;
 let drawGate: ReturnType<typeof gate<Uint8Array>> | null;
 
 const tick = async (ms = THUMB_TIMING.debounceMs + 1) => {
@@ -35,7 +37,13 @@ beforeEach(() => {
   maxActive = 0;
   changed = [];
   drawGate = null;
+  nativeUrls = new Map();
   deps = {
+    native: vi.fn(async (d: string): Promise<string | null> => {
+      const u = nativeUrls.get(d) ?? null;
+      if (u) cached.set(d, u);
+      return u;
+    }),
     list: vi.fn(async (ids: string[]): Promise<ThumbItem[]> => ids.map((d) => ({ docId: d, url: cached.get(d) ?? null, drawable: !cached.has(d), hash: HASH }))),
     open: vi.fn(async (d: string) => ({ url: `rl-doc://doc/${d}?v=abababab`, hash: HASH })),
     draw: vi.fn(async (u: string) => {
@@ -64,7 +72,7 @@ afterEach(() => vi.useRealTimers());
 
 describe('thumbnail store', () => {
   it('asks for the documents on screen in one debounced batch, then draws them one at a time', async () => {
-    const s = createThumbStore(deps);
+    const s = createThumbStore(deps as unknown as ThumbDeps);
     s.setActive(true);
     const seen: string[] = [];
     s.subscribe(id(1), () => seen.push(id(1)));
@@ -83,9 +91,42 @@ describe('thumbnail store', () => {
     expect(seen).toEqual([id(1)]); // told once, when the image appeared
   });
 
+  it('the thumbnail of the system comes first: with it nothing is opened, drawn or put', async () => {
+    nativeUrls.set(id(1), url(1));
+    const s = createThumbStore(deps as unknown as ThumbDeps);
+    s.setActive(true);
+    s.want([id(1), id(2)]);
+    await vi.runAllTimersAsync();
+    expect(s.urlOf(id(1))).toBe(url(1));
+    expect(deps.open).toHaveBeenCalledTimes(1); // only for the second, which the system had no thumbnail for
+    expect(deps.draw).toHaveBeenCalledTimes(1);
+    expect(deps.native.mock.calls.map((c) => c[0])).toEqual([id(1), id(2)]);
+    expect(s.urlOf(id(2))).toBe(url(2));
+  });
+
+  it('a native request that fails draws the page here', async () => {
+    deps.native.mockRejectedValue(new Error('shell'));
+    const s = createThumbStore(deps as unknown as ThumbDeps);
+    s.setActive(true);
+    s.want([id(1)]);
+    await vi.runAllTimersAsync();
+    expect(deps.draw).toHaveBeenCalledTimes(1);
+    expect(s.urlOf(id(1))).toBe(url(1));
+  });
+
+  it('a native request is not made for what was cached, and stops when the grid is left', async () => {
+    cached.set(id(1), url(1));
+    const s = createThumbStore(deps as unknown as ThumbDeps);
+    s.setActive(true);
+    s.want([id(1)]);
+    await tick();
+    expect(deps.native).not.toHaveBeenCalled();
+    s.setActive(false);
+  });
+
   it('a cached thumbnail is shown without opening or drawing anything', async () => {
     cached.set(id(1), url(1));
-    const s = createThumbStore(deps);
+    const s = createThumbStore(deps as unknown as ThumbDeps);
     s.setActive(true);
     s.want([id(1)]);
     await tick();
@@ -95,7 +136,7 @@ describe('thumbnail store', () => {
   });
 
   it('splits a long list into batches of at most the contract size', async () => {
-    const s = createThumbStore(deps);
+    const s = createThumbStore(deps as unknown as ThumbDeps);
     s.setActive(true);
     const ids = Array.from({ length: THUMB_LIMITS.batch + 5 }, (_, i) => id(i));
     s.want(ids);
@@ -105,7 +146,7 @@ describe('thumbnail store', () => {
   });
 
   it('does nothing before the grid is shown and nothing more after it is left', async () => {
-    const s = createThumbStore(deps);
+    const s = createThumbStore(deps as unknown as ThumbDeps);
     s.want([id(1)]);
     await tick();
     expect(deps.list).not.toHaveBeenCalled();
@@ -124,7 +165,7 @@ describe('thumbnail store', () => {
   });
 
   it('an item that scrolled away before its turn is not drawn', async () => {
-    const s = createThumbStore(deps);
+    const s = createThumbStore(deps as unknown as ThumbDeps);
     s.setActive(true);
     drawGate = gate();
     s.want([id(1), id(2)]);
@@ -140,7 +181,7 @@ describe('thumbnail store', () => {
 
   it('a failed drawing is marked and not tried again in a loop', async () => {
     broken.add(id(2));
-    const s = createThumbStore(deps);
+    const s = createThumbStore(deps as unknown as ThumbDeps);
     s.setActive(true);
     s.want([id(1), id(2), id(3)]);
     await vi.runAllTimersAsync();
@@ -157,7 +198,7 @@ describe('thumbnail store', () => {
 
   it('a failure on a file that then changes is tried again once', async () => {
     broken.add(id(2));
-    const s = createThumbStore(deps);
+    const s = createThumbStore(deps as unknown as ThumbDeps);
     s.setActive(true);
     s.want([id(2)]);
     await vi.runAllTimersAsync();
@@ -173,7 +214,7 @@ describe('thumbnail store', () => {
 
   it('a library event refreshes the URLs of what is on screen; the new version busts the cache', async () => {
     cached.set(id(1), url(1));
-    const s = createThumbStore(deps);
+    const s = createThumbStore(deps as unknown as ThumbDeps);
     s.setActive(true);
     s.want([id(1)]);
     await tick();
@@ -191,7 +232,7 @@ describe('thumbnail store', () => {
   });
 
   it('a stale put (the file changed meanwhile) asks again once, then gives up', async () => {
-    const s = createThumbStore(deps);
+    const s = createThumbStore(deps as unknown as ThumbDeps);
     s.setActive(true);
     deps.put.mockResolvedValue(null);
     s.want([id(1)]);
@@ -205,7 +246,7 @@ describe('thumbnail store', () => {
 
   it('a list that fails leaves the icons and does not throw', async () => {
     deps.list.mockRejectedValueOnce(new Error('down'));
-    const s = createThumbStore(deps);
+    const s = createThumbStore(deps as unknown as ThumbDeps);
     s.setActive(true);
     s.want([id(1)]);
     await tick();
@@ -214,7 +255,7 @@ describe('thumbnail store', () => {
   });
 
   it('releases the pdf.js worker after the idle time, only if something was drawn, and not while drawing', async () => {
-    const s = createThumbStore(deps);
+    const s = createThumbStore(deps as unknown as ThumbDeps);
     s.setActive(true);
     s.want([id(1)]);
     await tick();
@@ -224,7 +265,7 @@ describe('thumbnail store', () => {
     expect(deps.release).toHaveBeenCalledTimes(1);
 
     const release = vi.fn();
-    const idle = createThumbStore({ ...deps, release });
+    const idle = createThumbStore({ ...deps, release } as unknown as ThumbDeps);
     idle.setActive(true);
     cached.set(id(9), url(9));
     idle.want([id(9)]); // only a cached image: pdf.js was never loaded, nothing to release
@@ -233,7 +274,7 @@ describe('thumbnail store', () => {
   });
 
   it('the idle timer starts again when new work comes and does not fire in the middle of it', async () => {
-    const s = createThumbStore(deps);
+    const s = createThumbStore(deps as unknown as ThumbDeps);
     s.setActive(true);
     s.want([id(1)]);
     await tick();
@@ -247,7 +288,7 @@ describe('thumbnail store', () => {
   });
 
   it('leaving the grid still releases the worker after the idle time', async () => {
-    const s = createThumbStore(deps);
+    const s = createThumbStore(deps as unknown as ThumbDeps);
     s.setActive(true);
     s.want([id(1)]);
     await tick();

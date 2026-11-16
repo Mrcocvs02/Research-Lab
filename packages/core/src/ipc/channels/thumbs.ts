@@ -24,6 +24,8 @@ export const thumbItemSchema = z.object({
   hash: sha256Schema.optional(),
 });
 
+const thumbUrlSchema = z.string().startsWith('rl-thumb://thumb/').nullable();
+
 export const thumbsChannels = defineChannels('thumbs', {
   /**
    * The thumbnails of some documents of the active library (the ones on screen). Nothing is drawn by main: a missing
@@ -40,5 +42,15 @@ export const thumbsChannels = defineChannels('thumbs', {
   put: {
     request: z.object({ docId: documentIdSchema, hash: sha256Schema, webp: webpSchema }),
     response: z.object({ url: z.string().startsWith('rl-thumb://thumb/').nullable() }),
+  },
+  /**
+   * Main asks the operating system shell for the thumbnail of a present PDF of the active library (the thumbnail
+   * handler of the PDF app, with the system cache) and caches it like a drawn one. `url: null` means the renderer
+   * should draw page 1 with pdf.js; `reason` says why: `unsupported` (no API on this platform), `failed` (the call
+   * threw or timed out), `generic` (the shell gave a file-type icon or an empty/uniform image, not a page).
+   */
+  native: {
+    request: z.object({ docId: documentIdSchema }),
+    response: z.object({ url: thumbUrlSchema, reason: z.enum(['ok', 'unsupported', 'failed', 'generic']) }),
   },
 });

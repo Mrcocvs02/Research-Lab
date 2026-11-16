@@ -1,7 +1,7 @@
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 /**
- * The pdf.js set-up shared by the reader and the grid thumbnails (D-186, D-193, D-195). Imported only from lazy code:
+ * The pdf.js set-up shared by the reader and the grid thumbnails (D-186, D-193, D-196). Imported only from lazy code:
  * the library itself is a dynamic import, so nothing of pdf.js is fetched until a document must be opened or drawn.
  */
 export type PdfjsLib = typeof import('pdfjs-dist');

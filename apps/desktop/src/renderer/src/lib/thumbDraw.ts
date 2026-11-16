@@ -2,7 +2,7 @@ import { THUMB_LIMITS } from '@rl/core';
 import { loadPdfjs, pdfDocumentParams, type PdfjsLib } from './pdfjs';
 
 /**
- * Draws the first page of a PDF as a small WebP image (D-195). This module is a lazy chunk of its own: it is fetched,
+ * Draws the first page of a PDF as a small WebP image (D-196). This module is a lazy chunk of its own: it is fetched,
  * together with pdf.js, only when a thumbnail must be drawn. One pdf.js worker is shared by the documents of a run and
  * released by `releaseDrawer` (the queue calls it after a while without work).
  */

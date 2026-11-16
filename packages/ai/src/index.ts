@@ -1,21 +1,21 @@
-import type { AiProvider, ToolSpec } from '@rl/core';
-
-export interface ClaudeProviderOptions {
-  /** Resolves a secret from the OS store; the provider never persists it. */
-  getApiKey?: () => Promise<string | null>;
-}
-
-/** Owner: ai-integration. Claude Agent SDK provider. */
-export function createClaudeProvider(_options?: ClaudeProviderOptions): AiProvider {
-  throw new Error('not implemented');
-}
-
-/** Owner: ai-integration. Deterministic provider used by every automated test. */
-export function createMockAiProvider(_script?: Record<string, unknown>): AiProvider {
-  throw new Error('not implemented');
-}
-
-/** Owner: ai-integration. The only tools the chat agent may use (no shell, no free network). */
-export function createLibraryTools(): ToolSpec[] {
-  throw new Error('not implemented');
-}
+/** AI layer (phase 4): the Claude Agent SDK provider, the deterministic mock provider and the library tools. */
+export * from './types.js';
+export * from './pricing.js';
+export * from './guide.js';
+export * from './tools.js';
+export { createMockAiProvider, parseToolDirectives, type MockScript } from './mock.js';
+export {
+  BUILTIN_TOOLS_DISALLOWED,
+  MCP_SERVER_NAME,
+  buildQueryOptions,
+  bundledExecutable,
+  createClaudeProvider,
+  detectAccess,
+  effortFor,
+  mcpToolName,
+  renderPrompt,
+  resolveClaudeExecutable,
+  type ClaudeProviderOptions,
+  type QueryOptionsInput,
+  type SdkModule,
+} from './claude.js';

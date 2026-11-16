@@ -14,3 +14,4 @@ tools/generality.local.json
 *.local.json
 CLAUDE.local.md
 .claude/settings.local.json
+.claude/last-compact.md

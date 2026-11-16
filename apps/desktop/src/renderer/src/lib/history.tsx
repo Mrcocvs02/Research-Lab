@@ -1,6 +1,7 @@
-import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
+import { Lazy, lazyRetry } from '../components/Lazy';
 import { RlError } from './rl-error';
 import { useApp } from '../state/app-context';
 import { useLibraryEvents } from './events';
@@ -132,7 +133,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
 }
 
 // The panel with the list of changes is only needed when it is opened.
-const HistoryPanel = lazy(() => import('./HistoryPanel').then((m) => ({ default: m.HistoryPanel })));
+const HistoryPanel = lazyRetry(() => import('./HistoryPanel').then((m) => ({ default: m.HistoryPanel })));
 
 /** Undo and redo buttons plus the "History" panel with the recent changes. */
 export function HistoryControls() {
@@ -152,9 +153,9 @@ export function HistoryControls() {
         {t('history.title')}
       </button>
       {open && (
-        <Suspense fallback={null}>
+        <Lazy>
           <HistoryPanel id={panelId} onClose={() => setOpen(false)} />
-        </Suspense>
+        </Lazy>
       )}
     </div>
   );

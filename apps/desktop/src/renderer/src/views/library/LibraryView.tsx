@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Lazy, lazyRetry } from '../../components/Lazy';
 import { useTranslation } from 'react-i18next';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
@@ -18,10 +19,10 @@ import { useScanStatus } from './useScanStatus';
 import { TaxonomyProvider } from './useTaxonomy';
 
 // The detail panel, the bulk tag editor, the taxonomy manager and the project dialog load when they are first used.
-const DocumentCard = lazy(() => import('./DocPanel').then((m) => ({ default: m.DocumentCard })));
-const BulkTagEditor = lazy(() => import('./DocPanel').then((m) => ({ default: m.BulkTagEditor })));
-const TaxonomyManager = lazy(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })));
-const AddToProject = lazy(() => import('./AddToProject').then((m) => ({ default: m.AddToProject })));
+const DocumentCard = lazyRetry(() => import('./DocPanel').then((m) => ({ default: m.DocumentCard })));
+const BulkTagEditor = lazyRetry(() => import('./DocPanel').then((m) => ({ default: m.BulkTagEditor })));
+const TaxonomyManager = lazyRetry(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })));
+const AddToProject = lazyRetry(() => import('./AddToProject').then((m) => ({ default: m.AddToProject })));
 
 type PaneTab = 'folders' | 'tags' | 'filters';
 const TABS: PaneTab[] = ['folders', 'tags', 'filters'];
@@ -194,9 +195,9 @@ function LibraryInner() {
       </div>
 
       {mode === 'taxonomy' ? (
-        <Suspense fallback={null}>
+        <Lazy>
           <TaxonomyManager onBack={() => setMode('browse')} />
-        </Suspense>
+        </Lazy>
       ) : (
         <div className={showPanel ? 'library-grid with-detail' : 'library-grid'}>
           <aside className="library-nav" aria-label={t('docs.navigation')}>
@@ -263,17 +264,17 @@ function LibraryInner() {
 
           {showPanel && (
             <aside className="detail-pane" aria-label={t('docs.details')} data-testid="detail-pane" onKeyDown={(e) => e.key === 'Escape' && setDetailOpen(false)}>
-              <Suspense fallback={null}>
+              <Lazy>
                 {single ? <DocumentCard key={single} docId={single} onClose={() => setDetailOpen(false)} /> : <BulkTagEditor docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onClose={() => setDetailOpen(false)} />}
-              </Suspense>
+              </Lazy>
             </aside>
           )}
         </div>
       )}
       {addOpen && (
-        <Suspense fallback={null}>
+        <Lazy>
           <AddToProject docIds={selectedIds} onClose={() => setAddOpen(false)} />
-        </Suspense>
+        </Lazy>
       )}
     </div>
   );

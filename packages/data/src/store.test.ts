@@ -217,3 +217,30 @@ describe('library store', () => {
     expect(() => createLibraryStore({ rootPath: root, deviceId: '../evil' })).toThrow();
   });
 });
+
+describe('change head state is shared between instances of one change (D-182)', () => {
+  it('withActor keeps one summary per group, and a failed write hands the summary to the next entry', async () => {
+    const root = await tempDir();
+    try {
+      const s = createLibraryStore({ rootPath: root, deviceId: 'dev-1' });
+      await s.init();
+      const base = { type: 'change', at: '2026-01-02T03:04:05.000Z', deviceId: 'dev-1', actor: 'user', target: { kind: 'taxonomy' }, action: 'taxonomy.update' } as const;
+      const cs = s.withChange({ changeId: 'chg-1', summary: 'Head' });
+      await cs.appendLog(base);
+      await cs.withActor('ai').appendLog(base);
+      await cs.withActor('system').withActor('ai').appendLog(base);
+      const log = (await s.readLog({ type: 'change' })).filter((e) => e.type === 'change' && e.changeId === 'chg-1');
+      expect(log).toHaveLength(3);
+      expect(log.filter((e) => e.type === 'change' && e.summary === 'Head')).toHaveLength(1);
+
+      // The first write of a second change fails (invalid entry): the head is not consumed and goes on the next entry.
+      const c2 = s.withChange({ changeId: 'chg-2', summary: 'Head 2' });
+      await expect(c2.appendLog({ ...base, action: '' })).rejects.toBeDefined();
+      await c2.withActor('ai').appendLog(base);
+      const second = (await s.readLog({ type: 'change' })).filter((e) => e.type === 'change' && e.changeId === 'chg-2');
+      expect(second.map((e) => e.type === 'change' && e.summary)).toEqual(['Head 2']);
+    } finally {
+      await removeDir(root);
+    }
+  });
+});

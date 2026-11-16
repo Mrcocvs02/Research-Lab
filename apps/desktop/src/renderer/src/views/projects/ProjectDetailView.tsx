@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useId, useRef, useState } from 'react';
+import { Lazy, lazyRetry } from '../../components/Lazy';
 import { useTranslation } from 'react-i18next';
 import type { ProjectDetail, StudyState } from '@rl/core';
 import { ErrorNote } from '../../components/ui';
@@ -15,7 +16,7 @@ const TABS: Tab[] = ['members', 'notes', 'plan'];
 const STATES: StudyState[] = ['to-read', 'reading', 'read'];
 
 // The Markdown renderer is loaded when the preview is first shown.
-const Markdown = lazy(() => import('../../lib/markdown').then((m) => ({ default: m.Markdown })));
+const Markdown = lazyRetry(() => import('../../lib/markdown').then((m) => ({ default: m.Markdown })));
 
 /** Notes in Markdown: a plain text box, a preview next to it (rendered without any raw HTML), saved on demand or on leaving the box. */
 function NotesEditor({ detail, onSave }: { detail: ProjectDetail; onSave(notes: string): Promise<void> }) {
@@ -64,7 +65,7 @@ function NotesEditor({ detail, onSave }: { detail: ProjectDetail; onSave(notes: 
         )}
         {layout !== 'edit' && (
           <div className="notes-preview" aria-label={t('notes.preview')} data-testid="notes-preview">
-            {preview.trim() === '' ? <p className="hint">{t('notes.empty')}</p> : <Suspense fallback={null}><Markdown source={preview} /></Suspense>}
+            {preview.trim() === '' ? <p className="hint">{t('notes.empty')}</p> : <Lazy><Markdown source={preview} /></Lazy>}
           </div>
         )}
       </div>

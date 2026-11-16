@@ -16,9 +16,11 @@
     "remove": "Rimuovi",
     "no": "No",
     "fixErrors": "Correggi i campi evidenziati per salvare.",
-    "close": "Chiudi"
+    "close": "Chiudi",
+    "reload": "Ricarica"
   },
   "errors": {
+    "chunkLoad": "Una parte dell’app non si è caricata. Ricarica la finestra per riprovare.",
     "INVALID_REQUEST": "Alcuni valori non sono validi. Controlla i campi e riprova.",
     "INVALID_RESPONSE": "L'app ha ricevuto una risposta inattesa. Riprova.",
     "UNKNOWN_CHANNEL": "L'app ha provato a fare qualcosa che non supporta.",
@@ -409,6 +411,9 @@
     "redoThis": "Ripeti questa",
     "undoneBadge": "annullata",
     "otherDevice": "altro dispositivo",
+    "incompleteBadge": "incompleta",
+    "incompleteWhy": "Il registro è molto grande e ne è stata letta solo la parte più recente: questa modifica potrebbe avere voci mancanti, quindi non si può annullare.",
+    "partialRefused": "Questa modifica non si può annullare: il registro è molto grande e ne è stata letta solo una parte, quindi la modifica potrebbe essere incompleta.",
     "kind": {
       "change": "modifica",
       "undo": "annulla",

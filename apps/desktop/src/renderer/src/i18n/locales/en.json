@@ -16,9 +16,11 @@
     "remove": "Remove",
     "no": "No",
     "fixErrors": "Fix the highlighted fields to save.",
-    "close": "Close"
+    "close": "Close",
+    "reload": "Reload"
   },
   "errors": {
+    "chunkLoad": "A part of the app could not be loaded. Reload the window to try again.",
     "INVALID_REQUEST": "Some values are not valid. Check the fields and try again.",
     "INVALID_RESPONSE": "The app received an unexpected answer. Try again.",
     "UNKNOWN_CHANNEL": "The app tried to do something it does not support.",
@@ -409,6 +411,9 @@
     "redoThis": "Redo this",
     "undoneBadge": "undone",
     "otherDevice": "other device",
+    "incompleteBadge": "incomplete",
+    "incompleteWhy": "The log is very large and only its newest part could be read: this change may be missing entries, so it cannot be undone.",
+    "partialRefused": "This change cannot be undone: the log is very large and only part of it could be read, so the change may be incomplete.",
     "kind": {
       "change": "change",
       "undo": "undo",

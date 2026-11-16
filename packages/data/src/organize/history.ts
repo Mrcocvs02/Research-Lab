@@ -28,6 +28,8 @@ interface Group {
   entries: ChangeEntry[];
   undoOf?: string;
   summary?: string;
+  /** Possibly missing entries (the log was read from its middle): never reverted (D-182). */
+  partial: boolean;
 }
 
 export interface HistoryItem {
@@ -42,6 +44,8 @@ export interface HistoryItem {
   undoable: boolean;
   undone: boolean;
   mine: boolean;
+  /** The recorded entries may be incomplete (very large log, oldest lines not read): shown, never undone. */
+  incomplete: boolean;
 }
 
 export interface HistoryResult {
@@ -56,6 +60,7 @@ export interface HistoryResult {
 
 const SUPPORTED = new Set(['tags.update', 'document.fields', 'taxonomy.update', 'project.create', 'project.update', 'project.remove']);
 const conflict = (what: string, details: Rec = {}) => new AppError('CONFLICT', `${what} changed since; the change cannot be reverted safely`, { conflict: 'changed', ...details });
+const partialGroup = (changeId: string) => new AppError('CONFLICT', 'This change is only partly in the log that could be read; it cannot be reverted', { conflict: 'partial', reason: 'partial-group', changeId });
 const obj = (v: unknown): Rec => (v && typeof v === 'object' ? (v as Rec) : {});
 
 /** ---------------- pure inverses: each checks the current state against the entry's `after` ---------------- */
@@ -236,13 +241,14 @@ export class HistoryService {
   }
 
   private async readGroups(): Promise<Group[]> {
-    const entries = (await this.c.store.readLog({ type: 'change' })).filter((e): e is ChangeEntry => e.type === 'change' && e.changeId !== undefined);
+    const report = this.c.store.readLogReport ? await this.c.store.readLogReport({ type: 'change' }) : { entries: await this.c.store.readLog({ type: 'change' }), partialChangeIds: new Set<string>() };
+    const entries = report.entries.filter((e): e is ChangeEntry => e.type === 'change' && e.changeId !== undefined);
     const byId = new Map<string, Group>();
     for (const e of entries) {
       const id = e.changeId as string;
       let g = byId.get(id);
       if (!g) {
-        g = { changeId: id, order: byId.size, at: e.at, deviceId: e.deviceId, actor: e.actor, entries: [], ...(e.undoOf ? { undoOf: e.undoOf } : {}), ...(e.summary ? { summary: e.summary } : {}) };
+        g = { changeId: id, order: byId.size, at: e.at, deviceId: e.deviceId, actor: e.actor, entries: [], partial: report.partialChangeIds.has(id), ...(e.undoOf ? { undoOf: e.undoOf } : {}), ...(e.summary ? { summary: e.summary } : {}) };
         byId.set(id, g);
       }
       // Only one entry of a group carries the summary and `undoOf` (D-179): take them from whichever has them.
@@ -286,12 +292,12 @@ export class HistoryService {
   }
 
   private defaultUndo(groups: Group[], a: ReturnType<HistoryService['analyse']>): Group | undefined {
-    return [...groups].reverse().find((x) => x.deviceId === this.c.deviceId && (a.depth.get(x.changeId) ?? 0) === 0 && !a.undone.get(x.changeId) && x.entries.every((e) => SUPPORTED.has(e.action)));
+    return [...groups].reverse().find((x) => x.deviceId === this.c.deviceId && !x.partial && (a.depth.get(x.changeId) ?? 0) === 0 && !a.undone.get(x.changeId) && x.entries.every((e) => SUPPORTED.has(e.action)));
   }
 
   private defaultRedo(groups: Group[], a: ReturnType<HistoryService['analyse']>): Group | undefined {
     const lastChange = [...groups].reverse().find((x) => x.deviceId === this.c.deviceId && (a.depth.get(x.changeId) ?? 0) === 0);
-    return [...groups].reverse().find((x) => x.deviceId === this.c.deviceId && (a.depth.get(x.changeId) ?? 0) === 1 && a.undone.get(x.changeId) === false && x.order > (lastChange?.order ?? -1));
+    return [...groups].reverse().find((x) => x.deviceId === this.c.deviceId && !x.partial && (a.depth.get(x.changeId) ?? 0) === 1 && a.undone.get(x.changeId) === false && x.order > (lastChange?.order ?? -1));
   }
 
   async list(limit = 50): Promise<HistoryItem[]> {
@@ -318,9 +324,10 @@ export class HistoryService {
             taxonomy: g.entries.filter((e) => e.target.kind === 'taxonomy').length,
             projects: new Set(g.entries.filter((e) => e.target.kind === 'project').map((e) => e.target.id)).size,
           },
-          undoable: !undone && g.entries.every((e) => SUPPORTED.has(e.action)),
+          undoable: !g.partial && !undone && g.entries.every((e) => SUPPORTED.has(e.action)),
           undone,
           mine: g.deviceId === this.c.deviceId,
+          incomplete: g.partial,
         };
       });
   }
@@ -359,6 +366,7 @@ export class HistoryService {
 
   /** Applies the inverse of `g` as a new change group (itself undoable). Nothing is written if anything conflicts. */
   private async revert(g: Group, word: 'Undo' | 'Redo'): Promise<HistoryResult> {
+    if (g.partial) throw partialGroup(g.changeId);
     if (!g.entries.every((e) => SUPPORTED.has(e.action))) throw new AppError('INVALID_REQUEST', 'This change cannot be undone', { changeId: g.changeId });
     const now = this.c.now().toISOString();
     const entries = [...g.entries].reverse();

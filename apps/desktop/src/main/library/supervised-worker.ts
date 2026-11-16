@@ -71,17 +71,24 @@ export function createSupervisedWorker(options: SupervisedWorkerOptions): Librar
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
 
   /** Closes the idle worker politely (the thread's memory goes back to the system); the next call starts a new one. */
-  const closeIdle = async (): Promise<void> => {
+  let closing: Promise<void> | null = null;
+  const closeIdle = (): Promise<void> => {
     const w = raw;
-    if (!w || inFlight > 0 || starting) return;
+    if (!w || inFlight > 0 || starting) return closing ?? Promise.resolve();
     raw = null;
     w.killedByUs = true;
-    try {
-      await withTimeout(w.client.dispose(), wd.disposeMs);
-    } catch {
-      // killed below
-    }
-    await w.terminate().catch(() => {});
+    // `raw` is already null while the old thread winds down: `dispose` and `terminate` wait for this promise (D-183).
+    closing = (async () => {
+      try {
+        await withTimeout(w.client.dispose(), wd.disposeMs);
+      } catch {
+        // killed below
+      }
+      await w.terminate().catch(() => {});
+    })().finally(() => {
+      closing = null;
+    });
+    return closing;
   };
   const armIdle = () => {
     clearTimeout(idleTimer);
@@ -198,8 +205,11 @@ export function createSupervisedWorker(options: SupervisedWorkerOptions): Librar
     async openIndex(dbPath) {
       // The main process opens (and, when needed, creates) the index itself, so nothing needs the worker yet:
       // it starts with the first scan or index call, and reopens this file when it does.
-      if (raw) await run('openIndex', undefined, (w) => w.client.openIndex(dbPath));
+      // The path is recorded first, so that a worker that is starting (or starts later) after this call opens the new one.
       indexPath = dbPath;
+      // A worker that is starting opened the OLD path: wait for it, then switch it to the new one (D-183).
+      if (starting) await starting.catch(() => undefined);
+      if (raw) await run('openIndex', undefined, (w) => w.client.openIndex(dbPath));
     },
     resetIndex: () => run('resetIndex', undefined, (w) => w.client.resetIndex()),
     scan: (args, hooks) => run('scan', hooks, (w, h) => w.client.scan(args, h)),
@@ -209,6 +219,7 @@ export function createSupervisedWorker(options: SupervisedWorkerOptions): Librar
     async dispose() {
       disposed = true;
       clearTimeout(idleTimer);
+      await closing;
       const w = raw ?? (await starting?.catch(() => null)) ?? null;
       if (!w) return;
       try {
@@ -219,6 +230,7 @@ export function createSupervisedWorker(options: SupervisedWorkerOptions): Librar
       await kill(w);
     },
     async terminate() {
+      await closing;
       const w = raw ?? (await starting?.catch(() => null)) ?? null;
       if (w) await kill(w);
     },

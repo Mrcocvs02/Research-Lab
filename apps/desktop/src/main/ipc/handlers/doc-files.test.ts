@@ -40,7 +40,7 @@ afterEach(async () => {
   await rm(outside, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 });
 
-describe('openPdfHandle re-check after the open (D-197)', () => {
+describe('openPdfHandle re-check after the open (D-200)', () => {
   it('opens a file that is still where it was resolved', async () => {
     const r = await openPdfHandle(file, root);
     expect(typeof r).toBe('object');

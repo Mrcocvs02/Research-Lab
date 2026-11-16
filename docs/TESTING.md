@@ -128,6 +128,10 @@ Ogni script controlla prima la memoria disponibile (`tools/mem-guard.mjs`: 1,2 G
 - `npm run check:budget` (dopo `npm run build`) controlla le dimensioni dei bundle e dice quale soglia è superata e quali chunk carica la prima schermata; `node tools/check-budget.mjs --json` stampa i valori misurati.
 - `e2e/qa-budget.spec.ts` (`npx playwright test -c e2e/playwright.config.ts qa-budget`, dopo la build): libreria sintetica di 40 documenti creata e scansionata, poi secondo avvio; misura il tempo dall'avvio del processo alle prime righe della vista Libreria e la somma dei working set di `app.getAppMetrics()` dopo 10 s di inattività (il worker si chiude dopo 3 s con `RL_WORKER_IDLE_MS`). Stampa `BUDGET-MEASURE {...}`. Le soglie di tempo dipendono dalla macchina: un superamento isolato va ripetuto prima di indagare.
 
+## Correzioni della revisione di fase 3 (D-197..D-200)
+- Unit: `views/notes/NoteEditor.test.ts` (salvataggi in catena, `flushAll`, cambio libreria, chiusura del lettore e della finestra con `rl` finto), `views/reader/reader.test.ts` (Esc salva il commento, creazione multipagina che si ferma, avviso pagine saltate, annotazione dal risultato di ricerca, annotazioni disallineate e riconferma), `views/reader/selection.test.ts`, `main/ipc/handlers/doc-files.test.ts` (ricontrollo dopo l'apertura simulando lo scambio con `realpath`/`stat` finti), `ipc/study-handlers.test.ts` (`forHash` per annotazione, aggiornamenti parziali, tetto di 16 MiB).
+- E2E: `study-ui` ora confronta lo SHA-256 del PDF prima e dopo e cerca una parola presente solo nel testo evidenziato (`data-field="annotation"`); `thumbs` verifica le immagini con `<img>` (`naturalWidth` > 0, riuso dopo il riavvio), perché `fetch` è bloccato da `connect-src`.
+
 ## Studio (fase 3, dati)
 - Unit: `apps/desktop/src/main/doc-protocol.test.ts` (intervalli, 416, rifiuti, CORS) e `ipc/study-handlers.test.ts` (lettore, note, annotazioni, flag).
 - E2E: `e2e/study-data.spec.ts` (dopo `npm run build`): `fetch` con `Range` di `rl-doc://` dal renderer, id estraneo rifiutato, note e annotazioni dopo il riavvio, ricerca per una parola presente solo nella nota, SHA-256 dei PDF invariato.

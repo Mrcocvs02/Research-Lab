@@ -214,7 +214,7 @@ export async function nativeThumb(s: ThumbServices, docId: string): Promise<{ ur
   try {
     img = await nativeOnce(async () => {
       // The shell takes a path: the path is re-checked right before the call (an open handle) and again after it,
-      // so a file swapped for a link meanwhile is discarded (D-197).
+      // so a file swapped for a link meanwhile is discarded (D-200).
       const guard = await openPdfHandle(pdf.abs, pdf.root);
       if (typeof guard === 'string') throw new Error('refused');
       let timer: ReturnType<typeof setTimeout> | undefined;

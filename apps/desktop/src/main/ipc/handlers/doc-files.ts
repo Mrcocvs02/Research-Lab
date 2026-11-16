@@ -42,7 +42,7 @@ export async function presentPdf(s: Pick<MainServices, 'runtime' | 'libraries'>,
 const HEAD_BYTES = 1024;
 
 /**
- * Narrows the check-then-use window of `resolveInRoot` (D-197): once the handle is open, the path must still resolve
+ * Narrows the check-then-use window of `resolveInRoot` (D-200): once the handle is open, the path must still resolve
  * to itself, inside the root, and to the very file that was opened (same device and inode). A swap of a folder or of
  * the file for a link between the check and the open is caught here. What remains is a swap after this check, which
  * needs write access to the library folder.

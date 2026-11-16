@@ -1,4 +1,7 @@
 import { _electron as electron, expect, test, type Page } from '@playwright/test';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { DESKTOP_DIR, type LaunchedApp } from './helpers/launch';
 import { skipUnlessChannels } from './helpers/phase1';
 import { openSyntheticLibrary, rowByTitle } from './helpers/ui';
@@ -10,6 +13,7 @@ import { openSyntheticLibrary, rowByTitle } from './helpers/ui';
  */
 const READER_CHANNELS = ['reader:open', 'notes:save', 'notes:get', 'notes:list', 'annotations:save', 'annotations:list'];
 const NOTE_WORD = 'quasarmarker';
+const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 
 /** Opens a document in the reader from its row: the row buttons show on hover, as for a user. */
 async function openInReader(window: Page, title: string): Promise<void> {
@@ -43,6 +47,10 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
     const file = ctx.library!.manifest!.files.find((f) => f.format === 'pdf' && f.title && f.hasText !== false);
     test.skip(!file, 'needs a PDF with text and a title');
     const title = file!.title!;
+    // The original is never written: its SHA-256 is taken now and compared at the end (acceptance criterion of phase 3).
+    const pdfPath = path.join(ctx.library!.root, file!.relPath);
+    const shaBefore = sha(await readFile(pdfPath));
+    expect(shaBefore).toBe(file!.sha256);
 
     // Open it in the reader from the list.
     await window.getByTestId('search-sort').selectOption('title');
@@ -60,6 +68,10 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
     // Select text and highlight it in green with a comment.
     await selectFirstText(window);
     await expect(window.getByTestId('annotation-bar')).toBeVisible({ timeout: 10_000 });
+    // A word of the highlighted text that is not in the title: a search for it can only be answered by the highlight.
+    const highlighted = (await window.getByTestId('ann-text').textContent()) ?? '';
+    const word = highlighted.split(/[^A-Za-z]+/).find((w) => w.length >= 6 && !title.toLowerCase().includes(w.toLowerCase()) && !NOTE_WORD.includes(w.toLowerCase()));
+    test.skip(!word, 'the first line of text has no word that is outside the title');
     await window.getByTestId('ann-color-green').check({ force: true });
     await window.getByTestId('ann-comment').fill('worth a second look');
     await window.getByTestId('ann-highlight').click();
@@ -105,11 +117,23 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
     await expect(label).toHaveAttribute('data-field', 'note');
     await expect(label).toHaveText('in your notes');
 
+    // A word that is only in the highlighted text finds the document, labelled as a highlight.
+    await window.getByTestId('search-input').fill(word!);
+    const found = rowByTitle(window, title).getByTestId('hit-field');
+    await expect(found).toBeVisible({ timeout: 60_000 });
+    await expect(found).toHaveAttribute('data-field', 'annotation');
+    await window.getByTestId('search-input').fill(NOTE_WORD);
+    await expect(window.getByTestId('hit-field').first()).toHaveAttribute('data-field', 'note', { timeout: 60_000 });
+
     // And the hit opens the reader on the list of the notes, one click away from the page note.
     await label.click();
     await expect(window.getByTestId('reader')).toBeVisible();
     await window.getByTestId('notes-list-item').first().click();
     await expect(window.getByTestId('note-page-input')).toHaveValue(`${NOTE_WORD} on the first page`);
+
+    // The PDF on disk is byte-identical after the whole flow (highlight, note, restart, search).
+    expect(sha(await readFile(pdfPath))).toBe(shaBefore);
+    await ctx.verifyLibraryUntouched();
   } finally {
     await second?.close().catch(() => {});
     await ctx?.close();

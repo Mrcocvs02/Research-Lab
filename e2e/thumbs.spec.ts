@@ -15,6 +15,22 @@ import { rows } from './helpers/ui';
 const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 const thumbs = (window: Page) => window.locator('[data-testid="doc-thumb"] img');
 
+/**
+ * Loads a URL through an `<img>` (the way the app uses `rl-thumb`: `img-src` allows the scheme, `connect-src` does not, so
+ * `fetch` could not tell anything) and gives its `naturalWidth`, 0 when it does not load.
+ */
+const imgWidth = (window: Page, url: string) =>
+  window.evaluate(
+    (u) =>
+      new Promise<number>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img.naturalWidth);
+        img.onerror = () => resolve(0);
+        img.src = u;
+      }),
+    url,
+  );
+
 /** `naturalWidth` of every thumbnail currently in the grid. */
 const widths = (window: Page) => thumbs(window).evaluateAll((els) => els.map((e) => ({ src: (e as HTMLImageElement).src, w: (e as HTMLImageElement).naturalWidth })));
 
@@ -56,6 +72,8 @@ test('PDFs show their first page in the grid, cached across a restart', async ()
     ctx2 = await launchApp({ offline: true, env: { RL_USER_DATA_DIR: ctx1.userDataDir, RL_LOCAL_DATA_DIR: ctx1.localDataDir } });
     const w2 = ctx2.window;
     await expect(rows(w2).first()).toBeVisible({ timeout: 60_000 });
+    // The images of the first session are served again from the cache, through an <img>, with no drawing.
+    for (const t of shown.slice(0, 3)) expect(await imgWidth(w2, t.src)).toBeGreaterThan(0);
     const again = await ipcData<{ items: Array<{ docId: string; url: string | null; drawable: boolean }> }>(w2, 'thumbs:list', { docIds: ids });
     expect(again.items.map((i) => [i.url !== null, i.drawable])).toEqual(ids.map(() => [true, false]));
     if ((await w2.getByTestId('view-grid').getAttribute('aria-pressed')) !== 'true') await w2.getByTestId('view-grid').click();
@@ -71,17 +89,30 @@ test('PDFs show their first page in the grid, cached across a restart', async ()
   }
 });
 
-test('rl-thumb serves only thumbnails: other names and other origins get nothing', async () => {
-  test.setTimeout(120_000);
+test('rl-thumb serves only thumbnails: other names and versions do not load as images', async () => {
+  test.setTimeout(180_000);
   const ctx = await launchApp({ library: 'papers', dialogPath: true, offline: true });
   try {
     const { window } = ctx;
     await createLibraryViaWizard(window, { name: 'Thumbs scheme' });
     await waitForScan(window, ctx.library!.manifest!.files.length);
-    const get = (url: string) => window.evaluate(async (u) => (await fetch(u).then((r) => r.status, () => -1)), url);
-    for (const u of ['rl-thumb://thumb/0000000000000000?v=00000000', 'rl-thumb://thumb/not-an-id?v=00000000', 'rl-thumb://thumb/../../x?v=00000000', 'rl-thumb://other/0000000000000000?v=00000000']) {
-      const status = await get(u);
-      expect([u, status === 404 || status === -1]).toEqual([u, true]);
+    await expect(window.getByTestId('scan-status')).toHaveAttribute('data-state', 'done', { timeout: 120_000 });
+    await window.getByTestId('view-grid').click();
+    await expect.poll(async () => (await widths(window)).filter((x) => x.w > 0).length, { timeout: 90_000, intervals: [250, 500, 1000] }).toBeGreaterThan(0);
+    const good = (await widths(window)).find((x) => x.w > 0)!.src;
+    const m = /^rl-thumb:\/\/thumb\/([0-9a-f]{16})\?v=([0-9a-f]{8})$/.exec(good);
+    expect(m).not.toBeNull();
+    // A real thumbnail decodes as an image (this is the positive control: the checks below fail for the right reason).
+    expect(await imgWidth(window, good)).toBeGreaterThan(0);
+    const id = m![1]!;
+    for (const u of [
+      `rl-thumb://thumb/${id}?v=ffffffff`, // right document, content that has no thumbnail
+      'rl-thumb://thumb/0000000000000000?v=00000000', // unknown document
+      'rl-thumb://thumb/not-an-id?v=00000000',
+      'rl-thumb://thumb/../../x?v=00000000',
+      `rl-thumb://other/${id}?v=${m![2]}`, // another host of the scheme
+    ]) {
+      expect([u, await imgWidth(window, u)]).toEqual([u, 0]);
     }
   } finally {
     await ctx.close();

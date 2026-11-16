@@ -3,7 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { NoticeBanner } from './components/NoticeBanner';
 import { ErrorNote } from './components/ui';
 import { errorMessage } from './lib/errors';
+import { LibraryEventsProvider } from './lib/events';
+import { HistoryProvider } from './lib/history';
+import { NotifyProvider } from './lib/notify';
 import { Settings } from './settings/Settings';
+import { ProjectsView } from './views/projects/ProjectsView';
 import { LibraryView } from './views/library/LibraryView';
 import { Shell, type SectionId } from './shell/Shell';
 import { AppProvider, useApp } from './state/app-context';
@@ -12,7 +16,13 @@ import { Wizard } from './wizard/Wizard';
 export function App() {
   return (
     <AppProvider>
-      <Root />
+      <LibraryEventsProvider>
+        <NotifyProvider>
+          <HistoryProvider>
+            <Root />
+          </HistoryProvider>
+        </NotifyProvider>
+      </LibraryEventsProvider>
     </AppProvider>
   );
 }
@@ -58,6 +68,8 @@ function Root() {
           <Settings onNewLibrary={() => setWizardOpen(true)} />
         ) : section === 'library' && app.activeProfile && !showWizard ? (
           <LibraryView key={app.activeProfile.id} />
+        ) : section === 'projects' && app.activeProfile && !showWizard ? (
+          <ProjectsView key={app.activeProfile.id} />
         ) : (
           <Placeholder section={section} />
         )}

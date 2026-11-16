@@ -1,6 +1,12 @@
 {
-  "app": { "title": "Research Lab", "tagline": "Organizza e studia la tua ricerca" },
-  "languages": { "it": "Italiano", "en": "English" },
+  "app": {
+    "title": "Research Lab",
+    "tagline": "Organizza e studia la tua ricerca"
+  },
+  "languages": {
+    "it": "Italiano",
+    "en": "English"
+  },
   "common": {
     "loading": "Caricamento…",
     "retry": "Riprova",
@@ -9,7 +15,8 @@
     "cancel": "Annulla",
     "remove": "Rimuovi",
     "no": "No",
-    "fixErrors": "Correggi i campi evidenziati per salvare."
+    "fixErrors": "Correggi i campi evidenziati per salvare.",
+    "close": "Chiudi"
   },
   "errors": {
     "INVALID_REQUEST": "Alcuni valori non sono validi. Controlla i campi e riprova.",
@@ -99,7 +106,12 @@
   },
   "folders": {
     "empty": "Nessuna sottocartella.",
-    "toggle": "Mostra o nascondi il contenuto di {{name}}"
+    "toggle": "Mostra o nascondi il contenuto di {{name}}",
+    "all": "Tutti i documenti",
+    "rootOnly": "Solo la radice della libreria",
+    "exact": "solo questa cartella",
+    "includeSub": "Includi sottocartelle",
+    "label": "Cartelle"
   },
   "profile": {
     "name": "Nome",
@@ -132,15 +144,40 @@
     "page": "pag. {{page}}",
     "pagesLabel": "Trovato nelle pagine",
     "foundIn": "Trovato in: {{where}}",
-    "where": { "title": "titolo", "summary": "riassunto", "note": "note", "annotation": "annotazioni", "text": "testo" },
+    "where": {
+      "title": "titolo",
+      "summary": "riassunto",
+      "note": "note",
+      "annotation": "annotazioni",
+      "text": "testo"
+    },
     "failed": "Non è stato possibile completare la ricerca.",
     "filters": "Filtri",
     "clearFilters": "Azzera i filtri",
     "removeFilter": "Rimuovi il filtro: {{name}}",
-    "facet": { "tags": "Tag", "authors": "Autori", "types": "Tipi", "venues": "Riviste", "studyStates": "Stato di studio", "years": "Anni", "folders": "Cartelle" },
-    "study": { "to-read": "Da leggere", "reading": "In lettura", "read": "Letto" },
+    "facet": {
+      "tags": "Tag",
+      "authors": "Autori",
+      "types": "Tipi",
+      "venues": "Riviste",
+      "studyStates": "Stato di studio",
+      "years": "Anni",
+      "folders": "Cartelle"
+    },
+    "study": {
+      "to-read": "Da leggere",
+      "reading": "In lettura",
+      "read": "Letto"
+    },
     "sort": "Ordina per",
-    "sorts": { "relevance": "Pertinenza", "title": "Titolo", "year-desc": "Anno, dal più recente", "year-asc": "Anno, dal più vecchio", "added-desc": "Aggiunti di recente", "author": "Autore" },
+    "sorts": {
+      "relevance": "Pertinenza",
+      "title": "Titolo",
+      "year-desc": "Anno, dal più recente",
+      "year-asc": "Anno, dal più vecchio",
+      "added-desc": "Aggiunti di recente",
+      "author": "Autore"
+    },
     "more": "Mostra altri",
     "unavailable": "La ricerca non è disponibile per questa libreria: {{message}}"
   },
@@ -250,8 +287,13 @@
   },
   "settings": {
     "needsLibrary": "Crea o attiva una libreria per usare questa sezione.",
-    "profile": { "title": "Tu e l'interfaccia" },
-    "language": { "label": "Lingua dell'interfaccia", "hint": "Si applica subito." },
+    "profile": {
+      "title": "Tu e l'interfaccia"
+    },
+    "language": {
+      "label": "Lingua dell'interfaccia",
+      "hint": "Si applica subito."
+    },
     "libraries": {
       "title": "Librerie",
       "empty": "Ancora nessuna libreria.",
@@ -309,12 +351,304 @@
       "title": "Chiavi API",
       "intro": "Chiavi per la libreria \"{{name}}\". Sono conservate cifrate nell'archivio sicuro del sistema. Una volta salvate non si possono rivedere, solo sostituire o cancellare.",
       "storage": "Le chiavi non vengono mai scritte nella cartella della libreria né in file sincronizzati.",
-      "names": { "anthropic-api-key": "Chiave API Anthropic", "gemini-api-key": "Chiave API Gemini" },
+      "names": {
+        "anthropic-api-key": "Chiave API Anthropic",
+        "gemini-api-key": "Chiave API Gemini"
+      },
       "set": "Impostata",
       "notSet": "Non impostata",
       "placeholder": "Incolla la chiave",
       "replacePlaceholder": "Incolla una nuova chiave per sostituirla",
       "delete": "Cancella"
     }
+  },
+  "notify": {
+    "dismiss": "Chiudi avviso",
+    "reload": "Ricarica"
+  },
+  "tree": {
+    "toggle": "Apri o chiudi"
+  },
+  "ai": {
+    "badge": "Generato dall'AI",
+    "areaLabel": "Contenuto generato dall'AI",
+    "readOnly": "Scritto dall'AI, in sola lettura. I tuoi campi restano separati.",
+    "none": "Nessun contenuto generato dall'AI per questo documento.",
+    "legacy": "Importato dal vecchio indice",
+    "fields": {
+      "summary": "Riassunto",
+      "description": "Descrizione",
+      "keywords": "Parole chiave",
+      "synonyms": "Sinonimi",
+      "suggestedTags": "Tag suggeriti (non applicati)",
+      "suggestedType": "Tipo suggerito",
+      "relations": "Documenti correlati"
+    },
+    "review": {
+      "proposed": "proposto",
+      "accepted": "accettato",
+      "rejected": "rifiutato",
+      "edited": "modificato"
+    }
+  },
+  "history": {
+    "title": "Cronologia",
+    "undo": "Annulla",
+    "redo": "Ripeti",
+    "undoHint": "Annulla l'ultima modifica (Ctrl+Z)",
+    "redoHint": "Ripeti (Ctrl+Y o Ctrl+Maiusc+Z)",
+    "undone": "Annullato: {{summary}}",
+    "redone": "Ripetuto: {{summary}}",
+    "nothingToUndo": "Non c'è nulla da annullare.",
+    "nothingToRedo": "Non c'è nulla da ripetere.",
+    "empty": "Ancora nessuna modifica.",
+    "undoThis": "Annulla questa",
+    "redoThis": "Ripeti questa",
+    "undoneBadge": "annullata",
+    "otherDevice": "altro dispositivo",
+    "kind": {
+      "change": "modifica",
+      "undo": "annulla",
+      "redo": "ripeti"
+    },
+    "actions": {
+      "tags_update": "Tag modificati su {{documents}} documenti",
+      "taxonomy_update": "Tassonomia modificata ({{tags}} elementi)",
+      "document_fields": "Dati del documento modificati",
+      "project_update": "Progetto modificato"
+    }
+  },
+  "docs": {
+    "view": "Vista",
+    "view_list": "Elenco",
+    "view_grid": "Griglia",
+    "navigation": "Esplora",
+    "tabs": {
+      "folders": "Cartelle",
+      "tags": "Tag",
+      "filters": "Filtri"
+    },
+    "listLabel": "Documenti",
+    "selected_one": "{{count}} selezionato",
+    "selected_other": "{{count}} selezionati",
+    "details": "Scheda",
+    "clearSelection": "Deseleziona",
+    "missing": "file mancante",
+    "moreTags": "+{{count}}",
+    "openFile": "Apri il file",
+    "reveal": "Mostra nella cartella",
+    "openRefused": "Questo tipo di file non si apre dall'app. Usa \"Mostra nella cartella\".",
+    "deleteHint": "Dalla tastiera non si cancella nulla. Usa il pannello per togliere i tag (ti verrà chiesta conferma)."
+  },
+  "filter": {
+    "tags": "Tag:",
+    "include": "Filtra per tag",
+    "includePlaceholder": "Filtra per tag…",
+    "exclude": "Escludi un tag",
+    "excludePlaceholder": "Escludi un tag…",
+    "mode": "Corrispondenza dei tag",
+    "mode_all": "Tutti",
+    "mode_any": "Almeno uno",
+    "not": "non {{name}}",
+    "yearFrom": "Dall'anno",
+    "yearTo": "All'anno"
+  },
+  "tags": {
+    "add": "Aggiungi un tag",
+    "addPlaceholder": "Aggiungi un tag…",
+    "create": "Crea il tag \"{{label}}\"",
+    "viaAlias": "(alias: {{alias}})",
+    "removeFrom": "Togli il tag {{name}}",
+    "changed_one": "Tag aggiornati su {{count}} documento.",
+    "changed_other": "Tag aggiornati su {{count}} documenti.",
+    "none": "Ancora nessun tag. Creali da un documento o dalla gestione della tassonomia.",
+    "treeLabel": "Tag",
+    "countHint": "Documenti con questo tag o un suo sotto-tag",
+    "excludeThis": "Escludi {{name}}",
+    "manage": "Gestisci la tassonomia…"
+  },
+  "bulk": {
+    "title_one": "{{count}} documento selezionato",
+    "title_other": "{{count}} documenti selezionati",
+    "editTags": "Modifica i tag",
+    "addTag": "Aggiungi un tag a tutti",
+    "currentTags": "Tag della selezione",
+    "noTags": "Nessun documento selezionato ha tag.",
+    "onCount": "su {{count}} di {{total}}",
+    "remove": "Togli…",
+    "removeConfirm_one": "Togli da {{count}} documento",
+    "removeConfirm_other": "Togli da {{count}} documenti"
+  },
+  "doc": {
+    "metadata": "Dati",
+    "metadataHint": "I tuoi valori prevalgono su quelli letti dal file.",
+    "extracted": "dal file",
+    "extractedHint": "Letto in automatico dal file e non verificato. Modificalo per renderlo tuo.",
+    "title": "Titolo",
+    "authors": "Autori",
+    "authorsHint": "Un autore per riga.",
+    "year": "Anno",
+    "type": "Tipo",
+    "noType": "(nessuno)",
+    "venue": "Rivista o sede",
+    "venueRef": "Volume, pagine",
+    "doi": "DOI",
+    "arxiv": "ID arXiv",
+    "study": "Studio",
+    "studyState": "Stato di studio",
+    "underlined": "Sottolineato",
+    "underlinedFromAnnotations": "Calcolato dalle tue evidenziazioni; se lo cambi diventa manuale.",
+    "description": "La mia descrizione",
+    "userDescription": "Descrizione breve",
+    "userDescriptionHint": "Con parole tue; si può cercare. L'AI non scrive mai qui.",
+    "tags": "Tag",
+    "noTags": "Nessun tag.",
+    "file": "File",
+    "path": "Percorso",
+    "size": "Dimensione",
+    "added": "Aggiunto"
+  },
+  "tax": {
+    "title": "Tassonomia",
+    "back": "Torna alla libreria",
+    "newTopLevelButton": "Nuovo tag di primo livello",
+    "newTopLevel": "Nome del nuovo tag di primo livello",
+    "newChildOf": "Nuovo tag sotto {{name}}",
+    "create": "Crea",
+    "search": "Cerca un tag",
+    "showDeprecated": "Mostra i tag deprecati",
+    "dragHint": "Trascina un tag su un altro per spostarlo; oppure usa \"Genitori\" nell'editor.",
+    "treeLabel": "Tassonomia",
+    "empty": "La tassonomia è vuota. Crea il primo tag.",
+    "noMatch": "Nessun tag corrisponde.",
+    "selectHint": "Seleziona un tag per modificarlo.",
+    "topLevel": "Primo livello",
+    "label": "Nome",
+    "color": "Colore",
+    "colorValue": "Colore {{color}}",
+    "customColor": "Colore personalizzato",
+    "removeColor": "Togli il colore",
+    "aliases": "Alias",
+    "aliasesHint": "Uno per riga. Scrivendo un alias si trova questo tag.",
+    "parents": "Genitori",
+    "addParent": "Aggiungi un genitore",
+    "addParentPlaceholder": "Aggiungi un genitore…",
+    "removeParent": "Togli il genitore {{name}}",
+    "makeTopLevel": "Porta al primo livello",
+    "implies": "Implica",
+    "addImplies": "Aggiungi un tag implicato",
+    "addImpliesPlaceholder": "Aggiungi un tag implicato…",
+    "removeImplies": "Non implicare più {{name}}",
+    "noImplies": "Nulla di implicato.",
+    "impliesHint": "Un documento con questo tag conta come se avesse anche i tag implicati.",
+    "addChild": "Aggiungi sotto-tag",
+    "deprecate": "Depreca",
+    "restore": "Ripristina",
+    "deprecated": "deprecato",
+    "candidate": "candidato",
+    "counts": "Documenti: {{direct}} diretti, {{implied}} con implicazioni, {{subtree}} con sotto-tag",
+    "merge": "Unisci a un altro tag",
+    "mergeInto": "Unisci in",
+    "mergeIntoPlaceholder": "Unisci in…",
+    "mergeConfirm_one": "Unire \"{{from}}\" in \"{{to}}\"? {{count}} documento riceverà \"{{to}}\"; \"{{from}}\" sparisce e diventa un alias.",
+    "mergeConfirm_other": "Unire \"{{from}}\" in \"{{to}}\"? {{count}} documenti riceveranno \"{{to}}\"; \"{{from}}\" sparisce e diventa un alias.",
+    "mergeDo": "Unisci",
+    "delete": "Elimina",
+    "deleteNode": "Elimina il tag",
+    "deleteBlocked": "Si può eliminare solo un tag che nessun documento usa e a cui nulla fa riferimento.",
+    "deleteConfirm": "Eliminare \"{{name}}\"? Puoi annullare dalla cronologia.",
+    "deleteDo": "Elimina",
+    "multiParent": "Ha più genitori",
+    "cycle": "Un tag non può stare sotto sé stesso né sotto uno dei suoi sotto-tag.",
+    "add": "Aggiungi",
+    "typesVenues": "Tipi di documento e riviste",
+    "types": "Tipi",
+    "venues": "Riviste",
+    "addType": "Nuovo tipo",
+    "addVenue": "Nuova rivista"
+  },
+  "projects": {
+    "addToProject": "Aggiungi al progetto…",
+    "addTitle_one": "Aggiungi {{count}} documento a un progetto",
+    "addTitle_other": "Aggiungi {{count}} documenti a un progetto",
+    "added_one": "{{count}} documento aggiunto a {{name}}.",
+    "added_other": "{{count}} documenti aggiunti a {{name}}.",
+    "noneYet": "Ancora nessun progetto. Creane uno qui sotto.",
+    "pick": "Seleziona",
+    "newFromSelection": "Oppure creane uno nuovo",
+    "name": "Nome",
+    "kindLabel": "Genere",
+    "kind": {
+      "project": "Progetto",
+      "collection": "Collezione"
+    },
+    "status": {
+      "active": "Attivo",
+      "paused": "In pausa",
+      "done": "Concluso",
+      "archived": "Archiviato"
+    },
+    "statusLabel": "Stato",
+    "createWith_one": "Crea con {{count}} documento",
+    "createWith_other": "Crea con {{count}} documenti",
+    "new": "Nuovo progetto o collezione",
+    "create": "Crea",
+    "createHint": "Un progetto raccoglie documenti di qualsiasi cartella, con note e un piano di lettura.",
+    "showArchived": "Mostra gli archiviati",
+    "none": "Ancora nessun progetto.",
+    "rename": "Rinomina",
+    "archive": "Archivia",
+    "restore": "Ripristina",
+    "back": "Tutti i progetti",
+    "description": "Descrizione",
+    "counts": "{{total}} documenti: {{toRead}} da leggere, {{reading}} in lettura, {{read}} letti",
+    "missingCount_one": "{{count}} mancante",
+    "missingCount_other": "{{count}} mancanti",
+    "sections": "Sezioni del progetto",
+    "tabs": {
+      "members": "Documenti",
+      "notes": "Note",
+      "plan": "Piano di lettura"
+    },
+    "noMembers": "Ancora nessun documento. Seleziona documenti nella libreria e scegli \"Aggiungi al progetto\".",
+    "membersHint": "I documenti possono venire da cartelle diverse. Cambia qui lo stato di studio.",
+    "pickOne": "Seleziona {{title}}",
+    "removeSelected_one": "Togli {{count}} dal progetto",
+    "removeSelected_other": "Togli {{count}} dal progetto",
+    "removeConfirm_one": "Togli {{count}} documento dal progetto",
+    "removeConfirm_other": "Togli {{count}} documenti dal progetto",
+    "removed_one": "{{count}} documento tolto dal progetto (il file non cambia).",
+    "removed_other": "{{count}} documenti tolti dal progetto (i file non cambiano).",
+    "unknownDoc": "documento sconosciuto"
+  },
+  "notes": {
+    "label": "Note (Markdown)",
+    "layout": "Disposizione",
+    "layout_split": "Affiancati",
+    "layout_edit": "Modifica",
+    "layout_preview": "Anteprima",
+    "preview": "Anteprima delle note",
+    "markdownHint": "Titoli con #, elenchi con -, **grassetto**, *corsivo*, `codice`. L'HTML non viene interpretato.",
+    "empty": "Niente da mostrare.",
+    "unsaved": "Modifiche non salvate",
+    "saved": "Salvato"
+  },
+  "plan": {
+    "hint": "Trascina una riga, premi Alt+Su o Alt+Giù su di essa, oppure usa le frecce per riordinare.",
+    "progress": "{{total}} voci: {{read}} lette, {{reading}} in lettura, {{toRead}} da leggere",
+    "empty": "Il piano è vuoto. Aggiungi sotto i documenti del progetto.",
+    "itemLabel": "{{position}}. {{title}}",
+    "status": "Stato di {{title}}",
+    "moveUp": "Sposta su {{title}}",
+    "moveDown": "Sposta giù {{title}}",
+    "remove": "Togli {{title}} dal piano",
+    "moved": "{{title}} è ora il numero {{position}} di {{total}}",
+    "addAll": "Aggiungi i {{count}} documenti non nel piano",
+    "addOne": "Aggiungi: {{title}}"
+  },
+  "study": {
+    "to-read": "Da leggere",
+    "reading": "In lettura",
+    "read": "Letto"
   }
 }

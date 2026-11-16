@@ -98,20 +98,12 @@ export async function readTextFileLimited(file: string, maxBytes: number = DEFAU
   }
 }
 
-/** Reads and validates a JSON file. NOT_FOUND if missing, SCHEMA_INVALID if unparsable or invalid. */
+/** Default cap of `readJsonFile`: 32 MiB (no JSON file of the app is larger; a synced folder is untrusted input). */
+export const DEFAULT_MAX_JSON_BYTES = 32 * 1024 * 1024;
+
+/** Reads and validates a JSON file. NOT_FOUND if missing, SCHEMA_INVALID if unparsable or invalid, INVALID_REQUEST over `maxBytes` (default 32 MiB). */
 export async function readJsonFile<S extends z.ZodType>(file: string, schema: S, options: { maxBytes?: number } = {}): Promise<z.output<S>> {
-  let raw: string;
-  if (options.maxBytes !== undefined) {
-    raw = await readTextFileLimited(file, options.maxBytes);
-  } else {
-    try {
-      raw = await readFile(file, 'utf8');
-    } catch (e) {
-      const code = (e as NodeJS.ErrnoException).code;
-      if (code === 'ENOENT') throw new AppError('NOT_FOUND', 'File not found');
-      throw new AppError('IO_ERROR', 'Cannot read file', { code: code ?? 'unknown' }, { cause: e });
-    }
-  }
+  const raw = await readTextFileLimited(file, options.maxBytes ?? DEFAULT_MAX_JSON_BYTES);
   let json: unknown;
   try {
     json = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw);

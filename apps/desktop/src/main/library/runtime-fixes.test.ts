@@ -35,7 +35,8 @@ interface Rig {
   extractCalls: string[];
   scanArgs: Array<{ paths?: string[] }>;
   behaviour: Map<string, Behaviour>;
-  watch: { push(batch: { paths: string[]; overflow: boolean }): void };
+  projectEvents: string[][];
+  watch: { push(batch: { paths: string[]; overflow: boolean }): void; taxonomyChanged(): void };
 }
 
 async function open(wrap: (svc: LibraryWorker, rig: Pick<Rig, 'store' | 'extractCalls'>) => LibraryWorker = (s) => s): Promise<Rig> {
@@ -67,7 +68,9 @@ async function open(wrap: (svc: LibraryWorker, rig: Pick<Rig, 'store' | 'extract
   const index = createSearchIndex();
   const statuses: ScanStatus[] = [];
   const scanArgs: Rig['scanArgs'] = [];
+  const projectEvents: string[][] = [];
   let onBatch: ((b: { paths: string[]; overflow: boolean }) => void) | null = null;
+  let onTax: (() => void) | undefined;
   const svc = createWorkerService(deps);
   const worker = wrap(
     {
@@ -92,12 +95,14 @@ async function open(wrap: (svc: LibraryWorker, rig: Pick<Rig, 'store' | 'extract
     onStatus: (s) => statuses.push(s),
     backup: async () => {},
     progressIntervalMs: 0,
+    onProjectsChanged: (ids) => projectEvents.push(ids),
     watch: (o) => {
       onBatch = o.onBatch;
+      onTax = o.onTaxonomyChange;
       return { close() {} };
     },
   });
-  return { rt, store, index, statuses, extractCalls, scanArgs, behaviour, watch: { push: (b) => onBatch?.(b) } };
+  return { rt, store, index, statuses, extractCalls, scanArgs, behaviour, projectEvents, watch: { push: (b) => onBatch?.(b), taxonomyChanged: () => onTax?.() } };
 }
 
 const abortError = () => Object.assign(new Error('aborted'), { name: 'AbortError' });
@@ -347,9 +352,83 @@ describe('one bad document does not fail the scan (defect 6)', () => {
       expect(second.summary?.failed).toBe(1);
       const state = await rig.index.indexedState();
       expect(state.has(goneId)).toBe(false); // vanished phase ran
-      expect(state.get(good.id)?.stamp).toBe(`${edited.revision}:${edited.updatedAt}`); // stale phase ran
+      expect(state.get(good.id)?.stamp.startsWith(`${edited.revision}:${edited.updatedAt}|`)).toBe(true); // stale phase ran
     } finally {
       await rig.rt.close();
     }
+  });
+});
+
+describe('taxonomy changed from another device (defect 5)', () => {
+  const node = (id: string, label: string) => ({ id, label, parents: [], aliases: [], implies: [], status: 'active', origin: 'user' });
+
+  /** What another device does: rewrites taxonomy.json (a new revision) without touching any record. */
+  async function otherDevice(rig: Rig, label: string) {
+    const tax = await rig.store.readTaxonomy();
+    const file = path.join(root, '.lab', 'taxonomy.json');
+    await writeFile(file, JSON.stringify({ ...tax, revision: tax.revision + 1, nodes: tax.nodes.map((n) => (n.id === 'topic' ? { ...n, label } : n)) }));
+  }
+
+  async function setup() {
+    await put('a.md', 'Plain text about glaciers.\n');
+    const rig = await open();
+    await rig.store.writeTaxonomy({ schemaVersion: 1, revision: 0, nodes: [node('topic', 'Zebrafish')] } as never);
+    await rig.rt.startScan();
+    await rig.rt.whenIdle();
+    const [rec] = await rig.store.documents.list();
+    await rig.store.documents.update(rec!.id, (c) => ({ ...(c as NonNullable<typeof c>), tags: ['topic'], updatedAt: '2026-01-01T00:00:00.000Z' }));
+    await rig.rt.startScan();
+    await rig.rt.whenIdle();
+    return rig;
+  }
+
+  it('the next scan re-indexes the documents that carry the changed tag', async () => {
+    const rig = await setup();
+    expect((await rig.rt.search({ text: 'zebrafish' })).hits).toHaveLength(1);
+    await otherDevice(rig, 'Narwhal');
+    rig.rt.startScan();
+    await rig.rt.whenIdle();
+    expect((await rig.rt.search({ text: 'zebrafish' })).hits).toHaveLength(0);
+    expect((await rig.rt.search({ text: 'narwhal' })).hits).toHaveLength(1);
+    await rig.rt.close();
+  });
+
+  it('the watcher noticing taxonomy.json starts a scan of no file; an unchanged file does not', async () => {
+    const rig = await setup();
+    const before = rig.scanArgs.length;
+    rig.watch.taxonomyChanged();
+    await new Promise((r) => setTimeout(r, 20));
+    await rig.rt.whenIdle();
+    expect(rig.scanArgs.length).toBe(before); // the index was filled from this very file
+    await otherDevice(rig, 'Narwhal');
+    rig.watch.taxonomyChanged();
+    await new Promise((r) => setTimeout(r, 20));
+    await rig.rt.whenIdle();
+    expect(rig.scanArgs.at(-1)).toEqual({ paths: [] });
+    expect((await rig.rt.search({ text: 'narwhal' })).hits).toHaveLength(1);
+    await rig.rt.close();
+  });
+});
+
+describe('scans announce the projects of the documents they touched (defect 11)', () => {
+  it('a changed file tells the project that contains it, an untouched one does not', async () => {
+    await put('a.md', 'First text.\n');
+    await put('b.md', 'Other text.\n');
+    const rig = await open();
+    await rig.rt.startScan();
+    await rig.rt.whenIdle();
+    const docs = await rig.store.documents.list();
+    const a = docs.find((d) => d.path === 'a.md')!;
+    const created = await rig.rt.organizer.createProject({ name: 'P', docIds: [a.id] });
+    rig.projectEvents.length = 0;
+    await put('b.md', 'Other text, edited.\n');
+    await rig.rt.startScan();
+    await rig.rt.whenIdle();
+    expect(rig.projectEvents).toEqual([]);
+    await put('a.md', 'First text, edited.\n');
+    await rig.rt.startScan();
+    await rig.rt.whenIdle();
+    expect(rig.projectEvents).toEqual([[created.detail.project.id]]);
+    await rig.rt.close();
   });
 });

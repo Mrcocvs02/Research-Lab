@@ -56,7 +56,8 @@ export function detailOf(p: Project, info: ReadonlyMap<string, DocInfo>, changeI
         return {
           docId: i.docId,
           order: i.order,
-          ...(i.status ? { status: i.status } : {}),
+          // The reading state is the document's own (single source); a `status` stored by an older version is ignored.
+          ...(d ? { status: d.studyState } : {}),
           ...(i.due ? { due: i.due } : {}),
           ...(i.note !== undefined ? { note: i.note } : {}),
           studyState: d?.studyState ?? null,
@@ -123,6 +124,13 @@ export class ProjectService {
       .filter((p) => (q.kind === undefined || (p.kind ?? 'project') === q.kind) && (q.status === undefined ? q.includeArchived === true || p.status !== 'archived' : p.status === q.status))
       .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : a.name.localeCompare(b.name)))
       .map((p) => summaryOf(p, info));
+  }
+
+  /** Ids of the projects (archived included) that have one of `docIds` as a member. */
+  async containing(docIds: readonly string[]): Promise<string[]> {
+    if (docIds.length === 0) return [];
+    const wanted = new Set(docIds);
+    return (await this.c.store.projects.list()).filter((p) => p.members.some((m) => wanted.has(m.docId))).map((p) => p.id);
   }
 
   async get(id: string): Promise<ProjectDetail> {
@@ -228,7 +236,8 @@ export class ProjectService {
           if (seen.has(i.docId)) throw new AppError('INVALID_REQUEST', 'A document appears twice in the reading plan', { docId: i.docId });
           seen.add(i.docId);
         }
-        const plan = items.map((i, n) => ({ n, i })).sort((a, b) => a.i.order - b.i.order || a.n - b.n).map(({ i }) => i);
+        // `status` per item is deprecated: accepted, never stored (the state of a document is `study.state`).
+        const plan = items.map(({ status: _deprecated, ...i }, n) => ({ n, i })).sort((a, b) => a.i.order - b.i.order || a.n - b.n).map(({ i }) => i);
         return JSON.stringify(plan) === JSON.stringify(cur.readingPlan) ? null : { ...cur, readingPlan: plan };
       },
       expectedRevision,

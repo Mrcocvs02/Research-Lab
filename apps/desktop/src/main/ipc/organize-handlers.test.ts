@@ -38,6 +38,7 @@ async function harness() {
   const rt = {
     libraryId: 'lib-1',
     organizer,
+    scanExtensions: async () => ['pdf', 'md', 'txt', 'exe', 'bat', 'docm'],
     reindexDocuments: async (ids: string[]) => {
       reindexed.push([...ids]);
       await refresh(ids);
@@ -269,3 +270,31 @@ async function realRoot(): Promise<string> {
   const { realpath } = await import('node:fs/promises');
   return realpath(root);
 }
+
+describe('history:list state and project events', () => {
+  it('canUndo / canRedo follow the rule of undo and redo without an id', async () => {
+    await store.writeTaxonomy(taxonomyFileSchema.parse({ nodes: [node('a'), node('b')] }));
+    await store.documents.put(doc(1));
+    const { call } = await harness();
+    expect(ok(await call('history:list', {}))).toMatchObject({ canUndo: false, canRedo: false });
+    const t = ok(await call('documents:tag', { docIds: [hex(1)], add: ['a'] }));
+    expect(ok(await call('history:list', {}))).toMatchObject({ canUndo: true, canRedo: false });
+    ok(await call('history:undo', { changeId: t.changeId }));
+    expect(ok(await call('history:list', {}))).toMatchObject({ canUndo: false, canRedo: true });
+    ok(await call('documents:tag', { docIds: [hex(1)], add: ['b'] }));
+    expect(ok(await call('history:list', {}))).toMatchObject({ canUndo: true, canRedo: false });
+  });
+
+  it('a document edit announces the projects that contain it', async () => {
+    await store.documents.put(doc(1));
+    await store.documents.put(doc(2));
+    const { call } = await harness();
+    const p = ok(await call('projects:create', { name: 'P', docIds: [hex(1)] }));
+    events.length = 0;
+    ok(await call('documents:update', { docId: hex(1), patch: { title: 'New' } }));
+    expect(events).toContainEqual(['library:changed', { kind: 'projects', ids: [p.project.id] }]);
+    events.length = 0;
+    ok(await call('documents:update', { docId: hex(2), patch: { title: 'Other' } }));
+    expect(events.some(([, e]) => (e as { kind: string }).kind === 'projects')).toBe(false);
+  });
+});

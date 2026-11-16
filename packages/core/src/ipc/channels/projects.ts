@@ -44,6 +44,7 @@ export const projectMemberViewSchema = z.object({
 export const readingPlanItemViewSchema = z.object({
   docId: documentIdSchema,
   order: z.number().int().nonnegative(),
+  /** The document's own study state (same as `studyState`; kept for older callers). Change it with `documents:update`. */
   status: studyStateSchema.optional(),
   due: isoDateSchema.optional(),
   note: z.string().optional(),
@@ -109,11 +110,11 @@ export const projectsChannels = defineChannels('projects', {
   restore: { request: z.object({ id: itemIdSchema }), response: projectDetailSchema },
   addMembers: { request: projectId.extend({ docIds, note: z.string().max(PROJECT_LIMITS.note).optional() }), response: projectDetailSchema },
   removeMembers: { request: projectId.extend({ docIds }), response: projectDetailSchema },
-  /** Replaces the reading plan; every item must be a member. Items are kept sorted by `order` (stable). */
+  /** Replaces the reading plan; every item must be a member. A per-item `status` is deprecated and not saved.  Items are kept sorted by `order` (stable). */
   setReadingPlan: {
     request: projectId.extend({
       items: z
-        .array(z.object({ docId: documentIdSchema, order: z.number().int().min(0).max(1_000_000), status: studyStateSchema.optional(), due: isoDateSchema.optional(), note: z.string().max(PROJECT_LIMITS.note).optional() }))
+        .array(z.object({ docId: documentIdSchema, order: z.number().int().min(0).max(1_000_000), /** @deprecated accepted and ignored: the reading state is the document's (`documents:update`). */ status: studyStateSchema.optional(), due: isoDateSchema.optional(), note: z.string().max(PROJECT_LIMITS.note).optional() }))
         .max(PROJECT_LIMITS.members),
       expectedRevision: z.number().int().nonnegative().optional(),
     }),

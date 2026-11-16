@@ -22,6 +22,8 @@ export const searchFiltersSchema = z.object({
   types: z.array(value).max(SEARCH_LIMITS.filterValues).optional(),
   venues: z.array(value).max(SEARCH_LIMITS.filterValues).optional(),
   studyStates: z.array(studyStateSchema).max(3).optional(),
+  /** Include documents whose file is missing (default false). */
+  includeMissing: z.boolean().optional(),
   folders: z.array(relativePathSchema).max(SEARCH_LIMITS.filterValues).optional(),
   folder: relativePathSchema.optional(),
   includeSubfolders: z.boolean().optional(),
@@ -48,6 +50,8 @@ export const searchHitSchema = z.object({
   size: z.number().int().nonnegative(),
   /** Tag ids of the document, implied ones included. */
   tags: z.array(z.string()),
+  /** Only the tags set on the document itself (no implied ones): the ones the user can remove. */
+  directTags: z.array(z.string()).optional(),
   score: z.number(),
   field: z.enum(['title', 'summary', 'note', 'annotation', 'text']),
   /** Match markers are U+0001 (open) and U+0002 (close); render the text between them as emphasis, never as HTML. */

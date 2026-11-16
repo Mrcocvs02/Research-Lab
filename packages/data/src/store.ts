@@ -1,4 +1,5 @@
-import { appendFile, mkdir, open, readdir, readFile, unlink } from 'node:fs/promises';
+import { StringDecoder } from 'node:string_decoder';
+import { appendFile, mkdir, open, readdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type { z } from 'zod';
 import {
@@ -38,7 +39,7 @@ import {
   type TaxonomyFile,
   type WatchFile,
 } from '@rl/core';
-import { atomicWriteFile, atomicWriteJson, readJsonFile, resolveInRoot, type AtomicWriteOptions } from '@rl/core/node';
+import { atomicWriteFile, atomicWriteJson, readJsonFile, readTextFileLimited, resolveInRoot, type AtomicWriteOptions } from '@rl/core/node';
 import { copyDataDir } from './backup.js';
 import { withRetry, type RetryOptions } from './retry.js';
 import { diffTaxonomy } from './taxonomy-diff.js';
@@ -58,6 +59,13 @@ export interface LibraryStoreOptions {
   atomic?: AtomicWriteOptions;
   retry?: RetryOptions;
 }
+
+/** No data file the app parses whole (a record, the taxonomy, a note) may be larger than this: 32 MiB. */
+export const MAX_DATA_FILE_BYTES = 32 * 1024 * 1024;
+/** A change-log file is read from its end up to this many bytes; older lines are left unread (reported as an issue). */
+export const MAX_LOG_READ_BYTES = 32 * 1024 * 1024;
+/** One log line longer than this is skipped. */
+export const MAX_LOG_LINE_BYTES = 1024 * 1024;
 
 /** A data file that could not be read; the rest of the library still loads. */
 export interface LoadIssue {
@@ -269,9 +277,11 @@ class FileStore implements FileLibraryStore {
   private async readOptional<S extends z.ZodType>(rel: string, schema: S): Promise<z.output<S> | null> {
     try {
       const file = await this.abs(rel);
-      return await withRetry(() => readJsonFile(file, schema), this.retry);
+      return await withRetry(() => readJsonFile(file, schema, { maxBytes: MAX_DATA_FILE_BYTES }), this.retry);
     } catch (e) {
       if (e instanceof AppError && e.code === 'NOT_FOUND') return null;
+      // Too large to be one of ours: treated like a corrupt file (skipped and reported by `issues()` in listings).
+      if (e instanceof AppError && e.code === 'INVALID_REQUEST' && e.details?.['maxBytes'] !== undefined) throw new AppError('SCHEMA_INVALID', 'File is too large', { maxBytes: MAX_DATA_FILE_BYTES });
       throw e;
     }
   }
@@ -535,7 +545,7 @@ class FileStore implements FileLibraryStore {
       let raw: string;
       try {
         const file = await this.abs(rel);
-        raw = await withRetry(() => readFile(file, 'utf8'), this.retry);
+        raw = await withRetry(() => readTextFileLimited(file, MAX_DATA_FILE_BYTES), this.retry);
       } catch (e) {
         const code = (e as NodeJS.ErrnoException).code;
         if ((e instanceof AppError && e.code === 'NOT_FOUND') || code === 'ENOENT') return null;
@@ -654,25 +664,31 @@ class FileStore implements FileLibraryStore {
     const entries: LogEntry[] = [];
     for (const name of await this.listNames('log')) {
       if (!/^(changes|ai-sends)-\d{4}-\d{2}\..+\.jsonl$/.test(name)) continue;
-      let raw: string;
+      let invalid = 0;
+      let truncated = false;
       try {
         const file = await this.abs(`log/${name}`);
-        raw = await withRetry(() => readFile(file, 'utf8'), this.retry);
+        const res = await withRetry(
+          () =>
+            readLogLines(file, (line) => {
+              if (!line.trim()) return;
+              try {
+                const parsed = logEntrySchema.safeParse(JSON.parse(line));
+                if (parsed.success) entries.push(parsed.data);
+                else invalid++;
+              } catch {
+                invalid++; // a torn line must not hide the rest
+              }
+            }),
+          this.retry,
+        );
+        invalid += res.skipped;
+        truncated = res.truncated;
       } catch (e) {
         this.noteIssue(`log/${name}`, e);
         continue;
       }
-      let invalid = 0;
-      for (const line of raw.split('\n')) {
-        if (!line.trim()) continue;
-        try {
-          const parsed = logEntrySchema.safeParse(JSON.parse(line));
-          if (parsed.success) entries.push(parsed.data);
-          else invalid++;
-        } catch {
-          invalid++; // a torn line must not hide the rest
-        }
-      }
+      if (truncated) this.loadIssues.push({ file: `log/${name}`, code: 'LOG_TRUNCATED', message: 'only the newest part of a very large log was read' });
       if (invalid > 0) {
         this.loadIssues.push({
           file: `log/${name}`,
@@ -691,8 +707,73 @@ class FileStore implements FileLibraryStore {
     return result;
   }
 
+  /** Fingerprint of the change-log files: when it is the same, `readLog` would return the same entries. */
+  async logSignature(): Promise<string> {
+    const parts: string[] = [];
+    for (const name of (await this.listNames('log')).sort()) {
+      if (!/^(changes|ai-sends)-\d{4}-\d{2}\..+\.jsonl$/.test(name)) continue;
+      try {
+        const st = await stat(await this.abs(`log/${name}`));
+        parts.push(`${name}:${st.size}:${Math.round(st.mtimeMs)}`);
+      } catch {
+        parts.push(`${name}:?`);
+      }
+    }
+    return parts.join('|');
+  }
+
   async backup(backupDir: string): Promise<{ files: number }> {
     return copyDataDir(this.dataDir, backupDir);
+  }
+}
+
+/**
+ * Reads a log file line by line without holding it whole: at most `MAX_LOG_READ_BYTES` from its end (a partial first
+ * line is dropped), and a line over `MAX_LOG_LINE_BYTES` is skipped. Returns how many lines were skipped.
+ */
+async function readLogLines(file: string, onLine: (line: string) => void): Promise<{ skipped: number; truncated: boolean }> {
+  const handle = await open(file, 'r');
+  try {
+    const size = (await handle.stat()).size;
+    const start = Math.max(0, size - MAX_LOG_READ_BYTES);
+    const truncated = start > 0;
+    const decoder = new StringDecoder('utf8');
+    const buf = Buffer.allocUnsafe(256 * 1024);
+    let pos = start;
+    let carry = '';
+    let skipping = truncated; // the first line of a tail read is cut in the middle
+    let skipped = 0;
+    const feed = (text: string) => {
+      let from = 0;
+      for (;;) {
+        const nl = text.indexOf('\n', from);
+        if (nl === -1) break;
+        const piece = text.slice(from, nl);
+        if (skipping) skipping = false;
+        else if (carry.length + piece.length > MAX_LOG_LINE_BYTES) skipped++;
+        else onLine(carry + piece);
+        carry = '';
+        from = nl + 1;
+      }
+      const rest = text.slice(from);
+      if (!skipping && carry.length + rest.length > MAX_LOG_LINE_BYTES) {
+        // An endless line: drop what is buffered and everything up to the next line break.
+        skipped++;
+        carry = '';
+        skipping = true;
+      } else if (!skipping) carry += rest;
+    };
+    for (;;) {
+      const { bytesRead } = await handle.read(buf, 0, buf.length, pos);
+      if (bytesRead === 0) break;
+      pos += bytesRead;
+      feed(decoder.write(buf.subarray(0, bytesRead)));
+    }
+    feed(decoder.end());
+    if (!skipping && carry.trim()) onLine(carry);
+    return { skipped, truncated };
+  } finally {
+    await handle.close().catch(() => {});
   }
 }
 

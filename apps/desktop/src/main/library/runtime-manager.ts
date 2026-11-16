@@ -14,6 +14,8 @@ export interface ManagerDeps {
   emit(status: ScanStatus): void;
   /** Tells the renderer the documents changed (`library:changed`, kind documents): a scan ended. */
   emitDocumentsChanged?(): void;
+  /** Projects whose members changed in a scan (`library:changed`, kind projects). */
+  emitProjectsChanged?(ids: string[]): void;
   backupDataDir(libraryId: string, dataDir: string): Promise<unknown>;
   createStore(options: { rootPath: string; dataDir: string; deviceId: string }): LibraryStore;
   createIndex(): SearchIndex;
@@ -125,6 +127,7 @@ export class RuntimeManager {
         log: this.d.log,
         onStatus: (s) => this.d.emit(s),
         onDocumentsChanged: () => this.d.emitDocumentsChanged?.(),
+        onProjectsChanged: (ids) => this.d.emitProjectsChanged?.(ids),
         backup: async () => {
           const r = await this.d.backupDataDir(libraryId, dataDir);
           if (r) this.d.log.info('data folder backed up before the first scan write');

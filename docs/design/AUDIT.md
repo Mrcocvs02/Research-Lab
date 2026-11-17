@@ -1,161 +1,209 @@
 # Audit di design di Research Lab (stato attuale, main c1b9ac2)
 
-Autore: agente "designer avversario". Data: 2026-11-17. Stato del documento: **parziale** (vedi "DA COMPLETARE" in fondo).
+Autore: agente "designer avversario". Data: 2026-11-17. Stato del documento: **completo**. Quello che non si è potuto provare è elencato in "Limiti di questo audit", con il motivo.
 
-Metodo: `e2e/design-audit.spec.ts` (saltato senza `RL_DESIGN_AUDIT=1`) avvia l'app compilata su librerie sintetiche (`it`, `en`) con il fornitore AI simulato e la rete tagliata, attraversa la procedura guidata e tutte le viste raggiungibili, salva uno screenshot per schermata in `audit-shots/` (ignorata da git, mai committata) e misura per schermata: clic dalla Libreria, controlli visibili, errori di console, elementi tagliati o fuori finestra, contrasto WCAG del testo, ordine del Tab. Prima esecuzione completa (138 schermate, italiano) in `audit-shots/run1/` con `run1/metrics-it.json`; la seconda esecuzione è stata interrotta di proposito (16 schermate in `audit-shots/`).
+Metodo: `e2e/design-audit.spec.ts` (saltato senza `RL_DESIGN_AUDIT=1`; cartella di uscita con `RL_DESIGN_AUDIT_OUT`) avvia l'app compilata su librerie sintetiche (`it`, `en`) con il fornitore AI simulato e la rete tagliata, attraversa la procedura guidata e tutte le viste raggiungibili, salva uno screenshot per schermata in `audit-shots/<esecuzione>/` (ignorata da git, mai committata) e misura per schermata: clic dalla Libreria, controlli visibili, errori di console, elementi tagliati o fuori finestra, contrasto WCAG del testo, ordine del Tab. In più misura la geometria del lettore, la posizione delle evidenziazioni rispetto ai glifi disegnati, le regole di `pdf_viewer.css` che colpiscono elementi dell'app e lo stile calcolato di barra laterale e dialoghi prima e dopo il lettore.
 
-Macchina di misura: finestra fuori schermo, `devicePixelRatio` = 1,198 (scala di Windows frazionaria). Tutte le misure sotto sono in pixel CSS salvo dove indicato.
+Esecuzioni (cartelle di `audit-shots/`):
+- `run1/` — italiano, 141 schermate, `run1/metrics-it.json` (passi della scheda del documento falliti per un errore dello script).
+- `run2-partial/` — seconda esecuzione interrotta di proposito (16 schermate, `run2.log`).
+- `run3-aborted/` — fermata: un dialogo rimasto aperto bloccava i passi successivi (lo script ora lo chiude; il dialogo restava aperto per un difetto dell'app, N7).
+- `run3/` — **italiano completo, 183 schermate** (`it-001…it-181` più due ritagli), `run3/metrics-it.json`: scheda del documento, simili, citazioni, export completo, MCP acceso, registratore delle scorciatoie, backup verso una cartella valida e ripristino completo, evidenziazione a 1920×1080, contaminazione CSS, matrice tema × dimensioni.
+- `run4-en/` — **inglese completo, 161 schermate**, `run4-en/metrics-en.json` (il lettore non è stato raggiunto per un passo della tassonomia fallito, vedi Limiti).
+- `run5-en-reader/` — inglese, giro base con il lettore (63 schermate, `metrics-en.json`).
+
+Correzioni allo script rispetto alla prima esecuzione (solo `e2e/design-audit.spec.ts`): la scheda si apre con il pulsante "Scheda" (il secondo clic sulla riga non la apre: misurato, N2); "Simili" e "Citazioni" si raggiungono scorrendo la scheda; l'export aspetta la conferma in linea; il server MCP si accende con un clic e si aspetta lo stato (la casella è controllata dal processo principale: `check()` di Playwright falliva per questo); il ripristino non apre mai la finestra nativa dei file (nessun aggancio di test) ma parte dall'elenco dei backup, e le cartelle si scelgono con le variabili di test del processo principale; un passo fallito chiude anche un dialogo rimasto aperto. Build: `apps/desktop/out` compilato dallo stesso sorgente (nessuna modifica all'app dopo l'ultima build), quindi non ricompilato per risparmiare memoria.
+
+Macchina di misura: finestra fuori schermo, `devicePixelRatio` = 1,198 (scala di Windows frazionaria). Misure in pixel CSS salvo dove indicato. Gravità: **bloccante** (impedisce un compito o danneggia dati), **importante** (rallenta o confonde in un compito frequente), **minore** (rifinitura).
 
 ---
 
 ## Sintesi: i 15 problemi più gravi (per impatto)
 
-1. **critico — Il PDF nel lettore è deformato e le evidenziazioni finiscono fuori posto.** La regola globale `.page { max-width: 860px; padding: … }` dell'app (`apps/desktop/src/renderer/src/styles.css:451-454`) colpisce anche i `div.page` di pdf.js. Quando la pagina adattata alla larghezza supera 860 px il riquadro viene schiacciato in larghezza mentre l'altezza resta: a 1920×1080 la pagina è 860×1815 invece di 1285×1815 (rapporto 0,474 contro 0,707 del PDF: scala orizzontale 0,67). Lo strato di testo resta largo 1285 px, quindi selezione ed evidenziazioni non coincidono con i glifi e compare una barra di scorrimento orizzontale. Dettagli nella sezione Lettore. Evidenza: `run1/it-046-reader-open-fit-light-1920x1080.png`.
-2. **critico — Il CSS di pdf.js (`pdf_viewer.css`, importato globalmente da `views/reader/engine.ts:2`) contamina tutta l'app dopo la prima apertura del lettore.** Le sue regole `.sidebar` (bordo arrotondato, ombra, `width: 239px`, padding) e `.dialog` hanno lo stesso nome delle classi dell'app: dopo aver aperto un PDF la barra laterale diventa una "carta" fluttuante con ombra in tutte le viste, fino al riavvio. Evidenza: confronta `run1/it-010-library-home-light-1280x800.png` (prima) con `run1/it-049-projects-empty-light-1280x800.png` (dopo).
-3. **critico — Sottolineare ed evidenziare: flusso "prima seleziono, poi scelgo" e nessuno strumento.** Non c'è una modalità strumento (sposta / evidenziatore / sottolineatura / colore) né la scorciatoia Spazio per alternare l'ultimo pennello: si trascina una selezione, compare una barra in basso (`run1/it-036-reader-selection-bar-light-1280x800.png`) con due pulsanti primari identici "Evidenzia"/"Sottolinea", 5 pallini di colore e un campo commento. Ogni annotazione costa 3 azioni e lo sguardo deve andare in fondo alla finestra. Dopo il salvataggio la vista non resta sul punto annotato (in `run1/it-037-…` la pagina mostrata è la 2, l'evidenziazione era a pagina 1).
-4. **alto — Le impostazioni sono un'unica pagina di 7981 px (10,6 schermate a 1280×800), 10 sezioni, 119 controlli, senza indice né ricerca.** Ordine casuale per l'utente (profilo, librerie, libreria attiva, fonti online, AI, MCP, chiavi API, backup, scorciatoie, manutenzione); impostazioni da sviluppatore (id dei modelli, porta MCP, token, prezzi) mescolate con quelle di tutti. Lingua dell'interfaccia presente due volte (barra laterale e impostazioni). Evidenza: `run1/it-068…`, fatto `pre-settings-length` in `run1/metrics-it.json`.
-5. **alto — Cambiare account Claude non si può dall'app.** La sezione "Claude (AI)" mostra solo "Fornitore / Accesso / Disponibile" in un elenco non stilizzato (rientri del browser) e un testo che rimanda alla riga di comando di Claude Code; non esiste un pulsante "Esci", "Cambia account" o "Accedi", né l'indicazione di quale account è in uso. La chiave API è un'alternativa nascosta più in basso. Evidenza: `run1/it-073-pre-settings-05-Claude_AI_-light-1280x800.png`, `run1/it-094-settings-ai-account-area-light-1280x800.png`.
-6. **alto — Il badge "Arrivi" non dice cosa conta.** Un PDF scaricato direttamente nella cartella della libreria compare subito nella Libreria **e** accende "Arrivi 1": l'utente vede lo stesso documento in due posti senza sapere che deve "confermarlo". Il badge non ha tooltip (`title` assente; solo `aria-label` "1 file nella posta in arrivo"), il nome della sezione è "Arrivi", la scheda interna "Arrivi", la tablist "Posta in arrivo", e le "Proposte dell'AI" stanno nella stessa sezione ma non sono contate dal badge. Evidenza: `run1/it-064-inbox-badge-hover-light-1280x800.png`, `run1/it-065-inbox-flagged-library-file-light-1280x800.png`.
-7. **alto — Scansionare una libreria è nascosto.** "Scansiona ora" è un pulsante generico nella seconda riga della barra della Libreria accanto a "Tassonomia", e "Ricostruisci l'indice" è un link isolato su una terza riga; durante la scansione il pulsante diventa "Annulla la scansione" e sposta tutta la barra (`run1/it-025-taxonomy-node-editor-light-1280x800.png`). Nessuna voce nella palette dei comandi per la scansione, nessuno stato visibile fuori dalla barra di stato ("Cerco i file... 0").
-8. **alto — Le evidenziazioni non sono nel PDF e l'app non lo dice.** Per regola 1 gli originali non si toccano: corretto, ma nel lettore non c'è una sola riga che spieghi "le evidenziazioni vivono nell'app, non nel file: aprendo il PDF altrove non le vedrai", né un'azione "Esporta una copia annotata". L'unica frase vicina è nella guida ("salvate nella cartella della libreria e viaggiano con essa"). In più la casella "Sottolineato" della barra di studio, che si spunta da sola "dalle tue evidenziazioni", fa credere che il documento sia stato sottolineato davvero.
-9. **alto — Nel lettore lo spazio per il PDF è minimo.** Due barre di strumenti (titolo, pagine, zoom, "Adatta alla larghezza", "Cerca", "Note ed evidenziazioni" che va a capo) più una riga "studio" con un paragrafo di scorciatoie di 4 righe occupano 200 px su 800; a 1024×700 l'area del PDF è 405×389 px (`run1/it-047-reader-open-fit-light-1024x700.png`). "di 2" va a capo, le schede del pannello laterale vanno su due righe.
-10. **alto — La barra di stato è usata come area di notifica.** Messaggi lunghi ("Aggiornamento delle citazioni fallito: 0/4 fatti, 1 falliti · Una fonte online non è raggiungibile…", "Proposte AI pronte: 5/5 · <$0.01 Rivedi Nascondi") la fanno salire a 2-4 righe con link minuscoli; a 1024 px diventa alta 100 px (`run1/it-131-m-library-light-1024x700.png`). I toast dicono "Seguilo nella barra di stato" mentre la barra mostra già l'errore.
-11. **alto — Con la chat aperta la Libreria si rompe.** Il campo di ricerca scende a ~120 px ("Titolo, autore,"), "Ordina per" e i filtri vanno a capo, i titoli sono troncati; a 1024 px la lista mostra due righe larghe 145 px (`run1/it-031-chat-open-no-folders-light-1280x800.png`, `run1/it-138-m-chat-light-1024x700.png`). Due pulsanti "Cronologia" visibili insieme indicano cose diverse (annulla/ripeti della libreria e conversazioni della chat).
-12. **medio — Aprire la scheda di un documento richiede un secondo clic non scoperto.** Un clic seleziona e basta; la scheda si apre con un secondo clic sulla riga già selezionata, Invio, il pulsante "Scheda" della barra di selezione o l'icona "≡" che compare al passaggio. Il doppio clic apre il file nel programma esterno, mentre la guida dice "Fai doppio clic su un documento per aprirlo nel lettore" (contraddizione).
-13. **medio — Gerarchia visiva piatta e barre affollate.** Tutti i pulsanti hanno lo stesso peso (bordo grigio, testo nero); nella Libreria la prima riga ha ricerca + "Chiedi a Claude" + Annulla + Ripeti + Cronologia, la seconda Elenco/Griglia + Ordina + Mostra mancanti + Tassonomia + Scansiona, la terza un link da solo. Nessuna icona nella barra laterale; nessun titolo di sezione coerente (la Libreria ha il titolo dentro la barra, Progetti ha i pulsanti attaccati al titolo, Rete ha il seme e "Ricostruisci" in alto a destra).
-14. **medio — Testi obsoleti e incoerenze di linguaggio.** Dietro la procedura guidata aperta dalla barra laterale compare "Qui sfoglierai e cercherai i tuoi documenti. Questa sezione arriverà in una fase successiva." (`run1/it-095-wizard-again-from-sidebar-light-1280x800.png`). "Chiedi a Claude" accanto alla ricerca apre una ricerca AI, non la chat; "Esporta il secondo cervello" ed "Esporta come secondo cervello…" convivono nella palette; "Proposte dell'AI" sta sotto "Arrivi".
-15. **medio — Cartella di arrivo: ogni file è un modulo completo.** La scheda di un arrivo occupa più di una schermata (Dati, Proposta, Tag, nome file, cartella…) anche quando i dati sono già giusti; nessuna vista a elenco con "conferma tutto"; "Modello" è separato dal suo menu e va a capo (`run1/it-062-inbox-empty-light-1280x800.png`, `run1/it-066-inbox-dropped-card-light-1280x800.png`).
+1. **bloccante — Il PDF nel lettore è deformato e le evidenziazioni vengono salvate nel posto sbagliato.** La regola globale `.page { max-width: 860px; padding: … }` dell'app (`apps/desktop/src/renderer/src/styles.css:451-454`) colpisce anche i `div.page` di pdf.js. A 1920×1080 la pagina è 860×1815 invece di 1285×1815 (scala orizzontale 0,669) mentre lo strato di testo resta largo 1285 px. **Misura** (`reader-1920-selection-vs-mark` in `run3/metrics-it.json`, identica in `run5-en-reader/metrics-en.json`): un'evidenziazione creata selezionando una riga a 1920 px copre x 569-1030, mentre i glifi sono disegnati in x 529-837: **40 px di scarto a sinistra, 192 px oltre la fine del testo, solo il 58% dell'evidenziazione sta sul testo**. L'annotazione è **salvata** con quelle coordinate, quindi resta storta riaprendo il documento a 1024 o 1280 px (`run3/it-062-reader-open-fit-light-1024x700.png`: il rettangolo blu parte a metà di "arXiv:2401" e va oltre la riga) e resterà storta dopo la correzione del CSS. Evidenze: `run3/it-061-reader-1920-after-highlight-light-1920x1080.png`, `run5-en-reader/en-058-reader-1920-after-highlight-light-1920x1080.png`; barra di scorrimento orizzontale (`reader-1920-scroll`: 1497 su 1285 px).
+2. **bloccante — `pdf_viewer.css` contamina tutta l'app dopo la prima apertura del lettore.** **Misura** (`pdfjs-css-rules-outside-reader`, `styles-before/after-reader-*`): il foglio del lettore ha 156 regole e condivide con l'app i nomi `.dialog`, `.page`, `.selected`, `.sidebar`, `.textLayer`. Dopo il lettore la barra laterale passa da raggio 0 a 8 px, ombra doppia, bordo, `padding` da 16 a 5/16 px, larghezza da 236 a 239 px, `position: relative`; i dialoghi passano da raggio 8 a 4 px, `padding` da 16 a 12/16 px, ombra diversa e bordo bianco. Resta così fino al riavvio. Evidenze: `run3/it-064-library-after-reader-light-1280x800.png` e `run3/it-065-guide-dialog-after-reader-light-1280x800.png` contro `run3/it-010-library-home-light-1280x800.png` e `run3/it-042-guide-dialog-light-1280x800.png`.
+3. **bloccante — Sottolineare ed evidenziare: "prima seleziono, poi scelgo", nessuno strumento** (richiesta dell'utente). Nessuna modalità strumento, nessuno Spazio per alternare: si trascina, compare una barra in fondo alla finestra con due pulsanti primari identici, 5 pallini e un campo commento (`run3/it-049-reader-selection-bar-light-1280x800.png`). Ogni annotazione costa 3 azioni lontane dal testo; dopo la selezione la vista può saltare alla pagina successiva e la riga selezionata non è più visibile (`run5-en-reader/en-046-reader-selection-bar-light-1280x800.png`: barra con "Ada Placeholder, Ben Sample", pagina mostrata la 2).
+4. **importante — Impostazioni: una pagina di 8142 px in italiano e 8309 px in inglese (10,9-11,1 schermate a 1280×800), 10 sezioni, 125 controlli, senza indice né ricerca** (`post-settings-length`). Impostazioni da sviluppatore (id dei modelli, porta MCP, token, nomi degli strumenti MCP) mescolate con quelle di tutti; lingua presente due volte. Evidenze: `run3/it-125…138-post-settings-*`, `run4-en/en-103…116-post-settings-*`.
+5. **importante — Cambiare account Claude non si può dall'app.** Solo "Fornitore / Accesso / Disponibile" in un elenco senza stile e un rimando alla riga di comando; nessun "Cambia account", "Esci", "Accedi", nessuna indicazione dell'account in uso; la chiave API sta più in basso, dopo "Modelli e limiti" (`run3/it-123-settings-ai-account-area-light-1280x800.png`, `run4-en/en-101-settings-ai-account-area-light-1280x800.png`).
+6. **importante — Il badge "Arrivi"/"Inbox" non dice cosa conta.** Un PDF scaricato nella cartella della libreria compare subito in Libreria **e** accende il badge; nessun tooltip (`inbox-badge`: `title` nullo, solo `aria-label` "1 file nella posta in arrivo" / "1 file in the inbox"); tre nomi per la stessa cosa (it: Arrivi, Arrivi, Posta in arrivo; en: Inbox, Arrivals, "Go to Arrivals"); le proposte dell'AI non sono contate. Evidenze: `run3/it-085-inbox-badge-hover-light-1280x800.png`, `run4-en/en-064-inbox-flagged-library-file-light-1280x800.png`.
+7. **importante — Le evidenziazioni non sono nel PDF e l'app non lo dice; la guida dice il contrario.** Nessuna riga nel lettore lo spiega; la guida dice "I tuoi originali non vengono mai modificati" accanto alle annotazioni (`run3/it-042-guide-dialog-light-1280x800.png`); "Sottolineato · dalle tue evidenziazioni" fa credere che il documento sia stato sottolineato. Decisione dell'utente: scriverle nel PDF (vedi "Attacco al progetto", B.2).
+8. **importante — Scansionare è nascosto.** "Scansiona ora" è un pulsante generico accanto a "Tassonomia", "Ricostruisci l'indice" un link isolato; durante la scansione il pulsante cambia nome e sposta la barra; nessuna voce nella tavolozza (`run3/it-010-…`, `run1/it-025-taxonomy-node-editor-light-1280x800.png`).
+9. **importante — Nel lettore lo spazio per il PDF è minimo.** Barra su due righe, riga "studio" e un paragrafo di scorciatoie di 4 righe: 265 px di intestazione su 700 a 1024×700, area del PDF 405×389 px (`run3/it-062-…`).
+10. **importante — La barra di stato fa da area di notifica; i toast attraversano le viste.** Due righe a 1280 px ("Proposte AI pronte: 5/5 · <$0.01 Rivedi Nascondi", "Aggiornamento delle citazioni fallito… Nascondi"), 100 px a 1024 (`run3/it-164-m-library-detail-light-1024x700.png`). Il toast "Proposta accettata · Annulla" resta visibile dopo due cambi di sezione, sopra le impostazioni MCP (`run3/it-114-settings-mcp-enabled-light-1280x800.png`).
+11. **importante — Con la chat aperta la Libreria si rompe e la chat stessa trabocca.** Ricerca larga 120-190 px, filtri a capo, titoli troncati; due "Cronologia/History" con significati diversi; in inglese il blocco strumento della risposta è più largo del pannello (barra di scorrimento orizzontale, badge "Done" tagliato) (`run3/it-044-chat-open-no-folders-light-1280x800.png`, `run4-en/en-084-chat-answer-light-1280x800.png`, `run3/it-170-m-chat-light-1024x700.png`).
+12. **importante — La scheda del documento è difficile da aprire e da usare.** Il secondo clic sulla riga **non** la apre (`detail-opens-on-second-click` = falso in it e en; correzione della versione parziale di questo audit): solo "Scheda/Details" o Invio; il doppio clic apre il programma esterno mentre la guida dice "lettore". Aperta, a 1280 px **nasconde il pannello Cartelle/Tag/Filtri** senza dirlo (`styles.css:1846-1851`), è un modulo di modifica di 2319 px (3,9 schermate) e i pulsanti d'azione vanno a capo su tre righe. Evidenze: `run3/it-013-…`, `run3/it-014-library-detail-light-1280x800.png`, `run3/it-015-library-detail-bottom-light-1280x800.png`, `run4-en/en-014-library-detail-light-1280x800.png`.
+13. **importante — Export: dopo "Esporta" il fuoco si perde e la conferma è sotto la piega.** Dialogo di 1253 px in 688 visibili; dopo "Esporta" il fuoco va su `body` (`export-focus-after-run`, it e en), quindi **Esc non chiude più il dialogo** (il gestore è sul dialogo) e "Esporta comunque" compare fuori vista mentre "Esporta" diventa grigio: sembra che non succeda nulla. Avviso ripetuto due volte, due "Annulla", gergo ("circa 1095 token (indice 91)"). Evidenze: `run3/it-024-…`, `run3/it-025-export-confirm-light-1280x800.png`, `run4-en/en-025-export-confirm-light-1280x800.png`. È il difetto che ha bloccato `run3-aborted/`.
+14. **importante — Ripristino: pulsanti finali tagliati e risultato senza via d'uscita.** A 1280×800 il dialogo è più alto della finestra: "Annulla"/"Ripristina" tagliati dal bordo (`run3/it-176-restore-root-not-empty-light-1280x800.png`, `run4-en/en-154-…`); la radice della libreria esistente è accettata come destinazione senza avviso; a ripristino finito ci sono **due librerie con lo stesso nome** e nessun "Apri la libreria ripristinata" (`run3/it-179-restore-done-light-1280x800.png`, `run3/it-181-after-restore-library-light-1280x800.png`).
+15. **importante — Gerarchia piatta, stati dei controlli ambigui, testi sbagliati.** Tutti i pulsanti hanno lo stesso peso; un secondario con fuoco o al passaggio è grigio pieno e sembra **disattivato** (`run3/it-016-…` "Nascondi i paper simili", `run3/it-018-…` "Aggiorna", `run3/it-176-…` "Cambia cartella…", `run4-en/en-098-…` "Change"); gli elenchi chiave–valore (`<dl class="facts">`) sono senza stile con i rientri del browser (scheda, export, MCP, AI). Testi: "Close but do not look it" (en, sgrammaticato) e "Vicini ma non sembra" (it) come titolo di sezione; "second brain" nella guida italiana; "Questa sezione arriverà in una fase successiva" dietro la procedura guidata (`run3/it-124-wizard-again-from-sidebar-light-1280x800.png`).
+
+### Nuovi risultati di questa esecuzione (non già nella sintesi)
+
+| Id | Gravità | Risultato | Evidenza |
+| --- | --- | --- | --- |
+| N1 | bloccante | Annotazioni salvate con coordinate sbagliate quando la pagina è deformata (sintesi 1): la correzione del CSS deve includere una **riparazione** delle annotazioni già salvate (ricalcolo dei rettangoli dal testo citato e dalla pagina), altrimenti restano storte e, con la scrittura nel PDF, finiscono storte anche in Chrome | `run3/it-062-…`, `reader-1920-selection-vs-mark` |
+| N2 | importante | Il secondo clic sulla riga non apre la scheda; unico modo visibile: "Scheda" nella barra di selezione | `detail-opens-on-second-click`, `run3/it-013-…` |
+| N3 | importante | La scheda aperta nasconde il pannello Cartelle/Tag/Filtri a 1280 px | `run3/it-014-…` contro `run3/it-013-…` |
+| N4 | importante | Scheda: 9 sezioni in 2319 px, parte in modifica (Titolo, Autori, Anno…), pulsanti su 3 righe ("Apri / il / file"), "Proponi con l'AI…" ripetuto in barra e scheda; in inglese "Your values win over the ones read from the file." | `run3/it-014-…`, `run3/it-015-…`, `run4-en/en-014-…`, `detail-pane-geometry` |
+| N5 | importante | "Paper simili": sottosezione "Vicini ma non sembra" / "Close but do not look it" (testo rotto in entrambe le lingue); chip "70%" e "testo" senza spiegazione; il simile è un link che apre il lettore senza dirlo | `run3/it-016-library-detail-similar-light-1280x800.png`, `run4-en/en-016-library-detail-similar-light-1280x800.png` |
+| N6 | importante | "Citazioni": due clic per vedere qualcosa ("Mostra le citazioni", poi "Aggiorna"); offline l'errore rosso sta **sopra** la spiegazione, che è un paragrafo di 4 righe sulla privacy | `run3/it-018-library-detail-citations-refresh-offline-light-1280x800.png` |
+| N7 | importante | Export: fuoco perso dopo "Esporta", Esc inefficace, conferma fuori vista, "Esporta" grigio (sintesi 13) | `export-focus-after-run` = `body` (it, en) |
+| N8 | minore | Export: percorso assoluto mostrato due volte in monospazio; "Dimensione per un agente / Size for an agent … (index 108)"; risultato in un `<dl>` senza stile; "Mostra la cartella" più piccolo degli altri pulsanti | `run3/it-023-…`, `run3/it-027-export-result-light-1280x800.png` |
+| N9 | importante | Ripristino: pulsanti tagliati, nessun avviso sulla cartella non vuota alla scelta, due librerie omonime, nessun "Apri la libreria ripristinata" (sintesi 14) | `run3/it-175…181-*`, `run4-en/en-153…159-*` |
+| N10 | minore | Ripristino riuscito: "Le tue impostazioni attuali sono state mantenute." fuori dal riquadro e senza margine | `run3/it-179-…` |
+| N11 | minore | Backup: "Backup automatici da conservare" grigio quando la frequenza è "Spento", senza motivo; titolo "Backup" dentro "Backup e ripristino"; 4 pulsanti uguali per backup ("Ripristina…" pari a "Rimuovi") | `run3/it-171-…`, `run3/it-174-settings-backup-list-light-1280x800.png` |
+| N12 | minore | Console: `MaxListenersExceededWarning: 11 rl:event listeners added` durante il backup (possibile perdita di ascoltatori a ogni apertura della sezione) | record di `run3/it-172-settings-backup-running-…` |
+| N13 | importante | MCP acceso: nomi tecnici degli strumenti (`search_library, get_document, read_pages…`) tra le impostazioni normali; avviso di sicurezza sulla porta senza un'azione; campo porta largo 540 px per 5 cifre; "PROPORRE" in maiuscolo; stato in `<dl>` senza stile | `run3/it-114-…`, `run3/it-115-…`, `run4-en/en-093-…` |
+| N14 | minore | Scorciatoie: avviando la registrazione la colonna "Tasto" cambia larghezza e la tabella salta (x 597 → 551); "Cambia" resta grigio pieno; solo "Ripristina tutte", nessun "Annulla le modifiche". Il conflitto è invece chiaro (riga rossa + riquadro "Two commands cannot share a key") | `run3/it-118-…`, `run3/it-119-…`, `run4-en/en-098-settings-shortcut-conflict-light-1280x800.png` |
+| N15 | minore | Riga della Libreria con un tag: il chip copre il percorso del file (altezza fissa) | `run3/it-181-…`, `run3/it-140-m-library-detail-dark-1280x800.png` |
+| N16 | minore | Il pannello Cronologia non si chiude con Esc (`history-panel-closes-on-escape` = falso) | `run3/it-039-history-panel-light-1280x800.png` |
+| N17 | minore | Lettore: il campo pagina dice "2 di 2" mentre è visibile l'inizio della pagina 1 | `run3/it-061-…`, `run3/it-062-…` |
+| N18 | minore | Guida: "second brain" in italiano; "doppio clic per aprirlo nel lettore" falso; "I tuoi originali non vengono mai modificati" da rivedere con la scrittura nel PDF | `run3/it-042-…` |
+| N19 | minore | Contrasto: i soli testi sotto WCAG AA restano i badge di formato ("MD" 4,37 e 3,67; "PDF" 3,05 e 2,5 in scuro), uguali in it e en | `metrics-it.json`, `metrics-en.json` |
+| N20 | importante | Prima schermata sempre in italiano ("Benvenuto", "Avanti") anche per chi usa il sistema in inglese: la lingua iniziale non segue quella del sistema | `run4-en/en-001-wizard-step1-Benvenuto-light-1280x800.png` |
+| N21 | importante | Le scorciatoie di sezione non seguono l'ordine della barra laterale: Alt+1 Libreria, Alt+2 Progetti, **Alt+3 Rete**, Alt+4 Arrivi, Alt+5 Proposte; Scopri (terza voce) non ne ha | `run4-en/en-098-…` |
+| N22 | importante | Arrivi/Inbox: menu "Modello" e "Ragionamento" in testa alla vista senza dire a cosa servono; il nome del file è mostrato in MAIUSCOLO ("NEW-ARRIVAL.PDF"), cosa scorretta per un nome di file | `run4-en/en-064-…`, `run3/it-086-…` |
+| N23 | minore | Impostazioni AI: "Salva" attaccato al titolo della sezione successiva ("API KEY (OPTIONAL)") senza spazio | `run4-en/en-101-…` |
 
 ---
 
 ## Lettore PDF
 
-### Causa della deformazione (root cause)
+### Causa della deformazione (confermata e quantificata)
 
 - `apps/desktop/src/renderer/src/styles.css:451-454`:
   ```css
   .page { max-width: 860px; padding: var(--space-5) var(--space-6) var(--space-6); }
   ```
-  È la classe delle pagine dell'app (Impostazioni, Progetti…), ma pdf.js chiama `page` ogni pagina del documento (`div.page[data-page-number]`). Con `box-sizing: border-box` globale (`styles.css:71-75`) il div della pagina riceve `max-width: 860px` e un padding di 24/32 px.
-- pdf.js imposta larghezza e altezza della pagina come stile inline (`setLayerDimensions`, `width: round(down, var(--total-scale-factor) * 595px, …)`), e la tela (`canvas`) è `position:absolute; width:100%; height:100%` dentro il div (`pdf_viewer.css`, `.pdfViewer .canvasWrapper canvas`). Quando la larghezza calcolata supera 860 px, `max-width` la taglia; l'altezza resta quella calcolata: la bitmap (proporzioni giuste) viene stirata in un riquadro più stretto. Lo strato di testo (`.textLayer`) non ha la classe `page` e mantiene la larghezza vera.
-- In più `apps/desktop/src/renderer/src/views/reader/engine.ts:2` importa `pdfjs-dist/web/pdf_viewer.css` intero: le sue regole `.sidebar` (riga 6168 del CSS di pdf.js) e `.dialog` (riga 418) collidono con le classi dell'app (problema 2).
+  È la classe delle pagine dell'app, ma pdf.js chiama `page` ogni pagina del documento. Con `box-sizing: border-box` globale il div della pagina riceve `max-width: 860px` e un padding di 24/32 px (`pageRulesFromAppCss` elenca la regola dell'app e le due di pdf.js sullo stesso elemento).
+- pdf.js imposta larghezza e altezza in linea (`width: round(down, var(--total-scale-factor) * 595px, var(--scale-round-x))`) e la tela è `position:absolute; width:100%; height:100%` del riquadro. Oltre 860 px `max-width` taglia la larghezza, l'altezza resta: la bitmap viene stirata in un riquadro più stretto. Lo strato di testo non ha la classe `page` e mantiene la larghezza vera. Il `canvasWrapper` misura 796×1759 (riquadro meno il padding).
+- `apps/desktop/src/renderer/src/views/reader/engine.ts:2` importa `pdfjs-dist/web/pdf_viewer.css` intero. Vite lo mette nel chunk pigro `ReaderView-*.css`, che resta nel documento dopo la prima apertura: 156 regole valide per tutta l'app. Classi in comune misurate: `.dialog`, `.page`, `.selected`, `.sidebar`, `.textLayer`. A lettore aperto la regola `.sidebar` di pdf.js colpisce `aside.sidebar` dell'app; a dialogo aperto anche `.dialog`.
 
-Misure (`run1/metrics-it.json`, fatti `reader-geometry-*`; PDF A4, MediaBox 595×842, rapporto 0,7067):
-
-| Finestra | Area del PDF | Riquadro pagina (div) | Tela CSS | Bitmap tela | Strato di testo | Rapporto pagina | Effetto |
+| Finestra | Area del PDF | Riquadro pagina | Tela CSS | Bitmap | Strato di testo | Rapporto | Effetto |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1280×800, adatta (81%) | 661×557 | 645×910 | 645×910 | 768×1092 | 645×910 | 0,709 | +0,8% in larghezza (arrotondamento a 5 px di pdf.js con DPR 1,198) |
+| 1280×800, adatta (81%) | 661×557 | 645×910 | 645×910 | 768×1092 | 645×910 | 0,709 | +0,8% in larghezza (arrotondamento a 5 px con DPR 1,198) |
 | 1280×800, 100% | — | 790×1120 | 790×1120 | 948×1344 | 790×1120 | 0,705 | quasi esatto |
 | 1024×700, adatta (49%) | 405×389 | 390×550 | 390×550 | 462×660 | 390×550 | 0,709 | +1,3% in larghezza |
-| 1920×1080, adatta (162%) | 1300×895 | **860×1815** | **860×1815** | 1536×2178 | **1285×1815** | **0,474** | glifi compressi al 67% in larghezza, testo selezionabile largo 1,49× la tela |
+| 1920×1080, adatta (162%) | 1300×895 | **860×1815** | **860×1815** | 1536×2178 | **1285×1815** | **0,474** | glifi al 66,9% in larghezza |
 
-Quindi: (a) la deformazione forte (fattore 0,67) avviene appena la pagina supererebbe 860 px, cioè a schermo largo, con il pannello laterale chiuso o con zoom > ~110%; i caratteri appaiono stretti e alti e lo strato di selezione non coincide più con il disegno; (b) sotto quella soglia resta una deformazione piccola ma reale (0,8-1,3%, nella direzione "più largo") dovuta al passo `--scale-round-x: 5px` che pdf.js calcola per un DPR frazionario come 1,198 e applica separatamente a larghezza e altezza. Il punto (a) è quello visibile; il punto (b) spiega un leggero allargamento dei titoli anche in finestre normali.
+Evidenziazione a 1920×1080: selezione e annotazione coincidono tra loro (x 569, larghezza 460) ma i glifi sono in x 529, larghezza 308: scarto 40 px a sinistra, 192 px a destra, sovrapposizione 58%. L'annotazione salvata conserva lo scarto a ogni dimensione (N1).
 
-Come dovrebbe essere: nessuna classe globale generica (`.page`, `.sidebar`, `.dialog`) — classi dell'app con prefisso (`.rl-page`) o regole limitate (`.main > .page`), e il CSS di pdf.js caricato solo dentro un contenitore isolato (`.reader-scroll .pdfViewer …`, o un livello `@layer`/`@scope`); un test e2e che confronta il rapporto del riquadro della pagina con quello della MediaBox (tolleranza 0,5%) a 1280 e 1920 px.
+Come dovrebbe essere: nessuna classe globale generica (`.page`, `.sidebar`, `.dialog`, `.selected`); il CSS di pdf.js ridotto a ciò che serve e limitato al lettore; un e2e che confronta il rapporto della pagina con la MediaBox (tolleranza 0,5%: va trattato anche l'arrotondamento per DPR frazionario), uno che verifica che nessuna regola del foglio del lettore colpisca elementi fuori dall'area del PDF (la funzione `leakedRules` dello script è già quel controllo), e la riparazione N1.
 
 ### Altri risultati del lettore
 
-- **alto** — Barra superiore su due righe a 1280 px: "Note ed evidenziazioni" va a capo; il campo pagina è largo quanto un campo di testo; "di 2" su due righe; il titolo è troncato a 241 px su 323 (misurato in 17 schermate). `run1/it-032-reader-open-fit-light-1280x800.png`.
-- **alto** — Riga "studio" (Da leggere / In lettura / Letto / Sottolineato) più un paragrafo di scorciatoie lungo 4 righe sempre visibile: è documentazione, non interfaccia. Va in un tooltip o nella guida.
-- **alto** — Annotazione: la barra appare in fondo alla finestra, lontana dalla selezione; "Evidenzia" e "Sottolinea" sono entrambi pulsanti primari blu; il colore si sceglie dopo aver selezionato; non c'è anteprima del colore sul testo selezionato; la sottolineatura è un bordo di 2 px che a zoom basso quasi non si vede (`run1/it-038-reader-after-underline-light-1280x800.png`).
-  Come dovrebbe essere: barra degli strumenti verticale o in testa con strumenti a stato (Sposta/Seleziona `V`, Evidenziatore `H`, Sottolineatura `U`, colore attivo visibile come pallino sull'icona); con uno strumento attivo il trascinamento sul testo crea subito l'annotazione; Spazio alterna strumento corrente e ultimo usato; Esc torna a Sposta; il commento si aggiunge cliccando l'annotazione (popover accanto, non in fondo).
-- **medio** — Clic su un'annotazione: la barra di modifica è in fondo, non vicino al segno (`run1/it-039-reader-annotation-edit-bar-light-1280x800.png`).
-- **medio** — Ricerca nel documento: barra con 7 controlli tra cui "Evidenzia il risultato"/"Sottolinea il risultato" — funzione potente ma con etichette lunghe (`run1/it-040-reader-find-light-1280x800.png`).
-- **medio** — Pannello laterale con 4 schede ("Evidenziazioni", "Nota di pagina", "Nota del file", "Tutte le note") che vanno su due righe a 340 px; "Nota di pagina" e "Nota del file" potrebbero essere un unico editor con un selettore.
-- **medio** — Il lettore sostituisce la Libreria ma resta "dentro" la voce Libreria della barra laterale; il pulsante "← Torna alla libreria" è l'unico modo visibile per uscire (Esc funziona ma è scritto solo nel paragrafo delle scorciatoie).
-- **basso** — In tema scuro la pagina PDF bianca sta su uno sfondo quasi nero senza bordo né ombra; in chiaro la pagina bianca su `--surface-2` quasi bianco non ha contorno: non si vede dove finisce il foglio (`run1/it-048-reader-open-fit-dark-1280x800.png`, `run1/it-032-…`).
+- **importante** — Barra su due righe a 1280 px ("Note ed evidenziazioni"/"Notes and highlights" va a capo); campo pagina largo come un campo di testo; "di 2"/"of 2" su due righe; titolo troncato (`run3/it-045-…`, `run5-en-reader/en-046-…`).
+- **importante** — Riga "studio" più un paragrafo di scorciatoie di 4 righe sempre visibile: documentazione, non interfaccia.
+- **importante** — Annotazione: barra in fondo alla finestra; "Evidenzia" e "Sottolinea" entrambi primari; colore scelto dopo; nessuna anteprima; sottolineatura di 2 px quasi invisibile a zoom basso (`run3/it-051-reader-after-underline-light-1280x800.png`). Come dovrebbe essere: strumenti a stato (Seleziona `V`, Evidenzia `H`, Sottolinea `U`, colore attivo visibile), trascinamento che crea subito l'annotazione, Spazio per alternare strumento corrente e ultimo, Esc che torna a Seleziona, commento in un popover accanto all'annotazione.
+- **importante** — Clic su un'annotazione: la barra di modifica è in fondo, non vicino al segno (`run3/it-052-…`).
+- **minore** — Ricerca nel documento: 7 controlli con etichette lunghe (`run3/it-053-reader-find-light-1280x800.png`). Funzione potente: da tenere.
+- **minore** — 4 schede del pannello su due righe a 340 px (`run3/it-054…057-*`).
+- **importante** — Il lettore resta "dentro" Libreria; "← Torna alla libreria" è l'unica uscita visibile.
+- **minore** — Pagina bianca senza bordo né ombra su fondo quasi bianco o quasi nero (`run3/it-063-reader-open-fit-dark-1280x800.png`).
+- **minore** — A 1920 px barra di scorrimento orizzontale dovuta allo strato di testo più largo.
 
-### Evidenziazioni salvate fuori dal PDF (punto 6 dell'utente)
+### Evidenziazioni e PDF originale (punto dell'utente)
 
-Comportamento: corretto per la regola 1 (originali mai modificati; annotazioni in `.lab/`). Spiegazione all'utente: **assente** nel lettore, nella barra di annotazione e nell'elenco "Evidenziazioni". La procedura guidata dice "I tuoi documenti non vengono mai modificati" (passo 3) ma l'utente non collega questa frase alle evidenziazioni. Proposta: una riga fissa e discreta nel pannello "Evidenziazioni" ("Salvate in Research Lab, non nel file PDF. Per averle fuori dall'app: Esporta copia annotata…") e una funzione di esportazione di una **copia** del PDF con le annotazioni (scritta nella cartella di export, mai sull'originale). Rinominare la casella "Sottolineato" della barra di studio (ad esempio "Studiato a fondo") o toglierla dal lettore.
+Oggi: annotazioni nella cartella dati (`.lab/`), mai nel PDF; nessuna spiegazione nel lettore; guida in contraddizione. Decisione dell'utente: le evidenziazioni vanno **scritte nel PDF originale**. Requisiti di design: lo stato "nel PDF / solo nell'app / in attesa / rifiutato (motivo)" visibile per documento nel lettore; la riparazione N1 prima della prima scrittura; i rischi tecnici in B.2.
 
 ---
 
 ## Navigazione e struttura generale
 
-- **alto** — Barra laterale: 6 voci solo testo, nessuna icona; "Impostazioni" spinta in basso; sopra il menu un selettore "Libreria attiva" e un link "Nuova libreria"; in fondo un secondo selettore della lingua. La lingua dell'interfaccia (impostazione rara) occupa spazio permanente; la libreria attiva usa un `<select>` nativo.
-- **alto** — La chat a scomparsa è un'aletta larga 44 px con un solo "‹" in alto a destra: nessuna etichetta, nessuna icona riconoscibile (`run1/it-010-library-home-light-1280x800.png`).
-- **medio** — Annulla / Ripeti / Cronologia ripetuti nelle barre di Libreria, Progetti e Proposte dell'AI, con posizioni diverse; il pannello Cronologia non si chiude con Esc e resta aperto sotto palette e guida (`run1/it-027-palette-light-1280x800.png`, `run1/it-029-guide-dialog-light-1280x800.png`).
-- **medio** — Palette comandi (Ctrl+K): le prime 9 voci sono richieste all'AI che "riempiono la casella del messaggio" (non eseguono nulla), poi le navigazioni; le scorciatoie Alt+1… sono mostrate, le richieste AI no. Duplicato "Esporta il secondo cervello" / "Esporta come secondo cervello…".
-- **medio** — Toast che si accumulano in basso al centro e coprono contenuto per molti secondi (`run1/it-088-review-after-accept-toast-light-1280x800.png`, `run1/it-089-network-labels-dialog-light-1280x800.png`).
-- **basso** — Ordine di tabulazione corretto e focus sempre visibile (misurato su procedura guidata, Libreria, lettore): da tenere.
+- **importante** — Barra laterale: 6 voci solo testo; sopra un `<select>` "Libreria attiva" e un link "Nuova libreria"; in fondo un secondo selettore della lingua.
+- **importante** — Chat chiusa: aletta di 44 px con un solo "‹", senza etichetta.
+- **importante** — Annulla / Ripeti / Cronologia ripetuti nelle barre di Libreria, Progetti e Proposte; Cronologia non si chiude con Esc (N16).
+- **importante** — Scorciatoie Alt+N non nell'ordine della barra laterale (N21).
+- **minore** — Tavolozza: le prime 9 voci sono richieste all'AI che riempiono il campo della chat; "Esporta il secondo cervello" ed "Esporta come secondo cervello…" convivono (`run3/it-040-…`, `run3/it-041-…`).
+- **importante** — Toast che attraversano i cambi di sezione (sintesi 10).
+- **minore** — Ordine di tabulazione corretto e fuoco visibile ovunque misurato: da tenere.
 
 ## Procedura guidata (primo avvio)
 
-- 7 passi, 11 clic fino alla libreria (`wizard-clicks` = 11). Passi: Benvenuto (lingua), Chi sei (5 campi facoltativi), Cartella, Dettagli, Tassonomia, Cartelle abilitate a Claude, Riepilogo.
-- **medio** — "Chi sei" chiede ORCID e id OpenAlex al primo minuto d'uso: un dottorando non sa cos'è l'id autore OpenAlex. Va spostato in "Profilo" dopo, con un aiuto.
-- **medio** — Passo AI: casella obbligatoria "Ho capito che per ora nulla verrà inviato a Claude" per poter proseguire senza abilitare cartelle: conferma superflua (`run1/it-007-wizard-step6-Cartelle_abilitate_a_Claude-light-1280x800.png`).
-- **basso** — "Scegli un'altra cartella…" incollato al riquadro del percorso (nessuno spazio), percorso assoluto completo in monospace.
-- **basso** — Riaperta dalla barra laterale, la procedura ha "Annulla" come link sotto i pulsanti e dietro mostra il testo obsoleto "Questa sezione arriverà in una fase successiva" (problema 14).
-- Dopo la creazione: la carta di benvenuto occupa 250 px su 800 sopra la Libreria e riduce la lista a 3,5 righe (`run1/it-009-first-screen-welcome-light-1280x800.png`); tre "Nascondi" per tre suggerimenti.
+- 7 passi, 11 clic fino alla libreria (`wizard-clicks` = 11, it e en). Prima schermata sempre in italiano (N20).
+- **minore** — "Chi sei" chiede ORCID e id OpenAlex al primo minuto (`run3/it-002-…`, `run4-en/en-002-wizard-step2-About_you-light-1280x800.png`).
+- **minore** — Passo AI: casella obbligatoria "Ho capito che per ora nulla verrà inviato a Claude" (`run3/it-007-…`).
+- **minore** — "Scegli un'altra cartella…" incollato al percorso; percorso assoluto completo in monospazio (`run3/it-004-…`).
+- **minore** — Riaperta dalla barra laterale: "Annulla" come link e, dietro, testo obsoleto (`run3/it-124-…`).
+- **minore** — Carta di benvenuto di 250 px sopra la Libreria; tre "Nascondi" (`run3/it-009-…`).
 
 ## Libreria
 
-- **alto** — Tre righe di barra (vedi problema 13). "Chiedi a Claude" accanto alla ricerca è la ricerca AI (`run1/it-022-advanced-search-dialog-light-1280x800.png`): l'etichetta fa pensare alla chat.
-- **medio** — Il suggerimento della sintassi di ricerca (`Parole, "frasi esatte", prefisso*, a OR b, author:, tag:, type:, year:2018-2022, venue:`) è sempre visibile sotto il campo: utile ma rumoroso; con la chat aperta va su tre righe.
-- **medio** — Barra di selezione: 6 azioni su due righe come pulsanti uguali ("Modifica i tag", "Aggiungi al progetto…", "Proponi con l'AI…", "Aggiorna citazioni", "Esporta come secondo cervello…", "Deseleziona") (`run1/it-013-library-selection-bar-light-1280x800.png`).
-- **medio** — Icone delle righe (≡ ↗ ⌂) piccole, senza etichetta, visibili solo al passaggio.
-- **medio** — "Aggiorna citazioni" su una libreria senza rete: toast "avviato, seguilo nella barra di stato" e insieme, in barra di stato, "fallito 0/4, 1 falliti" (`run1/it-017-library-bulk-citations-light-1280x800.png`).
-- **basso** — Badge del tipo di file: "MD" verde su bianco contrasto 4,37 (sotto 4,5); "PDF" rosso su selezione scura 2,5 in tema scuro (unici fallimenti di contrasto misurati, `run1/metrics-it.json`).
-- **basso** — Vista Griglia: miniature piccole (70×75 px) al centro di carte da 330×180, molto spazio vuoto (`run1/it-011-library-grid-light-1280x800.png`).
-- Ricerca: risultati immediati, sintassi ricca, etichetta "nelle tue note"/"nell'evidenziazione" sul risultato: **da tenere**.
+- **importante** — Tre righe di barra; "Chiedi a Claude"/"Ask Claude" accanto alla ricerca apre la ricerca AI, non la chat (`run3/it-033-advanced-search-dialog-light-1280x800.png`).
+- **minore** — Sintassi di ricerca sempre visibile: rumorosa ma utile; **da non perdere**.
+- **importante** — Barra di selezione: 6 azioni uguali su due righe (tre a 1024 px, 130 px) che spingono giù l'elenco (`run3/it-019-…`, `run3/it-164-…`).
+- **minore** — Icone di riga (≡ ↗ ⌂) piccole, senza etichetta, solo al passaggio.
+- **importante** — "Aggiorna citazioni" offline: toast "avviato, seguilo nella barra di stato" e insieme "fallito 0/4" (`run3/it-028-…`).
+- **minore** — Griglia: miniature piccole in carte grandi (`run3/it-011-…`). Chip del tag sul percorso (N15).
+- Ricerca: immediata, sintassi ricca, indica dove ha trovato il testo (`run3/it-029-…`, `run3/it-030-…`, `run4-en/en-029-…`): **da tenere**.
+
+### Scheda del documento
+
+- Apertura: N2; doppio clic = programma esterno; pannello di sinistra nascosto (N3).
+- Contenuto (`detail-pane-geometry`): Dati, Studio, Note sul file, La mia descrizione, Tag, Citazioni, Paper simili, File; 2319 px in 593 visibili; parte in modifica (N4). Per l'uso quotidiano serve prima una vista di lettura (titolo, autori, stato, tag, azioni) e la modifica su richiesta.
+- "Paper simili" (N5), "Citazioni" (N6). Il riquadro "Generato dall'AI" vuoto occupa 130 px per dire "nessun contenuto".
+- Sezione File: `<dl>` senza stile (`run3/it-015-…`).
 
 ## Tassonomia
 
-- **medio** — È una "modalità" della Libreria (pulsante "Tassonomia" nella barra, poi "Torna alla libreria" dentro il pannello), non un luogo: l'utente non la trova nella barra laterale.
-- **medio** — Editor del nodo lungo e denso: colore (12 pallini + selettore), alias, genitori, implica, unione, deprecazione in una colonna con scorrimento (`run1/it-025-taxonomy-node-editor-light-1280x800.png`).
-- **basso** — Creare due tag ha avviato una scansione ("Cerco i file... 0", barra che cambia forma).
+- **importante** — Modalità della Libreria, non un luogo (`run3/it-034-…`, `run4-en/en-035-taxonomy-new-form-light-1280x800.png`); in inglese il modulo "New top-level tag" ha "Create" grigio accanto al campo vuoto e "Find a tag" con un campo largo la metà.
+- **importante** — Editor del nodo lungo e denso (`run3/it-036-taxonomy-node-editor-light-1280x800.png`).
+- **minore** — Creare due tag ha avviato una scansione.
 
-## Progetti
+## Progetti, Scopri, Rete
 
-- **medio** — "Crea" porta direttamente dentro il progetto appena creato (ok) ma la pagina di dettaglio mette "Tutti i progetti" come pulsante a sinistra del titolo, due badge "Attivo"/"Progetto" e "Esporta come secondo cervello…" sulla stessa riga (`run1/it-050-projects-list-light-1280x800.png`).
-- **medio** — Progetto vuoto: il testo dice di andare in Libreria e usare "Aggiungi al progetto", nessuna azione diretta "Aggiungi documenti…".
-- **basso** — "Progetto" / "Collezione" scelti con radio accanto al pulsante "Crea" senza spiegare la differenza (`run1/it-049-projects-empty-light-1280x800.png`).
+- **importante** — Progetto: "Tutti i progetti" a sinistra del titolo, due badge ed "Esporta come secondo cervello…" sulla stessa riga; progetto vuoto senza "Aggiungi documenti…" (`run3/it-067…070-*`).
+- **minore** — "Progetto"/"Collezione" senza spiegazione (`run3/it-066-…`, `run3/it-071-…`).
+- **importante** — Scopri: quattro schede vuote finché non si aggiornano le citazioni dalla Libreria, senza il pulsante nello stato vuoto (`run3/it-072…076-*`).
+- **importante** — Rete: "Seme" in primo piano; mappa con quadratini di 4 px; scheda "Rete" con 3 selettori, 6 caselle e 5 pulsanti disattivati prima del grafo vuoto; "Qui non c'è nulla." (`run3/it-077…082-*`, `run4-en/en-055…060-*`).
+- **minore** — Dialogo delle etichette: "Livello 1" come pulsante, "nessuno(1)" incollato (`run3/it-112-…`).
 
-## Scopri / citazioni
+## Arrivi e proposte dell'AI
 
-- **medio** — Quattro schede (Da leggere dopo, Novità, Pubblicati, Fonti) tutte vuote finché non si fa "Aggiorna citazioni" dalla Libreria: lo stato vuoto lo dice, ma non offre il pulsante per farlo da qui (`run1/it-051-discover-first-light-1280x800.png`).
-- **basso** — "Ambito" e "Minimo di documenti citanti" sopra il messaggio vuoto: controlli prima dei contenuti.
-
-## Rete
-
-- **medio** — "Seme" (casella numerica) in alto a destra a fianco di "Costruisci il modello": parametro da sviluppatore in primo piano (`run1/it-056-network-first-light-1280x800.png`).
-- **medio** — Mappa con 4 documenti: tre quadratini rossi di 4 px e un'etichetta "sintetici, doi, rltest" al centro; cluster a destra con "Esporta" come link (`run1/it-057-network-built-light-1280x800.png`).
-- **medio** — Scheda "Rete": 3 selettori, 6 caselle "Espandi per", 5 pulsanti disabilitati e una legenda prima del grafo vuoto (`run1/it-059-network-tab2-light-1280x800.png`). "Esplora": "Qui non c'è nulla." e pulsanti disabilitati in fondo (`run1/it-060-…`).
-- **basso** — "Colora per" su due righe; "Livello 1" come pulsante seguito da "nessuno(1)" incollato nel dialogo delle etichette (`run1/it-089-…`).
-
-## Arrivi (cartella di arrivo) e proposte dell'AI
-
-- Badge: vedi problema 6. Misura: `inbox-badge` = `{ text: "1", aria: "1 file nella posta in arrivo", title: null }`.
-- **alto** — Il file trovato nella libreria ("trovato nella libreria") e quello trascinato ("trascinato") hanno lo stesso modulo, ma il primo è già in libreria: l'azione richiesta all'utente non è spiegata (`run1/it-065-inbox-flagged-library-file-light-1280x800.png`).
-- **medio** — Senza rete: "senza connessione · Riprova" come badge grigio, poco visibile.
-- **medio** — Proposte dell'AI: carte grandi, una per campo, con "Accetta / Modifica / Rifiuta" ripetuti; titolo del documento in maiuscolo grigio più un chip con lo stesso titolo; utile la marcatura viola "Generato dall'AI" (`run1/it-087-review-view-light-1280x800.png`).
-- **basso** — Sovrapposizione di trascinamento (`run1/it-067-inbox-drop-hint-light-1280x800.png`): da verificare con un vero trascinamento.
+- Badge: sintesi 6.
+- **importante** — "Trovato nella libreria" e "trascinato" hanno lo stesso modulo; per il primo l'azione richiesta non è spiegata (`run3/it-086-…`, `run3/it-087-…`, `run3/it-inbox-card-detail.png`).
+- **importante** — Ogni arrivo è un modulo più alto di una schermata; nessun "conferma tutto"; Modello/Ragionamento in testa senza spiegazione e nome del file in maiuscolo (N22).
+- **minore** — Offline: "senza connessione · Riprova" come badge grigio poco visibile.
+- **importante** — Proposte dell'AI: carte grandi, Accetta/Modifica/Rifiuta ripetuti per campo; utile la marcatura viola (`run3/it-110-…`, `run3/it-111-…`).
 
 ## Chat, AI, lavori in blocco
 
-- **medio** — Pannello chat: "Modello" e "Ragionamento" come due grandi menu sempre visibili sotto il campo di testo, "Invia" piccolo, una riga di scorciatoie fissa (`run1/it-081-chat-open-enabled-light-1280x800.png`).
-- **medio** — L'anteprima "Inviare a Claude?" a ogni messaggio (impostazione predefinita) è corretta per la regola 4 ma senza "non chiedere più per questa conversazione" diventa un attrito a ogni domanda (`run1/it-082-chat-preview-dialog-light-1280x800.png`).
-- **medio** — Risposta: il blocco strumento `search_library` mostra il nome tecnico e "Searched the library for…" in inglese nell'interfaccia italiana (dal fornitore simulato; da verificare con quello reale) (`run1/it-083-chat-answer-light-1280x800.png`).
-- **medio** — Dialogo "Proponi con l'AI": 5 caselle, 2 menu, "Proponi di nuovo", poi 4 righe di riepilogo e un riquadro; il pulsante di conferma è sotto la piega a 1280×800 (`run1/it-085-job-dialog-light-1280x800.png`). Senza cartelle abilitate il dialogo si apre comunque e dice in fondo "non c'è nulla da inviare" (`run1/it-015-…`).
+- **importante** — Pannello chat: "Modello" e "Ragionamento" come due grandi menu, "Invia" piccolo, riga di scorciatoie fissa (`run3/it-104-…`, `run4-en/en-084-…`); blocco strumento più largo del pannello in inglese (sintesi 11).
+- **importante** — Anteprima "Inviare a Claude?" a ogni messaggio senza "non chiedere più per questa conversazione" (`run3/it-105-…`).
+- **minore** — Blocco strumento con nome tecnico `search_library` e testo inglese nell'interfaccia italiana (fornitore simulato) (`run3/it-106-…`).
+- **importante** — "Proponi con l'AI": conferma sotto la piega; senza cartelle abilitate il dialogo si apre e dice in fondo "non c'è nulla da inviare" (`run3/it-108-…`, `run3/it-021-…`).
 
-## Impostazioni (punto 3 dell'utente)
+## Esportazione (flusso completo)
 
-- **alto** — Pagina unica di 7981 px, vedi problema 4. Misure per sezione (altezza px / controlli): Tu e l'interfaccia 759/8, Librerie 227/3, Impostazioni della libreria 602/6, Fonti online 325/4, Claude (AI) 1378/24, Server MCP 1177/7, Chiavi API 199/3, Backup 883/6, Scorciatoie 1242/50, Manutenzione 852/8.
-- **alto** — Elenchi "Stato" (AI e MCP) resi con `<dl>` senza stile: rientri del browser, etichette e valori disallineati (`run1/it-073-…`, `run1/it-074-…`).
-- **alto** — Modelli: si modificano a mano id (`claude-haiku-5-5`) ed etichetta, con "Rimuovi": è materia da sviluppatore.
-- **medio** — Tre posti diversi per le chiavi: "Chiave API Anthropic" (sezione AI), "Chiave API di OpenAlex" (Fonti online), "Chiavi API" (solo Gemini, sezione a parte).
-- **medio** — Backup: con la destinazione dentro la libreria compare un errore rosso, ma "Scegli cartella…" resta grigio e "Esegui il backup ora" disabilitato con la frase "Scegli prima una cartella di destinazione" mentre una cartella è stata appena scelta (rifiutata): messaggi in conflitto (`run1/it-090-settings-backup-after-choose-light-1280x800.png`).
-- **medio** — Ogni sezione ha il proprio "Salva" (Profilo, Libreria, AI) mentre altre si applicano subito (lingua, tema, MCP): modello di salvataggio misto.
-- **basso** — Scorciatoie: tabella di 17 righe × 3 pulsanti (Cambia / Spegni / Predefinito) = 50 controlli (`run1/it-091-settings-restore-attempt-light-1280x800.png` mostra l'inizio).
+Percorso: seleziona › "Esporta come secondo cervello…" › "Cambia cartella…" › nome › "Esporta" › "Esporta comunque" › risultato: 8 clic.
+- **importante** — 1253 px in 688 visibili; l'intestazione scorre via (nessun titolo né × a metà dialogo) (`run3/it-023-…`).
+- **importante** — N7 (fuoco, Esc, conferma fuori vista); avviso due volte e due "Annulla" (`run3/it-025-…`).
+- **minore** — N8.
+- Risultato chiaro con contatori, "Esporta di nuovo" e "Mostra la cartella" (`run3/it-027-…`): da tenere.
+
+## Impostazioni (punto dell'utente)
+
+- **importante** — Pagina unica (sintesi 4). Per sezione (altezza px / controlli, prima dell'AI, italiano): Tu e l'interfaccia 759/8, Librerie 227/3, Impostazioni della libreria 602/6, Fonti online 325/4, Claude (AI) 1378/24, Server MCP 1177/7 (1183/7 acceso), Chiavi API 199/3, Backup 883/6, Scorciatoie 1242/50, Manutenzione 852/8.
+- **importante** — Stati AI e MCP in `<dl>` senza stile (`run3/it-115-…`, `run3/it-123-…`).
+- **importante** — Modelli: id ed etichetta a mano con "Rimuovi" (`run4-en/en-101-…`): da sviluppatore.
+- **importante** — Tre posti per le chiavi (Anthropic, OpenAlex, Gemini).
+- **importante** — Backup con destinazione nella libreria: errore rosso più "Scegli prima una cartella" (messaggi in conflitto) (`run3/it-117-…`).
+- **minore** — Salvataggio misto ("Salva" per alcune sezioni, applicazione immediata per altre); N23.
+- **importante** — MCP acceso: N13; posto giusto: "Sviluppatore / Avanzate" con una riga di spiegazione.
+- **minore** — Scorciatoie: N14; 17 righe × 3 pulsanti; registrazione, Esc e conflitto funzionano (`run3/it-119-…`, `run4-en/en-098-…`).
+- **minore** — Manutenzione: diagnostica leggibile ma tecnica (`run3/it-122-…`).
+
+### Backup e ripristino (flusso completo)
+
+- Backup verso una cartella valida: 3 clic, stima prima e verifica dopo (`run3/it-171…174-*`): **da tenere**. N11, N12.
+- Ripristino: N9, N10. Il testo introduttivo è buono; il consiglio finale ("ripristina in una cartella diversa e poi togli dall'elenco la libreria che non vuoi più") descrive un flusso in tre passi che l'app potrebbe offrire come azione.
 
 ### Inventario completo delle impostazioni attuali
 
-Legenda "chi": T = tutti, P = utente esperto, S = sviluppatore. Fonte: `packages/core/src/settings.ts`, `apps/desktop/src/renderer/src/settings/*.tsx`, schermate `run1/it-068…106`.
+Legenda "chi": T = tutti, P = utente esperto, S = sviluppatore. Fonte: `packages/core/src/settings.ts`, `apps/desktop/src/renderer/src/settings/*.tsx`, schermate `run3/it-089…138`.
 
 | Impostazione | Dove (sezione) | Predefinito | Ambito di salvataggio | Chi |
 | --- | --- | --- | --- | --- |
-| Lingua dell'interfaccia | Tu e l'interfaccia; anche barra laterale e procedura guidata | `it` | app (questo computer) | T |
+| Lingua dell'interfaccia | Tu e l'interfaccia; barra laterale; procedura guidata | `it` | app (questo computer) | T |
 | Aspetto (sistema/chiaro/scuro) | Tu e l'interfaccia | `system` | app | T |
 | Nome | Tu e l'interfaccia; procedura guidata | vuoto | app | T |
 | Nomi con cui compari tra gli autori | Tu e l'interfaccia; procedura guidata | vuoto | app | P |
@@ -163,76 +211,221 @@ Legenda "chi": T = tutti, P = utente esperto, S = sviluppatore. Fonte: `packages
 | ORCID | Tu e l'interfaccia | vuoto | app | P |
 | Id autore OpenAlex | Tu e l'interfaccia | vuoto | app | P |
 | Elenco librerie: attiva, rinomina, rimuovi dall'elenco, nuova | Librerie; selettore nella barra laterale | — | app | T |
-| Cartella dati della libreria (`dataDirName`) | solo procedura guidata (`wizard-data-dir`) | `.lab` | app | S |
+| Cartella dati della libreria (`dataDirName`) | solo procedura guidata | `.lab` | app | S |
 | Nome della libreria | Impostazioni della libreria | dal nome scelto | library.json | T |
 | Lingua dei documenti | Impostazioni della libreria; procedura guidata | `it` | library.json | T |
 | Cartelle escluse | Impostazioni della libreria | nessuna | library.json | P |
-| Preset di export (nome, sorgenti none/paths/copies, profondità citati 0-3, includi citati, note, annotazioni) | Impostazioni della libreria; dialogo export | nessun preset (valori del preset: none, 1, no, sì, sì) | library.json | P |
+| Preset di export | Impostazioni della libreria; dialogo export | nessuno | library.json | P |
 | Estensioni scansionate | nessuna interfaccia | pdf, md, txt, tex, rst, docx, pptx, ipynb | library.json | S |
 | Estensioni solo per nome | nessuna interfaccia | nessuna | library.json | S |
 | Giorni prima di eliminare i record dei file cancellati | nessuna interfaccia | 30 | library.json | S |
 | Invia a OpenAlex l'email del profilo | Fonti online | spento | app | P |
 | Chiave API OpenAlex | Fonti online | non salvata | archivio sicuro | P |
-| Programma Claude Code (percorso, Automatico/Scegli…) | Claude (AI) | automatico | app | S |
-| Fornitore AI (claude-agent-sdk / anthropic-api / gemini / mock) | Claude (AI) (solo stato; `ai-provider`) | `claude-agent-sdk` | library.json | S |
+| Programma Claude Code | Claude (AI) | automatico | app | S |
+| Fornitore AI | Claude (AI) (solo stato) | `claude-agent-sdk` | library.json | S |
 | Chiave API Anthropic | Claude (AI) | non salvata | archivio sicuro (app) | P |
-| Cartelle abilitate a Claude (tutta la libreria, file nella radice, cartelle) | Claude (AI); procedura guidata | nessuna | library.json | T |
-| Chiedi conferma con anteprima prima di ogni invio | Claude (AI) | acceso | library.json | T |
+| Cartelle abilitate a Claude | Claude (AI); procedura guidata | nessuna | library.json | T |
+| Conferma con anteprima prima di ogni invio | Claude (AI) | acceso | library.json | T |
 | Modelli (id, etichetta; prezzi solo nei dati) | Claude (AI) | Haiku 5.5, Sonnet 5.5, Opus 5.5 | library.json | S |
 | Modello predefinito | Claude (AI) | `claude-haiku-5-5` | library.json | P |
-| Ragionamento predefinito | Claude (AI) / menu di chat e dialoghi | `low` | library.json | P |
+| Ragionamento predefinito | Claude (AI) | `low` | library.json | P |
 | Tetto di spesa mensile (USD) | Claude (AI) | nessuno | library.json | P |
 | Conferma i lavori in blocco sopra (USD) | Claude (AI) | 0,50 | library.json | P |
-| Registro "Cosa è stato inviato a Claude" | Claude (AI) | — (sola lettura) | locale | P |
+| Registro degli invii a Claude | Claude (AI) | — | locale | P |
 | Server MCP acceso | Server MCP | spento | library.json | P |
 | Scrittura MCP (proposte di campi AI) | Server MCP (con conferma) | spenta | library.json | S |
-| Porta MCP | Server MCP | automatica (1024-65535) | locale | S |
+| Porta MCP | Server MCP | automatica | locale | S |
 | Copia comando / voce `.mcp.json` | Server MCP | — | — | S |
 | Cambia il token MCP | Server MCP (con conferma) | — | archivio sicuro | S |
-| Registro chiamate MCP | Server MCP | — (sola lettura) | locale | S |
+| Registro chiamate MCP | Server MCP | — | locale | S |
 | Chiave API Gemini | Chiavi API | non salvata | archivio sicuro (libreria) | S |
 | Cartella di destinazione dei backup | Backup e ripristino | nessuna | app | T |
-| Backup automatico (spento/giornaliero/settimanale/mensile) | Backup e ripristino | spento | app | T |
+| Backup automatico | Backup e ripristino | spento | app | T |
 | Backup automatici da conservare | Backup e ripristino | 5 (1-50) | app | P |
-| Includi cronologia chat, contatori d'uso e stato di lettura (backup manuale) | Backup e ripristino | acceso | — (per esecuzione) | P |
-| Ripristino (radice, nome, impostazioni, segreti, dati locali) | dialogo di ripristino | — | — | P |
-| Scorciatoie da tastiera (17 comandi, cambia/spegni/predefinito) | Scorciatoie da tastiera | vedi `packages/core/src/shortcuts.ts` | app | P |
+| Includi cronologia chat, contatori e stato di lettura | Backup e ripristino | acceso | per esecuzione | P |
+| Ripristino (radice, nome, impostazioni, dati locali) | dialogo di ripristino | — | — | P |
+| Scorciatoie (17 comandi) | Scorciatoie da tastiera | `packages/core/src/shortcuts.ts` | app | P |
 | Diagnostica, log, memoria, pulizia, rapporto | Manutenzione e prestazioni | — | — | S |
 | Benvenuto visto / suggerimenti chiusi | carta di benvenuto | falso / nessuno | app | T (implicito) |
-| Vista Libreria (elenco/griglia), scheda laterale, chat aperta, pannello del lettore | interfaccia, `localStorage` (`rl.libraryView`, `rl.libraryTab`, `rl.chatOpen`, `rl.readerSide`) | elenco, cartelle, chiusa, aperto | browser locale | T (implicito) |
-| Variabili d'ambiente `RL_AI_PROVIDER`, `RL_USER_DATA_DIR`, `RL_LOCAL_DATA_DIR`, `RL_WORKER_*_MS`, `RL_E2E*`, `RL_PACKAGED_TEST` | nessuna interfaccia | — | ambiente | S (solo sviluppo/test) |
+| Vista Libreria, scheda laterale, chat aperta, pannello del lettore | `localStorage` (`rl.libraryView`, `rl.libraryTab`, `rl.chatOpen`, `rl.readerSide`) | elenco, cartelle, chiusa, aperto | browser locale | T (implicito) |
+| Variabili d'ambiente `RL_*` | nessuna interfaccia | — | ambiente | S (solo sviluppo/test) |
 
-Proposta di raggruppamento per l'architetto: **Generale** (lingua, aspetto, profilo essenziale), **Libreria** (nome, lingua documenti, cartelle escluse, scansione), **Claude** (account e accesso con stato chiaro, cartelle abilitate, conferma, tetto di spesa), **Backup**, **Scorciatoie**, **Sviluppatore** (programma Claude Code, fornitore, modelli e prezzi, MCP completo con porta/token/scrittura/registro, chiave Gemini, estensioni scansionate, giorni di pulizia, cartella dati, manutenzione e diagnostica, registri).
+Raggruppamento proposto: **Generale** (lingua, aspetto, profilo essenziale), **Libreria** (nome, lingua documenti, cartelle escluse, scansione), **Claude** (account e accesso, cartelle abilitate, conferma, tetto di spesa), **Backup**, **Scorciatoie**, **Sviluppatore / Avanzate** (programma Claude Code, fornitore, modelli e prezzi, MCP completo, chiave Gemini, estensioni, giorni di pulizia, cartella dati, manutenzione e diagnostica, registri).
 
 ---
+
+## Interfaccia inglese
+
+Schermate `run4-en/en-001…159` e `run5-en-reader/en-042…062`. Struttura e difetti uguali all'italiano (stesse misure di contrasto, stessa deformazione del lettore, stessa contaminazione CSS, stesso fuoco perso nell'export, stesso ripristino tagliato); in più:
+- **importante** — Prima schermata in italiano (N20).
+- **importante** — Testi rotti: "Close but do not look it" (`run4-en/en-016-…`); "Your values win over the ones read from the file." (`run4-en/en-014-…`).
+- **importante** — Tre nomi per la cartella di arrivo: "Inbox" (barra laterale), "Arrivals" (scheda), "Go to Arrivals" (scorciatoia); "AI proposals" vs "Go to AI proposals to review" (`run4-en/en-064-…`, `run4-en/en-098-…`).
+- **minore** — Gergo e calchi: "Propose with AI…" (meglio "Suggest with AI…"), "Export second brain…" nella barra e "Export as second brain…" altrove, "Size for an agent: about 1,176 tokens (index 108)", "Rebuild index" come link, "Show missing documents" (meglio "Show missing files").
+- **minore** — I testi inglesi sono più lunghi: impostazioni 8309 px contro 8142; "Show in folder" e "Propose with AI…" vanno a capo su tre righe nella scheda; nessun titolo tagliato in modo illeggibile, ma 8 schermate su 159 hanno titoli con puntini (chat aperta, 1024 px).
+- **minore** — Date e numeri seguono la lingua (11/17/2026, 10:36:07 PM; 1,176): corretto.
+- Chiari e da tenere: il conflitto delle scorciatoie ("Two commands cannot share a key. Fix this to save"), l'introduzione del ripristino, le frasi sull'AI ("Written by the AI, read-only. Your own fields are kept apart.").
+
+---
+
+## Temi e dimensioni (matrice)
+
+Schermate `run3/it-139…170-m-*` e `run4-en/en-117…148-m-*` (scuro 1280×800, chiaro e scuro 1920×1080, chiaro 1024×700).
+- **importante** — 1024×700: barra di stato di 100 px su 5 righe, barra di selezione su 3 righe, elenco con 2,5 righe visibili (`run3/it-164-…`).
+- **importante** — Dopo il lettore la barra laterale è una "carta" fluttuante in tutte le schermate della matrice (sintesi 2).
+- **minore** — Scuro: contrasto buono tranne i badge di formato (N19); pagina PDF bianca senza bordo.
+- **minore** — 1920×1080: pagine dell'app larghe 860 px a sinistra con 800 px vuoti a destra (`run3/it-153-m-settings-light-1920x1080.png`, `run3/it-149-m-projects-light-1920x1080.png`).
+- **minore** — A 1024 px la finestra risulta larga 1025 px (scala frazionaria): misure valide.
 
 ## Cosa funziona e va tenuto
 
-- La **ricerca**: immediata, sintassi ricca (frasi, prefissi, OR, campi), indica dove ha trovato il testo (nota, evidenziazione, pagina), risultato vuoto chiaro. È il riferimento di qualità.
-- **Contrasto e focus**: in 138 schermate i soli testi sotto WCAG AA sono i badge "MD"/"PDF"; il focus è sempre visibile e l'ordine del Tab è logico.
-- **Trasparenza sull'AI**: anteprima di cosa viene inviato, costo stimato, registro, marcatura "Generato dall'AI" separata dai campi dell'utente.
-- **Sicurezza dei dati**: originali intatti, testi che lo ripetono nei punti giusti (procedura guidata, export, backup).
-- Procedura guidata breve e in un dialogo chiaro, con passo e totale ("Passo 3 di 7").
-- Temi chiaro/scuro coerenti nei token (salvo i problemi indicati), testo leggibile, buon uso dei messaggi vuoti con istruzioni.
-- Annulla/Ripeti con cronologia per ogni modifica di dati.
+- La **ricerca**: immediata, sintassi ricca, indica dove ha trovato il testo, stato vuoto chiaro (richiesta dell'utente: va tenuta).
+- **Contrasto e fuoco**: in 344 schermate (it + en) i soli testi sotto WCAG AA sono i badge di formato; fuoco sempre visibile, Tab in ordine.
+- **Trasparenza sull'AI**: anteprima, costo, registro, marcatura "Generato dall'AI".
+- **Backup**: stima prima, verifica dopo, ripristino come nuova libreria senza sovrascrivere.
+- **Export**: risultato con contatori e protezione delle modifiche fatte a mano; avviso prima di esportare documenti non abilitati all'AI.
+- **Scorciatoie**: registrazione, Esc e conflitti chiari.
+- Procedura guidata breve con passo e totale; temi coerenti nei token; Annulla/Ripeti con cronologia.
+
+## Limiti di questo audit (cosa non si è potuto provare e perché)
+
+- **Vero trascinamento di file dal sistema**: Playwright non trascina file del sistema operativo in Electron; provati la sovrapposizione con un evento simulato e l'aggiunta via IPC.
+- **Finestre native** ("Apri un file di backup…", "Scegli…" dell'eseguibile di Claude Code): nessun aggancio di test; con la finestra fuori schermo bloccherebbero l'esecuzione.
+- **Tassonomia in inglese**: il passo dello script fallisce dopo il primo tag (il pulsante "Create" è attivo; il secondo inserimento non trova il campo): difetto dello script non risolto; la tassonomia è coperta in italiano.
+- **Account Claude e fornitore reali**: solo fornitore simulato (regola 6).
+- **PDF protetto, danneggiato o scansionato senza testo**: le librerie sintetiche non ne contengono; lo stato d'errore del lettore non è stato visto.
+- **Rete reale** (citazioni, Scopri con dati): prove offline per regola.
+- **DPR 1, 1,25, 1,5**: la macchina ha 1,198; la deformazione residua (+0,8/+1,3%) va rimisurata con altre scale.
+- **Librerie grandi, progetti pieni**: fuori dallo scopo delle librerie sintetiche (4-6 documenti); i carichi sono in `qa-*`.
 
 ---
 
-## DA COMPLETARE
+## Attacco al progetto dell'architetto
 
-Interrotto su richiesta (prima esecuzione completa, seconda esecuzione fermata a 16 schermate). Mancano:
+Oggetto: `docs/design/ARCHITETTURA-UI.md` sul ramo `design-arch` (5d56f8b; il documento è identico a 32e13c8, 1026 righe) **più** le decisioni D-325…D-344 dello stesso ramo, che descrivono il "giro 2". Riferimenti "§" al documento, "D-" alle decisioni.
 
-- Esecuzione in inglese (`en`): controllo di lunghezze e terminologia inglese (nessuna schermata ancora).
-- Scheda del documento (pannello di dettaglio), "Simili" e "Citazioni" del documento, assegnazione di un tag dalla scheda: il clic doppio dello script non apre la scheda (anche nella seconda esecuzione): va aperta con il pulsante "Scheda" della barra di selezione o con Invio.
-- Misura dell'errore di posizione delle evidenziazioni a 1920 px (passo `reader-1920-selection` aggiunto allo script, non ancora eseguito).
-- Dialogo di export completo (destinazione, esecuzione, risultato), export da progetto e da cluster.
-- Server MCP acceso (il clic sulla casella non ne cambiava lo stato nella prima esecuzione: da capire se serve la conferma o se è disabilitato).
-- Backup verso una destinazione valida, verifica, ripristino completo (serve un percorso fuori libreria: il dialogo di test restituisce sempre la radice della libreria).
-- Registrazione di una scorciatoia e conflitti; manutenzione (diagnostica), registro AI.
-- Lista dei progetti con più progetti, piano di lettura, note del progetto; schede di Scopri con dati (Fonti: modulo nuova fonte).
-- Vero trascinamento di un PDF (non automatizzabile) e stato di errore del lettore (PDF protetto o danneggiato).
-- Dialoghi aperti dopo il caricamento del lettore: verificare l'effetto della regola `.dialog` di pdf.js.
+Giudizio sintetico: la struttura (Libreria, Da rivedere, Progetti, Scopri, Mappa + Claude/Aiuto/Impostazioni; chip Attività; Impostazioni a 7 sezioni con "Sviluppatore / Avanzate"; lettore a strumenti) risponde alle richieste dell'utente, e il giro 2 corregge molte debolezze del primo (CSS di pdf.js, Invio e doppio clic, Annulla in un posto solo, disposizione adattiva, salvataggio uniforme). Restano tre punti deboli: (1) la scrittura nei PDF è progettata come problema di formato e non di **consenso, cartella sincronizzata e dati già storti**; (2) il documento sul ramo non contiene ancora il giro 2 (D-325 parla di una tabella "§0" che nel file non c'è): oggi due fonti si contraddicono, e un compito che legge solo il documento implementerà il primo giro; (3) l'ordine delle onde lega correzioni urgenti e semplici a parti rischiose.
 
-Screenshot presi finora: `audit-shots/run1/it-001…it-138*.png`, `run1/it-welcome-card-only.png`, `run1/it-inbox-card-detail.png`, misure in `run1/metrics-it.json`; seconda esecuzione parziale `audit-shots/it-001…it-015*.png`, `audit-shots/metrics-it.json`.
+**Problema 0 (importante): due fonti in disaccordo.** Esempi: §8.1 rinomina solo `.page`, D-326 rinomina sette classi e usa `@layer`; §4.3 lascia la barra di studio come menu, D-332 cambia i tasti; §8.3.7 `author: 'profile'`, D-328 `'none'`; §6 sezioni con "Salva", D-336 salvataggio automatico. Correzione: riscrivere il documento con il giro 2 **prima** di assegnare qualsiasi compito, e togliere dal documento ciò che le decisioni superano.
 
-Come riprendere: in Git Bash, `export PATH="/c/Program Files/nodejs:$PATH"`, dalla radice del worktree `npm run build`, poi `RL_DESIGN_AUDIT=1 npx playwright test -c e2e/playwright.config.ts e2e/design-audit.spec.ts` (circa 6 minuti per lingua; `-g "Italian UI"` o `-g "English UI"` per una sola; `RL_DESIGN_AUDIT_FULL_EN=1` per il giro completo anche in inglese). Spostare prima le schermate esistenti in una sottocartella di `audit-shots/` perché i nomi si sovrascrivono.
+### A. I risultati dell'audit: il progetto li risolve?
+
+| # | Risultato | Risolto? | Dove | Cosa manca |
+| --- | --- | --- | --- | --- |
+| S1 | PDF deformato, evidenziazioni fuori posto | **sì** per il CSS | §8.1, D-326 | **No** per le annotazioni già salvate storte (N1): nessuna riparazione prevista |
+| S2 | `pdf_viewer.css` contamina l'app | **sì** (giro 2) | D-326 (rinomine, `@import … layer(pdfjs)`, test delle classi e dello stile della barra laterale) | Il documento §8.1 non lo dice ancora; `@layer` fa vincere l'app nei conflitti ma **non impedisce** alle regole di pdf.js di applicarsi a proprietà che l'app non imposta (es. `--sidebar-*`, `position`): serve anche `@scope (.reader-pages)` o un foglio filtrato. `.textLayer` "voluta" va verificata: l'app la usa per la ricerca? |
+| S3 | Annotazione senza strumenti | **sì** | §8.2, D-332 | Vedi B.5 |
+| S4 | Impostazioni in una pagina | **sì** | §6, §4.6-4.8, D-336, D-341 | Stato "salvato/errore" per campo non disegnato |
+| S5 | Account Claude | **sì, con rischi** | §10, D-330 | B.4 |
+| S6 | Badge Arrivi | **sì** | §7.1, D-338 | B.3 (badge che diventa enorme) |
+| S7 | Scansione nascosta | **sì** | §9 | — |
+| S8 | Evidenziazioni non nel PDF | **sì (decisione dell'utente)** | §8.3, D-316…D-318, D-331 | B.2 (consenso, sincronizzazione, dati storti) |
+| S9 | Poco spazio per il PDF | **parzialmente** | §4.3 | La barra in alto del guscio aggiunge una riga sopra il lettore; la barra del lettore resta su due righe (B.6) |
+| S10 | Barra di stato come notifiche, toast | **sì** | §7 | Tabella evento → mezzo mancante (B.3) |
+| S11 | Chat che rompe la Libreria | **sì** | D-335 | Soglie da verificare (B.6) |
+| S12 | Scheda difficile da aprire | **sì** | D-333 | Con "un clic mostra la scheda" a 1280 px **ogni** clic nasconderebbe il pannello di sinistra (N3) se la soglia di D-335 non scatta prima: va misurato |
+| S13 | Export: fuoco perso, conferma fuori vista | **parzialmente** | D-339 (piede sempre visibile) | Fuoco dopo "Esporta" e Esc non citati: il piede fisso non basta se il fuoco resta su `body` |
+| S14 | Ripristino tagliato, librerie omonime | **parzialmente** | D-339 (piede visibile nei dialoghi lunghi: export e lavori AI) | Il dialogo di ripristino non è citato; nomi duplicati e "Apri la libreria ripristinata" mancano |
+| S15 | Gerarchia, stati dei pulsanti, `<dl>`, testi | **parzialmente** | §5.5, D-340 (livelli di pulsante), §11 | Stati hover/fuoco/disattivato e componente chiave–valore assenti (B.9); testi rotti N5 non citati |
+| N2-N4 | Scheda: apertura, pannello nascosto, modulo lungo | **parzialmente** | D-333 | La scheda resta un modulo di modifica (§4.2 mostra una vista di lettura, ma nessuna regola dice "lettura prima, modifica su richiesta") |
+| N5-N6 | Simili e Citazioni | **no** | — | Testi e "due clic per vedere le citazioni" non trattati |
+| N9-N11 | Ripristino e backup | **no** | §6 sposta il backup ma non lo ridisegna | Pulsanti tagliati, campo grigio senza motivo, 4 pulsanti uguali |
+| N12 | Avviso di ascoltatori in console | **no** | — | Da correggere nel compito che tocca `lib/events` |
+| N13 | MCP tecnico tra le impostazioni normali | **sì** | §6.2 (Avanzate) | — |
+| N14 | Scorciatoie: tabella che salta | **no** | — | Larghezze di colonna fisse |
+| N15 | Chip del tag sul percorso | **parzialmente** | §5.3 (righe 36/56 px) | Con tag e frammento serve una terza altezza o il troncamento del chip |
+| N16 | Cronologia non si chiude con Esc | **sì** | D-334 | — |
+| N20 | Prima schermata in italiano | **no** | — | Lingua iniziale dal sistema (`app.getLocale()`), "Benvenuto/Welcome" nella lingua rilevata |
+| N21 | Alt+N fuori ordine | **sì** | §2, A2 (Alt+1…5 nell'ordine nuovo) | — |
+| N22 | Modello/Ragionamento in Arrivi, nome in maiuscolo | **parzialmente** | D-338 (righe compatte) | Non detto dove vanno modello e ragionamento della cartella di arrivo |
+| N23 | Spaziatura di "Salva" | **sì** | D-336 (niente pulsanti Salva) | — |
+
+### B. Problemi del progetto (con correzione proposta)
+
+#### B.1 CSS del lettore (importante)
+- D-326 è la correzione giusta, ma `@layer` regola solo chi vince nei conflitti: le dichiarazioni di pdf.js su proprietà che l'app non tocca continuano a valere su ogni elemento con quella classe. Le rinomine bastano solo se **nessuna** classe dell'app coincide con una di pdf.js, oggi e domani. Correzione: `@scope (.reader-pages) { @import … }` (o foglio filtrato a build time) **e** il test delle classi; il test `leakedRules` di questo audit come e2e permanente.
+- §8.1 dice che la scala frazionaria "non è la causa": vero per il fattore 0,67, ma resta una deformazione di +0,8/+1,3% a DPR 1,198 (arrotondamento a 5 px separato sui due assi). Il criterio "entro 0,5%" di D-326 **fallirà** su questa macchina se non si tratta anche questo (altezza derivata dalla larghezza arrotondata, non arrotondata a parte).
+- Manca la riparazione N1: un compito che, all'apertura di un documento, ricalcola i rettangoli delle annotazioni salvate con la pagina deformata (si riconoscono confrontandoli con le posizioni del testo citato nello strato di testo) e lo dice all'utente ("3 evidenziazioni riposizionate"). Va fatto **prima** della prima scrittura nel PDF.
+
+#### B.2 Scrittura nei PDF originali (bloccante prima dell'onda 4)
+Il formato è progettato con cura e il giro 2 aggiunge riconciliazione, giornale dei temporanei, rifiuto dei segnaposto di OneDrive e gestione delle copie in conflitto (D-331). Restano:
+1. **Consenso.** `writeToPdf` predefinito acceso (D-316) anche per le librerie esistenti; il banner "primo uso" (§8.3.5) arriva **dopo** la prima scrittura. La regola 1 è tra i "Vincoli che non si negoziano" di `CLAUDE.md`: l'utente l'ha cambiata, ma deve vederlo prima che succeda al singolo file. Correzione: alla prima evidenziazione di ogni libreria un dialogo "Salvare le evidenziazioni anche dentro i PDF?" con [Sì, anche nel PDF] predefinito e [Solo nell'app]; nelle librerie nuove un passo della procedura guidata. Mai una scrittura senza quel clic.
+2. **Lotti ogni 4 s in una cartella sincronizzata.** `copyFile` + `rename` a ogni lotto = il servizio di sincronizzazione ricarica **l'intero file** a ogni lotto (un libro da 80 MB evidenziato per un'ora = decine di caricamenti completi), e ogni sostituzione durante un caricamento può generare una copia in conflitto (D-331 la riconosce, ma meglio non crearla). Correzione: lotti alla chiusura del documento, al cambio di documento e dopo 60 s di inattività (non 4 s); valutare nello spike S2 la scrittura in coda sul file stesso (`r+`, scrittura alla fine, `fsync`) dopo la verifica del prefisso, che non cambia identità del file né attributi e riduce i conflitti.
+3. **Due computer.** La regola dello scanner (§8.3.4 punto 2: "prefisso uguale al vecchio hash") tratta come "contenuto cambiato" il file in cui **l'altro** computer ha scritto prima della sincronizzazione del record se anche questo computer ha scritto: le annotazioni diventano "non allineate" e spariscono dal lettore. La riconciliazione di D-331 aggiusta il PDF ma non l'identità. Correzione: classificare un aggiornamento incrementale come "solo annotazioni" **leggendo la revisione aggiunta** (solo `/Annot`, aspetti e pagine in cui cambia solo `/Annots`), indipendentemente da chi l'ha scritta: vale per l'altro computer e per Acrobat, e non serve rileggere il testo.
+4. **PDF cifrati con password utente vuota** (permessi dell'editore): molto comuni negli articoli scaricati. Il rifiuto totale (D-331) escluderebbe una parte grande di una libreria reale con un "solo nell'app" che l'utente non capisce. Correzione: nello spike S2 contare la quota su una libreria reale (conteggio locale, nessun nome committato); se rilevante, supportare RC4/AES con password vuota, altrimenti rendere **obbligatoria** "Esporta copia annotata" (oggi facoltativa in onda 5) e scrivere il motivo nel chip ("PDF protetto dall'editore").
+5. **Firmati.** Rifiutare solo con una firma presente (`/V`) o `/Perms /DocMDP`, non per `/SigFlags` con campi firma vuoti (moduli).
+6. **"Dati dopo `%%EOF`" rifiutati** (D-331): frequenti nei PDF scaricati; si può aggiungere dopo senza toccarli. Correzione: accettarli; supportare `/XRefStm` (xref ibride, non citate).
+7. **Ripristino distruttivo.** "Ripristina il PDF originale" e "Ripristina e riscrivi in una revisione" (D-331, al limite di 200) troncano il file e perdono le annotazioni di altri programmi. Correzione: azione principale "Togli dal PDF le evidenziazioni di Research Lab" (una revisione che toglie solo gli oggetti `rl-`); il troncamento in Avanzate.
+8. **Copia di sicurezza nella cartella dati sincronizzata** (D-327, provvisoria): raddoppia lo spazio cloud dei PDF annotati. Il prefisso garantito rende il troncamento sufficiente quasi sempre. Correzione: predefinito `'local'`, `'data'` come scelta.
+9. **Osservatore dei file.** La propria scrittura arriva all'osservatore prima che `own` sia aggiornato (§8.3.3 punto 8). Correzione: hash atteso registrato in memoria prima della rinomina; evento corrispondente ignorato.
+10. **Colori in tema scuro.** §5.2: `screen` al 35% in scuro, ma la pagina PDF resta **bianca**: `screen` su bianco dà bianco, le evidenziazioni spariscono. Correzione: `multiply` sempre sulla pagina.
+
+#### B.3 Notifiche e "Da rivedere" (importante)
+- Il badge somma file nuovi e documenti con proposte (§7.1): dopo "Proponi con l'AI" su 300 documenti vale 300 e resta lì; contraddice "i numeri chiedono una decisione". Correzione: numero = file nuovi; per le proposte un punto e il numero sulla scheda interna.
+- Manca una tabella evento → mezzo (chip, banner, toast, dialogo) per ogni evento esistente (scansione, citazioni, lavori AI, backup automatico, export, MCP, scritture PDF, tetto di spesa): senza, ogni compito deciderà a modo suo e tornerà la barra di stato. Correzione: la tabella nel documento.
+
+#### B.4 Account Claude (importante)
+- "Cambia account…" apre una **console** con `claude auth login` (§10.2): per un utente non tecnico la parte più confusa dell'app, mentre la richiesta era "facilmente". Correzione: il dialogo dice cosa apparirà (finestra di Claude Code, poi il browser); se la CLI lo consente (spike S1) login con URL nel browser senza console; account corrente anche nell'intestazione del pannello Claude.
+- L'osservatore di `~/.claude` presume un file di credenziali: dove la CLI usa il Gestore credenziali l'evento non arriva. "Ho finito, verifica" deve essere il pulsante **primario**.
+- "Esci da Claude Code…" esce anche dal terminale dell'utente e non serve per cambiare account: nel menu ⋯, non nel flusso principale.
+- "Prova la connessione" spende denaro senza anteprima: scriverlo sul pulsante ("Prova · circa 0,001 $").
+
+#### B.5 Lettore a strumenti (importante)
+- **Spazio**: D-332 esclude "Spazio tenuto = mano" e Spazio non scorre più. Va bene per la richiesta dell'utente, ma ogni lettore PDF (Chrome compreso) scorre con Spazio: va detto la prima volta (suggerimento "Spazio cambia strumento; per scorrere usa PagGiù") e Maiusc+Spazio/PagGiù devono restare.
+- **Tasti a lettera singola** "solo con il fuoco nella regione del lettore" (D-332): dopo un clic nel pannello note o nella ricerca il fuoco cambia regione senza segnale; serve un indicatore dello strumento vicino al punto di lavoro (bordo della pagina o cursore), non solo il pulsante premuto nella barra flottante.
+- La barra flottante **sopra** le pagine copre le prime righe a inizio pagina. Correzione: nella barra del lettore o `scroll-padding-top` pari alla sua altezza.
+- Gomma con trascinamento (§8.2): un gesto sbagliato cancella molte annotazioni, scritte anche nel PDF. Correzione: oltre 3 annotazioni chiede conferma; Annulla sempre disponibile.
+
+#### B.6 Spazio e finestre piccole (importante)
+- D-335 mette il pannello Claude in sovrapposizione sotto 1180 px; tra 1180 e ~1500 px con Claude aperto e la scheda aperta restano circa 300 px per l'elenco (barra laterale 232 + Claude 380 + scheda 360). Correzione: scheda e Claude mai affiancati sotto 1600 px (uno dei due sovrapposto).
+- Lettore: barra del guscio + barra del lettore su **due** righe (§4.3) + barra flottante. Correzione: nel lettore la barra del guscio si fonde con quella del lettore in una riga.
+- Nessuna larghezza minima della finestra dichiarata (D-335 dichiara solo la vista ≥ 640 px): dire cosa succede a 1024×700.
+
+#### B.7 Cose che confonderanno l'utente
+- **"Mappa" contiene "Rete"** (§2): sezione Mappa con schede Mappa e Rete. Correzione: schede "Argomenti", "Citazioni", "Esplora", "Vicini inattesi".
+- **"Chiedi a Claude"** nella barra della Libreria apre la ricerca AI, "Claude" nella barra laterale la chat (§4.2 lo mantiene). Correzione: "Cerca con Claude".
+- **"Sottolineato"** come stato di studio convive con le sottolineature vere scritte nel PDF: ancora più ambiguo. Correzione: rinominarlo ("Studiato a fondo") o derivarlo dalle annotazioni.
+- **Anteprima in linea dopo la prima conferma** (D-339): utile, ma la regola 4 chiede la conferma "di default" prima di ogni invio; un utente può non notare che un turno successivo include un documento nuovo della stessa cartella. Correzione: l'anteprima in linea elenca i documenti **nuovi** rispetto al turno precedente in grassetto, e qualunque documento nuovo (non solo una cartella nuova) riporta il dialogo.
+- **Libreria omonima dopo il ripristino**: il progetto non tratta i nomi duplicati nel selettore di libreria (popover §2). Correzione: suffisso automatico "(ripristinata il …)" e cartella radice mostrata nel popover.
+
+#### B.8 Funzioni dimenticate o a rischio (bloccante: nessuna funzione si toglie)
+| Funzione di oggi | Nel progetto | Correzione |
+| --- | --- | --- |
+| Riga della **sintassi di ricerca** | la ricerca passa nella barra in alto (§3); la riga non è citata | menu della ricerca vuota con la sintassi + guida; lo spostamento della ricerca (la funzione che l'utente vuole tenere) va provato con `search-basic`/`qa-search-perf` e a 1024 px |
+| Schede **Nota di pagina / Nota del file / Tutte le note** | diventano "Note" (§4.3) | selettore Pagina / File / Tutte dentro "Note" |
+| Icone di riga **Leggi / Apri il file / Mostra nella cartella** | D-333: "Leggi, Scheda, ⋯" | "Mostra nella cartella" deve stare nel menu ⋯, scritto |
+| Barra di stato: "Invio a Claude: N cartelle", "Indice aggiornato: N documenti", lingua dei documenti | §2 la toglie; cita libreria, AI, versione | "Indice: N documenti" nel popover Attività; cartelle abilitate nell'intestazione Claude |
+| **Seme** della mappa | D-344 (menu "Opzioni del modello") | ok |
+| **Includi sottocartelle** | non citato | resta nel pannello Cartelle |
+| Esportazione da **cluster** della mappa | non citata | menu ⋯ del cluster |
+| **Selettori modello e ragionamento** nella cartella di arrivo (N22) | non citati | tenerli come chip nella barra di "Da rivedere", con la spiegazione "per le proposte di Claude sui file nuovi" |
+| "**Proponi di nuovo**" e i 5 campi del dialogo dei lavori AI | non citati | restano nel dialogo con il piede fisso (D-339) |
+| **Registrazione delle scorciatoie con conflitti** | §6 "editor esistente" | ok; aggiungere "Annulla le modifiche" (N14) |
+
+#### B.9 Sistema visivo (minore)
+- `--text-muted` (#5A5D65) e `--text-subtle` (#62656D) quasi uguali: due token per una differenza invisibile. Correzione: un solo grigio secondario; il terzo livello con dimensione e peso.
+- `--accent` blu e `--ai` viola si confondono con deuteranopia/protanopia; il bordo AI di 3 px e il bordo del campo attivo si somigliano. Correzione: l'icona ✦ in ogni blocco AI, non solo nell'etichetta.
+- Stati dei pulsanti (riposo, hover, premuto, fuoco, disattivato, in corso) non tabellati: oggi il fuoco sembra "disattivato" (sintesi 15). Correzione: tabella degli stati per ogni variante.
+- Nessun componente chiave–valore (§5.5): i `<dl>` restano senza stile in scheda, export, AI, MCP. Correzione: `KeyValue` a due colonne.
+- Pagina PDF: D-340 aggiunge token per ombra e bordo della pagina: bene, ma §5.3 va aggiornato.
+
+#### B.10 Leggerezza e budget (importante)
+- JS iniziale stimato 386-390 KiB su 391 (D-342): 1-5 KiB di margine per guscio, briciole, chip, popover, icone, tavolozza con documenti e indice delle impostazioni. Correzione: l'indice delle impostazioni (`settingsIndex.ts`, etichette in due lingue) si carica con la tavolozza, mai dal guscio; budget per file nel compito A2.
+- Verifica della scrittura "con pdf.js nel worker" a ogni lotto: per un PDF da 80 MB un picco di memoria e CPU ogni pochi secondi. Correzione: verifica leggera a ogni lotto (coda e oggetti nuovi col parser proprio), pdf.js solo alla prima scrittura di un file.
+- Il CSS diviso per vista non libera memoria dopo la prima apertura dei chunk: non contarlo come risparmio senza misura.
+
+#### B.11 Ordine delle onde (importante)
+1. Il **PDF stirato** sta in A1 con il rifacimento di tutto il CSS. Correzione: compito **H0 in onda 0**, da solo (rinomine di D-326, `@layer`/`@scope`, test di geometria e di contaminazione, riparazione N1), unito subito.
+2. Il **lettore a strumenti** (F4, solo renderer) aspetta l'onda 4 perché condivide l'onda con lo scrittore. Correzione: F4 in onda 3; il chip "PDF" arriva in onda 4.
+3. **G4b dopo G4a**: tra i due merge `main` avrebbe la scrittura accesa e l'identità del contenuto non adattata → ogni evidenziazione renderebbe il documento "cambiato" e le annotazioni "non allineate". Correzione: G4b prima di G4a, o `writeToPdf` dietro un interruttore spento fino al merge di G4b.
+4. Onda 2: A2 e C2 in parallelo toccano entrambi `ai-ui.spec.ts`, `helpers/ui.ts` e testid che passano dall'uno all'altro (`status-ai`, `language-select`). Correzione: proprietà dei file e2e scritta per compito, o C2 dopo A2.
+5. La guida d'uso non ha un compito: cambiano nomi, Esc, Invio, strumenti, scrittura nel PDF, e la guida oggi ha già contraddizioni (N18). Correzione: ogni compito aggiorna la guida per il comportamento che cambia (criterio di accettazione).
+6. D-325 rimanda all'onda 6 le verifiche che questo audit ha ora fatto (inglese, scheda, export, MCP, backup, scorciatoie): i risultati sono qui sopra; vanno assegnati ai compiti delle onde 2-3, non all'onda 6.
+
+#### B.12 Stati mancanti
+- Lettore: PDF che non si apre (danneggiato, password di apertura), PDF senza testo (gli strumenti non possono funzionare: la barra deve dirlo), file mancante sul disco.
+- Scrittura PDF: una frase per l'utente per ogni motivo di rifiuto (§8.3.8 elenca solo codici).
+- Account: CLI non installata, CLI senza `auth`, offline durante "Prova".
+- Da rivedere: "Tutto fatto" quando è vuoto; metadati non trovati offline.
+- Impostazioni: ricerca senza risultati; "Valori diversi dal predefinito" vuoto; errore di salvataggio automatico (D-336).
+- Backup e ripristino: cartella non vuota alla scelta, ripristino riuscito con "Apri la libreria ripristinata", librerie omonime.
+- Prima apertura in una lingua diversa dall'italiano (N20).

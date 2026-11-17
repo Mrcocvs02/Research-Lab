@@ -9,16 +9,16 @@ Stato di passaggio per riprendere il lavoro dalla chat originale. Prima di fare 
 1. `CLAUDE.md` (regole di lavoro, modelli per compito, commit, comandi);
 2. `docs/STATUS.md` (fase, onda, fatto, in corso, bloccato, prossimo);
 3. `docs/HISTORY.md` (cronologia di fasi, revisioni ed eventi);
-4. `docs/DECISIONS.md` (le ultime voci D-280..D-306 e quelle successive).
+4. `docs/DECISIONS.md` (le ultime voci: D-280..D-306, poi D-310..D-382 per il design dell'interfaccia).
 
 Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo file va poi aggiornato.
 
 ## 2. Aggiornato
 
-- Data: 2026-11-17.
-- Ultimo merge su `main`: `c40cb01` (p8-fix-e2e, D-305, D-306), verifica finale verde su questo commit. Tag `phase-6` e `phase-7` creati su `c40cb01` e pubblicati su `origin`.
-- Installer di rilascio costruito (`apps/desktop/release/ResearchLab-Setup-0.0.0.exe`, 131 MB, non firmato) e copiato in `C:UsersPublic`, con due librerie di prova generate in `C:UsersPublicRL-prova` (`libreria-it`, `libreria-en`).
-- Rami di lavoro aperti (NON uniti): `design-arch` e `design-audit`, pubblicati su `origin` come copia di sicurezza.
+- Data: 2026-11-17 (sera e notte).
+- Ultimo merge su `main`: `14ceee1` (merge di `design-arch`), preceduto da `8000850` (merge di `design-audit`). Typecheck e `check:generality` verdi dopo i merge; push fatto. Tag `phase-6` e `phase-7` su `c40cb01`, pubblicati su `origin`.
+- Installer di rilascio costruito (`apps/desktop/release/ResearchLab-Setup-0.0.0.exe`, 131 MB, non firmato) e copiato in `C:UsersPublic`, con due librerie di prova generate in `C:UsersPublicRL-prova` (`libreria-it`, `libreria-en`). Costruito prima della progettazione, quindi da rifare dopo le ondate.
+- Nessun ramo di lavoro aperto: `design-arch` e `design-audit` sono uniti in `main`.
 
 ## 3. Cosa e successo in questa sessione
 
@@ -36,34 +36,38 @@ I test rimandati nelle versioni precedenti del file sono stati eseguiti il 2026-
 
 Se in futuro la RAM libera non basta, la suite si ferma da sola: rieseguire solo i test mancanti, mai due pesanti insieme.
 
-## 5. In corso: riprogettazione dell'interfaccia (2026-11-17 sera)
+## 5. Progettazione dell'interfaccia: chiusa (2026-11-17 notte)
 
-Richieste dell'utente dopo aver provato l'app (da soddisfare tutte):
-- grafica poco attraente; impostazioni molto confuse; navigazione difficile; tutto piu chiaro e ordinato;
-- una sezione "Sviluppatore / Avanzate" con tutte le impostazioni non predefinite e tecniche;
-- cambiare account Claude in modo facile; scansione piu facile da trovare e fare;
-- la notifica sulla cartella di arrivo non si capisce;
-- lettore: il PDF appare stirato in orizzontale (difetto); annotazioni a STRUMENTI: prima si sceglie lo strumento (sposta, evidenziatore, sottolineatura, colore) poi si passa sul testo; la barra spaziatrice alterna lo strumento attuale e l'ultimo usato;
-- **DECISIONE DELL UTENTE**: evidenziazioni e sottolineature vanno SCRITTE NEL PDF ORIGINALE (devono vedersi in Chrome). Cambia la regola 1 solo per questo caso: aggiunta in coda di annotazioni PDF standard (aggiornamento incrementale, byte esistenti mai riscritti), copia di sicurezza dell'originale prima della prima scrittura, scrittura atomica, PDF cifrati/firmati esclusi, interruttore per libreria (acceso di default), comando "ripristina originale". Attenzione all'identita per hash (annotazioni, miniature, cache, duplicati). Area da revisione di sicurezza dedicata. RULES.md e CLAUDE.md vanno aggiornati con l'eccezione.
-- la ricerca funziona bene: va tenuta.
-- "fai tu i test della fase 8": l'agente fara installazione silenziosa in una cartella temporanea, avvio, disinstallazione e controllo dei dati (salvando e ripristinando prima le impostazioni dell'account dell'utente); il secondo account Windows non e accessibile all'agente.
+La fase di progettazione è chiusa e non ci sono subagent attivi. L'implementazione non è ancora partita: attende l'approvazione di P0 da parte dell'utente.
 
-Metodo scelto dall'utente: le scelte di struttura e grafica le fanno DUE subagent **Opus 5.5**:
-1. **architetto designer**, worktree `C:devl-wtdesign-arch` (ramo `design-arch`): scrive `docs/design/ARCHITETTURA-UI.md` (architettura dell'informazione, navigazione, sistema visivo, mappa delle impostazioni vecchie -> nuove, account Claude, scansione, notifiche, lettore a strumenti, scrittura nel PDF, piano di implementazione a ondate per subagent Sonnet), decisioni da D-310; nessuna modifica al codice dell'app in questo giro;
-2. **designer avversario**, worktree `C:devl-wtdesign-audit` (ramo `design-audit`): avvia l'app con Playwright su librerie sintetiche, fotografa ogni vista e dialogo (chiaro/scuro, 1280x800, 1920x1080, 1024x700; immagini in `audit-shots/`, mai committate), prova ogni funzione, scrive `docs/design/AUDIT.md` e `e2e/design-audit.spec.ts` (saltato senza `RL_DESIGN_AUDIT=1`), con la causa del PDF stirato.
+Documenti:
+- `docs/design/AUDIT.md`: audit dell'app con Playwright su librerie sintetiche, run in italiano e in inglese (run3 183 screenshot, run4-en 161, run5-en-reader). Gli screenshot stanno solo su disco in `C:\dev\rl-wt\design-audit\audit-shots`, non sono versionati.
+- `docs/design/ARCHITETTURA-UI.md`: architettura finale (stato "finale", giro 3 chiuso), decisioni D-310..D-382 in `docs/DECISIONS.md`. Ondate di implementazione al §14; principi di composizione §1.1 (D-366); Mappa §4.20 (D-367, task M4).
+- `docs/design/prototipo/index.html`: prototipo statico P0, un solo file, dati sintetici. Pubblicato all'utente come artifact privato.
+- `RULES.md` e `CLAUDE.md`: regola 1 aggiornata per scrivere le annotazioni nel PDF originale (decisione dell'utente).
 
-Stato al momento della pausa (tutto salvato e pubblicato su `origin`):
-- `design-arch` @ `32e13c8`: `ARCHITETTURA-UI.md` COMPLETO, decisioni D-310..D-324, regola 1 riscritta in `RULES.md` e `CLAUDE.md` del ramo (D-316, scelta dell'utente). Causa del PDF stirato: la classe `.page` dell'app (`styles.css` ~451-454, max-width 860px) si scontra con quella di pdf.js; inoltre `pdf_viewer.css`, importato globalmente in `engine.ts:2`, cambia gli stili `.sidebar` e `.dialog` dell'app. Piano in 7 ondate (0..6); budget proposti: main 1060 KiB, renderer 1640 KiB.
-- `design-audit` @ `7243a1e`: `AUDIT.md` PARZIALE (marcato DA COMPLETARE) ed `e2e/design-audit.spec.ts`; 141 screenshot del giro italiano in `C:\dev\rl-wt\design-audit\audit-shots\run1\` (non versionati). Mancano: giro inglese, pannello di dettaglio del documento, misura dello spostamento delle evidenziazioni a 1920, export completo, MCP acceso, backup e ripristino, registratore delle scorciatoie. Per riprendere: spostare gli screenshot esistenti in una sottocartella, `npm run build`, poi `RL_DESIGN_AUDIT=1 npx playwright test -c e2e/playwright.config.ts e2e/design-audit.spec.ts`.
-- Domande dell'architetto per l'utente, ancora senza risposta: (1) copia di sicurezza dei PDF annotati nella cartella dati sincronizzata o nella cartella locale dell'app; (2) nome dell'utente come autore nelle annotazioni, o nessun nome; (3) Esc non chiude piu il lettore; (4) consumo del mese nell'Account Claude per la libreria attiva o per tutte.
+Risultati da non dimenticare:
+- Le evidenziazioni fatte con la pagina stirata a 1920 px sono salvate con coordinate sbagliate (40 px a sinistra, 192 px oltre il testo, 58% di sovrapposizione). Serve la riparazione R0 (D-347); nessuna scrittura nei PDF prima di R0.
+- Il CSS di pdf.js filtra nell'app: il foglio va prefissato con `.reader-scroll` (D-346).
+- Lo stretch si corregge per primo, da solo (H0, D-354).
+- Scrittura nel PDF: su chiusura del documento o dopo 120 s di inattività (non ogni pochi secondi, per limitare gli upload di OneDrive); consenso per libreria con banner non modale prima della prima scrittura; mai cancellazione automatica delle annotazioni rimosse da altri programmi ("Da controllare"); flag di compilazione fino alla revisione di sicurezza.
+
+Default provvisori per le 4 domande, da confermare con l'utente (non ancora risposte):
+1. Copia di sicurezza dei PDF annotati nella cartella dati sincronizzata (si può passare alla cartella locale).
+2. Nessun nome autore nelle annotazioni PDF (opt-in).
+3. Esc non chiude il lettore.
+4. Nell'Account Claude il consumo del mese mostra la libreria attiva (totale di tutte al clic).
+
+Accento: "Petrolio" (teal) provvisorio oppure "Indaco". Lo sceglie l'utente.
+
+Budget proposti dal design, non ancora applicati a `tools/budgets.json`: main 1080 KiB, renderer iniziale 391 KiB, renderer totale 1655 KiB.
 
 Passi successivi, in ordine:
-1. completare i due documenti (riprendere i subagent Opus con il contenuto dei rami);
-2. secondo giro: l'architetto rivede il progetto con AUDIT.md; il designer avversario attacca il progetto rivisto; versione finale;
-3. implementazione a ondate con subagent Sonnet (al massimo 2 insieme, file distinti), poi revisioni indipendente e di sicurezza (scrittura nei PDF!);
-4. test finali uno alla volta, poi i test di fase 8 fatti dall'agente, poi tag `phase-8` e versione 1.0.0.
-
-Prima di riprendere, verificare lo stato reale: `git worktree list`, `git log` dei rami `design-arch` e `design-audit`.
+1. Utente: approva P0 (aspetto, colore d'accento, sensazione della mappa), conferma le 4 domande e sceglie l'accento. Senza approvazione non si parte con l'onda 1.
+2. Implementazione a ondate (`ARCHITETTURA-UI.md` §14) con subagent Sonnet, al massimo 2 insieme e su file disgiunti; prima H0 e R0.
+3. Revisione indipendente e revisione di sicurezza dedicata alla scrittura nei PDF originali; la scrittura resta dietro il flag di compilazione finché la sicurezza non passa.
+4. Test finali, uno alla volta.
+5. Fase 8: i test di installazione li fa l'agente (installazione silenziosa in una cartella temporanea, avvio, disinstallazione, controllo dei dati; impostazioni dell'account dell'utente salvate e ripristinate prima). Poi tag `phase-8` e versione 1.0.0 (D-262).
 
 ## 6. Come lavorare (preferenze dell'utente)
 
@@ -90,7 +94,7 @@ Comandi utili (in Git Bash, prima: `export PATH="/c/Program Files/nodejs:$PATH"`
 
 Da porre all'utente quando serve, senza bloccare il lavoro: decidere quanto possibile e registrare.
 
-- Fase 8, prova di installazione: `npm run dist` (installer mai costruito finora) e `docs/PROVA-INSTALLAZIONE.md` su un secondo account Windows. Poi tag `phase-8` e versione 1.0.0 (D-262).
+- Fase 8, prova di installazione: la fa l'agente (sezione 5, punto 5), non più un secondo account Windows. Poi tag `phase-8` e versione 1.0.0 (D-262).
 - Fase 4, criteri su dati reali:
   - 5 paper campione con almeno l'80% dei tag accettati (lavoro AI con Claude vero e revisione);
   - un PDF vero trascinato nella cartella di arrivo in meno di un minuto, con i metadati giusti;

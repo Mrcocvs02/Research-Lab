@@ -674,8 +674,10 @@ class FileStore implements FileLibraryStore {
     });
   }
 
-  quarantineCitations(docId: DocumentId): Promise<boolean> {
-    return this.quarantine(dataPath.citations(documentIdSchema.parse(docId)));
+  async quarantineCitations(docId: DocumentId): Promise<boolean> {
+    const id = documentIdSchema.safeParse(docId);
+    if (!id.success) throw new AppError('INVALID_REQUEST', 'Invalid item id');
+    return this.quarantine(dataPath.citations(id.data));
   }
 
   resetWatch(): Promise<boolean> {

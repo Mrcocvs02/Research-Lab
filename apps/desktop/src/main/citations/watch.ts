@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { AppError, WATCH_FILE_LIMITS, type DocumentId, type DocumentRecord, type WatchSeen, type WatchSource } from '@rl/core';
+import { AppError, UNSAFE_TEXT, WATCH_FILE_LIMITS, type DocumentId, type DocumentRecord, type WatchSeen, type WatchSource } from '@rl/core';
 import { arxivFromDoi, findOwned, isOwn, normaliseDoi } from '@rl/citations';
 import { trackAbort } from '../ai/abort-registry.js';
 import type { MainServices } from '../ipc/handlers/services.js';
@@ -289,7 +289,10 @@ export async function checkPublished(s: MainServices, req: Parameters<H['watch:c
 
 export async function applyPublished(s: MainServices, req: Parameters<H['watch:applyPublished']>[0], settle: (rt: Awaited<ReturnType<MainServices['runtime']['require']>>, ids: string[]) => Promise<void>): Res<H['watch:applyPublished']> {
   const rt = await s.runtime.require();
-  const { expectedRevision, docId, ...found } = req;
+  const { expectedRevision, docId, ...asked } = req;
+  // Stored (and synced) fields are clean whatever the request carried.
+  const clear = (v: string | null) => (v === null ? null : v.replace(UNSAFE_TEXT, '').trim() || null);
+  const found = { ...asked, venue: clear(asked.venue), venueRef: clear(asked.venueRef) };
   // Never two documents with one DOI: the proposal was made before, and the library may have changed since.
   const other = findOwned(await ownedIndex(rt, true), { doi: found.doi }, docId);
   if (other) throw new AppError('CONFLICT', 'Another document of the library already has this DOI', { reason: 'doi-owned', docId: other });

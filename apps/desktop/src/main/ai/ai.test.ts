@@ -188,7 +188,7 @@ describe('chat:send', () => {
     expect(conv.turns[0]).toMatchObject({ text: 'What is in this paper?', contextDocIds: [hex(1)] });
     expect(conv.turns[1]).toMatchObject({ id: r.turnId, text: 'The answer is short.', model: 'claude-haiku-5-5' });
     expect(conv.turns[1].usage.inputTokens).toBeGreaterThan(0);
-    expect(ok(await call('chat:list')).items).toEqual([{ id: r.conversationId, title: 'What is in this paper?', updatedAt: expect.any(String), turns: 2 }]);
+    expect(ok(await call('chat:list')).items).toEqual([{ id: r.conversationId, title: 'What is in this paper?', mode: 'chat', updatedAt: expect.any(String), turns: 2 }]);
 
     const log = await sends();
     expect(log).toHaveLength(1);
@@ -197,6 +197,38 @@ describe('chat:send', () => {
     expect(JSON.stringify(log)).not.toContain('answer'); // sizes, never text
     // The turn is counted once in the usage.
     expect(ok(await call('ai:usage', {})).sends).toBe(1);
+  });
+
+  it('advanced search: new conversation marked as search, fixed instruction first, same log; refused with a conversation', async () => {
+    let seen = '';
+    script = { reply: (req) => ((seen = req.messages.at(-1)!.content), 'Found it.') };
+    const call = harness();
+    const r = ok(await send(call, { text: 'efficient attention', mode: 'search', confirmed: true }));
+    await until(finished(r.turnId));
+    expect(seen.startsWith('ADVANCED SEARCH.')).toBe(true);
+    expect(seen).toContain('2-4 keyword searches');
+    expect(seen).toContain('at most 7 lines');
+    expect(seen.endsWith('efficient attention')).toBe(true);
+    const items = ok(await call('chat:list')).items;
+    expect(items).toEqual([expect.objectContaining({ id: r.conversationId, title: 'Search: efficient attention', mode: 'search', turns: 2 })]);
+    // The stored user turn is the user's own text, not the instruction.
+    expect(ok(await call('chat:get', { conversationId: r.conversationId })).turns[0].text).toBe('efficient attention');
+    expect(await sends()).toHaveLength(1);
+    expect(fail(await send(call, { mode: 'search', conversationId: r.conversationId })).code).toBe('INVALID_REQUEST');
+    // The same gates as the chat: cap and access.
+    script = { available: false };
+    expect(fail(await send(call, { mode: 'search' }))).toMatchObject({ code: 'AI_PROVIDER_ERROR', details: { reason: 'no-access' } });
+  });
+
+  it('a history file written before the modes existed reads as a chat', async () => {
+    const call = harness();
+    const r = ok(await send(call));
+    await until(finished(r.turnId));
+    const file = path.join(local, 'chat', 'lib-1', `${r.conversationId}.json`);
+    const raw = JSON.parse(await readFile(file, 'utf8'));
+    delete raw.mode;
+    await writeFile(file, JSON.stringify(raw));
+    expect(ok(await call('chat:list')).items[0]).toMatchObject({ mode: 'chat' });
   });
 
   it('continues a conversation with the earlier turns as history', async () => {

@@ -7,16 +7,17 @@ const hex = (n: number) => n.toString(16).padStart(16, '0');
 const rec = (n: number, over: Record<string, unknown> = {}): DocumentRecord =>
   documentRecordSchema.parse({ id: hex(n), hash: 'ab'.repeat(32), path: `open/p${n}.pdf`, size: 1, mtimeMs: 1, addedAt: NOW, updatedAt: NOW, title: `Paper ${n}`, year: 2020, ...over });
 
-function setup(opts: { enabled?: string[]; docs?: DocumentRecord[]; notes?: Record<string, ToolNote[]> } = {}) {
+function setup(opts: { enabled?: string[]; docs?: DocumentRecord[]; notes?: Record<string, ToolNote[]>; search?: (text: string) => string[] } = {}) {
   const docs = new Map((opts.docs ?? [rec(1), rec(2, { path: 'closed/p2.pdf' }), rec(3, { path: 'open/sub/p3.pdf' })]).map((d) => [d.id, d]));
+  const searches: string[] = [];
   const sends: Array<Parameters<LibraryToolsHost['logSend']>[0]> = [];
   const writes: Array<{ docId: string; field: AiFieldName; value: AiField<AiFieldValue> }> = [];
   let enabled = opts.enabled ?? ['open'];
   const host: LibraryToolsHost = {
     enabledFolders: async () => enabled,
-    search: async () => ({
+    search: async (q) => (searches.push(q.text), {
       total: docs.size,
-      hits: [...docs.values()].map(
+      hits: (opts.search ? opts.search(q.text).map((id) => docs.get(id)!) : [...docs.values()]).map(
         (d) => ({ docId: d.id, score: 1, field: 'text', snippet: '\u0001match\u0002 here', page: 2, pages: [{ page: 2, snippet: '\u0001match\u0002 here' }], title: d.title, authors: ['A. One'], year: d.year, type: null, path: d.path, studyState: 'to-read', size: 1, tags: [] }) as SearchResultHit,
       ),
     }),
@@ -30,7 +31,7 @@ function setup(opts: { enabled?: string[]; docs?: DocumentRecord[]; notes?: Reco
   const tools = createLibraryTools({ host, model: 'claude-haiku-5-5', provider: 'mock' });
   const by = (name: string): ToolSpec => tools.find((t) => t.name === name)!;
   const run = async (name: string, input: unknown) => (await by(name).run(input, {})) as ToolResult;
-  return { tools, run, sends, writes, setEnabled: (f: string[]) => void (enabled = f) };
+  return { tools, run, searches, sends, writes, setEnabled: (f: string[]) => void (enabled = f) };
 }
 
 describe('folder rules', () => {
@@ -164,5 +165,45 @@ describe('write_ai_field', () => {
       else await expect(p).rejects.toMatchObject({ code: 'CONFLICT' });
       expect(writes).toHaveLength(ok ? 1 : 0);
     }
+  });
+});
+
+describe('search_library recall', () => {
+  const many = Array.from({ length: 6 }, (_, i) => rec(i + 1));
+  const andOr = (andIds: string[], orIds: string[]) => (text: string) => (text.includes(' OR ') ? orIds : andIds);
+
+  it('keeps the AND result when it is enough (matched all, one search)', async () => {
+    const { run, searches } = setup({ docs: many, search: andOr([hex(1), hex(2), hex(3)], [hex(4)]) });
+    const r = await run('search_library', { query: 'efficient attention memory' });
+    expect((r.data as any).matched).toBe('all');
+    expect(r.docIds).toEqual([hex(1), hex(2), hex(3)]);
+    expect(searches).toEqual(['efficient attention memory']);
+  });
+
+  it('retries with OR when few hits, appends without duplicates and respects the limit', async () => {
+    const { run, searches } = setup({ docs: many, search: andOr([hex(1)], [hex(1), hex(2), hex(3), hex(4)]) });
+    const r = await run('search_library', { query: 'efficient  attention memory', limit: 3 });
+    expect(searches).toEqual(['efficient  attention memory', 'efficient OR attention OR memory']);
+    expect((r.data as any).matched).toBe('any');
+    expect(r.docIds).toEqual([hex(1), hex(2), hex(3)]);
+  });
+
+  it('stays all when the OR retry adds nothing', async () => {
+    const { run } = setup({ docs: many, search: andOr([], []) });
+    const r = await run('search_library', { query: 'alpha beta' });
+    expect((r.data as any).matched).toBe('all');
+    expect(r.docIds).toEqual([]);
+  });
+
+  it('does not retry single terms, quotes, operators, filters or wildcards', async () => {
+    const { run, searches } = setup({ docs: many, search: andOr([], [hex(1)]) });
+    for (const q of ['alpha', '"alpha beta"', 'alpha OR beta', 'year:2020 alpha', 'alpha* beta']) await run('search_library', { query: q });
+    expect(searches).toHaveLength(5);
+  });
+
+  it('the OR retry never returns documents of folders that are not enabled', async () => {
+    const docs = [rec(1), rec(2, { path: 'closed/p2.pdf' })];
+    const { run } = setup({ docs, search: andOr([], [hex(1), hex(2)]) });
+    expect((await run('search_library', { query: 'alpha beta' })).docIds).toEqual([hex(1)]);
   });
 });

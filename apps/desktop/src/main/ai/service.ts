@@ -212,7 +212,12 @@ export interface SendInput {
   contextDocIds: string[];
   contextPage?: number | undefined;
   confirmed: boolean;
+  mode?: 'chat' | 'search' | undefined;
 }
+
+/** Fixed instruction put before the request of an advanced search (plan §5, "Ricerca a due livelli"). */
+export const SEARCH_INSTRUCTION =
+  'ADVANCED SEARCH. Reformulate the request below into 2-4 keyword searches of the library (search_library, with OR between synonyms) and run them. Read pages (read_pages) only when needed to judge relevance. Answer in at most 7 lines with the most relevant documents: each with a lab://doc/<id>?page=N link (with the page) and one line on why it matches. If nothing relevant is found, say so plainly.';
 
 /** Validates and starts a turn; returns at once, the turn streams `chat:event`s. */
 export async function startChatTurn(s: MainServices, input: SendInput): Promise<{ conversationId: string; turnId: string }> {
@@ -223,6 +228,8 @@ export async function startChatTurn(s: MainServices, input: SendInput): Promise<
   const store = new ChatStore(s.localDataDir, rt.libraryId);
   let conversationId = input.conversationId;
   let existing = null;
+  const mode = input.mode ?? 'chat';
+  if (mode === 'search' && conversationId !== undefined) throw new AppError('INVALID_REQUEST', 'An advanced search always starts a new conversation');
   if (conversationId !== undefined) {
     existing = await store.get(conversationId);
     if (!existing) throw new AppError('NOT_FOUND', 'Unknown conversation');
@@ -263,7 +270,8 @@ export async function startChatTurn(s: MainServices, input: SendInput): Promise<
     await store.update(convoId, (cur) => ({
       version: 1,
       id: convoId,
-      title: cur?.title ?? titleFrom(input.text),
+      title: cur?.title ?? (mode === 'search' ? `Search: ${titleFrom(input.text)}` : titleFrom(input.text)),
+      mode: cur?.mode ?? mode,
       createdAt: cur?.createdAt ?? now,
       updatedAt: now,
       turns: [...(cur?.turns ?? []), userTurn],
@@ -319,7 +327,8 @@ async function runTurn(a: RunArgs): Promise<void> {
       blocks.push(buildDataBlock(d, texts.filter((p) => p.page !== extra), extra ? texts.find((p) => p.page === extra) : undefined));
     }
     const readingNote = input.contextPage !== undefined && a.docs[0] ? `(The user is reading page ${input.contextPage} of document ${a.docs[0].id}.)\n` : '';
-    const content = blocks.length ? `${blocks.join('\n')}\n${readingNote}\nUser request (answer in the language of this request):\n${input.text}` : input.text;
+    const request = input.mode === 'search' ? `${SEARCH_INSTRUCTION}\n\nUser request (answer in the language of this request):\n${input.text}` : input.text;
+    const content = blocks.length ? `${blocks.join('\n')}\n${readingNote}\nUser request (answer in the language of this request):\n${input.text}` : request;
     promptChars = system.length + content.length + a.history.reduce((n, m) => n + m.content.length, 0);
 
     // Tools: the library tools, wrapped to remember which documents each call touched (for the links of the cards).
@@ -381,7 +390,7 @@ async function runTurn(a: RunArgs): Promise<void> {
     if (!discard) {
       await store.update(conversationId, (cur) => {
         const at = new Date().toISOString();
-        const base = cur ?? { version: 1 as const, id: conversationId, title: titleFrom(input.text), createdAt: at, updatedAt: at, turns: [] };
+        const base = cur ?? { version: 1 as const, id: conversationId, title: titleFrom(input.text), mode: input.mode ?? ('chat' as const), createdAt: at, updatedAt: at, turns: [] };
         return { ...base, updatedAt: at, turns: [...base.turns, turn] };
       });
     }

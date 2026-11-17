@@ -85,40 +85,40 @@ describe('fetchWorkMetadata', () => {
       'https://api.openalex.org/': () => reply('{}', { status: 404 }),
       'https://export.arxiv.org/api/query?id_list=': () => reply(atom(arxivEntry)),
     });
-    const r = await fetchWorkMetadata({ doi: '10.1/none', arxivId: 'arXiv:2401.01234v2' }, { fetch: f });
+    const r = await fetchWorkMetadata({ doi: '10.1001/none', arxivId: 'arXiv:2401.01234v2' }, { fetch: f });
     expect(r?.source).toBe('arxiv');
-    expect(seen.map((x) => x.url)).toEqual(['https://api.openalex.org/works/doi:10.1/none', 'https://export.arxiv.org/api/query?id_list=2401.01234']);
+    expect(seen.map((x) => x.url)).toEqual(['https://api.openalex.org/works/doi:10.1001/none', 'https://export.arxiv.org/api/query?id_list=2401.01234']);
   });
 
   it('returns null when nothing is found and throws when the sources fail', async () => {
     const nf = fakeFetch({ 'https://api.openalex.org/': () => reply('', { status: 404 }) });
-    expect(await fetchWorkMetadata({ doi: '10.1/none' }, { fetch: nf.f })).toBeNull();
+    expect(await fetchWorkMetadata({ doi: '10.1001/none' }, { fetch: nf.f })).toBeNull();
     expect(await fetchWorkMetadata({}, { fetch: nf.f })).toBeNull();
     const down = fakeFetch({ 'https://api.openalex.org/': () => reply('', { status: 503 }) });
-    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: down.f })).rejects.toBeInstanceOf(WorkLookupError);
+    await expect(fetchWorkMetadata({ doi: '10.1001/x' }, { fetch: down.f })).rejects.toBeInstanceOf(WorkLookupError);
     const broken = fakeFetch({ 'https://api.openalex.org/': () => reply('not json') });
-    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: broken.f })).rejects.toThrow('invalid answer');
+    await expect(fetchWorkMetadata({ doi: '10.1001/x' }, { fetch: broken.f })).rejects.toThrow('invalid answer');
     const offline = (async () => {
       throw new TypeError('fetch failed');
     }) as unknown as typeof fetch;
-    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: offline })).rejects.toThrow('network error');
+    await expect(fetchWorkMetadata({ doi: '10.1001/x' }, { fetch: offline })).rejects.toThrow('network error');
   });
 
   it('caps the response size and the time, and honours an abort', async () => {
     const big = fakeFetch({ 'https://api.openalex.org/': () => reply('x'.repeat(5000)) });
-    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: big.f, maxBytes: 1000 })).rejects.toThrow('too large');
+    await expect(fetchWorkMetadata({ doi: '10.1001/x' }, { fetch: big.f, maxBytes: 1000 })).rejects.toThrow('too large');
     const hang = (async (_u: string, init?: RequestInit) =>
       new Promise((_res, rej) => init?.signal?.addEventListener('abort', () => rej(new Error('aborted'))))) as unknown as typeof fetch;
-    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: hang, timeoutMs: 20 })).rejects.toThrow('timeout');
+    await expect(fetchWorkMetadata({ doi: '10.1001/x' }, { fetch: hang, timeoutMs: 20 })).rejects.toThrow('timeout');
     const ctl = new AbortController();
-    const p = fetchWorkMetadata({ doi: '10.1/x' }, { fetch: hang, signal: ctl.signal });
+    const p = fetchWorkMetadata({ doi: '10.1001/x' }, { fetch: hang, signal: ctl.signal });
     ctl.abort();
     await expect(p).rejects.toBeInstanceOf(WorkLookupError);
   });
 
   it('refuses a redirect to a non-https address', async () => {
     const f = (async () => ({ ok: true, status: 200, url: 'http://evil.example/', headers: new Headers(), text: async () => '{}' })) as unknown as typeof fetch;
-    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: f })).rejects.toThrow('unexpected address');
+    await expect(fetchWorkMetadata({ doi: '10.1001/x' }, { fetch: f })).rejects.toThrow('unexpected address');
   });
 
   it('does not follow redirects, not even to another https host or the other fixed host, and asks for manual redirects', async () => {
@@ -127,17 +127,17 @@ describe('fetchWorkMetadata', () => {
       seen.push(init);
       return new Response('', { status: 302, headers: { location: 'https://export.arxiv.org/x' } });
     }) as unknown as typeof fetch;
-    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: redirect })).rejects.toThrow('redirect refused');
+    await expect(fetchWorkMetadata({ doi: '10.1001/x' }, { fetch: redirect })).rejects.toThrow('redirect refused');
     expect(seen[0]?.redirect).toBe('manual');
     const elsewhere = (async () => ({ ok: true, status: 200, url: 'https://evil.example/works', headers: new Headers(), text: async () => '{}' })) as unknown as typeof fetch;
-    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: elsewhere })).rejects.toThrow('unexpected address');
+    await expect(fetchWorkMetadata({ doi: '10.1001/x' }, { fetch: elsewhere })).rejects.toThrow('unexpected address');
     const opaque = (async () => ({ ok: false, status: 0, type: 'opaqueredirect', url: '', headers: new Headers() })) as unknown as typeof fetch;
-    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: opaque })).rejects.toThrow('redirect refused');
+    await expect(fetchWorkMetadata({ doi: '10.1001/x' }, { fetch: opaque })).rejects.toThrow('redirect refused');
   });
 
   it('caps a body-less answer, and an arXiv entry is capped before parsing', async () => {
     const noBody = (async () => ({ ok: true, status: 200, url: 'https://api.openalex.org/x', headers: new Headers(), body: null, arrayBuffer: async () => new ArrayBuffer(5000) })) as unknown as typeof fetch;
-    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: noBody, maxBytes: 1000 })).rejects.toThrow('too large');
+    await expect(fetchWorkMetadata({ doi: '10.1001/x' }, { fetch: noBody, maxBytes: 1000 })).rejects.toThrow('too large');
     const hostile = `<entry><id>http://arxiv.org/abs/2401.01234</id><title>T</title>${'<id '.repeat(400_000)}</entry>`;
     const t0 = Date.now();
     expect(parseArxivAtom(atom(hostile))?.title).toBe('T');
@@ -149,6 +149,6 @@ describe('fetchWorkMetadata', () => {
       'https://api.openalex.org/': () => reply('', { status: 503 }),
       'https://export.arxiv.org/': () => reply(atom('')),
     });
-    await expect(fetchWorkMetadata({ doi: '10.1/x', arxivId: '2401.01234' }, { fetch: f })).rejects.toBeInstanceOf(WorkLookupError);
+    await expect(fetchWorkMetadata({ doi: '10.1001/x', arxivId: '2401.01234' }, { fetch: f })).rejects.toBeInstanceOf(WorkLookupError);
   });
 });

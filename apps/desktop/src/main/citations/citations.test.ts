@@ -26,7 +26,7 @@ let reindexed: string[][];
 
 const work = (n: number, extra: Record<string, unknown> = {}) => ({
   id: `https://openalex.org/W${n}`,
-  doi: `https://doi.org/10.1/w${n}`,
+  doi: `https://doi.org/10.1001/w${n}`,
   title: `Work number ${n} about robots`,
   publication_year: 2020,
   authorships: [{ author: { display_name: `Author${n} Person` } }],
@@ -35,8 +35,8 @@ const work = (n: number, extra: Record<string, unknown> = {}) => ({
 });
 /** The fake OpenAlex: works by DOI, batches by id, nothing cites anyone. */
 const WORKS: Record<string, any> = {
-  '10.1/w1': work(1, { referenced_works: ['https://openalex.org/W2', 'https://openalex.org/W7', 'https://openalex.org/W8'], cited_by_count: 1 }),
-  '10.1/w2': work(2, { referenced_works: ['https://openalex.org/W7', 'https://openalex.org/W8', 'https://openalex.org/W9'], cited_by_count: 0 }),
+  '10.1001/w1': work(1, { referenced_works: ['https://openalex.org/W2', 'https://openalex.org/W7', 'https://openalex.org/W8'], cited_by_count: 1 }),
+  '10.1001/w2': work(2, { referenced_works: ['https://openalex.org/W7', 'https://openalex.org/W8', 'https://openalex.org/W9'], cited_by_count: 0 }),
 };
 const openAlex = (u: URL): Response => {
   const f = u.searchParams.get('filter') ?? '';
@@ -95,8 +95,8 @@ beforeEach(async () => {
   await store.init();
   await store.writeConfig(defaultLibraryConfig());
   await store.writeTaxonomy(taxonomyFileSchema.parse({ nodes: [] }));
-  await store.documents.put(doc(1, 'papers/a.pdf', { doi: '10.1/w1', title: 'Alpha paper about robots', authors: ['Ada Example'], year: 2020 }));
-  await store.documents.put(doc(2, 'papers/b.pdf', { doi: '10.1/w2', title: 'Beta paper about robots', year: 2020 }));
+  await store.documents.put(doc(1, 'papers/a.pdf', { doi: '10.1001/w1', title: 'Alpha paper about robots', authors: ['Ada Example'], year: 2020 }));
+  await store.documents.put(doc(2, 'papers/b.pdf', { doi: '10.1001/w2', title: 'Beta paper about robots', year: 2020 }));
   await store.documents.put(doc(3, 'other/c.pdf'));
   libraryId = 'lib-1';
   online = true;
@@ -133,7 +133,7 @@ describe('citations:get and citations:refresh', () => {
     expect(gone.references[0].matched).toBeNull();
     expect(gone).toMatchObject({ inLibrary: 0, missing: 3 });
     expect((await store.citations.get(hex(1) as never))?.references[0]?.matchedDocId).toBe(hex(2)); // the stored link is not rewritten by a read
-    await store.documents.put(doc(5, 'papers/z.pdf', { doi: '10.1/w7' }));
+    await store.documents.put(doc(5, 'papers/z.pdf', { doi: '10.1001/w7' }));
     // the index of owned documents is reused for a while: a refresh of any document rebuilds it
     ok(await call('citations:refresh', { docId: hex(1), what: ['references'] }));
     expect(ok(await call('citations:get', { docId: hex(1) })).references[1].matched.docId).toBe(hex(5));
@@ -157,7 +157,7 @@ describe('citations:get and citations:refresh', () => {
     expect(urls).toHaveLength(0);
     online = true;
     expect(fail(await call('citations:refresh', { docId: hex(3) })).code).toBe('INVALID_REQUEST');
-    await store.documents.put(doc(4, 'papers/d.pdf', { doi: '10.1/unknown' }));
+    await store.documents.put(doc(4, 'papers/d.pdf', { doi: '10.1001/unknown' }));
     expect(fail(await call('citations:refresh', { docId: hex(4) })).code).toBe('NOT_FOUND');
     net = () => new Response(null, { status: 400 });
     expect(fail(await call('citations:refresh', { docId: hex(1) }))).toMatchObject({ code: 'NETWORK_ERROR', details: { reason: 'http' } });
@@ -235,11 +235,11 @@ describe('recommend', () => {
     const r = ok(await call('recommend:readNext', {}));
     expect(r.documentsWithCitations).toBe(2);
     expect(r.items.map((i: any) => [i.key, i.citingCount, i.score])).toEqual([
-      ['doi:10.1/w7', 2, 2],
-      ['doi:10.1/w8', 2, 2],
+      ['doi:10.1001/w7', 2, 2],
+      ['doi:10.1001/w8', 2, 2],
     ]);
     expect(r.items[0].citing.map((c: any) => c.docId).sort()).toEqual([hex(1), hex(2)]);
-    expect(r.items[0].work).toMatchObject({ doi: '10.1/w7', title: 'Work number 7 about robots', source: 'openalex' });
+    expect(r.items[0].work).toMatchObject({ doi: '10.1001/w7', title: 'Work number 7 about robots', source: 'openalex' });
     expect(ok(await call('recommend:readNext', { minCiting: 1 })).items).toHaveLength(3); // w9 is cited once; w2 is owned
   });
   it('is scoped by project members or folder, and dismissed keys disappear', async () => {
@@ -247,16 +247,16 @@ describe('recommend', () => {
     expect(ok(await call('recommend:readNext', { projectId: 'proj', minCiting: 2 })).items).toEqual([]);
     const one = ok(await call('recommend:readNext', { projectId: 'proj', minCiting: 1 }));
     expect(one.items.map((i: any) => [i.key, i.citingCount, i.score])).toEqual([
-      ['doi:10.1/w7', 2, 1],
-      ['doi:10.1/w8', 2, 1],
+      ['doi:10.1001/w7', 2, 1],
+      ['doi:10.1001/w8', 2, 1],
     ]);
     expect(ok(await call('recommend:readNext', { folder: 'papers', minCiting: 2 })).items).toHaveLength(2);
     expect(ok(await call('recommend:readNext', { folder: 'other', minCiting: 1 })).items).toEqual([]);
     expect(fail(await call('recommend:readNext', { projectId: 'nope' })).code).toBe('NOT_FOUND');
-    ok(await call('recommend:dismiss', { key: 'doi:10.1/w7' }));
-    ok(await call('recommend:dismiss', { key: 'doi:10.1/w7' }));
-    expect((await store.readWatch()).dismissedRecommendations).toEqual(['doi:10.1/w7']);
-    expect(ok(await call('recommend:readNext', {})).items.map((i: any) => i.key)).toEqual(['doi:10.1/w8']);
+    ok(await call('recommend:dismiss', { key: 'doi:10.1001/w7' }));
+    ok(await call('recommend:dismiss', { key: 'doi:10.1001/w7' }));
+    expect((await store.readWatch()).dismissedRecommendations).toEqual(['doi:10.1001/w7', 'oa:W7']); // every key of the work
+    expect(ok(await call('recommend:readNext', {})).items.map((i: any) => i.key)).toEqual(['doi:10.1001/w8']);
   });
   it('a removed citing document no longer counts', async () => {
     await store.documents.remove(hex(2) as never);
@@ -292,10 +292,10 @@ describe('watch sources and checks', () => {
     expect(days).toBeGreaterThan(89);
     expect(days).toBeLessThan(91.5);
     expect(ok(await call('watch:check', {}))).toMatchObject({ checked: 1, newItems: 0 });
-    expect(filterOf(urls.at(-1)!)).toBe(`from_publication_date:${new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)}`);
+    expect(filterOf(urls.at(-1)!)).toBe(`from_publication_date:${new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10)}`);
     const items = ok(await call('watch:items', {}));
     expect(items.total).toBe(2);
-    expect(items.items.map((i: any) => [i.externalId, i.inLibrary])).toEqual([['W1', hex(1)], ['W30', null]]);
+    expect(items.items.map((i: any) => [i.externalId, i.inLibrary])).toEqual([['W30', null], ['W1', hex(1)]]) // newest published first (the source answers oldest first);
     expect(ok(await call('watch:list')).sources[0]).toMatchObject({ id: s.id, newCount: 2 });
     ok(await call('watch:dismiss', { sourceId: s.id, externalId: 'W30' }));
     expect(ok(await call('watch:items', {})).total).toBe(1);
@@ -305,7 +305,7 @@ describe('watch sources and checks', () => {
   });
 
   it('checks authors by id and by name, venues by id and by name, and own preprints', async () => {
-    net = (u) => (u.pathname === '/authors' ? json({ results: [{ id: 'https://openalex.org/A77' }] }) : u.pathname === '/sources' ? json({ results: [{ id: 'https://openalex.org/S88' }] }) : found([40]));
+    net = (u) => (u.pathname === '/authors' ? json({ results: [{ id: 'https://openalex.org/A77', display_name: 'Ada Example' }] }) : u.pathname === '/sources' ? json({ results: [{ id: 'https://openalex.org/S88' }] }) : found([40], { authorships: [{ author: { display_name: 'Ada Example' } }] }));
     const mk = async (kind: string, query: string) => ok(await call('watch:saveSource', { kind, query }));
     await mk('author', 'A123');
     await mk('author', 'Some Name');
@@ -341,10 +341,10 @@ describe('published versions', () => {
   const preprint = (n: number, extra: Record<string, unknown> = {}) => doc(n, `pre/p${n}.pdf`, { arxivId: `2401.0000${n}`, title: `Preprint ${n} on planning`, authors: ['Ada Example'], year: 2024, publication: { status: 'preprint' }, ...extra });
   const publishedNet = (u: URL) => {
     const p = decodeURIComponent(u.pathname);
-    if (p === '/works/doi:10.48550/arXiv.2401.00006')
-      return json(work(60, { doi: 'https://doi.org/10.48550/arxiv.2401.00006', type: 'preprint', locations: [{ version: 'publishedVersion', source: { type: 'journal', display_name: 'Journal Y' }, landing_page_url: 'https://doi.org/10.2/pub' }] }));
-    if (p === '/works/doi:10.2/pub') return json(work(61, { doi: 'https://doi.org/10.2/pub', publication_year: 2025, biblio: { volume: '3', first_page: '10', last_page: '20' } }));
-    if (p === '/works/doi:10.48550/arXiv.2401.00007') return json(work(70, { doi: 'https://doi.org/10.48550/arxiv.2401.00007', type: 'preprint' }));
+    if (p === '/works/doi:10.48550/arxiv.2401.00006')
+      return json(work(60, { doi: 'https://doi.org/10.48550/arxiv.2401.00006', type: 'preprint', locations: [{ version: 'publishedVersion', source: { type: 'journal', display_name: 'Journal Y' }, landing_page_url: 'https://doi.org/10.1002/pub' }] }));
+    if (p === '/works/doi:10.1002/pub') return json(work(61, { doi: 'https://doi.org/10.1002/pub', publication_year: 2025, biblio: { volume: '3', first_page: '10', last_page: '20' } }));
+    if (p === '/works/doi:10.48550/arxiv.2401.00007') return json(work(70, { doi: 'https://doi.org/10.48550/arxiv.2401.00007', type: 'preprint' }));
     return new Response(null, { status: 404 });
   };
   beforeEach(async () => {
@@ -358,7 +358,7 @@ describe('published versions', () => {
     const r = ok(await call('watch:checkPublished', {}));
     expect(r).toMatchObject({ checked: 3, failed: 0 });
     expect(r.proposals).toHaveLength(1);
-    expect(r.proposals[0]).toMatchObject({ docId: hex(6), found: { doi: '10.2/pub', venue: 'Journal X', year: 2025, source: 'openalex' }, current: { doi: null, arxivId: '2401.00006', year: 2024 } });
+    expect(r.proposals[0]).toMatchObject({ docId: hex(6), found: { doi: '10.1002/pub', venue: 'Journal X', year: 2025, source: 'openalex' }, current: { doi: null, arxivId: '2401.00006', year: 2024 } });
     expect(ok(await call('watch:checkPublished', { ownOnly: true })).checked).toBe(2);
     expect(ok(await call('watch:checkPublished', { docIds: [hex(7)] })).checked).toBe(1);
     await store.documents.put(preprint(9));
@@ -374,7 +374,7 @@ describe('published versions', () => {
     expect(fail(await call('watch:applyPublished', { ...req, expectedRevision: p.revision + 3 })).code).toBe('CONFLICT');
     const done = ok(await call('watch:applyPublished', { ...req, expectedRevision: p.revision }));
     expect(done.checkedAt).toMatch(/^\d{4}-/);
-    expect(await store.documents.get(hex(6) as never)).toMatchObject({ doi: '10.2/pub', year: 2025, ref: { venue: 'Journal X' }, publication: { status: 'published', source: 'openalex', checkedAt: done.checkedAt } });
+    expect(await store.documents.get(hex(6) as never)).toMatchObject({ doi: '10.1002/pub', year: 2025, ref: { venue: 'Journal X' }, publication: { status: 'published', source: 'openalex', checkedAt: done.checkedAt } });
     expect(reindexed.at(-1)).toEqual([hex(6)]);
     expect(events.some(([e, pl]) => e === 'library:changed' && pl.kind === 'documents')).toBe(true);
     expect(ok(await call('watch:checkPublished', {})).proposals).toEqual([]);
@@ -390,22 +390,22 @@ describe('net fixtures hook', () => {
     await writeFile(
       file,
       JSON.stringify({
-        'https://api.openalex.org/works/doi:10.1/w1': WORKS['10.1/w1'],
+        'https://api.openalex.org/works/doi:10.1001/w1': WORKS['10.1001/w1'],
         'https://api.openalex.org/works?filter=openalex_id:W2|W7|W8&per-page=50&select=id,doi,title,publication_year,authorships,primary_location': { results: [work(2)] },
         'https://api.openalex.org/works': { results: [], meta: { next_cursor: null } },
         'https://export.arxiv.org/api/query?id_list=2401.00001': '<feed/>',
-        'https://api.semanticscholar.org/graph/v1/paper/DOI:10.1/gone': { status: 404 },
+        'https://api.semanticscholar.org/graph/v1/paper/DOI:10.1001/gone': { status: 404 },
       }),
     );
   });
   it('serves exact keys (query decoded and sorted, mailto ignored), then the key without a query, else 404', async () => {
     const f = fixtureFetch(file);
-    expect((await f('https://api.openalex.org/works/doi:10.1/w1?select=id&mailto=x%40y.z')).status).toBe(200);
+    expect((await f('https://api.openalex.org/works/doi:10.1001/w1?select=id&mailto=x%40y.z')).status).toBe(200);
     const batch = await f('https://api.openalex.org/works?select=id,doi,title,publication_year,authorships,primary_location&per-page=50&filter=openalex_id%3AW2%7CW7%7CW8');
     expect(((await batch.json()) as { results: unknown[] }).results).toHaveLength(1);
     expect(((await (await f('https://api.openalex.org/works?filter=cites%3AW1&cursor=*')).json()) as { results: unknown[] }).results).toEqual([]);
     expect(await (await f('https://export.arxiv.org/api/query?id_list=2401.00001')).text()).toBe('<feed/>');
-    expect((await f('https://api.semanticscholar.org/graph/v1/paper/DOI:10.1/gone?fields=x')).status).toBe(404);
+    expect((await f('https://api.semanticscholar.org/graph/v1/paper/DOI:10.1001/gone?fields=x')).status).toBe(404);
     expect((await f('https://api.openalex.org/authors?search=x')).status).toBe(404);
   });
   it('replaces the network for a refresh', async () => {

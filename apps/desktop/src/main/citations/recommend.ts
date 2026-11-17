@@ -127,10 +127,10 @@ export async function readNext(s: MainServices, req: { limit: number; minCiting:
 export async function dismissRecommendation(s: MainServices, key: string): Promise<{ ok: true }> {
   const rt = await s.runtime.require();
   const entry = (await aggregate(rt).catch(() => null))?.entries.find((e) => e.keys.has(key));
-  const keys = [key, ...(entry ? [...entry.keys] : [])];
+  const keys = new Set([key, ...(entry ? entry.keys : [])]);
   await updateWatch(rt, (w) => {
     const have = new Set(w.dismissedRecommendations);
-    w.dismissedRecommendations = [...w.dismissedRecommendations, ...keys.filter((k) => !have.has(k))].slice(-WATCH_FILE_LIMITS.dismissedRecommendations);
+    w.dismissedRecommendations = [...w.dismissedRecommendations, ...[...keys].filter((k) => !have.has(k))].slice(-WATCH_FILE_LIMITS.dismissedRecommendations);
   });
   return { ok: true };
 }

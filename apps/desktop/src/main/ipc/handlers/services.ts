@@ -37,6 +37,10 @@ export interface MainServices {
   pickFolder(purpose: 'library-root' | 'legacy-index' | 'export-destination', title?: string): Promise<string | null>;
   /** Native single-file picker; resolves null when cancelled. */
   pickFile(purpose: 'taxonomy-file', title?: string): Promise<string | null>;
+  /** Native multi-file picker for PDF files (inbox); resolves [] when cancelled. */
+  pickPdfFiles?(): Promise<string[]>;
+  /** Native single-file picker for the Claude Code executable; resolves null when cancelled. */
+  pickExecutable?(): Promise<string | null>;
   appInfo(): { name: string; version: string; platform: string; electron: string };
   /** Factory so a missing implementation only fails when the feature is used. */
   createImporter(options?: { updateConfig?: (fn: (current: LibraryConfig) => LibraryConfig | Promise<LibraryConfig>) => Promise<unknown> }): LegacyImporter;
@@ -49,4 +53,8 @@ export interface MainServices {
   aiProvider?: AiProviderFactory;
   /** Whether the machine has a network connection (`net.isOnline()`); absent: assumed online. Not used by the mock provider. */
   isOnline?: () => boolean;
+  /** HTTPS fetch of the metadata lookup (Electron `net.fetch`); absent in tests that do not use it. */
+  fetch?: typeof fetch;
+  /** Test hook (RL_E2E=1, development run only): JSON file that replaces the online metadata lookup. */
+  metadataFile?: string | null;
 }

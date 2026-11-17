@@ -44,7 +44,8 @@ export interface AiCtx {
 export async function loadCtx(s: MainServices): Promise<AiCtx> {
   const rt = await s.runtime.require();
   const cfg = await rt.store.readConfig();
-  const provider = s.aiProvider ? s.aiProvider({ provider: cfg.ai.provider, models: cfg.ai.models }) : null;
+  const claudeCodePath = (await s.settings.get()).ai.claudeCodePath;
+  const provider = s.aiProvider ? s.aiProvider({ provider: cfg.ai.provider, models: cfg.ai.models, claudeCodePath }) : null;
   return { rt, cfg, provider };
 }
 
@@ -68,6 +69,7 @@ export async function computeStatus(s: MainServices): Promise<AiStatus> {
   const av = await availability(s, ctx.provider);
   const capUsd = ctx.cfg.ai.usageCap.monthlyUsd;
   const capReached = capUsd !== null && usage.usd >= capUsd;
+  const exe = ctx.provider?.executable?.();
   return {
     provider: ctx.provider?.id ?? ctx.cfg.ai.provider,
     available: av.available && !capReached,
@@ -76,6 +78,7 @@ export async function computeStatus(s: MainServices): Promise<AiStatus> {
     enabledFolders: ctx.cfg.aiEnabledFolders,
     monthUsd: usage.usd,
     capUsd,
+    ...(exe ? { claudeCode: exe } : {}),
   };
 }
 
@@ -140,7 +143,7 @@ const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n)}…` : t
 const stripMarkers = (t: string) => t.replace(/<<<DATA|DATA>>>/g, '[marker removed]');
 
 /** One delimited DATA block for a context document: metadata plus the first pages, capped. Never the whole text. */
-export function buildDataBlock(doc: DocumentRecord, pages: Array<{ page: number; text: string }>, extraPage?: { page: number; text: string }): string {
+export function buildDataBlock(doc: DocumentRecord, pages: Array<{ page: number; text: string }>, extraPage?: { page: number; text: string }, pagesChars = CONTEXT_PAGES_CHARS): string {
   const meta = [
     `id: ${doc.id}`,
     `title: ${doc.title ?? doc.path}`,
@@ -151,7 +154,7 @@ export function buildDataBlock(doc: DocumentRecord, pages: Array<{ page: number;
   ]
     .filter(Boolean)
     .join('\n');
-  let budget = CONTEXT_PAGES_CHARS;
+  let budget = pagesChars;
   const parts: string[] = [];
   for (const p of pages) {
     if (budget <= 0) break;
@@ -316,7 +319,7 @@ async function runTurn(a: RunArgs): Promise<void> {
       blocks.push(buildDataBlock(d, texts.filter((p) => p.page !== extra), extra ? texts.find((p) => p.page === extra) : undefined));
     }
     const readingNote = input.contextPage !== undefined && a.docs[0] ? `(The user is reading page ${input.contextPage} of document ${a.docs[0].id}.)\n` : '';
-    const content = blocks.length ? `${blocks.join('\n')}\n${readingNote}\nUser request:\n${input.text}` : input.text;
+    const content = blocks.length ? `${blocks.join('\n')}\n${readingNote}\nUser request (answer in the language of this request):\n${input.text}` : input.text;
     promptChars = system.length + content.length + a.history.reduce((n, m) => n + m.content.length, 0);
 
     // Tools: the library tools, wrapped to remember which documents each call touched (for the links of the cards).

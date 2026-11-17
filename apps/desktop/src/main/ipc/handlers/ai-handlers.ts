@@ -2,6 +2,8 @@
  * Phase 4 (AI): status, preview, usage and log of the AI layer, the chat with Claude, the user's commands (D-204..).
  * Contracts: `packages/core/src/ipc/channels/{ai,chat,commands}.ts`. The logic lives in `main/ai/`.
  */
+import { realpath, stat } from 'node:fs/promises';
+import path from 'node:path';
 import { AppError } from '@rl/core';
 import { ChatStore } from '../../ai/chat-store.js';
 import { listUserCommands } from '../../ai/guide-files.js';
@@ -14,12 +16,24 @@ export { abortAllChatTurns };
 
 export const aiHandlers = (s: MainServices): DomainHandlers<'ai'> => ({
   'ai:status': () => computeStatus(s),
-  // Wave 4.2 (stubs until the main side is merged).
-  'ai:chooseExecutable': () => {
-    throw new AppError('NOT_IMPLEMENTED', 'Not implemented yet');
+  'ai:chooseExecutable': async () => {
+    // Only a dialog shown by main can name the program: the renderer never passes a path.
+    const picked = await s.pickExecutable?.();
+    if (!picked) return { path: null };
+    if (!path.isAbsolute(picked)) throw new AppError('INVALID_REQUEST', 'The chosen file is not an absolute path');
+    const real = await realpath(picked).catch(() => null);
+    const st = real ? await stat(real).catch(() => null) : null;
+    if (!real || !st?.isFile()) throw new AppError('INVALID_REQUEST', 'The chosen path is not a regular file');
+    await s.settings.update((cur) => {
+      cur.ai.claudeCodePath = real;
+    });
+    return { path: real };
   },
-  'ai:clearExecutable': () => {
-    throw new AppError('NOT_IMPLEMENTED', 'Not implemented yet');
+  'ai:clearExecutable': async () => {
+    await s.settings.update((cur) => {
+      cur.ai.claudeCodePath = null;
+    });
+    return { ok: true as const };
   },
   'ai:preview': async ({ purpose, model, docIds, promptChars }) => {
     const ctx = await loadCtx(s);

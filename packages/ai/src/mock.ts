@@ -138,7 +138,7 @@ export function createMockAiProvider(script: MockScript = {}): AiProviderEx {
       if (demo) {
         const intro = 'Let me check the library. ';
         yield { type: 'text-delta', text: intro };
-        const word = last.replace(/User request:|<<<DATA[\s\S]*?DATA>>>/g, ' ').match(/[\p{L}\p{N}]{4,}/gu)?.sort((a, b) => b.length - a.length)[0] ?? 'paper';
+        const word = last.replace(/User request[^\r\n]*:|<<<DATA[\s\S]*?DATA>>>/g, ' ').match(/[\p{L}\p{N}]{4,}/gu)?.sort((a, b) => b.length - a.length)[0] ?? 'paper';
         yield* runCall({ name: 'search_library', input: { query: word } });
         const id = last.match(/<<<DATA document\r?\nid: ([0-9a-f]{16})/)?.[1] ?? foundId;
         chunkList = [id ? `Here is the paper: [Source](lab://doc/${id}?page=1). ` : 'I found nothing relevant. ', 'This is a mock answer.'];

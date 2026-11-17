@@ -7,7 +7,7 @@ export const API_KEY_SECRET = 'anthropic-api-key';
 
 export interface AiProviderFactory {
   /** The provider for a library's configuration; null when that provider is not available in this app (yet). */
-  (config: { provider: AiProviderId; models: ModelConfig[] }): AiProviderEx | null;
+  (config: { provider: AiProviderId; models: ModelConfig[]; /** Claude Code executable chosen by the user (settings of this machine). */ claudeCodePath?: string | null }): AiProviderEx | null;
 }
 
 export interface FactoryDeps {
@@ -29,6 +29,7 @@ export function createProviderFactory(d: FactoryDeps): AiProviderFactory {
     if (config.provider !== 'claude-agent-sdk') return null;
     return createClaudeProvider({
       models: config.models,
+      configuredExecutable: () => config.claudeCodePath ?? null,
       workDir: path.join(d.localDataDir, 'ai-work'),
       getApiKey: () => d.secrets.get({ kind: 'app' }, API_KEY_SECRET),
       ...(d.clientApp ? { clientApp: d.clientApp } : {}),

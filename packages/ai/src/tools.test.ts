@@ -155,9 +155,20 @@ describe('write_ai_field', () => {
     expect(writes).toHaveLength(1);
   });
 
-  it('does not overwrite what the user accepted or edited, but replaces a proposed or rejected one', async () => {
+  it('a related document in a folder not enabled is reported exactly like an unknown one (no existence oracle)', async () => {
+    const { run, writes } = setup();
+    const err = async (id: string) => run('write_ai_field', { docId: hex(1), field: 'relations', relations: [{ docId: id, reason: 'x' }] }).catch((e: any) => e);
+    const closed = await err(hex(2));
+    const unknown = await err(hex(77));
+    expect(closed.code).toBe('NOT_FOUND');
+    expect(unknown.code).toBe('NOT_FOUND');
+    expect(closed.message.replace(hex(2), 'ID')).toBe(unknown.message.replace(hex(77), 'ID'));
+    expect(writes).toEqual([]);
+  });
+
+  it('does not overwrite what the user accepted, edited or rejected, but replaces a proposed one', async () => {
     const field = (status: string) => ({ value: 'old', meta: { model: 'm', provider: 'mock', date: NOW, source: 'chat' }, review: { status } });
-    for (const [status, ok] of [['accepted', false], ['edited', false], ['proposed', true], ['rejected', true]] as const) {
+    for (const [status, ok] of [['accepted', false], ['edited', false], ['proposed', true], ['rejected', false]] as const) {
       const { run, writes } = setup({ docs: [rec(1, { ai: { summary: field(status) } })] });
       const p = run('write_ai_field', { docId: hex(1), field: 'summary', text: 'new' });
       if (ok) await p;

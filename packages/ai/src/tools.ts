@@ -261,12 +261,16 @@ export function createLibraryTools(options: LibraryToolsOptions): ToolSpec[] {
         if (!input.relations?.length) throw new AppError('INVALID_REQUEST', 'relations needs "relations"');
         for (const r of input.relations) {
           if (r.docId === doc.id) throw new AppError('INVALID_REQUEST', 'A document cannot be related to itself');
-          if (!(await host.getDocument(r.docId))) throw new AppError('NOT_FOUND', `Unknown related document ${r.docId}`);
+          // The related document goes through the same folder gate: one answer for unknown and for not enabled (no existence oracle).
+          await gate(r.docId).catch(() => {
+            throw new AppError('NOT_FOUND', `Unknown related document ${r.docId}`);
+          });
         }
         value = input.relations;
       }
       const existing = doc.ai[input.field];
-      if (existing && (existing.review.status === 'accepted' || existing.review.status === 'edited')) {
+      // A decision of the user (accepted, edited, rejected) is never overwritten; the store re-checks it inside its update.
+      if (existing && existing.review.status !== 'proposed') {
         throw new AppError('CONFLICT', `The user already reviewed this ${input.field}: it is not overwritten`, { reason: 'reviewed' });
       }
       const meta: AiMeta = { model: options.model, provider: options.provider, date: now(), source: purpose };

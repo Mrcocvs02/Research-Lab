@@ -56,7 +56,10 @@ export function createToolsHost(c: ToolsHostContext): LibraryToolsHost {
       let before: unknown = null;
       await rt.store.documents.update(docId as DocumentId, (cur) => {
         if (!cur) throw new AppError('NOT_FOUND', 'Unknown document');
-        before = cur.ai[field] ? { status: cur.ai[field]!.review.status, model: cur.ai[field]!.meta.model } : null;
+        // Re-checked on the record as it is NOW (a review accepted since the tool read the document must win).
+        const live = cur.ai[field];
+        if (live && live.review.status !== 'proposed') throw new AppError('CONFLICT', `The user already reviewed this ${field}: it is not overwritten`, { reason: 'reviewed' });
+        before = live ? { status: live.review.status, model: live.meta.model } : null;
         // Only `ai.<field>` changes: no user field, no note.
         return { ...cur, ai: { ...cur.ai, [field]: value }, updatedAt: now } as DocumentRecord;
       });

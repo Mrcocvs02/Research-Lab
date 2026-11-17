@@ -54,7 +54,7 @@ test('references in library and missing, explained read-next, published preprint
         },
         [`${OA}/works?filter=openalex_id:W900&per-page=50&select=${LINK}`]: { results: [work('W900', MISSING.doi, MISSING.title)] },
         // C as a preprint: found through its arXiv DOI, merged with the published version.
-        [`${OA}/works/doi:10.48550/arXiv.${c.arxivId}`]: work('W103', PUBLISHED.doi, c.title!, {
+        [`${OA}/works/doi:10.48550/arxiv.${c.arxivId}`]: work('W103', PUBLISHED.doi, c.title!, {
           type: 'article',
           primary_location: { source: { display_name: PUBLISHED.venue, type: 'journal' } },
           biblio: { volume: '12', issue: '3', first_page: '45', last_page: '67' },

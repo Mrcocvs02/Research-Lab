@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Lazy, lazyRetry } from '../components/Lazy';
 import { LibrariesSection } from './LibrariesSection';
 import { LibraryConfigSection } from './LibraryConfigSection';
+import { NetworkSection } from './NetworkSection';
 import { ProfileSection } from './ProfileSection';
 import { SecretsSection } from './SecretsSection';
 
@@ -17,6 +18,7 @@ export function Settings({ onNewLibrary }: { onNewLibrary: () => void }) {
       <ProfileSection />
       <LibrariesSection onNew={onNewLibrary} />
       <LibraryConfigSection />
+      <NetworkSection />
       <Lazy>
         <AiSection />
       </Lazy>

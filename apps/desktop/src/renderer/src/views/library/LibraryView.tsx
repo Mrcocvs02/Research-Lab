@@ -6,6 +6,7 @@ import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
 import { useChangeVersion } from '../../lib/events';
 import { HistoryControls } from '../../lib/history';
+import { useCitationJob } from '../../lib/citationJobs';
 import { useNotify } from '../../lib/notify';
 import { useLocalChoice } from '../../lib/useLocalString';
 import { useApp } from '../../state/app-context';
@@ -52,6 +53,7 @@ function LibraryInner() {
   const missingId = useId();
   const { status, start, cancel, rebuild } = useScanStatus();
   const docsVersion = useChangeVersion('documents');
+  const citationJob = useCitationJob();
 
   const [browse, setBrowse] = useState<BrowseState>(initialBrowse);
   const [view, setView] = useLocalChoice<ViewMode>('rl.libraryView', ['list', 'grid'], 'list');
@@ -266,6 +268,9 @@ function LibraryInner() {
                   </button>
                   <button type="button" onClick={() => setJobOpen(true)} data-testid="bulk-ai-propose">
                     {t('jobs.propose')}
+                  </button>
+                  <button type="button" onClick={() => void citationJob.start(selectedIds)} title={t('citations.bulkHint')} data-testid="bulk-citations">
+                    {t('citations.bulk')}
                   </button>
                   <button type="button" className="link" onClick={() => setSelection(emptySelection())} data-testid="selection-clear">
                     {t('docs.clearSelection')}

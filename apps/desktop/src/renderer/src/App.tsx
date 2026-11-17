@@ -7,11 +7,13 @@ import { errorMessage } from './lib/errors';
 import { installWindowGuard } from './lib/dirtyEditors';
 import { AiUiProvider, useAiUi } from './lib/aiUi';
 import { LibraryEventsProvider } from './lib/events';
+import { CitationJobsProvider } from './lib/citationJobs';
 import { HistoryProvider } from './lib/history';
 import { InboxProvider } from './lib/inbox';
 import { JobsProvider } from './lib/jobs';
 import { NotifyProvider } from './lib/notify';
 import { ReaderProvider, useReader } from './lib/reader';
+import { WatchProvider } from './lib/watch';
 import { LibraryView } from './views/library/LibraryView';
 import { Shell, type SectionId } from './shell/Shell';
 import { AppProvider, useApp } from './state/app-context';
@@ -22,6 +24,7 @@ const ProjectsView = lazyRetry(() => import('./views/projects/ProjectsView').the
 // The reader (and pdf.js with it) loads the first time a document is opened in it.
 const ReaderView = lazyRetry(() => import('./views/reader/ReaderView').then((m) => ({ default: m.ReaderView })));
 const InboxView = lazyRetry(() => import('./views/inbox/InboxView').then((m) => ({ default: m.InboxView })));
+const DiscoverView = lazyRetry(() => import('./views/discover/DiscoverView').then((m) => ({ default: m.DiscoverView })));
 const Wizard = lazyRetry(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })));
 
 export function App() {
@@ -35,7 +38,11 @@ export function App() {
                 <AiUiProvider>
                   <JobsProvider>
                     <InboxProvider>
-                      <Root />
+                      <CitationJobsProvider>
+                        <WatchProvider>
+                          <Root />
+                        </WatchProvider>
+                      </CitationJobsProvider>
                     </InboxProvider>
                   </JobsProvider>
                 </AiUiProvider>
@@ -128,6 +135,8 @@ function Root() {
           </div>
         ) : section === 'projects' && app.activeProfile && !showWizard ? (
           <ProjectsView key={app.activeProfile.id} />
+        ) : section === 'discover' && app.activeProfile && !showWizard ? (
+          <DiscoverView key={app.activeProfile.id} />
         ) : section === 'inbox' && app.activeProfile && !showWizard ? (
           <InboxView key={app.activeProfile.id} tab={inboxTab} onTab={setInboxTab} />
         ) : (

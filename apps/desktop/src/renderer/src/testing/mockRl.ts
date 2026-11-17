@@ -51,6 +51,7 @@ export function memoryBackend(init: { settings?: Partial<AppSettings>; profiles?
       if (p.uiLanguage) state.settings.uiLanguage = p.uiLanguage;
       if (p.firstRunDone !== undefined) state.settings.firstRunDone = p.firstRunDone;
       if (p.user) state.settings.user = { ...state.settings.user, ...p.user };
+      if (p.network) state.settings.network = { ...state.settings.network, ...p.network };
       return { ...state.settings, libraries: state.profiles, activeLibraryId: state.active };
     },
     'library:list': () => ({ profiles: state.profiles, activeLibraryId: state.active }),

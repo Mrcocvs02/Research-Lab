@@ -101,6 +101,25 @@ describe('LibraryRuntime (real scanner, extractor and index; worker service in-p
     }
   });
 
+  it('reindexing records written outside the organizer (AI proposals, MCP) moves its generation, so readers cached by it see them', async () => {
+    await put('a/alpha.md', 'Alpha text about kelp.\n');
+    const { rt, store } = await open();
+    try {
+      rt.startScan();
+      await rt.whenIdle();
+      const [id] = (await store.documents.list()).map((d) => d.id);
+      const before = rt.organizer.generation;
+      await store.documents.update(id as never, (cur) => ({ ...cur!, updatedAt: new Date().toISOString() }));
+      await rt.reindexDocuments([id as never]);
+      const afterMany = rt.organizer.generation;
+      expect(afterMany).toBeGreaterThan(before);
+      await rt.reindexDocument(id as never);
+      expect(rt.organizer.generation).toBeGreaterThan(afterMany);
+    } finally {
+      await rt.close();
+    }
+  });
+
   it('organising through the runtime: tags, implications and edits reach the index and survive the next scan', async () => {
     await put('a/alpha.md', 'Alpha text about kelp.\n');
     await put('b/beta.md', 'Beta text about reefs.\n');

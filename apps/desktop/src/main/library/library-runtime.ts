@@ -572,6 +572,8 @@ export class LibraryRuntime {
   /** Same as `reindexDocument` for many documents: the taxonomy is read once and the worker gets batches of 25. */
   async reindexDocuments(docIds: readonly DocumentId[]): Promise<void> {
     if (docIds.length === 0) return;
+    // Whoever wrote the records (AI proposals, MCP, enrichment): readers that cache by generation must see the change.
+    this.org?.invalidate();
     this.taxonomyCache = null;
     const taxonomy = await this.taxonomy();
     const gone: DocumentId[] = [];
@@ -589,6 +591,7 @@ export class LibraryRuntime {
 
   /** Re-reads one document (record, notes, annotations) into the index; for edits made while the app runs. */
   async reindexDocument(docId: DocumentId): Promise<void> {
+    this.org?.invalidate();
     const rec = await this.d.store.documents.get(docId);
     if (!rec) {
       await this.d.worker.remove([docId]);

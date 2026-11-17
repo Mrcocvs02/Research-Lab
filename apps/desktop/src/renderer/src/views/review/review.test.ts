@@ -138,7 +138,7 @@ describe('review of AI proposals', () => {
     await screen.findAllByTestId('review-item');
     fireEvent.click(screen.getByTestId('review-accept-all'));
     await waitFor(() => expect(w.state.manyDecisions).toHaveLength(1));
-    expect(w.state.manyDecisions[0]).toEqual({ items: [{ docId: D1, field: 'description' }, { docId: D2, field: 'summary' }], decision: 'accept' });
+    expect(w.state.manyDecisions[0]).toEqual({ items: [{ docId: D1, field: 'description', metaDate: meta.date }, { docId: D2, field: 'summary', metaDate: meta.date }], decision: 'accept' });
     await waitFor(() => expect(screen.getByTestId('review-empty')).toBeTruthy());
     expect((await screen.findAllByTestId('toast'))[0]!.textContent).toContain('2 proposals accepted');
   });

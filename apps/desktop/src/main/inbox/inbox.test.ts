@@ -24,6 +24,8 @@ let metadataFile: string | null;
 let fetched: string[];
 let scans: unknown[];
 let picks: string[];
+let readHashOverride: string | undefined;
+let failFetch: boolean;
 let changed: Array<[string, unknown]>;
 
 const OPENALEX = {
@@ -62,7 +64,7 @@ function harness() {
     startScan: (o: unknown) => void scans.push(o),
     extractFile: async (rootPath: string, file: string, hash: string) => {
       const t = await createTextExtractor({ cacheDir }).extract(rootPath, file, { hash });
-      return { path: file, hash, ok: true, cached: false, meta: t.meta };
+      return { path: file, hash, ok: true, cached: false, meta: t.meta, ...(readHashOverride ? { readHash: readHashOverride } : {}) };
     },
   };
   const services = {
@@ -77,6 +79,7 @@ function harness() {
     isOnline: () => online,
     fetch: (async (url: string) => {
       fetched.push(url);
+      if (failFetch) throw new TypeError('fetch failed');
       return new Response(JSON.stringify(OPENALEX), { status: 200 });
     }) as unknown as typeof fetch,
     get metadataFile() {
@@ -132,6 +135,8 @@ beforeEach(async () => {
   scans = [];
   picks = [];
   changed = [];
+  readHashOverride = undefined;
+  failFetch = false;
 });
 afterEach(async () => {
   await whenInboxIdle();
@@ -184,7 +189,7 @@ describe('inbox:add', () => {
       ['note.pdf', 'not-pdf'],
       ['file.pdf', 'not-found'],
       ['missing.pdf', 'not-found'],
-      [path.basename(drop), 'not-found'],
+      [path.basename(drop), 'not-pdf'],
       ['x.pdf', 'in-library'],
       ['good.pdf', 'already-queued'],
     ]);
@@ -487,5 +492,143 @@ describe('library items', () => {
     const call = harness();
     expect(fail(await call('inbox:previewTags', { id: hex(33), model: 'claude-haiku-5-5' })).code).toBe('FOLDER_NOT_AI_ENABLED');
     expect(ok(await call('inbox:proposeTags', { id: hex(34), model: 'claude-haiku-5-5', reasoning: 'low' })).proposal.tagsFrom).toBe('ai');
+  });
+});
+
+describe('inbox security and robustness (review fixes)', () => {
+  const BS = String.fromCharCode(92);
+  const confirmReq = (id: string, over: Record<string, unknown> = {}) => ({ id, name: 'Moved.pdf', folder: 'robots', tagIds: [], newTags: [], metadata: {}, ...over });
+  const queued = async (call: ReturnType<typeof harness>, name = 'a.pdf') => {
+    ok(await call('inbox:add', { paths: [await pdf(name)] }));
+    await whenInboxIdle();
+    return ok(await call('inbox:list')).items[0].id as string;
+  };
+
+  it('inbox:add refuses network and device paths without touching them, and a non-.pdf name; the dialog paths stay accepted', async () => {
+    const call = harness();
+    const unc = [`${BS}${BS}host${BS}share${BS}a.pdf`, `${BS}${BS}?${BS}UNC${BS}host${BS}share${BS}a.pdf`, `${BS}${BS}.${BS}pipe${BS}a.pdf`, '//host/share/a.pdf'];
+    const r = ok(await call('inbox:add', { paths: [...unc, path.join(drop, 'note.txt')] }));
+    expect(r.added).toEqual([]);
+    expect(r.refused).toHaveLength(5);
+    expect(r.refused.slice(0, 4).every((x: any) => x.reason === 'not-found')).toBe(true);
+    expect(r.refused[4].reason).toBe('not-pdf');
+    // A PDF chosen in the dialog (trusted) is accepted even when its extension is odd.
+    const odd = path.join(drop, 'paper.PDFX');
+    await writeSyntheticPdf(odd, { title: 'Upper', authors: ['A B'], year: 2020, body: 'x' });
+    picks = [odd];
+    expect(ok(await call('inbox:choose')).added).toHaveLength(1);
+  });
+
+  it('refuses a file that changed between the hash and the extraction (the worker read other bytes)', async () => {
+    const call = harness();
+    readHashOverride = 'f'.repeat(64);
+    const r = ok(await call('inbox:add', { paths: [await pdf('swap.pdf')] }));
+    expect(r.added).toEqual([]);
+    expect(r.refused).toEqual([{ name: 'swap.pdf', reason: 'not-found' }]);
+  });
+
+  it('confirm: every variant of an excluded or data folder is refused and nothing is copied', async () => {
+    const call = harness();
+    const id = await queued(call);
+    for (const folder of ['skipped', 'skipped/.', './skipped', 'skipped//', 'skipped/./']) {
+      expect(fail(await call('inbox:confirm', confirmReq(id, { folder }))).details).toMatchObject({ reason: 'excluded' });
+    }
+    // Case variants name the same folder on a case-insensitive file system (Windows).
+    if (process.platform === 'win32') for (const folder of ['Skipped', 'SKIPPED']) expect(fail(await call('inbox:confirm', confirmReq(id, { folder }))).details).toMatchObject({ reason: 'excluded' });
+    for (const folder of ['.lab', '.lab/.', './.lab']) expect(['INVALID_REQUEST', 'NOT_FOUND']).toContain(fail(await call('inbox:confirm', confirmReq(id, { folder }))).code);
+    expect(await treeOf(root)).toEqual([]);
+    expect(await readdir(path.join(root, 'skipped'))).toEqual([]);
+    expect(ok(await call('inbox:list')).items).toHaveLength(1);
+  });
+
+  it('confirm: the stored path is the normalised one, so it matches what the scanner would record', async () => {
+    const call = harness();
+    const id = await queued(call);
+    const r = ok(await call('inbox:confirm', confirmReq(id, { folder: './robots//' })));
+    expect(r.path).toBe('robots/Moved.pdf');
+    expect((await store.documents.get(id as never))!.path).toBe('robots/Moved.pdf');
+  });
+
+  it('confirm failure after the copy removes the copy, the record and new nodes, so a retry works', async () => {
+    const call = harness();
+    const id = await queued(call);
+    let failNext = true;
+    const origWithChange = store.withChange.bind(store);
+    (store as any).withChange = (ctx: never) => {
+      const cs = origWithChange(ctx);
+      const upd = cs.documents.update.bind(cs.documents);
+      (cs.documents as any).update = async (...a: [never, never]) => {
+        if (failNext) {
+          failNext = false;
+          throw new Error('disk hiccup');
+        }
+        return upd(...a);
+      };
+      return cs;
+    };
+    const e = fail(await call('inbox:confirm', confirmReq(id, { newTags: [{ label: 'Brand new', parentId: null, aliases: [], reason: 'x' }] })));
+    expect(e.code).not.toBe('CONFLICT');
+    expect(await treeOf(root)).toEqual([]);
+    expect(await store.documents.get(id as never)).toBeNull();
+    expect((await store.readTaxonomy()).nodes.map((n) => n.label)).not.toContain('Brand new');
+    expect(ok(await call('inbox:list')).items).toHaveLength(1);
+    const again = ok(await call('inbox:confirm', confirmReq(id)));
+    expect(again.path).toBe('robots/Moved.pdf');
+    expect(await treeOf(root)).toEqual([path.join('robots', 'Moved.pdf')]);
+  });
+
+  it('count: no document read, no network, no lookup; the badge counts the queue and the remembered flagged files', async () => {
+    const call = harness();
+    ok(await call('inbox:add', { paths: [await pdf('a.pdf')] }));
+    await whenInboxIdle();
+    await store.documents.put(doc(9, 'misc/new.pdf', { doi: '10.1/zzz', inbox: { since: NOW, reason: 'new' } }));
+    fetched.length = 0;
+    const reads = { list: 0, get: 0 };
+    const ol = store.documents.list.bind(store.documents);
+    const og = store.documents.get.bind(store.documents);
+    store.documents.list = (async () => (reads.list++, ol())) as never;
+    store.documents.get = (async (i: never) => (reads.get++, og(i))) as never;
+    expect(ok(await call('inbox:count', {}))).toEqual({ count: 1 });
+    expect(reads).toEqual({ list: 0, get: 0 });
+    await whenInboxIdle();
+    expect(fetched).toEqual([]);
+    // After a scan the renderer asks for a recount: one pass over the records, still no lookup.
+    expect(ok(await call('inbox:count', { recount: true }))).toEqual({ count: 2 });
+    expect(ok(await call('inbox:count', {}))).toEqual({ count: 2 });
+    await whenInboxIdle();
+    expect(fetched).toEqual([]);
+  });
+
+  it('a lookup that fails leaves a negative entry: listing again does not schedule it again', async () => {
+    await store.documents.put(doc(9, 'misc/new.pdf', { doi: '10.1/zzz', inbox: { since: NOW, reason: 'new' } }));
+    const call = harness();
+    online = true;
+    failFetch = true;
+    ok(await call('inbox:list'));
+    await whenInboxIdle();
+    expect(ok(await call('inbox:list')).items[0].lookup.state).toBe('error');
+    await whenInboxIdle();
+    const calls = fetched.length;
+    const events = changed.filter(([e]) => e === 'inbox:changed').length;
+    ok(await call('inbox:list'));
+    ok(await call('inbox:list'));
+    await whenInboxIdle();
+    expect(fetched.length).toBe(calls);
+    expect(changed.filter(([e]) => e === 'inbox:changed').length).toBe(events);
+  });
+
+  it('a damaged inbox file is kept as .bad before the queue is rewritten', async () => {
+    const call = harness();
+    await mkdir(path.join(local, 'inbox'), { recursive: true });
+    const file = path.join(local, 'inbox', 'lib-1.json');
+    await writeFile(file, JSON.stringify({ version: 99, items: [] }));
+    ok(await call('inbox:add', { paths: [await pdf('a.pdf')] }));
+    expect(JSON.parse(await readFile(`${file}.bad`, 'utf8'))).toEqual({ version: 99, items: [] });
+  });
+
+  it('the fallback file name is a safe segment (alternate data stream, reserved name)', () => {
+    expect(isValidCopyName(proposedFileName({ title: null }, 'a.pdf:stream'))).toBe(true);
+    expect(proposedFileName({ title: null }, 'con.pdf')).toBe('_con.pdf');
+    expect(isValidCopyName(proposedFileName({ title: null }, ' . '))).toBe(true);
   });
 });

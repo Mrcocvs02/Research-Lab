@@ -27,11 +27,13 @@ interface Props {
   section: SectionId;
   onSection(s: SectionId): void;
   onNewLibrary(): void;
+  /** Optional block above the main area (in the layout flow, never over other controls). */
+  banner?: ReactNode;
   children: ReactNode;
 }
 
 /** Window layout: sidebar, main area, collapsible chat panel, status bar. */
-export function Shell({ section, onSection, onNewLibrary, children }: Props) {
+export function Shell({ section, onSection, onNewLibrary, banner, children }: Props) {
   const { t } = useTranslation();
   const { chatOpen, setChatOpen, paletteOpen, setPaletteOpen, exportInit, closeExport, guide, closeGuide } = useAiUi();
   const app = useApp();
@@ -79,6 +81,7 @@ export function Shell({ section, onSection, onNewLibrary, children }: Props) {
         <SidebarLanguage />
       </aside>
 
+      {banner && <div className="main-banner">{banner}</div>}
       <main id="main" className="main" tabIndex={-1}>
         {children}
       </main>

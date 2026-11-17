@@ -8,6 +8,7 @@ import { clickRow } from './helpers/ui';
  * (synthetic text only), one enabled folder, one selected document, the default model (Haiku) and reasoning (low).
  * 1. A question on the selected document: its first pages go with the turn, so the answer needs no tool.
  * 2. A question on the rest of the library: the agent must use the library tools (at least one card).
+ * 3. A general question: a short answer without any library tool.
  * Both turns must stream in and end without error.
  */
 test.skip(process.env.RL_LIVE_AI !== '1', 'live AI test: set RL_LIVE_AI=1 (uses the Claude access of this machine)');
@@ -15,6 +16,7 @@ test.skip(process.env.RL_LIVE_AI !== '1', 'live AI test: set RL_LIVE_AI=1 (uses 
 const AI_CHANNELS = ['ai:status', 'ai:preview', 'chat:send', 'chat:list', 'chat:get'];
 const QUESTION = 'In one sentence, what is this paper about? Cite the page you read with a lab:// link.';
 const SEARCH = 'Search the library for other papers on a related topic and list their titles, each with its lab:// link.';
+const GENERAL = 'General question, not about the library: what is the capital of France? One word.';
 
 test('live chat: real Claude answers about a selected document using the library tools', async ({}, testInfo) => {
   test.setTimeout(300_000);
@@ -67,6 +69,8 @@ test('live chat: real Claude answers about a selected document using the library
     };
     await ask(QUESTION, 0);
     expect((await ask(SEARCH, 1)).length).toBeGreaterThan(0);
+    // 3. A general question gets a short answer WITHOUT reading the library (plan §4, phase 4 criterion).
+    expect(await ask(GENERAL, 2)).toEqual([]);
     // The raw Markdown of the answers, for the log (links and chips can be checked against it).
     const list = await ipcData<{ items: { id: string }[] }>(window, 'chat:list', {});
     const conv = await ipcData<{ turns: { role: string; text: string }[] }>(window, 'chat:get', { conversationId: list.items[0]!.id });

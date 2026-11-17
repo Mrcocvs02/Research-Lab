@@ -46,6 +46,8 @@ export const chatTurnSchema = z.object({
 export const chatConversationSummarySchema = z.object({
   id: itemIdSchema,
   title: z.string().max(AI_LIMITS.title),
+  /** 'search' for a conversation started by the advanced search. */
+  mode: z.enum(['chat', 'search']).default('chat'),
   updatedAt: isoDateSchema,
   turns: z.number().int().nonnegative(),
 });
@@ -72,6 +74,13 @@ export const chatChannels = defineChannels('chat', {
       /** Page the user is reading, when the chat is opened from the reader. */
       contextPage: z.number().int().positive().max(STUDY_LIMITS.pageMax).optional(),
       confirmed: z.boolean().default(false),
+      /**
+       * 'search': the advanced search of the search bar (plan §5, "Ricerca a due livelli"): the agent reformulates the
+       * request into a few keyword searches of the library, reads pages only when needed, and answers in a few lines
+       * with the most relevant documents, each with a lab:// link (with the page) and one line on why. Always starts a
+       * new conversation (`conversationId` must be absent) whose title marks it as a search. 'chat' (default): as before.
+       */
+      mode: z.enum(['chat', 'search']).default('chat'),
     }),
     response: z.object({ conversationId: itemIdSchema, turnId: z.string() }),
   },

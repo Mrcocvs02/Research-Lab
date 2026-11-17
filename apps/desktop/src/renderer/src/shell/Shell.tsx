@@ -14,6 +14,8 @@ import { useScanStatus } from '../views/library/useScanStatus';
 // The chat and the command palette (and all the AI code with them) load the first time they are shown.
 const ChatPanel = lazyView(() => import('../views/chat/ChatPanel').then((m) => ({ default: m.ChatPanel })), ['chat', 'chat-preview']);
 const Palette = lazyView(() => import('../views/chat/Palette').then((m) => ({ default: m.Palette })), ['palette']);
+// The second-brain export dialog loads when an entry point (project, cluster, selection, palette) opens it.
+const ExportDialog = lazyView(() => import('../views/export/ExportDialog').then((m) => ({ default: m.ExportDialog })), ['export']);
 
 export const SECTIONS = ['library', 'projects', 'discover', 'network', 'inbox', 'settings'] as const;
 export type SectionId = (typeof SECTIONS)[number];
@@ -28,7 +30,7 @@ interface Props {
 /** Window layout: sidebar, main area, collapsible chat panel, status bar. */
 export function Shell({ section, onSection, onNewLibrary, children }: Props) {
   const { t } = useTranslation();
-  const { chatOpen, setChatOpen, paletteOpen, setPaletteOpen } = useAiUi();
+  const { chatOpen, setChatOpen, paletteOpen, setPaletteOpen, exportInit, closeExport } = useAiUi();
   const app = useApp();
   const chatCollapsed = !chatOpen;
   const chatId = useId();
@@ -112,6 +114,12 @@ export function Shell({ section, onSection, onNewLibrary, children }: Props) {
       {paletteOpen && (
         <Lazy>
           <Palette onClose={() => setPaletteOpen(false)} />
+        </Lazy>
+      )}
+
+      {exportInit && app.activeProfile && (
+        <Lazy>
+          <ExportDialog key={app.activeProfile.id} init={exportInit} onClose={closeExport} />
         </Lazy>
       )}
 

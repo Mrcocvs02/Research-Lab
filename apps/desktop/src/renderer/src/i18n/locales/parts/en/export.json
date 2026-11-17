@@ -1,0 +1,123 @@
+{
+  "secondBrain": {
+    "title": "Export as a second brain",
+    "intro": "Writes a folder of linked Markdown files (an index, one card per document, concepts, your notes and highlights) that Claude Code or any agent can read. Nothing is sent anywhere: the export is local and your originals are only read.",
+    "remove": "Remove {{name}}",
+    "run": "Export",
+    "runUpdate": "Update the export",
+    "cancel": "Cancel export",
+    "again": "Export again",
+    "progress": "Export progress",
+    "phase": {
+      "collect": "Collecting documents…",
+      "write": "Writing files…",
+      "copy": "Copying source files…",
+      "done": "Finishing…"
+    },
+    "previous": {
+      "title": "Update an earlier export",
+      "hint": "Pick one to reuse its selection, options and folder. Only the generated parts that changed are rewritten and what you edited by hand is kept.",
+      "update": "{{name}} ({{when}})"
+    },
+    "selection": {
+      "title": "What to export",
+      "hint": "The union of everything below.",
+      "project": "Project",
+      "projectNone": "No project",
+      "clusters": "Clusters",
+      "docs": "Documents",
+      "docsCount_one": "{{count}} selected document",
+      "docsCount_other": "{{count}} selected documents",
+      "folders": "Folders ({{count}})",
+      "foldersHint": "A folder includes everything below it. Excluded folders never enter an export.",
+      "tags": "Tags ({{count}})",
+      "tagsFilter": "Filter tags",
+      "tagsNone": "No tags to show.",
+      "empty": "Choose a project, a folder, a tag, a cluster or some documents to export."
+    },
+    "options": {
+      "title": "Options",
+      "preset": "Preset",
+      "presetNone": "No preset",
+      "cited": "Include the works cited by the selection",
+      "citedHint": "Adds the library documents the selection cites.",
+      "depth": "Depth of cited works",
+      "depthValue_one": "{{count}} step",
+      "depthValue_other": "{{count}} steps",
+      "sources": "Source files",
+      "sourcesNone": "Not included",
+      "sourcesPaths": "List of the original paths",
+      "sourcesCopies": "Copies of the files",
+      "sourcesHint_none": "Cards only: no reference to the original files.",
+      "sourcesHint_paths": "A list of where the original files are. Nothing is copied.",
+      "sourcesHint_copies": "Copies the files into the export (the originals are only read). It can take a lot of space.",
+      "notes": "Include your notes",
+      "annotations": "Include your highlights"
+    },
+    "destination": {
+      "title": "Where to write",
+      "hint": "Choose a folder with the folder dialog. The export goes into a new subfolder with the name below, or updates an earlier export there.",
+      "choose": "Choose folder…",
+      "change": "Change folder…",
+      "none": "No folder chosen.",
+      "dialogTitle": "Choose where to write the export",
+      "pickAgain": "For safety, choose the folder again: the app only writes to folders you picked in this session.",
+      "folderName": "Folder name",
+      "folderNameHint": "Without \\ / : * ? \" < > | and not ending in a dot or space.",
+      "folderInvalid": "This is not a valid folder name.",
+      "willWrite": "Will write to"
+    },
+    "estimate": {
+      "title": "Estimate",
+      "loading": "Calculating…",
+      "documents": "Documents",
+      "cited": "Cited works added",
+      "files": "Files to write",
+      "tokens": "Size for an agent",
+      "tokensValue": "about {{tokens}} tokens (index {{index}})",
+      "copy": "Copied files",
+      "missing": "Missing files",
+      "missingValue_one": "{{count}} document has no file on disk (its card is written, the file is not copied)",
+      "missingValue_other": "{{count}} documents have no file on disk (their cards are written, the files are not copied)",
+      "aiDisabled_one": "{{count}} selected document is in a folder not enabled for AI. Exporting it will ask for your confirmation.",
+      "aiDisabled_other": "{{count}} selected documents are in folders not enabled for AI. Exporting them will ask for your confirmation."
+    },
+    "target": {
+      "new": "{{name}} does not exist yet: it will be created.",
+      "empty": "{{name}} is empty: the export will be written there.",
+      "previous-export": "{{name}} holds an earlier export (last on {{when}}): it will be updated in place.",
+      "not-empty": "{{name}} already has other files and is not an export of this library. Nothing is overwritten: choose another folder or name.",
+      "other-library": "{{name}} is an export of another library. Choose another folder or name.",
+      "edited_one": "{{count}} file has a generated section you edited by hand: it is kept as it is.",
+      "edited_other": "{{count}} files have a generated section you edited by hand: they are kept as they are."
+    },
+    "conflict": {
+      "busy": "Another export is still running. Wait for it to finish and try again.",
+      "not-empty": "This folder already has other files and is not an export of this library, so nothing was written. Choose another folder or name.",
+      "other-library": "This folder is an export of another library, so nothing was written. Choose another folder or name."
+    },
+    "confirm": {
+      "title": "Documents not enabled for AI",
+      "body_one": "{{count}} selected document is in a folder you did not enable for AI. Once exported, anyone who opens the export folder with an agent (such as Claude Code) can read it. Export it anyway?",
+      "body_other": "{{count}} selected documents are in folders you did not enable for AI. Once exported, anyone who opens the export folder with an agent (such as Claude Code) can read them. Export them anyway?",
+      "yes": "Export anyway"
+    },
+    "result": {
+      "done": "The export is complete.",
+      "cancelled": "The export was cancelled. The files already written stay: run it again to complete them.",
+      "failed": "The export failed: {{message}}",
+      "written": "New files",
+      "updated": "Updated files",
+      "unchanged": "Unchanged files",
+      "keptEdited": "Kept (edited by you)",
+      "keptHint": "Files whose generated section you edited: they were not overwritten",
+      "orphaned": "No longer in the selection",
+      "orphanedHint": "Cards of documents that left the selection are not deleted: the index lists them as no longer exported.",
+      "copied": "Copied",
+      "reveal": "Show the folder"
+    },
+    "errors": {
+      "noModel": "The network model is not built yet, so clusters cannot be exported. Build it in the Network section or remove the clusters."
+    }
+  }
+}

@@ -426,5 +426,10 @@
   "discover": {
     "badge_one": "{{count}} new work found",
     "badge_other": "{{count}} new works found"
+  },
+  "secondBrain": {
+    "button": "Export second brain…",
+    "clusterButton": "Export",
+    "clusterAria": "Export the cluster “{{name}}” as a second brain"
   }
 }

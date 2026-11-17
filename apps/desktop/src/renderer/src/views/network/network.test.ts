@@ -1,13 +1,15 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { createElement } from 'react';
+import { createElement, Fragment } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LibraryProfile } from '@rl/core';
 import i18n from '../../i18n';
+import { AiUiProvider } from '../../lib/aiUi';
 import { LibraryEventsProvider } from '../../lib/events';
 import { NotifyProvider } from '../../lib/notify';
 import { ReaderProvider } from '../../lib/reader';
 import { AppProvider } from '../../state/app-context';
+import { ExportProbe } from '../../testing/exportProbe';
 import { callsTo, emitEvent, memoryBackend, setHandlers } from '../../testing/mockRl';
 import { Explore } from './Explore';
 import { MAX_NET_NODES, Network } from './forceSim';
@@ -167,8 +169,8 @@ const settle = () => act(async () => void (await new Promise((r) => setTimeout(r
 async function mount(child: React.ReactElement, extra: Record<string, (p: any) => unknown>) {
   const { handlers } = memoryBackend({ profiles: [profile], settings: { uiLanguage: 'en' } });
   setHandlers({ ...handlers, 'projects:list': () => ({ items: [] }), 'taxonomy:get': () => ({ revision: 0, nodes: [], documentTypes: [], venues: [] }), 'library:listFolders': () => ({ folders: [] }), ...extra });
-  const P: any[] = [AppProvider, LibraryEventsProvider, NotifyProvider, ReaderProvider];
-  render(P.reduceRight((c, X) => createElement(X, null, c), child));
+  const P: any[] = [AppProvider, LibraryEventsProvider, NotifyProvider, ReaderProvider, AiUiProvider];
+  render(P.reduceRight((c, X) => createElement(X, null, c), createElement(Fragment, null, child, createElement(ExportProbe))));
   await settle();
 }
 
@@ -209,6 +211,27 @@ describe('NetworkView', () => {
     expect(screen.getByTestId('graph-status-text').textContent).toContain('2 documents');
     expect(screen.getByTestId('graph-build').textContent).toBe('Rebuild');
     expect(callsTo('graph:map').length).toBeGreaterThan(0);
+  });
+});
+
+describe('NetworkView: second-brain export', () => {
+  it('starts the export from one cluster of the legend', async () => {
+    await mount(createElement(NetworkView), {
+      'graph:status': () => ({ state: 'ready', documents: 2, builtAt: '2026-01-01T10:00:00.000Z', seed: 5, pending: 0 }),
+      'graph:map': () => ({
+        points: [
+          { docId: 'a'.repeat(16), x: 0, y: 0, clusters: ['c0'] },
+          { docId: 'b'.repeat(16), x: 1, y: 1, clusters: ['c0'] },
+        ],
+        clusters: [{ id: 'c0', parent: null, level: 0, size: 2, topTerms: ['alpha', 'beta'], aiLabel: null, centroid: { x: 0.5, y: 0.5 } }],
+        seed: 5,
+        builtAt: '2026-01-01T10:00:00.000Z',
+      }),
+    });
+    const button = await screen.findByTestId('cluster-export');
+    expect(button.getAttribute('aria-label')).toContain('alpha, beta');
+    fireEvent.click(button);
+    expect(JSON.parse(screen.getByTestId('export-probe').textContent!)).toEqual({ clusters: [{ id: 'c0', label: 'alpha, beta' }], name: 'alpha, beta' });
   });
 });
 

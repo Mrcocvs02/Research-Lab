@@ -19,7 +19,7 @@ import { Shell } from './Shell';
 vi.mock('../lib/rl', async () => (await import('../testing/mockRl')).rlModule);
 
 const profile: LibraryProfile = { id: 'lib-a', name: 'Alpha', rootPath: '/tmp/a', dataDirName: '.lab', createdAt: '2026-01-01T00:00:00.000Z' };
-const AI_CHANNELS = ['ai:status', 'ai:usage', 'ai:log', 'chat:list', 'chat:get', 'chat:send', 'commands:list'];
+const AI_CHANNELS = ['ai:status', 'ai:usage', 'ai:log', 'chat:list', 'chat:get', 'chat:send', 'commands:list', 'export:preview', 'export:run', 'mcp:status', 'mcp:log'];
 
 function setup() {
   const ai = memoryAi();
@@ -79,13 +79,15 @@ describe('AI interface loads on demand', () => {
   it('keeps the AI chunks out of the first screen: only dynamic imports reach them', () => {
     const root = path.resolve(import.meta.dirname, '..');
     const read = (rel: string) => readFileSync(path.join(root, rel), 'utf8');
-    const staticImport = /^\s*import\s[^;]*from\s+'[^']*(views\/chat\/|\.\/AiSection|settings\/AiSection|\/AiLog)/m;
-    for (const file of ['App.tsx', 'main.tsx', 'shell/Shell.tsx', 'settings/Settings.tsx', 'lib/aiUi.tsx', 'views/library/LibraryView.tsx', 'views/reader/ReaderView.tsx', 'views/projects/ProjectsView.tsx']) {
+    const staticImport = /^\s*import\s[^;]*from\s+'[^']*(views\/chat\/|views\/export\/|\.\/AiSection|\.\/McpSection|settings\/AiSection|settings\/McpSection|\/AiLog)/m;
+    for (const file of ['App.tsx', 'main.tsx', 'shell/Shell.tsx', 'settings/Settings.tsx', 'lib/aiUi.tsx', 'views/library/LibraryView.tsx', 'views/reader/ReaderView.tsx', 'views/projects/ProjectsView.tsx', 'views/projects/ProjectDetailView.tsx', 'views/network/MapPanel.tsx']) {
       expect(staticImport.test(read(file)), file).toBe(false);
     }
     expect(read('shell/Shell.tsx')).toMatch(/import\('\.\.\/views\/chat\/ChatPanel'\)/);
     expect(read('shell/Shell.tsx')).toMatch(/import\('\.\.\/views\/chat\/Palette'\)/);
     expect(read('settings/Settings.tsx')).toMatch(/import\('\.\/AiSection'\)/);
+    expect(read('settings/Settings.tsx')).toMatch(/import\('\.\/McpSection'\)/);
+    expect(read('shell/Shell.tsx')).toMatch(/import\('\.\.\/views\/export\/ExportDialog'\)/);
     // The first-screen glue must not pull the schemas (zod) of the core in.
     expect(read('lib/aiUi.tsx')).not.toMatch(/from '@rl\/core'/);
   });

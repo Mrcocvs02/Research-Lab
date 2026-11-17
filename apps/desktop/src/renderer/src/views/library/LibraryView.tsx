@@ -112,7 +112,7 @@ function LibraryInner() {
 
   const selectedIds = useMemo(() => [...selection.ids], [selection]);
   // The chat panel uses the selection as context; it is withdrawn when the library view goes away.
-  const { publishSelection } = useAiUi();
+  const { publishSelection, openExport } = useAiUi();
   useEffect(() => {
     publishSelection(selectedIds);
   }, [selectedIds, publishSelection]);
@@ -271,6 +271,9 @@ function LibraryInner() {
                   </button>
                   <button type="button" onClick={() => void citationJob.start(selectedIds)} disabled={citationJob.busy} title={citationJob.busy ? t('citations.alreadyRunning') : t('citations.bulkHint')} data-testid="bulk-citations">
                     {t('citations.bulk')}
+                  </button>
+                  <button type="button" onClick={() => openExport({ docIds: selectedIds })} data-testid="bulk-export">
+                    {t('secondBrain.button')}
                   </button>
                   <button type="button" className="link" onClick={() => setSelection(emptySelection())} data-testid="selection-clear">
                     {t('docs.clearSelection')}

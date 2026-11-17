@@ -4,7 +4,7 @@ import { Dialog } from '../../components/Dialog';
 import { useAiUi } from '../../lib/aiUi';
 import { rl } from '../../lib/rl';
 import { safeText } from '../library/safeText';
-import { PREDEFINED_COMMANDS, type PaletteItem } from './commands';
+import { ACTION_COMMANDS, PREDEFINED_COMMANDS, type PaletteItem } from './commands';
 
 /**
  * Command palette (Ctrl+K): predefined and user commands. Choosing one puts its text in the chat prompt and opens the
@@ -12,7 +12,7 @@ import { PREDEFINED_COMMANDS, type PaletteItem } from './commands';
  */
 export function Palette({ onClose }: { onClose(): void }) {
   const { t } = useTranslation();
-  const { fillPrompt, setChatOpen } = useAiUi();
+  const { fillPrompt, setChatOpen, openExport, selection } = useAiUi();
   const [custom, setCustom] = useState<PaletteItem[]>([]);
   const [query, setQuery] = useState('');
   const [at, setAt] = useState(0);
@@ -39,6 +39,7 @@ export function Palette({ onClose }: { onClose(): void }) {
   const items = useMemo<PaletteItem[]>(() => {
     const all = [
       ...PREDEFINED_COMMANDS.map((id) => ({ id, label: t(`chat.commands.${id}.label`), prompt: t(`chat.commands.${id}.prompt`), custom: false })),
+      ...ACTION_COMMANDS.map((id) => ({ id, label: t(`chat.commands.${id}.label`), prompt: '', custom: false, action: id })),
       ...custom,
     ];
     const q = query.trim().toLowerCase();
@@ -52,6 +53,12 @@ export function Palette({ onClose }: { onClose(): void }) {
 
   const choose = (item: PaletteItem | undefined) => {
     if (!item) return;
+    if (item.action === 'exportDialog') {
+      // The library selection (if any) is where the export starts from.
+      openExport(selection.length > 0 ? { docIds: [...selection] } : {});
+      onClose();
+      return;
+    }
     fillPrompt(item.prompt);
     setChatOpen(true);
     onClose();

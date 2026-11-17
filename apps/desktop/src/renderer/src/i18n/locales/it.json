@@ -426,5 +426,10 @@
   "discover": {
     "badge_one": "{{count}} nuova opera trovata",
     "badge_other": "{{count}} nuove opere trovate"
+  },
+  "secondBrain": {
+    "button": "Esporta come secondo cervello…",
+    "clusterButton": "Esporta",
+    "clusterAria": "Esporta il cluster «{{name}}» come secondo cervello"
   }
 }

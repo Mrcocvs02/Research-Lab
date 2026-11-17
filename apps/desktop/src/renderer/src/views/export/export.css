@@ -1,0 +1,44 @@
+.export-dialog {
+  display: grid;
+  gap: var(--space-3);
+}
+.dialog:has(.export-dialog) {
+  width: min(680px, 94vw);
+}
+.callout.warn {
+  border-left-color: var(--warn);
+  background: var(--warn-soft);
+}
+.callout p {
+  margin: 0 0 var(--space-2);
+}
+.sb-chips,
+.sb-past {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 4px 1px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 12px;
+}
+.sb-tags {
+  max-height: 160px;
+  overflow-y: auto;
+}
+.mcp-url,
+.mcp-copy code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+  font-size: 12px;
+}

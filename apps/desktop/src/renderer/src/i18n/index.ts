@@ -25,6 +25,7 @@ export type StringPart =
   | 'doc-review'
   | 'history'
   | 'inbox'
+  | 'export'
   | 'jobs'
   | 'network'
   | 'palette'

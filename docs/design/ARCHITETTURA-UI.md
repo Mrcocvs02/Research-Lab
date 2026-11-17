@@ -1,7 +1,5 @@
 # Architettura dell'interfaccia e sistema visivo (riprogettazione)
 
-> **DA COMPLETARE (stato del lavoro):** documento completo in tutte le sezioni; restano da scrivere le decisioni D-310…D-324 in `docs/DECISIONS.md` e il testo nuovo della regola 1 in `docs/RULES.md` e in `CLAUDE.md` (§8.3.1 ne dà il contenuto).
-
 Stato: proposta dell'architetto (2026-11-17), ramo `design-arch` da `main` c1b9ac2. Primo giro: scritto dal codice, dai documenti e dalle richieste dell'utente; il rapporto dell'auditor visivo arriverà al secondo giro e potrà correggere dettagli (non la struttura). Decisioni: D-310 … D-324 in `docs/DECISIONS.md`.
 
 Le richieste dell'utente a cui risponde questo documento:

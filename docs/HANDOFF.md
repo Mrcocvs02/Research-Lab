@@ -9,15 +9,15 @@ Stato di passaggio per riprendere il lavoro dalla chat originale. Prima di fare 
 1. `CLAUDE.md` (regole di lavoro, modelli per compito, commit, comandi);
 2. `docs/STATUS.md` (fase, onda, fatto, in corso, bloccato, prossimo);
 3. `docs/HISTORY.md` (cronologia di fasi, revisioni ed eventi);
-4. `docs/DECISIONS.md` (le ultime voci D-246..D-254 e quelle successive).
+4. `docs/DECISIONS.md` (le ultime voci D-280..D-300 e quelle successive).
 
 Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo file va poi aggiornato.
 
 ## 2. Aggiornato
 
 - Data: 2026-11-17.
-- Ultimo commit su `main` prima di questo file: `ed1cecb`, "docs: status and history, phases 6 and 7 done in code, e2e waiting for free memory".
-- Questo file e stato aggiunto con il commit successivo; il suo hash si legge con `git -C C:/dev/research-lab log --oneline -1`.
+- Ultimo merge su `main` con codice di fase 8: `838945d` (p8-fix-final). I file di stato sono stati aggiornati con il commit "docs: phase 8 implemented, reviewed and fixed; unit suite green; e2e pending"; il suo hash si legge con `git -C C:/dev/research-lab log --oneline -1`.
+- Commit non pubblicato: il push su `origin` non e stato fatto in questa sessione.
 
 ## 3. Cosa e successo in questa sessione
 
@@ -27,30 +27,25 @@ La chat originale ha esaurito i crediti; questa sessione di ripresa ha fatto qua
 - Fase 6: revisione indipendente e di sicurezza rifatte (0 bloccanti, 10 importanti), tutte corrette in `p6-fix` (D-248, D-249).
 - Fase 7, lato main: export del second brain e server MCP (D-246, D-247). Lato interfaccia: D-250, D-251. Revisioni: 1 bloccante e 15 importanti, con scelte di prodotto in D-252 e D-253 e correzioni in D-254. L'e2e del criterio di fase 7, `e2e/export-mcp.spec.ts`, e verde.
 - Verifiche: 1592 unitari verdi, typecheck e build verdi, budget rispettati (JS iniziale 373,6/391 KiB; renderer 1500/1560 KiB; main 940/950 KiB).
+- Fase 8 (D-280..D-300): implementata, revisionata e corretta; unita in `main` (e1de2a6, e9294e7, 2148e89, 838945d). Suite unitaria 1687 passati, 12 saltati, 0 falliti; typecheck, build e generalita verdi; budget rispettati (JS iniziale 379,5/391 KiB, renderer 1573,6/1600 KiB, main 1007/1010 KiB: margine del main di soli 3 KiB). Worktree temporanei rimossi; `C:\dev\rl-wt` vuota.
 
 ## 4. Test rimandati alla fine
 
 Decisione dell'utente del 2026-11-17. Eseguirli quando la macchina ha almeno circa 4 GiB di RAM libera (chiudere Chrome e VS Code), in quest'ordine:
 
 1. `e2e/network.spec.ts`: esteso in `p6-fix`, mai eseguito; con 2,5 GiB liberi si ferma da solo.
-2. La suite completa `npm run test:e2e`, mai eseguita dopo i merge di fase 6 e 7.
+2. La suite completa `npm run test:e2e`, mai eseguita dopo i merge di fase 6, 7 e 8 (include il nuovo `e2e/backup-restore.spec.ts`).
 3. I test pesanti (`npm run test:heavy`, `npm run test:e2e:heavy`), uno alla volta, con `RL_HEAVY_TESTS=1`.
-4. Poi i tag `phase-6` e `phase-7`.
+4. `npm run dist:test-dir` e poi `e2e/packaged-app.spec.ts` (build di prova dell'app impacchettata).
+5. Poi i tag `phase-6`, `phase-7` e `phase-8` (e versione 1.0.0 secondo D-262) se verdi.
 
 Se la RAM libera non basta, la suite si ferma da sola: rieseguire solo i test mancanti, mai due pesanti insieme.
 
 ## 5. In corso
 
-Fase 8 avviata. Un subagent architetto (Sonnet) scrive i contratti di fase 8 nel worktree `C:\dev\rl-wt\p8-contracts`.
+Nessun lavoro in corso. Fase 8 implementata, revisionata e corretta; restano le verifiche della sezione 4.
 
-Passi successivi, nell'ordine:
-
-1. lato main e interfaccia in parallelo (al massimo 2 subagent);
-2. revisioni indipendente e di sicurezza;
-3. correzioni;
-4. tutti i test, poi tag.
-
-Prima di riprendere, verificare lo stato reale: il subagent potrebbe essersi fermato a meta. Controllare il worktree, `git branch` e `git log` su `main`.
+Prima di riprendere, verificare lo stato reale: controllare `git branch`, `git status` e `git log` su `main`, e che non ci siano worktree residui.
 
 ## 6. Come lavorare (preferenze dell'utente)
 

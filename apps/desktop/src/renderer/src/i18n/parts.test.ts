@@ -3,9 +3,12 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { coreOf, flatten, partNames, partOf } from './testing';
+import { SHORTCUT_IDS } from '../lib/shortcutDefs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const plural = (k: string) => k.replace(/_(one|other|zero|two|few|many)$/, '');
+/** Shortcut command ids (`reader.find`...) look like keys but are not translation keys: the id table of lib/shortcutDefs.ts is skipped. */
+const SHORTCUT_COMMAND_IDS = new Set<string>(SHORTCUT_IDS);
 
 /** Where each key lives (the same in both languages, checked below): 'core' or the name of a part. */
 const placement = new Map<string, string>();
@@ -47,7 +50,7 @@ walk(root);
 const rel = (f: string) => path.relative(root, f).split(path.sep).join('/');
 
 /** The keys a source file may use: literal keys, plural bases, and `prefix.${x}` / `prefix_${x}` families. */
-function usedKeys(src: string): Set<string> {
+function usedKeys(src: string, skipCommandIds = false): Set<string> {
   const out = new Set<string>();
   const add = (s: string, prefix: boolean) => {
     for (const k of keys) {
@@ -59,7 +62,8 @@ function usedKeys(src: string): Set<string> {
     const s = m[2]!;
     if (m[3] === '${') {
       if (s.includes('.')) add(s.replace(/\.$/, ''), true);
-    } else if (keys.some((k) => plural(k) === s)) add(s, false);
+    } else if (skipCommandIds && SHORTCUT_COMMAND_IDS.has(s)) continue;
+    else if (keys.some((k) => plural(k) === s)) add(s, false);
   }
   return out;
 }
@@ -135,7 +139,7 @@ describe('strings of every file are loaded with its view', () => {
     const problems: string[] = [];
     for (const [f, src] of text) {
       if (rel(f) === 'i18n/index.ts') continue;
-      const used = usedKeys(src);
+      const used = usedKeys(src, rel(f) === 'lib/shortcutDefs.ts');
       if (used.size === 0) continue;
       // A file of the first screen (or of no view at all) can only count on the core.
       const holders = main.has(f) ? [] : closures.filter((c) => c.files.has(f));

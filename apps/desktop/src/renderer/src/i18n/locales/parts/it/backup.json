@@ -104,7 +104,8 @@
       "unknown": "L'operazione non è riuscita.",
       "file-not-listed": "Quel file non è nella cartella dei backup. Sceglilo di nuovo con il selettore di file.",
       "invalid-path": "Quel percorso non si può usare.",
-      "running": "Un altro backup o ripristino è già in corso."
+      "running": "Un altro backup o ripristino è già in corso.",
+      "file-locked": "Un file della libreria è bloccato da un altro programma (sincronizzazione o antivirus). Riprova tra poco."
     },
     "restore": {
       "button": "Ripristina…",

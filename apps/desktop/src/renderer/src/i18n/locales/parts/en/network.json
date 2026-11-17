@@ -91,7 +91,7 @@
         "contains": "contains"
       },
       "empty": "Choose a document, folder or tag to start the network.",
-      "help": "Double-click a node (or use Expand) to add its neighbours; drag nodes to move them; wheel to zoom.",
+      "help": "Double-click a node (or use Expand, or press Enter) to add its neighbours; drag nodes to move them; wheel to zoom; ] and [ choose the next or previous node.",
       "label": "Network of documents, folders and tags",
       "noKinds": "None of the chosen kinds applies to this node.",
       "alreadyExpanded": "This node is already expanded.",

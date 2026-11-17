@@ -91,7 +91,7 @@
         "contains": "contiene"
       },
       "empty": "Scegli un documento, una cartella o un tag per avviare la rete.",
-      "help": "Doppio clic su un nodo (o Espandi) per aggiungere i suoi vicini; trascina i nodi per spostarli; rotella per ingrandire.",
+      "help": "Doppio clic su un nodo (o Espandi, o Invio) per aggiungere i suoi vicini; trascina i nodi per spostarli; rotella per ingrandire; ] e [ scelgono il nodo successivo o precedente.",
       "label": "Rete di documenti, cartelle e tag",
       "noKinds": "Nessuno dei tipi scelti vale per questo nodo.",
       "alreadyExpanded": "Questo nodo è già espanso.",

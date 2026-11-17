@@ -305,6 +305,21 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
   }, [start?.nonce]);
 
   const selected = selKey ? net.nodes.get(selKey) : undefined;
+  /** Keyboard: ] and [ move the selection through the nodes, Enter expands the selected one; the rest is pan and zoom. */
+  const onKeyDown = (e: React.KeyboardEvent<HTMLCanvasElement>) => {
+    if (e.key === ']' || e.key === '[') {
+      const keys = [...net.nodes.keys()];
+      if (keys.length === 0) return;
+      const at = selKey ? keys.indexOf(selKey) : -1;
+      const next = keys[(at + (e.key === ']' ? 1 : -1) + keys.length) % keys.length]!;
+      setSelKey(next);
+      view.requestDraw();
+      e.preventDefault();
+    } else if (e.key === 'Enter' && selected) {
+      e.preventDefault();
+      void expand(selected);
+    } else view.handlers.onKeyDown(e);
+  };
   const toggleKind = (k: Kind) => setKinds((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : KINDS.filter((x) => x === k || cur.includes(x))));
   const hovered = hover ? net.nodes.get(hover.key) : undefined;
   const afterChange = () => {
@@ -456,6 +471,7 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
           data-edges={net.edges.length}
           data-selected={selected?.key ?? ''}
           {...view.handlers}
+          onKeyDown={onKeyDown}
         />
         {hovered && (
           <div className="map-tooltip" role="tooltip" style={{ left: (hover?.x ?? 0) + 12, top: (hover?.y ?? 0) + 12 }} data-testid="net-tooltip">

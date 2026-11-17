@@ -1,5 +1,5 @@
-import { CITATION_FILE_LIMITS, type CitationLink, type CitationSource, type WorkMetadata as CoreMetadata, type WorkRef as CoreRef } from '@rl/core';
-import { asObj, clean, clip, encodePath, normaliseDoi, parseArxivAtom } from './metadata.js';
+import { ARXIV_SHAPE, CITATION_FILE_LIMITS, isValidDoi, type CitationLink, type CitationSource, type WorkMetadata as CoreMetadata, type WorkRef as CoreRef } from '@rl/core';
+import { asObj, clean, clip, encodePath, normaliseDoi, parseArxivAtom, pathDoi } from './metadata.js';
 import { arxivBase, arxivFromDoi, lastName, sameWork, titleKey } from './match.js';
 import type { Net } from './net.js';
 
@@ -29,10 +29,17 @@ const L = CITATION_FILE_LIMITS;
 const LIST_BYTES = 4 * 1024 * 1024;
 const q = encodeURIComponent;
 const yearOf = (v: unknown): number | undefined => (typeof v === 'number' && Number.isInteger(v) && v >= 1000 && v <= 3000 ? v : undefined);
-const doiOf = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? clip(normaliseDoi(v), 300) : undefined);
+/** A DOI from a source, only when it has the shape of one (anything else is dropped, never stored). */
+const doiOf = (v: unknown): string | undefined => {
+  const d = typeof v === 'string' ? clean(normaliseDoi(v), 300) : null;
+  return d && isValidDoi(d) ? d : undefined;
+};
 const names = (list: unknown[]): string[] => list.map((a) => clean(a, L.author)).filter((a): a is string => a !== null).slice(0, L.authors);
 const refArxiv = (r: SourceRef): string | null => (r.arxivId ? arxivBase(r.arxivId) : arxivFromDoi(r.doi));
-const validArxiv = (a: string | null): a is string => a !== null && /^[a-z0-9.\-/]{4,60}$/.test(a);
+const validArxiv = (a: string | null): a is string => a !== null && ARXIV_SHAPE.test(a);
+const S2_ID = /^[0-9a-f]{40}$/;
+/** Cited-by pages of OpenAlex (its maximum). */
+const OA_PAGE = 200;
 
 /** Accept a search hit only when title, year and first author agree with what is known. */
 function confident(ref: SourceRef, c: { title?: string | undefined; year?: number | undefined; authors: string[] }): boolean {
@@ -78,25 +85,37 @@ const biblioRef = (b: Obj): string | undefined => {
 export function createOpenAlex(net: Net, now: () => Date): CitationSourceX {
   // The work just resolved is reused by the calls that follow it (references, cited by); it is not kept for long.
   const memo = new Map<string, { w: Obj; at: number }>();
-  const remember = (key: string, w: Obj): Obj => {
-    if (memo.size >= 8) memo.delete(memo.keys().next().value as string);
+  const put = (key: string, w: Obj) => {
+    if (memo.size >= 16) memo.delete(memo.keys().next().value as string);
     memo.set(key, { w, at: now().getTime() });
+  };
+  // Kept under the lookup key and under the resolved id: a first refresh (no id yet) and the calls that follow it (id set) share one entry.
+  const remember = (key: string, w: Obj): Obj => {
+    put(key, w);
+    put(`id|${oaId(w['id'])}`, w);
     return w;
+  };
+  const recall = (key: string): Obj | null => {
+    const hit = memo.get(key);
+    return hit && now().getTime() - hit.at < 30_000 ? hit.w : null;
   };
   const one = async (path: string, signal?: AbortSignal): Promise<Obj | null> => {
     const w = asObj(await net.json(`${OA}/works/${path}${path.includes('?') ? '&' : '?'}select=${FULL_FIELDS}`, signal));
     return oaId(w['id']) ? w : null;
   };
-  const byDoi = (doi: string, signal?: AbortSignal) => one(`doi:${encodePath(doi)}`, signal);
+  const byDoi = (doi: string, signal?: AbortSignal) => {
+    const d = pathDoi(doi);
+    return d ? one(`doi:${encodePath(d)}`, signal) : Promise.resolve(null);
+  };
 
   async function resolve(ref: SourceRef, signal?: AbortSignal): Promise<Obj | null> {
     const ax = refArxiv(ref);
-    const key = `${ref.externalId ?? ""}|${ref.doi ?? ""}|${ax ?? ""}|${ref.title ?? ""}|${ref.year ?? ""}|${ref.authors?.[0] ?? ""}`;
-    const hit = memo.get(key);
-    if (hit && now().getTime() - hit.at < 30_000) return hit.w;
+    const key = `${ref.doi ?? ''}|${ax ?? ''}|${ref.title ?? ''}|${ref.year ?? ''}|${ref.authors?.[0] ?? ''}`;
+    const hit = (ref.externalId && /^W\d+$/.test(ref.externalId) ? recall(`id|${ref.externalId}`) : null) ?? recall(key);
+    if (hit) return hit;
     let w: Obj | null = null;
     if (ref.externalId && /^W\d+$/.test(ref.externalId)) w = await one(ref.externalId, signal);
-    if (!w && ref.doi) w = await byDoi(normaliseDoi(ref.doi), signal);
+    if (!w && ref.doi) w = await byDoi(ref.doi, signal);
     if (!w && validArxiv(ax) && !ref.doi?.toLowerCase().includes('10.48550/')) w = await byDoi(`10.48550/arXiv.${ax}`, signal);
     if (!w && ref.title && titleKey(ref.title).length >= 12) {
       const y = ref.year;
@@ -156,12 +175,13 @@ export function createOpenAlex(net: Net, now: () => Date): CitationSourceX {
       const at = now().toISOString();
       const out: CitationLink[] = [];
       let cursor: string | null = '*';
-      while (cursor && out.length < L.citedBy) {
-        const res = asObj(await net.json(`${OA}/works?filter=${q(`cites:${id}`)}&sort=publication_date:desc&per-page=50&cursor=${q(cursor)}&select=${LINK_FIELDS}`, signal, LIST_BYTES));
+      // A source that never ends its pages (a repeated cursor, endless empty-looking pages) cannot keep this loop alive.
+      for (let page = 0; cursor && out.length < L.citedBy && page < Math.ceil(L.citedBy / OA_PAGE) + 2; page++) {
+        const res = asObj(await net.json(`${OA}/works?filter=${q(`cites:${id}`)}&sort=publication_date:desc&per-page=${OA_PAGE}&cursor=${q(cursor)}&select=${LINK_FIELDS}`, signal, LIST_BYTES));
         const results = arr(res['results']);
         for (const r of results) out.push(openAlexLink(asObj(r), at));
         const next = asObj(res['meta'])['next_cursor'];
-        cursor = results.length > 0 && typeof next === 'string' && next ? next : null;
+        cursor = results.length > 0 && typeof next === 'string' && next && next !== cursor ? next : null;
       }
       return out.slice(0, L.citedBy);
     },
@@ -200,7 +220,7 @@ function s2Link(p: Obj, at: string): CitationLink {
   const ids = asObj(p['externalIds']);
   const doi = doiOf(ids['DOI']);
   return compact({
-    externalId: typeof p['paperId'] === 'string' ? clip(p['paperId'], 100) : undefined,
+    externalId: typeof p['paperId'] === 'string' && S2_ID.test(p['paperId']) ? p['paperId'] : undefined,
     doi,
     arxivId: typeof ids['ArXiv'] === 'string' ? clip(arxivBase(ids['ArXiv']), 300) : undefined,
     title: clean(p['title'], L.text) ?? undefined,
@@ -221,8 +241,9 @@ export function createSemanticScholar(net: Net, now: () => Date): CitationSource
   async function resolve(ref: SourceRef, signal?: AbortSignal): Promise<Obj | null> {
     const ax = refArxiv(ref);
     let p: Obj | null = null;
-    if (ref.externalId && /^[0-9a-f]{40}$/.test(ref.externalId)) p = await paper(ref.externalId, S2_FULL, signal);
-    if (!p && ref.doi) p = await paper(`DOI:${encodePath(normaliseDoi(ref.doi))}`, S2_FULL, signal);
+    if (ref.externalId && S2_ID.test(ref.externalId)) p = await paper(ref.externalId, S2_FULL, signal);
+    const d = pathDoi(ref.doi);
+    if (!p && d) p = await paper(`DOI:${encodePath(d)}`, S2_FULL, signal);
     if (!p && validArxiv(ax)) p = await paper(`ARXIV:${encodePath(ax)}`, S2_FULL, signal);
     if (!p && ref.title && titleKey(ref.title).length >= 12) {
       const res = asObj(await net.json(`${S2}/paper/search/match?query=${q(ref.title.slice(0, 300))}&fields=paperId,${S2_FULL}`, signal));
@@ -231,11 +252,14 @@ export function createSemanticScholar(net: Net, now: () => Date): CitationSource
     return p;
   }
   const list = async (ref: SourceRef, edge: 'references' | 'citations', key: 'citedPaper' | 'citingPaper', cap: number, signal?: AbortSignal): Promise<CitationLink[]> => {
-    const id = ref.externalId && /^[0-9a-f]{40}$/.test(ref.externalId) ? ref.externalId : (await resolve(ref, signal))?.['paperId'];
-    if (typeof id !== 'string') return [];
+    const found = ref.externalId && S2_ID.test(ref.externalId) ? ref.externalId : (await resolve(ref, signal))?.['paperId'];
+    // The id goes into the path: only the 40 hex digits of a paper id are accepted, whatever the answer said.
+    const id = typeof found === 'string' && S2_ID.test(found) ? found : null;
+    if (!id) return [];
     const at = now().toISOString();
     const out: CitationLink[] = [];
-    for (let offset: number | null = 0; offset !== null && out.length < cap; ) {
+    // A page cap, since items without a title or id are skipped and a hostile answer could otherwise page forever.
+    for (let offset: number | null = 0, page = 0; offset !== null && out.length < cap && page < Math.ceil(cap / 500) + 2; page++) {
       const res = asObj(await net.json(`${S2}/paper/${id}/${edge}?fields=${S2_LINK}&limit=500&offset=${offset}`, signal, LIST_BYTES));
       const data = arr(res['data']);
       for (const d of data) {

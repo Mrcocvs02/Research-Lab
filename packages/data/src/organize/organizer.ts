@@ -110,6 +110,7 @@ export class Organizer {
   private readonly history!: HistoryService;
   private chain: Promise<unknown> = Promise.resolve();
   private cache: { at: number; infos: DocInfo[] } | null = null;
+  private gen = 0;
   private readonly ttl: number;
 
   constructor(private readonly d: OrganizerDeps) {
@@ -122,6 +123,7 @@ export class Organizer {
       docInfos: (fresh) => this.docInfos(fresh),
       invalidate: () => {
         this.cache = null;
+        this.gen++;
         this.history?.invalidate();
       },
     };
@@ -135,6 +137,12 @@ export class Organizer {
    */
   invalidate(): void {
     this.cache = null;
+    this.gen++;
+  }
+
+  /** Moves whenever a document may have changed (every write goes through `invalidate`): a key for what is derived from the documents. */
+  get generation(): number {
+    return this.gen;
   }
 
   private run<T>(fn: () => Promise<T>): Promise<T> {
@@ -258,6 +266,9 @@ export class Organizer {
       const changeId = this.ctx.newChangeId();
       const apply = (c: DocumentRecord): DocumentRecord => {
         const next: DocumentRecord = { ...c, ref: { ...c.ref }, publication: { status: 'published', source: clip(found.source, 500), checkedAt }, updatedAt: checkedAt };
+        // A preprint whose only identity was its arXiv DOI keeps the arXiv id when the DOI becomes the journal one.
+        const oldArxiv = /^10\.48550\/arxiv\.(.+)$/i.exec(c.doi ?? '')?.[1]?.replace(/v\d+$/i, '');
+        if (!next.arxivId && oldArxiv) next.arxivId = oldArxiv;
         next.doi = cleanDoiInput(found.doi);
         if (found.year !== null) next.year = found.year;
         if (found.venue) next.ref.venue = found.venue;

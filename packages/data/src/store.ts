@@ -1,5 +1,5 @@
 import { StringDecoder } from 'node:string_decoder';
-import { appendFile, mkdir, open, readdir, stat, unlink } from 'node:fs/promises';
+import { appendFile, mkdir, open, readdir, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type { z } from 'zod';
 import {
@@ -652,6 +652,34 @@ class FileStore implements FileLibraryStore {
 
   async readWatch(): Promise<WatchFile> {
     return (await this.readOptional(dataPath.watch, watchFileSchema)) ?? watchFileSchema.parse({});
+  }
+
+  /** Sets a damaged data file aside as `<file>.corrupt` (replacing an earlier copy); false when there was no file. */
+  private quarantine(rel: string): Promise<boolean> {
+    return this.locked(rel, async () => {
+      let file: string;
+      try {
+        file = await this.abs(rel);
+      } catch (e) {
+        if (e instanceof AppError && e.code === 'NOT_FOUND') return false;
+        throw e;
+      }
+      try {
+        await withRetry(() => rename(file, `${file}.corrupt`), this.retry);
+        return true;
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === 'ENOENT') return false;
+        throw new AppError('IO_ERROR', 'Cannot set the damaged file aside', { code: (e as NodeJS.ErrnoException).code ?? 'unknown' }, { cause: e });
+      }
+    });
+  }
+
+  quarantineCitations(docId: DocumentId): Promise<boolean> {
+    return this.quarantine(dataPath.citations(documentIdSchema.parse(docId)));
+  }
+
+  resetWatch(): Promise<boolean> {
+    return this.quarantine(dataPath.watch);
   }
 
   async writeWatch(watch: WatchFile): Promise<void> {

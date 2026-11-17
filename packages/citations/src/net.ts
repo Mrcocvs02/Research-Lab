@@ -39,8 +39,10 @@ const realSleep = (ms: number, signal?: AbortSignal) =>
 export function networkError(e: unknown): unknown {
   if (!(e instanceof WorkLookupError)) return e;
   if (e.reason === 'cancelled') return new AppError('CANCELLED', 'Cancelled');
-  const reason = e.reason === 'rate-limited' ? 'rate-limited' : e.reason === 'network' ? 'offline' : 'http';
-  return new AppError('NETWORK_ERROR', reason === 'offline' ? 'The online source cannot be reached' : reason === 'rate-limited' ? 'The online source asked to slow down' : 'The online source answered with an error', { reason, ...(e.status ? { status: e.status } : {}) });
+  // `offline`: the host could not be reached at all; `timeout`: it did not answer in time (one slow answer is not an outage).
+  const reason = e.reason === 'rate-limited' ? 'rate-limited' : e.reason === 'network' ? 'offline' : e.reason === 'timeout' ? 'timeout' : 'http';
+  const message = { offline: 'The online source cannot be reached', timeout: 'The online source did not answer in time', 'rate-limited': 'The online source asked to slow down', http: 'The online source answered with an error' }[reason];
+  return new AppError('NETWORK_ERROR', message, { reason, ...(e.status ? { status: e.status } : {}) });
 }
 
 export function createNet(o: NetOptions): Net {
@@ -60,10 +62,12 @@ export function createNet(o: NetOptions): Net {
         if (at > now()) await sleep(at - now(), signal);
         return await httpGet(full, accept, { fetch: o.fetch, signal, ...(o.timeoutMs ? { timeoutMs: o.timeoutMs } : {}), ...(maxBytes ? { maxBytes } : {}) });
       } catch (e) {
-        const retry = e instanceof WorkLookupError && (e.status === 429 || e.status >= 500) && attempt < RETRIES && !signal?.aborted;
+        const failure = e instanceof WorkLookupError ? e : null;
+        // 429 and 5xx twice; a timeout once (a second one is counted by the caller, not retried again).
+        const retry = failure !== null && !signal?.aborted && ((failure.reason !== 'timeout' && (failure.status === 429 || failure.status >= 500) && attempt < RETRIES) || (failure.reason === 'timeout' && attempt < 1));
         if (!retry) throw networkError(e);
         try {
-          await sleep((e as WorkLookupError).retryAfterMs || 500 * 2 ** attempt, signal);
+          await sleep(failure!.retryAfterMs || 500 * 2 ** attempt, signal);
         } catch (c) {
           throw networkError(c);
         }

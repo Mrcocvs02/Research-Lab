@@ -1,6 +1,6 @@
 # Architettura dell'interfaccia e sistema visivo (riprogettazione)
 
-Stato: **finale (giro 3)**, giro 3 chiuso con la critica del progetto finale (§16, D-368 … D-382), 2026-11-17, ramo `design-arch`. Il giro 3 integra l'audit completo (ramo `design-audit` 8c0d950, italiano e inglese) e due richieste nuove dell'utente (composizione moderna e minimale; mappa bella e giocabile): §0.3-§0.5, §1.1, §4.14-§4.20, §8.1.2, §8.3 rivisto, §14 riordinato, decisioni D-345 … D-367. In caso di dubbio vale questo documento. Primo giro scritto dal codice, dai documenti e dalle richieste dell'utente (D-310 … D-324); secondo giro rivisto con l'audit del designer avversario (`docs/design/AUDIT.md` sul ramo `design-audit`, parziale, 138 schermate misurate) e con nuove verifiche nel codice (D-325 … D-344). Le quattro domande del primo giro hanno ora una risposta **provvisoria, da confermare con l'utente** (§15): nessuna blocca il lavoro.
+Stato: **finale (giro 3)**, giro 3 chiuso con la critica del progetto finale (§16, D-368 … D-382); prototipo P0 **approvato dall'utente** per la grafica (D-383); reti per tag, argomenti e autori aggiunte su richiesta dell'utente (§4.21, D-384 … D-388), 2026-11-17, ramo `design-arch`. Il giro 3 integra l'audit completo (ramo `design-audit` 8c0d950, italiano e inglese) e due richieste nuove dell'utente (composizione moderna e minimale; mappa bella e giocabile): §0.3-§0.5, §1.1, §4.14-§4.20, §8.1.2, §8.3 rivisto, §14 riordinato, decisioni D-345 … D-367. In caso di dubbio vale questo documento. Primo giro scritto dal codice, dai documenti e dalle richieste dell'utente (D-310 … D-324); secondo giro rivisto con l'audit del designer avversario (`docs/design/AUDIT.md` sul ramo `design-audit`, parziale, 138 schermate misurate) e con nuove verifiche nel codice (D-325 … D-344). Le quattro domande del primo giro hanno ora una risposta **provvisoria, da confermare con l'utente** (§15): nessuna blocca il lavoro.
 
 Le richieste dell'utente a cui risponde questo documento:
 
@@ -258,7 +258,7 @@ Research Lab
 │     ├── Da leggere dopo | Novità | Pubblicati | Fonti seguite
 │
 ├── 5 Mappa (Alt+5)                 ex "Rete"
-│     ├── Argomenti | Citazioni | Esplora | Vicini inattesi (§4.20)
+│     ├── Panorama | Collegamenti (rete di Documenti · Tag · Argomenti · Autori) | Esplora | Vicini inattesi (§4.20, §4.21)
 │
 ├── (in basso) Claude  (Ctrl+J)     apre/chiude il pannello di destra
 ├── (in basso) Aiuto   (F1)         guida, scorciatoie (Ctrl+/)
@@ -306,7 +306,7 @@ type NavLocation =
   | { view: 'review'; tab: 'files' | 'proposals' }
   | { view: 'projects'; projectId?: string }
   | { view: 'discover'; tab: 'readnext' | 'new' | 'published' | 'sources' }
-  | { view: 'map'; tab: 'topics' | 'citations' | 'explore' | 'surprising' }
+  | { view: 'map'; tab: 'overview' | 'links' | 'explore' | 'surprising'; mode?: 'docs' | 'tag' | 'topic' | 'author' }
   | { view: 'settings'; section: SettingsSectionId; anchor?: string };
 ```
 
@@ -773,12 +773,12 @@ Dialogo 880 × max 90% della finestra: intestazione fissa (titolo, ×), corpo sc
 
 Richiesta dell'utente: "The graph network should be nice and fun to look and play with". Oggi (`views/network/**`, 3077 righe, D-245): **canvas 2D** scritto a mano, nessuna libreria di grafi; scheda Mappa = punti con disposizione calcolata nel main (vettori TF-IDF, cluster a più livelli, fino a 60 000 documenti, D-243/D-249) disegnati come un percorso per colore con esclusione fuori vista e griglia per i clic; scheda Rete = rete espandibile (documento, cartella, tag; archi simile/cita/tag/contiene) con un passo di forze incrementale O(n²) e al massimo 800 nodi (`forceSim.ts`); Esplora e Vicini inattesi come elenchi. Si resta su **canvas 2D senza dipendenze** (d3-force + d3-quadtree costerebbero ~20 KiB minificati per ciò che si scrive in ~4 KiB; WebGL/sigma.js ~120 KiB non serve sotto le decine di migliaia di punti): tutto nel chunk pigro della vista.
 
-Schede (D-362): **Argomenti** (la mappa dei punti), **Citazioni** (la rete espandibile), **Esplora**, **Vicini inattesi**.
+Schede (D-384, supera D-362): **Panorama** (la mappa dei punti, ex Argomenti), **Collegamenti** (la rete, con il modo Documenti · Tag · Argomenti · Autori di §4.21; ex Citazioni), **Esplora**, **Vicini inattesi**.
 
 ```
 +--------------------------------------------------------------------------------------------------------------+
 | Mappa  214 documenti · 9 argomenti                                                        [[Aggiorna la mappa]]  [⋯] |
-| ( Argomenti | Citazioni | Esplora | Vicini inattesi )                                                                  |
+| ( Panorama | Collegamenti | Esplora | Vicini inattesi )                                                                  |
 | [⌕ Vai a un documento…]  [Anni 2015 ━━●━━━●━ 2024]  [Tag ▾]                                       [✧] [✦?] [⤢]  |   ← una riga: filtri a sinistra, Mescola · Sorprendimi · Adatta come IconButton (D-377)
 +----------------------------------------------------------------------------------------------+---------------+
 |            ╭─ Ottica ────────╮                    ╭─ Reti neurali ──────╮                      | Scheda del    |
@@ -826,6 +826,76 @@ Schede (D-362): **Argomenti** (la mappa dei punti), **Citazioni** (la rete espan
 **Stati:** modello non costruito → `EmptyState` "Costruisci la mappa dei tuoi documenti" con [[Costruisci la mappa]] e la stima del tempo; Citazioni senza un punto di partenza → "Scegli un documento da cui partire" con il campo "Vai a un documento" e i 5 documenti più citati come chip; meno di 3 documenti → spiegazione con [+ Aggiungi PDF]; costruzione in corso → avanzamento per fasi nel corpo e nel chip Attività.
 
 **Peso:** +12-16 KiB (con le aggiunte di D-379) nel chunk pigro della vista Mappa (quadtree e Barnes-Hut ~2, archi curvi e assottigliati ~1, involucri e Chaikin ~1, livello di dettaglio delle etichette ~1, camera con inerzia e volo ~1,5, minimappa ~1,5, cartellino, filtri animati e azioni ~3, tastiera ~1); nessun peso nella prima schermata.
+
+
+### 4.21 Reti per tag, argomenti e autori (D-384 … D-388)
+
+Richiesta dell'utente (dopo l'approvazione del prototipo P0): «The network should be implemented as both tags topics authors». Oggi la rete (`views/network/GraphNet.tsx`, `forceSim.ts`) ha nodi documento, cartella e tag con archi simile, cita, tag, contiene, espandibili da un punto di partenza; la mappa (`graph:map`) ha i cluster del modello a più livelli; Esplora (`explore:level/documents/related`, `packages/graph/src/explore.ts`) ha già le dimensioni `topic`, `author`, `venue` con la chiave d'autore normalizzata. Tutto resta; si aggiunge un modo di costruzione della rete.
+
+**Schede della sezione Mappa (D-384):** **Panorama** (la mappa dei documenti colorata per argomento: la scheda giocabile che si apre per prima, ex "Argomenti") · **Collegamenti** (la rete, con il selettore del modo; ex "Citazioni") · **Esplora** · **Vicini inattesi**. Il nome "Argomenti" resta per il modo della rete, così non indica due cose.
+
+**Un solo controllo per il modo:** nella riga sotto le schede di Collegamenti, a sinistra, un `Segmented` "Rete di: **Documenti · Tag · Argomenti · Autori**" (tasto `M` per passare al successivo; il modo si ricorda per libreria nella sessione). Il resto della riga (Vai a…, Anni, filtri del modo, Mescola · Sorprendimi · Adatta) non cambia posto.
+
+```
+| Mappa  214 documenti · 9 argomenti · 38 tag · 312 autori                         [[Aggiorna la mappa]]  [⋯] |
+| ( Panorama | Collegamenti | Esplora | Vicini inattesi )                                                      |
+| Rete di: (Documenti | Tag | Argomenti | Autori)   [⌕ Vai a…]  [Anni ━●━━●━]  [Almeno 2 documenti ▾]  [Legami ━━●] [✧][✦][⤢] |
++--------------------------------------------------------------------------------------------+-----------------+
+|        ╭ Gruppo di A. Esempio ─╮              ●  B. Prova                                   | Autore          |
+|       ·   ◎ Tu        ●        ·          ╱                                                 | Anna Esempio    |
+|      ·  ●═════◉ A. Esempio ────●  C. Finta   ┌──────────────────────────────┐               | anche: A. Esempio|
+|       ·      ●        ●       ·              │ Anna Esempio  (2 forme)      │               | 14 documenti    |
+|        ╰──────────────────────╯              │ 14 documenti · 2016–2025 ▁▃▅▇▅ │             | [[Apri nella    |
+|                                              │ Argomento: Serie temporali   │               |   Libreria]]    |
+|                                              │ Coautori: B. Prova (6), …     │               | Documenti …     |
+|                                              └──────────────────────────────┘               | Argomenti …     |
++--------------------------------------------------------------------------------------------+-----------------+
+```
+
+#### 4.21.1 I quattro modi
+
+| Modo | Nodi | Archi (peso) | Colore | Dimensione | Involucri | Clic | Doppio clic |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **Documenti** (oggi) | documenti, cartelle, tag (come oggi) | simile, cita, tag, contiene (come oggi) | argomento del documento (tinte stabili, D-379) | collegamenti o citazioni | argomenti | scheda del documento | vicinato |
+| **Tag** | tag della tassonomia usati da almeno N documenti (livello: tutti, o solo i rami principali) | **co-occorrenza**: documenti che hanno entrambi i tag, forza `co / √(nA·nB)` (coseno); in più gli archi "implica" della tassonomia, tratteggiati e leggeri | colore del ramo principale (il colore che l'utente ha dato al nodo, se ha ≥ 3:1 sul fondo; altrimenti la tinta `--cat-*` più vicina) | √ documenti | rami principali della tassonomia | Libreria filtrata con il tag incluso (D-369) | "apre" il tag: i suoi documenti compaiono attorno come punti piccoli (vista bipartita), di nuovo per richiuderli |
+| **Argomenti** | argomenti del modello al livello scelto (cursore "Livello 1 … L", come la mappa), etichetta di Claude o i tre termini principali | **affinità**: somma delle somiglianze tra documenti dei due argomenti normalizzata per le dimensioni + citazioni tra i due gruppi (cita vale 2) | tinta stabile dell'argomento (D-379) | √ documenti | argomento padre quando il livello > 1 | Libreria filtrata sui documenti dell'argomento (filtro `docIds`, oltre 500 con il filtro di argomento nuovo `topic` del modello) | scende di livello: l'argomento si divide nei sottoargomenti (zoom semantico, animato) |
+| **Autori** | autori normalizzati (§4.21.2) con almeno N documenti nella libreria (predefinito 2) | **coautorialità**: numero di documenti in comune, forza `log(1 + co)`; facoltativo (⋯ "Mostra temi in comune") archi leggeri tra autori con lo stesso argomento principale che non hanno mai scritto insieme | argomento prevalente dei suoi documenti | √ documenti (o citazioni, ⋯ "Dimensione per") | comunità (propagazione delle etichette, 10 passi) con l'etichetta "Gruppo di <autore più centrale>" | Libreria filtrata con il facet Autori (tutte le forme del nome) | vicinato di coautori a due passi |
+
+In ogni modo valgono stile, livelli di dettaglio, cartellino, volo, percorso più breve, filtri animati, minimappa, tastiera e movimento ridotto di §4.20 e §16.3; i nodi entità sono cerchi pieni, i documenti nella vista bipartita punti di 3-4 px senza bordo; il nodo dell'utente in modo Autori (nome e varianti del profilo) ha un anello `--accent` e l'etichetta "Tu".
+
+**Passaggio tra i modi (divertente, non disorientante):** le posizioni iniziali vengono dal Panorama — un tag o un argomento nasce nel baricentro dei suoi documenti, un autore nel baricentro dei suoi —, quindi cambiando modo i punti "volano" verso il loro nodo (300 ms, solo trasformazioni) e la simulazione si assesta da lì; con il movimento ridotto il cambio è immediato. La camera tiene il centro.
+
+**Sorprendimi per modo:** Tag → la coppia con co-occorrenza molto più alta dell'attesa ma in rami diversi ("Ottica e Statistica compaiono insieme in 7 documenti"); Argomenti → due argomenti lontani nel Panorama con una citazione o una somiglianza forte tra i loro documenti; Autori → due autori con lo stesso argomento e molte citazioni reciproche che non hanno mai scritto insieme ("Potrebbero conoscersi"). Ogni frase dice il motivo con i numeri.
+
+#### 4.21.2 Autori: normalizzazione e omonimie
+
+- Chiave come in Esplora (`packages/graph/src/explore.ts`): cognome + iniziale del nome, senza accenti e maiuscole, "Cognome, Nome" e "Nome Cognome" uguali; il nome mostrato è la forma più completa e più frequente.
+- Se una chiave raccoglie nomi propri diversi (es. "Anna" e "Andrea" con la stessa iniziale), il cartellino dice "Possibile omonimia: 2 forme del nome" e la scheda le elenca con il numero di documenti; un ORCID diverso nei dati del documento (quando presente) separa sempre.
+- Correzioni dell'utente: nella scheda dell'autore "Separa queste forme" e "Unisci con…" scrivono `<dataDir>/graph/author-aliases.json` (sincronizzato, scrittura atomica, regola 2), letto dalla costruzione e da Esplora; nessuna modifica ai metadati dei documenti.
+- Lavori con moltissimi autori (oltre 25 per documento: consorzi): contano per ogni autore ma **non** creano archi di coautorialità (altrimenti un solo documento collega tutto); la legenda lo dice.
+
+#### 4.21.3 Limiti, filtri e prestazioni
+
+- Contratto nuovo (agente principale): `graph:entityNetwork { mode: 'tag' | 'topic' | 'author', level?, scope? (come graph:map), years?: [from, to], minDocs = 2, minWeight = 0, limit = 800 } → { nodes: [{ id, label, count, years: number[10], colorKey, group, variants? }], edges: [{ a, b, w, n }], total: number, truncated: boolean }`, calcolato nel main (worker del grafo) dai record e dal modello, in cache per versione del modello e della libreria; gli id sono quelli di Esplora (`author:<chiave>`, nodo di tassonomia, cluster) così "Correlati" (`explore:related`) funziona dalla scheda dell'entità.
+- Tetto 800 nodi (i più grandi) e al più 8 archi per nodo (i più pesanti, unione dei due lati): ≤ 3 200 archi. Sottotitolo "800 di 3 120 autori"; cursore "Almeno N documenti" e cursore "Legami" (peso minimo) nella riga dei filtri; i nodi tagliati si raggiungono con "Vai a…" (il volo aggiunge il nodo e i suoi vicini).
+- Filtri del modo nella stessa riga: Anni (contano solo i documenti nel periodo), ambito (cartella, progetto, tag come `graph:map`), e in Autori e Argomenti "Tag ▾".
+- Prestazioni: gli stessi obiettivi di §4.20 (passo Barnes-Hut ≤ 4 ms a 800 nodi, ≥ 55 fps); costruzione nel main ≤ 1,5 s per 10 000 documenti (prova sotto `RL_HEAVY_TESTS=1`), coppie per documento limitate (30 tag, 25 autori).
+
+#### 4.21.4 Cartellino e scheda dell'entità
+
+- Cartellino: nome (e "anche: …" per le varianti), numero di documenti, anni con un istogramma di 10 barre (`--accent` al 60%), argomento o ramo, i tre collegamenti più forti con il numero ("Coautori: B. Prova (6)", "Spesso con: Laser (9)").
+- Scheda nel pannello di destra (stesso `DetailPanel`): titolo, conteggi, [[Apri nella Libreria]] (filtro del modo), elenco dei documenti (virtuale, ordinato per anno, clic = scheda del documento, "Leggi"), "Correlati" dalle altre dimensioni (`explore:related`: per un autore i suoi argomenti e tag; per un tag gli autori e gli argomenti), e per un autore "Separa"/"Unisci con…".
+
+#### 4.21.5 Stati vuoti e accessibilità
+
+- Tag senza tag: illustrazione "mappa da costruire" + "Non ci sono ancora tag" [[Gestisci tag]] (Proponi tag con Claude…). Argomenti senza modello: [[Costruisci la mappa]]. Autori senza autori nei dati: "I documenti non hanno autori" [Completa i dati] (Da rivedere) e (Aggiorna le citazioni). Meno di 3 nodi dopo i filtri: "Allarga i filtri" con [Togli i filtri].
+- Tastiera: `M` cambia modo, il resto come §4.20; l'annuncio dice tipo e numeri ("Autore Anna Esempio, 14 documenti, 5 coautori"); `L` apre Esplora sulla stessa dimensione (Tag → la tassonomia nell'elenco di Esplora, Argomenti → `topic`, Autori → `author`).
+- Movimento ridotto: niente volo tra i modi né apertura animata dei tag, la simulazione si assesta fuori schermo.
+
+#### 4.21.6 Peso e prove
+
+- Renderer: +5-7 KiB nel chunk pigro della Mappa (selettore del modo, stili dei nodi entità e della vista bipartita, cartellino e scheda dell'entità, passaggio animato, Sorprendimi per modo). Main: +4-6 KiB (`packages/graph/src/entity-network.ts`, alias degli autori, gestore del canale).
+- Prove: unitarie per la costruzione (pesi di co-occorrenza e coautorialità, consorzi esclusi dagli archi, unione e separazione degli autori, alias, tetto e top-k, anni), per la colorazione dei tag (colori dell'utente sotto 3:1 → tinta vicina) e per la propagazione delle etichette; e2e `network.spec.ts`: cambio dei quattro modi, cartellino di un autore, clic che apre la Libreria con il filtro dell'autore, doppio clic su un tag che apre i documenti, `M` e movimento ridotto; prova di costruzione con 10 000 documenti sintetici in `test:e2e:heavy`.
 
 ---
 
@@ -1728,7 +1798,7 @@ Correzioni aggiunte dal giro 3 (audit finale, D-362):
 | Inbox · Arrivals · "Go to Arrivals"; "AI proposals" · "Go to AI proposals to review" | "To review" › "New files" · "Claude's suggestions"; scorciatoia "Go to To review" | E1 |
 | "I tuoi originali non vengono mai modificati" (guida, accanto alle annotazioni) | "Research Lab non sposta, non rinomina e non cancella i tuoi file. Le evidenziazioni si aggiungono dentro il PDF solo se lo scegli, e puoi toglierle." | N18, §8.3 |
 | "PROPORRE" e altri maiuscoli nelle impostazioni MCP; "NEW-ARRIVAL.PDF" | maiuscolo solo nelle etichette di gruppo; nomi di file, titoli e percorsi mai trasformati | N13, N22 |
-| Sezione Mappa con schede "Mappa", "Rete", "Esplora", "Vicini inattesi" | "Argomenti · Citazioni · Esplora · Vicini inattesi" / "Topics · Citations · Explore · Unexpected neighbours" | attacco B.7 |
+| Sezione Mappa con schede "Mappa", "Rete", "Esplora", "Vicini inattesi" | "Panorama · Collegamenti · Esplora · Vicini inattesi" / "Overview · Connections · Explore · Unexpected neighbours" (D-384); modi della rete "Documenti · Tag · Argomenti · Autori" / "Documents · Tags · Topics · Authors" | attacco B.7 |
 
 ---
 
@@ -1750,10 +1820,10 @@ Correzioni aggiunte dal giro 3 (audit finale, D-362):
 | Voce | Oggi | Stima dopo | Note |
 | --- | --- | --- | --- |
 | JS iniziale renderer | 379,5 / 391 KiB | 385,5-389 KiB | H0 0, A1 +3-5, A2 +3-5 netti (−2 barra di stato e lingua); `Drawer`, popover del selettore di libreria, popover Attività, Cronologia e indice delle impostazioni pigri **da subito** (D-380); controllo per compito "iniziale ≤ 388" dopo A2 |
-| JS totale renderer | 1574 / 1600 KiB | 1620-1643 KiB | per compito (D-380): H0 2-3, A1 5-7, A2 4-6, C2 10-12, D3 3-5, F4 6-9, E3 1-3, G4a 1-2, M4 12-16, I5 2-4, H5 0-2. **Tetto 1655** |
+| JS totale renderer | 1574 / 1600 KiB | 1625-1650 KiB | per compito (D-380, D-388): H0 2-3, A1 5-7, A2 4-6, C2 10-12, D3 3-5, F4 6-9, E3 1-3, G4a 1-2, M4 17-23 (con i modi Tag, Argomenti, Autori), I5 2-4, H5 0-2. **Tetto 1655** |
 | CSS | tutto nel primo caricamento | ~35% nel primo | divisione per vista: riduce il CSS **del primo avvio**, non la memoria dopo che le viste sono state aperte (non conta come risparmio di memoria) |
 | Risorse del lettore | tetto 2760 KiB | −150 KiB circa | foglio di pdf.js filtrato (§8.1.1) |
-| JS main (con worker) | 1009 / 1010 KiB | 1060-1076 KiB | per compito (D-380): B1 7-10, R0 2-3, G4b 4-6 (classificatore, solo qui), G4a 32-40 (riusa `classify.ts`), G4c 6-8 (sempre). **Tetto 1080** |
+| JS main (con worker) | 1009 / 1010 KiB | 1064-1082 KiB | per compito (D-380, D-388): B1 7-10, R0 2-3, G4b 4-6 (classificatore, solo qui), G4a 32-40 (riusa `classify.ts`), G4c 6-8 (sempre), N4 4-6 (reti per entità). **Tetto 1085** |
 | Preload | ≤ 8 KiB | invariato | canali nuovi dal ponte generico |
 | Memoria a riposo | tetto 501 MB | invariata | nessun processo nuovo; scrittore caricato alla prima scrittura nel worker esistente; pdf.js per la verifica solo alla prima scrittura di un file |
 | Primo contenuto | tetto 530 ms | invariato | nessuna richiesta nuova all'avvio |
@@ -1808,15 +1878,17 @@ Prima di H0 l'agente principale aggiunge `geom` all'`annotationSchema`. Dopo l'o
 
 **G4b · Identità del contenuto** (prima dello scrittore) — File: `packages/data/src/scanner.ts`, nuovo `packages/data/src/pdf-annot/classify.ts` con il lexer e la lettura xref minimi che servono (+test; G4a li estende senza cambiarne l'interfaccia), `packages/data/src/extract/text-extractor.ts` (chiave della cache), `apps/desktop/src/main/thumbs.ts`, `main/graph/inputs.ts`, `main/inbox/service.ts` (duplicati e copie in conflitto), `main/ai/tools-host.ts` e la cache AI, `main/ipc/handlers/study-handlers.ts` (solo il confronto `forHash`), `main/ipc/handlers/doc-files.ts`, `packages/search/src/sqlite-index.ts` (se usa l'hash come chiave di contenuto), `tools/check-nondestructive.mjs`. Contratti: `pdfWrite`, `contentHashOf` (agente principale). Criteri: test "Identità" e "Classificazione" di §8.3.13 con file sintetici annotati da "un altro programma" (scritti dal generatore dei test); un file davvero cambiato si comporta come oggi. e2e (proprietà): `study-data.spec.ts`, `qa-scan-nondestructive.spec.ts`. Budget: main +4-6 KiB (classificatore).
 
-### Onda 4 — scrittura nel PDF e Mappa (G4a ∥ M4, poi G4c se deciso)
+### Onda 4 — scrittura nel PDF e Mappa (G4a ∥ M4, poi G4c ∥ N4)
 
 **G4a · Scrittore incrementale, sincronia, consenso** — **area sensibile** — File: `packages/data/src/pdf-annot/**` esclusa l'interfaccia di `classify.ts` (nuovi `objects.ts`, `serialize.ts`, `xref.ts`, `objstm.ts`, `pages.ts`, `geometry.ts`, `plan.ts`, `reconcile.ts`, `appearance.ts`, `verify.ts`, test e generatori), `apps/desktop/src/main/study/pdf-sync.ts` (nuovo: momenti di scrittura, coda, registro, `expectedWrites`, copia, rinomina, togli dal PDF, troncamento, migrazione, consenso), `main/ipc/handlers/study-handlers.ts` (solo i canali nuovi), `main/library/worker-protocol.ts` e `worker-service.ts` (messaggi e import pigro), `views/reader/PdfWriteChip.tsx` e nuovo `views/reader/PdfConsentDialog.tsx` (F4 è unito), nuovo `settings/LibraryAnnotationsGroup.tsx` (montato da `LibraryConfigSection` con una riga), parti i18n `settings` (solo il gruppo) e `reader` (solo chip e consenso). Criteri: tutti i test di §8.3.13 tranne Identità e Classificazione (di G4b); prefisso intatto in ogni test; nessuna scrittura senza consenso e senza `geom: 2`; momenti di scrittura di D-349; `PDF_WRITE_ENABLED` resta `false` nel merge (i test lo accendono localmente); main ≤ 1068 dopo G4a (riga di D-380; se lo scrittore supera 44 KiB: stop e rapporto); riusa `classify.ts` di G4b senza duplicarlo. e2e (proprietà): nuova `pdf-annot.spec.ts`, poi da sola `security-hostile-scan.spec.ts`. Revisione: Sonnet indipendente **e security dedicata** (con G4b) prima di accendere `PDF_WRITE_ENABLED`. Budget: main +32-40 KiB.
 
-**M4 · Mappa bella e giocabile** (D-367) — File: `views/network/**` (nuovi `camera.ts` con inerzia e volo, `quadtree.ts` + Barnes-Hut in `forceSim.ts`, `edges.ts` per archi curvi e assottigliati, `hulls.ts` con Chaikin, `labelsLod.ts`, `MiniMap.tsx`, `HoverCard.tsx`, `NodeSearch.tsx`, `playful.ts` per Mescola e Sorprendimi, `mapKeyboard.ts`; `MapCanvas.tsx`, `GraphNet.tsx`, `NetworkView.tsx`, `network.css`), i token `--cat-1..10` in un file della vista (`views/network/palette.css`, importato dalla vista; A1 li ha già previsti in `tokens.css` come nomi), parti i18n `network`. Criteri: tutto §4.20; schede rinominate; involucri, etichette con livello di dettaglio, cartellino, scheda al clic (usa il `DetailPanel` di D3), volo, percorso, filtri animati, minimappa, Mescola e Sorprendimi, tastiera con annunci, movimento ridotto, stati vuoti con azione; nessun `requestAnimationFrame` a riposo (test con un contatore); prestazioni: test Vitest con margine (passo Barnes-Hut 800 nodi ≤ 4 ms sulla macchina di CI, energia che scende e assestamento entro 400 passi; disegno di 20 000 punti in un canvas finto ≤ 16 ms), e2e con misura dei frame in panoramica (≥ 50 fps medi su 2 s con la libreria sintetica moltiplicata a 5000 punti). Test unitari: quadtree, Barnes-Hut contro somma esatta (errore < 5% con θ 0,9), inviluppo e Chaikin, scelta delle etichette senza sovrapposizioni, camera (inerzia che si ferma, volo che arriva), percorso BFS, colori della tavolozza ≥ 3:1 nei due temi. e2e (proprietà): `network.spec.ts` (aggiornata: schede, cartellino, volo, tastiera, movimento ridotto). Budget: +12-16 KiB nel chunk pigro, tetto totale 1655 (D-380). Criteri aggiunti da D-379 (Argomenti giocabile, Citazioni mai vuota, grafi piccoli, tetto di 800 con stato, colori stabili, opacità del tema scuro, misura vera dei fps sotto `RL_HEAVY_TESTS=1` in `test:e2e:heavy`, revisione a vista prima del merge con il prototipo P0 come riferimento).
+**M4 · Mappa bella e giocabile, con le reti per tag, argomenti e autori** (D-367, D-384 … D-388) — Criteri in più: tutto §4.21 lato interfaccia (selettore del modo e `M`, nodi entità, vista bipartita dei tag, discesa di livello degli argomenti, comunità degli autori e anello "Tu", cartellino con l'istogramma degli anni, scheda dell'entità con "Apri nella Libreria" e "Correlati", Separa/Unisci, volo tra i modi, Sorprendimi per modo, stati vuoti), con i dati di `graph:entityNetwork` da `mockRl` finché N4 non è unito; prove di §4.21.6. File: `views/network/**` (nuovi `camera.ts` con inerzia e volo, `quadtree.ts` + Barnes-Hut in `forceSim.ts`, `edges.ts` per archi curvi e assottigliati, `hulls.ts` con Chaikin, `labelsLod.ts`, `MiniMap.tsx`, `HoverCard.tsx`, `NodeSearch.tsx`, `playful.ts` per Mescola e Sorprendimi, `mapKeyboard.ts`; `MapCanvas.tsx`, `GraphNet.tsx`, `NetworkView.tsx`, `network.css`), i token `--cat-1..10` in un file della vista (`views/network/palette.css`, importato dalla vista; A1 li ha già previsti in `tokens.css` come nomi), parti i18n `network`. Criteri: tutto §4.20; schede rinominate; involucri, etichette con livello di dettaglio, cartellino, scheda al clic (usa il `DetailPanel` di D3), volo, percorso, filtri animati, minimappa, Mescola e Sorprendimi, tastiera con annunci, movimento ridotto, stati vuoti con azione; nessun `requestAnimationFrame` a riposo (test con un contatore); prestazioni: test Vitest con margine (passo Barnes-Hut 800 nodi ≤ 4 ms sulla macchina di CI, energia che scende e assestamento entro 400 passi; disegno di 20 000 punti in un canvas finto ≤ 16 ms), e2e con misura dei frame in panoramica (≥ 50 fps medi su 2 s con la libreria sintetica moltiplicata a 5000 punti). Test unitari: quadtree, Barnes-Hut contro somma esatta (errore < 5% con θ 0,9), inviluppo e Chaikin, scelta delle etichette senza sovrapposizioni, camera (inerzia che si ferma, volo che arriva), percorso BFS, colori della tavolozza ≥ 3:1 nei due temi. e2e (proprietà): `network.spec.ts` (aggiornata: schede, cartellino, volo, tastiera, movimento ridotto). Budget: +17-23 KiB nel chunk pigro (12-16 per §4.20 e §16.3, 5-7 per §4.21), tetto totale 1655 (D-380, D-388). Criteri aggiunti da D-379 (Argomenti giocabile, Citazioni mai vuota, grafi piccoli, tetto di 800 con stato, colori stabili, opacità del tema scuro, misura vera dei fps sotto `RL_HEAVY_TESTS=1` in `test:e2e:heavy`, revisione a vista prima del merge con il prototipo P0 come riferimento).
 
 **H5 · Progetti e Scopri** (onda 5) — File: `views/projects/**`, `views/discover/**`, i loro CSS e parti i18n. Criteri: §1.1 (tabella delle azioni), §4.13, D-344, Annulla/Cronologia tolti dalle barre. e2e (proprietà): `ui-projects.spec.ts`. Budget ±2 KiB.
 
-**G4c · PDF cifrati con password utente vuota** (sempre, D-375; dopo G4a, da solo, prima dell'accensione) — File: nuovo `packages/data/src/pdf-annot/crypt.ts` (+test con RC4, AES-128, AES-256), una riga in `plan.ts` e `verify.ts`. Criteri: test di §8.3.13 sui cifrati; `/P` rispettato. Revisione security. Budget: main +6-8 KiB (tetto 1080, D-380).
+**N4 · Reti per entità nel main** (D-387, in parallelo con G4c: file disgiunti) — File: nuovo `packages/graph/src/entity-network.ts` (+test), `packages/graph/src/explore.ts` (solo la lettura degli alias), nuovo `apps/desktop/src/main/graph/author-aliases.ts`, `main/graph/host.ts` e `main/ipc/handlers/graph-handlers.ts` (solo il canale nuovo), `packages/search/src/query.ts` (solo il filtro `topic`). Criteri: §4.21.3 (pesi, top-k, tetto, consorzi esclusi, alias, cache, ≤ 1,5 s per 10 000 documenti sotto `RL_HEAVY_TESTS=1`). e2e (proprietà): nessuna nuova; `network.spec.ts` resta di M4 e si riesegue con i dati veri in V1. Budget: main +4-6 KiB (tetto 1085, D-388).
+
+**G4c · PDF cifrati con password utente vuota** (sempre, D-375; dopo G4a, da solo rispetto alle e2e, prima dell'accensione; in parallelo solo con N4) — File: nuovo `packages/data/src/pdf-annot/crypt.ts` (+test con RC4, AES-128, AES-256), una riga in `plan.ts` e `verify.ts`. Criteri: test di §8.3.13 sui cifrati; `/P` rispettato. Revisione security. Budget: main +6-8 KiB (tetto 1080, D-380).
 
 ### Onda 5 — chat, export, viste secondarie, facoltativi (I5 ∥ H5, poi J5)
 

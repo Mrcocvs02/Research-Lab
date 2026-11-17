@@ -1,2 +1,6 @@
-/** Phase 7: second-brain export (plan §6, contract in `@rl/core` `ipc/channels/export.ts`). Not implemented yet. */
-export {};
+/** Second-brain export (plan section 6, contract in `@rl/core` `ipc/channels/export.ts`): pure logic, no Electron, no I/O of its own. */
+export * from './citekeys.js';
+export * from './manifest.js';
+export * from './markers.js';
+export * from './render.js';
+export { approxTokens, foldAscii, sha256, slugify } from './text.js';

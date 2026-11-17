@@ -2361,6 +2361,20 @@ button.page-chip {
 .palette-item.on {
   background: var(--accent-soft);
 }
+.palette-item > span:first-child {
+  flex: 1;
+}
+.palette-key,
+.kbd {
+  margin-left: var(--space-3);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font: 12px/1.6 var(--mono);
+  white-space: nowrap;
+}
 .preview-docs {
   margin: 0 0 var(--space-2);
   padding-left: var(--space-5);

@@ -503,7 +503,9 @@ describe('command palette', () => {
     await ready();
     const palette = await screen.findByTestId('command-palette');
     const items = within(palette).getAllByTestId('palette-item');
-    expect(items.map((i) => i.getAttribute('data-command'))).toEqual(['describe', 'tags', 'related', 'readNext', 'summarizeSelection', 'updateProject', 'whatsNew', 'secondBrain', 'exportDialog', 'user-mine']);
+    expect(items.map((i) => i.getAttribute('data-command')).slice(0, 10)).toEqual(['describe', 'tags', 'related', 'readNext', 'summarizeSelection', 'updateProject', 'whatsNew', 'secondBrain', 'exportDialog', 'user-mine']);
+    // The app actions (views, backup, guide...) follow the commands for Claude.
+    expect(items).toHaveLength(21);
     expect(items[0]!.textContent).toBe('Describe this paper');
     fireEvent.click(items[0]!);
     await waitFor(() => expect(input().value).toContain('Describe the selected paper'));
@@ -515,7 +517,7 @@ describe('command palette', () => {
     setup({ palette: true, commands: [{ id: 'mine', label: 'My own command', prompt: 'Do my thing' }] });
     await ready();
     const box = await screen.findByTestId('palette-input');
-    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(10));
+    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(21));
     fireEvent.change(box, { target: { value: 'own' } });
     const only = screen.getAllByTestId('palette-item');
     expect(only).toHaveLength(1);
@@ -528,7 +530,7 @@ describe('command palette', () => {
   it('still lists the predefined commands when the user commands cannot be read', async () => {
     setup({ palette: true, tweak: (a) => (a.handlers['commands:list'] = () => { throw new AppError('IO_ERROR', 'x'); }) });
     await ready();
-    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(9));
+    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(20));
   });
 
   it('translates the predefined commands', async () => {

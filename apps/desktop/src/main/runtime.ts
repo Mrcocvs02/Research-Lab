@@ -13,6 +13,8 @@ export interface RuntimeConfig {
   localDataDir: string | null;
   /** Path the folder dialog returns without opening (tests; needs RL_E2E=1). */
   dialogPath: string | null;
+  /** Tests (needs RL_E2E=1): path the folder dialog returns for the export destination only (falls back to `dialogPath`). */
+  exportDialogPath: string | null;
   /** Tests (needs RL_E2E=1): JSON file that replaces the online metadata lookup of the inbox. */
   metadataFile: string | null;
   /** Tests (needs RL_E2E=1): JSON file that replaces the network of the online sources of phase 5 (citations, monitoring) and of the inbox lookup. */
@@ -32,7 +34,7 @@ export interface RuntimeConfig {
   warnings: string[];
 }
 
-const HOOK_VARIABLES = ['RL_E2E', 'RL_E2E_DIALOG_PATH', 'RL_E2E_METADATA', 'RL_E2E_NET_FIXTURES', 'RL_E2E_OFFLINE', 'RL_E2E_HIDDEN', 'RL_USER_DATA_DIR', 'RL_LOCAL_DATA_DIR', 'RL_AI_PROVIDER', 'ELECTRON_RENDERER_URL'] as const;
+const HOOK_VARIABLES = ['RL_E2E', 'RL_E2E_DIALOG_PATH', 'RL_E2E_EXPORT_DIALOG_PATH', 'RL_E2E_METADATA', 'RL_E2E_NET_FIXTURES', 'RL_E2E_OFFLINE', 'RL_E2E_HIDDEN', 'RL_USER_DATA_DIR', 'RL_LOCAL_DATA_DIR', 'RL_AI_PROVIDER', 'ELECTRON_RENDERER_URL'] as const;
 
 /**
  * Accepts only `http://localhost:<port>` or `http://127.0.0.1:<port>` (no credentials, no
@@ -60,7 +62,7 @@ export function resolveRuntimeConfig(env: NodeJS.ProcessEnv, isPackaged: boolean
   const present = HOOK_VARIABLES.filter((k) => env[k] !== undefined && env[k] !== '');
   if (isPackaged) {
     if (present.length) warnings.push(`Ignored development/test variables in the installed app: ${present.join(', ')}`);
-    return { userDataDir: null, localDataDir: null, dialogPath: null, metadataFile: null, netFixturesFile: null, hiddenWindow: false, offline: false, aiProvider: null, rendererDevUrl: null, warnings };
+    return { userDataDir: null, localDataDir: null, dialogPath: null, exportDialogPath: null, metadataFile: null, netFixturesFile: null, hiddenWindow: false, offline: false, aiProvider: null, rendererDevUrl: null, warnings };
   }
   const rendererDevUrl = parseDevServerUrl(env.ELECTRON_RENDERER_URL);
   if (env.ELECTRON_RENDERER_URL && !rendererDevUrl) {
@@ -72,6 +74,7 @@ export function resolveRuntimeConfig(env: NodeJS.ProcessEnv, isPackaged: boolean
     localDataDir: absolute(env.RL_LOCAL_DATA_DIR),
     // The dialog path variable alone never does anything: RL_E2E=1 must be set as well.
     dialogPath: env.RL_E2E === '1' ? absolute(env.RL_E2E_DIALOG_PATH) : null,
+    exportDialogPath: env.RL_E2E === '1' ? absolute(env.RL_E2E_EXPORT_DIALOG_PATH) : null,
     metadataFile: env.RL_E2E === '1' ? absolute(env.RL_E2E_METADATA) : null,
     netFixturesFile: env.RL_E2E === '1' ? absolute(env.RL_E2E_NET_FIXTURES) : null,
     hiddenWindow: env.RL_E2E_HIDDEN === '1',
@@ -82,7 +85,7 @@ export function resolveRuntimeConfig(env: NodeJS.ProcessEnv, isPackaged: boolean
   };
 }
 
-let current: RuntimeConfig = { userDataDir: null, localDataDir: null, dialogPath: null, metadataFile: null, netFixturesFile: null, hiddenWindow: false, offline: false, aiProvider: null, rendererDevUrl: null, warnings: [] };
+let current: RuntimeConfig = { userDataDir: null, localDataDir: null, dialogPath: null, exportDialogPath: null, metadataFile: null, netFixturesFile: null, hiddenWindow: false, offline: false, aiProvider: null, rendererDevUrl: null, warnings: [] };
 
 /** Called once, first thing in the main entry point. */
 export function configureRuntime(config: RuntimeConfig): RuntimeConfig {

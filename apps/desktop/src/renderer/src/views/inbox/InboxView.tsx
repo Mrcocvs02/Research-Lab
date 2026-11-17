@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ReasoningLevel, ResponseOf } from '@rl/core';
-import { Lazy, lazyRetry } from '../../components/Lazy';
+import { Lazy, lazyView } from '../../components/Lazy';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { useInbox } from '../../lib/inbox';
@@ -12,7 +12,7 @@ import { useFolderOptions } from '../library/useFolderOptions';
 import { TaxonomyProvider } from '../library/useTaxonomy';
 import { InboxCard } from './InboxCard';
 
-const ReviewView = lazyRetry(() => import('../review/ReviewView').then((m) => ({ default: m.ReviewView })));
+const ReviewView = lazyView(() => import('../review/ReviewView').then((m) => ({ default: m.ReviewView })), ['doc-review', 'review']);
 
 export type InboxItem = ResponseOf<Channels, 'inbox:list'>['items'][number];
 type Tab = 'arrivals' | 'proposals';

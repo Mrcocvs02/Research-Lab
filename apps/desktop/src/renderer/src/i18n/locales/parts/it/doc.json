@@ -1,0 +1,67 @@
+{
+  "ai": {
+    "areaLabel": "Contenuto generato dall'AI",
+    "readOnly": "Scritto dall'AI, in sola lettura. I tuoi campi restano separati.",
+    "none": "Nessun contenuto generato dall'AI per questo documento.",
+    "fields": {
+      "summary": "Riassunto",
+      "description": "Descrizione",
+      "keywords": "Parole chiave",
+      "synonyms": "Sinonimi",
+      "suggestedTags": "Tag suggeriti (non applicati)",
+      "suggestedType": "Tipo suggerito",
+      "relations": "Documenti correlati",
+      "suggestedNewTags": "Nuovi tag suggeriti (non applicati)"
+    }
+  },
+  "docs": {
+    "readHint": "Apri nel lettore (scorciatoia: R nell’elenco)"
+  },
+  "tags": {
+    "changed_one": "Tag aggiornati su {{count}} documento.",
+    "changed_other": "Tag aggiornati su {{count}} documenti."
+  },
+  "bulk": {
+    "title_one": "{{count}} documento selezionato",
+    "title_other": "{{count}} documenti selezionati",
+    "working": "Aggiorno {{count}} documenti… tieni aperta l'app; può volerci un po'.",
+    "tooMany": "Una modifica può riguardare al massimo {{limit}} documenti; ne sono selezionati {{n}}.",
+    "addTag": "Aggiungi un tag a tutti",
+    "currentTags": "Tag della selezione",
+    "noTags": "Nessun documento selezionato ha tag.",
+    "onCount": "su {{count}} di {{total}}",
+    "implied": "implicito",
+    "impliedHint": "Implicito da un altro tag: si toglie quello.",
+    "remove": "Togli…",
+    "removeConfirm_one": "Togli da {{count}} documento",
+    "removeConfirm_other": "Togli da {{count}} documenti"
+  },
+  "doc": {
+    "metadata": "Dati",
+    "metadataHint": "I tuoi valori prevalgono su quelli letti dal file.",
+    "extracted": "dal file",
+    "extractedHint": "Letto in automatico dal file e non verificato. Modificalo per renderlo tuo.",
+    "authorsHint": "Un autore per riga.",
+    "type": "Tipo",
+    "noType": "(nessuno)",
+    "venueRef": "Volume, pagine",
+    "study": "Studio",
+    "underlinedFromAnnotations": "Calcolato dalle tue evidenziazioni; se lo cambi diventa manuale.",
+    "description": "La mia descrizione",
+    "userDescription": "Descrizione breve",
+    "userDescriptionHint": "Con parole tue; si può cercare. L'AI non scrive mai qui.",
+    "file": "File",
+    "size": "Dimensione",
+    "added": "Aggiunto",
+    "notes": "Note sul file",
+    "notesHint": "Le tue note in Markdown, tenute separate dal file. Le note di pagina sono nel lettore."
+  },
+  "jobs": {
+    "proposeOne": "Proponi con l’AI…"
+  },
+  "citations": {
+    "title": "Citazioni",
+    "show": "Mostra le citazioni",
+    "hide": "Nascondi le citazioni"
+  }
+}

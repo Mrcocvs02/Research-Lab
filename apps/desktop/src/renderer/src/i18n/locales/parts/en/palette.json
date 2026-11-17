@@ -1,0 +1,42 @@
+{
+  "chat": {
+    "paletteSearch": "Search commands",
+    "paletteCustom": "yours",
+    "paletteNone": "No command matches.",
+    "paletteHint": "Choosing a command fills the message box. Nothing is sent until you press Send.",
+    "commands": {
+      "describe": {
+        "label": "Describe this paper",
+        "prompt": "Describe the selected paper: what it is about, the method and the main results, in a few sentences."
+      },
+      "tags": {
+        "label": "Tags and keywords",
+        "prompt": "Suggest tags and keywords for the selected documents, using the tags of my taxonomy where they fit."
+      },
+      "related": {
+        "label": "Find related documents",
+        "prompt": "Find documents in my library related to the selected one and say why each is related."
+      },
+      "readNext": {
+        "label": "What to read next",
+        "prompt": "Based on what I have read and my projects, what should I read next? Give a short ordered list with reasons."
+      },
+      "summarizeSelection": {
+        "label": "Summarize the selection",
+        "prompt": "Summarize the selected documents together: common themes, differences and open questions."
+      },
+      "updateProject": {
+        "label": "Update the project",
+        "prompt": "Update the notes of my current project with what is new in the selected documents, and propose documents to add."
+      },
+      "whatsNew": {
+        "label": "Check what is new",
+        "prompt": "Check what is new on the topics of my library since I last looked, and list the most relevant publications."
+      },
+      "secondBrain": {
+        "label": "Export the second brain",
+        "prompt": "Prepare an export of my library as a second brain: notes, links between documents and a summary of each topic."
+      }
+    }
+  }
+}

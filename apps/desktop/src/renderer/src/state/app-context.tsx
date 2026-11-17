@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AppSettings, Language, LibraryConfig, LibraryProfile } from '@rl/core';
-import i18n from '../i18n';
+import i18n, { setLanguage } from '../i18n';
 import { flushAll } from '../lib/dirtyEditors';
 import { rl } from '../lib/rl';
 
@@ -31,7 +31,7 @@ export function useApp(): AppState {
 
 function applyLanguage(language: Language): Promise<unknown> {
   document.documentElement.lang = language;
-  return i18n.changeLanguage(language);
+  return setLanguage(language);
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {

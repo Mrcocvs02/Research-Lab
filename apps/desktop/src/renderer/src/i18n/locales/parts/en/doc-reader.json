@@ -1,0 +1,20 @@
+{
+  "doc": {
+    "underlined": "Underlined"
+  },
+  "notes": {
+    "fileTitle": "Note on the whole file",
+    "pageTitle": "Note on page {{page}}",
+    "fileLabel": "Note on the whole file (Markdown)",
+    "pageLabel": "Note on page {{page}} (Markdown)",
+    "conflict": "This note was changed elsewhere while you were editing it. Your text is still here.",
+    "reloadTheirs": "Reload theirs",
+    "keepMine": "Keep mine",
+    "saveFailed": "The note could not be saved. Your text is still here: try again.",
+    "draftRestored": "Unsaved text restored: the earlier note could not be saved. Check it and save."
+  },
+  "reader": {
+    "underlinedOrigin_annotations": "from your highlights",
+    "underlinedOrigin_manual": "set by hand"
+  }
+}

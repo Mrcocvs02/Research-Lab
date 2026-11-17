@@ -1,6 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Lazy, lazyRetry } from '../components/Lazy';
+import { Lazy, lazyView } from '../components/Lazy';
 import { useAiUi } from '../lib/aiUi';
 import { CitationIndicator } from '../lib/citationJobs';
 import { useInbox } from '../lib/inbox';
@@ -12,8 +12,8 @@ import { scanText } from '../views/library/ScanStatusText';
 import { useScanStatus } from '../views/library/useScanStatus';
 
 // The chat and the command palette (and all the AI code with them) load the first time they are shown.
-const ChatPanel = lazyRetry(() => import('../views/chat/ChatPanel').then((m) => ({ default: m.ChatPanel })));
-const Palette = lazyRetry(() => import('../views/chat/Palette').then((m) => ({ default: m.Palette })));
+const ChatPanel = lazyView(() => import('../views/chat/ChatPanel').then((m) => ({ default: m.ChatPanel })), ['chat', 'chat-preview']);
+const Palette = lazyView(() => import('../views/chat/Palette').then((m) => ({ default: m.Palette })), ['palette']);
 
 export const SECTIONS = ['library', 'projects', 'discover', 'network', 'inbox', 'settings'] as const;
 export type SectionId = (typeof SECTIONS)[number];

@@ -1,0 +1,77 @@
+{
+  "settings": {
+    "profile": {
+      "title": "You and the interface"
+    },
+    "language": {
+      "label": "Interface language",
+      "hint": "Applies immediately."
+    },
+    "libraries": {
+      "title": "Libraries",
+      "empty": "No libraries yet.",
+      "active": "Active",
+      "activate": "Activate",
+      "rename": "Rename",
+      "forget": "Remove from list",
+      "forgetTitle": "Remove library from the list",
+      "forgetBody": "\"{{name}}\" will be removed from this list. No file or folder is deleted, and you can add the folder again later.",
+      "forgetConfirm": "Remove from list"
+    },
+    "library": {
+      "title": "Library settings: {{name}}",
+      "general": "General",
+      "excluded": "Excluded folders",
+      "excludedHint": "These folders are not scanned or indexed.",
+      "mcp": "MCP server",
+      "mcpHint": "Lets Claude Code query this library. It listens only on this computer and needs a token.",
+      "mcpEnabled": "Enable the MCP server",
+      "mcpWrite": "Allow writing",
+      "mcpWriteHint": "Off by default: the server is read-only.",
+      "presets": "Export presets",
+      "presetsEmpty": "No presets yet.",
+      "presetName": "Preset name",
+      "presetSources": "Source documents",
+      "sourcesNone": "Not included",
+      "sourcesPaths": "Links to the files",
+      "sourcesCopies": "Copies",
+      "presetDepth": "Depth of cited papers",
+      "presetCited": "Include cited papers",
+      "presetNotes": "Include notes",
+      "presetAnnotations": "Include annotations",
+      "presetDefaultName": "Preset {{n}}",
+      "addPreset": "Add preset"
+    },
+    "secrets": {
+      "title": "API keys",
+      "intro": "Keys for the library \"{{name}}\". They are stored encrypted in the system's secure storage. Once saved they cannot be viewed again, only replaced or deleted.",
+      "storage": "Keys are never written to the library folder or to any synchronised file.",
+      "names": {
+        "gemini-api-key": "Gemini API key"
+      },
+      "set": "Set",
+      "notSet": "Not set",
+      "placeholder": "Paste the key",
+      "replacePlaceholder": "Paste a new key to replace it",
+      "delete": "Delete"
+    },
+    "network": {
+      "title": "Online sources",
+      "intro": "Citations and monitoring use OpenAlex, arXiv and Semantic Scholar, and only when you ask. Only identifiers and titles leave this computer, never the text of your documents.",
+      "openAlexEmail": "Send my profile email to OpenAlex",
+      "openAlexEmailHint": "OpenAlex answers faster and more reliably when it knows an email to contact. Off by default: the email leaves this computer only if you turn this on.",
+      "noEmail": "Add an email to your profile above to turn this on.",
+      "apiKey": {
+        "title": "OpenAlex API key (optional)",
+        "hint": "A free key from your OpenAlex account settings gives you your own daily budget, and is needed to read more than the 200 most recent \"cited by\" works of a document. It is kept in the system's secure storage and is never shown again.",
+        "label": "OpenAlex API key",
+        "stored": "Saved",
+        "notStored": "Not saved",
+        "placeholder": "Paste the key",
+        "replacePlaceholder": "Paste a new key to replace the saved one",
+        "store": "Save",
+        "remove": "Remove"
+      }
+    }
+  }
+}

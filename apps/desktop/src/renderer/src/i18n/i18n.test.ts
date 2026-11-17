@@ -3,8 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ERROR_CODES } from '@rl/core';
-import en from './locales/en.json';
-import itDict from './locales/it.json';
+import { loadDictionary } from './testing';
 
 type Tree = { [k: string]: string | Tree };
 
@@ -12,6 +11,9 @@ function flatten(tree: Tree, prefix = ''): string[] {
   return Object.entries(tree).flatMap(([k, v]) => (typeof v === 'string' ? [`${prefix}${k}`] : flatten(v, `${prefix}${k}.`)));
 }
 
+/** Core and parts together: the whole dictionary of a language (the split is checked in `parts.test.ts`). */
+const en = loadDictionary('en');
+const itDict = loadDictionary('it');
 const enKeys = flatten(en as Tree).sort();
 const itKeys = flatten(itDict as Tree).sort();
 

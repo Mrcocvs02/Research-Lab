@@ -1,0 +1,20 @@
+{
+  "doc": {
+    "underlined": "Sottolineato"
+  },
+  "notes": {
+    "fileTitle": "Nota sull’intero file",
+    "pageTitle": "Nota sulla pagina {{page}}",
+    "fileLabel": "Nota sull’intero file (Markdown)",
+    "pageLabel": "Nota sulla pagina {{page}} (Markdown)",
+    "conflict": "Questa nota è stata modificata altrove mentre la scrivevi. Il tuo testo è ancora qui.",
+    "reloadTheirs": "Ricarica l’altra",
+    "keepMine": "Tieni la mia",
+    "saveFailed": "Non è stato possibile salvare la nota. Il testo è ancora qui: riprova.",
+    "draftRestored": "Testo non salvato recuperato: la nota precedente non era stata salvata. Controllalo e salva."
+  },
+  "reader": {
+    "underlinedOrigin_annotations": "dalle tue evidenziazioni",
+    "underlinedOrigin_manual": "impostato a mano"
+  }
+}

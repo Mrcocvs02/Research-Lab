@@ -1,0 +1,77 @@
+{
+  "settings": {
+    "profile": {
+      "title": "Tu e l'interfaccia"
+    },
+    "language": {
+      "label": "Lingua dell'interfaccia",
+      "hint": "Si applica subito."
+    },
+    "libraries": {
+      "title": "Librerie",
+      "empty": "Ancora nessuna libreria.",
+      "active": "Attiva",
+      "activate": "Attiva",
+      "rename": "Rinomina",
+      "forget": "Rimuovi dall'elenco",
+      "forgetTitle": "Rimuovi la libreria dall'elenco",
+      "forgetBody": "\"{{name}}\" verrà tolta da questo elenco. Nessun file o cartella viene cancellato e potrai aggiungere di nuovo la cartella più tardi.",
+      "forgetConfirm": "Rimuovi dall'elenco"
+    },
+    "library": {
+      "title": "Impostazioni della libreria: {{name}}",
+      "general": "Generale",
+      "excluded": "Cartelle escluse",
+      "excludedHint": "Queste cartelle non vengono scansionate né indicizzate.",
+      "mcp": "Server MCP",
+      "mcpHint": "Permette a Claude Code di interrogare questa libreria. Ascolta solo su questo computer e richiede un token.",
+      "mcpEnabled": "Abilita il server MCP",
+      "mcpWrite": "Consenti la scrittura",
+      "mcpWriteHint": "Disattivata per impostazione predefinita: il server è in sola lettura.",
+      "presets": "Preset di export",
+      "presetsEmpty": "Ancora nessun preset.",
+      "presetName": "Nome del preset",
+      "presetSources": "Documenti sorgente",
+      "sourcesNone": "Non inclusi",
+      "sourcesPaths": "Collegamenti ai file",
+      "sourcesCopies": "Copie",
+      "presetDepth": "Profondità dei paper citati",
+      "presetCited": "Includi i paper citati",
+      "presetNotes": "Includi le note",
+      "presetAnnotations": "Includi le annotazioni",
+      "presetDefaultName": "Preset {{n}}",
+      "addPreset": "Aggiungi preset"
+    },
+    "secrets": {
+      "title": "Chiavi API",
+      "intro": "Chiavi per la libreria \"{{name}}\". Sono conservate cifrate nell'archivio sicuro del sistema. Una volta salvate non si possono rivedere, solo sostituire o cancellare.",
+      "storage": "Le chiavi non vengono mai scritte nella cartella della libreria né in file sincronizzati.",
+      "names": {
+        "gemini-api-key": "Chiave API Gemini"
+      },
+      "set": "Impostata",
+      "notSet": "Non impostata",
+      "placeholder": "Incolla la chiave",
+      "replacePlaceholder": "Incolla una nuova chiave per sostituirla",
+      "delete": "Cancella"
+    },
+    "network": {
+      "title": "Fonti online",
+      "intro": "Citazioni e monitoraggio usano OpenAlex, arXiv e Semantic Scholar, e solo su tua richiesta. Escono dal computer solo identificatori e titoli, mai il testo dei documenti.",
+      "openAlexEmail": "Invia a OpenAlex l’email del mio profilo",
+      "openAlexEmailHint": "OpenAlex risponde più in fretta e in modo più affidabile se conosce un’email di contatto. Spento di default: l’email lascia il computer solo se lo attivi.",
+      "noEmail": "Aggiungi un’email al profilo qui sopra per attivarlo.",
+      "apiKey": {
+        "title": "Chiave API di OpenAlex (facoltativa)",
+        "hint": "Una chiave gratuita, dalle impostazioni del tuo account OpenAlex, dà un budget giornaliero tutto tuo ed è necessaria per leggere più dei 200 lavori più recenti di \"citato da\" di un documento. Resta nell’archivio sicuro del sistema e non viene più mostrata.",
+        "label": "Chiave API di OpenAlex",
+        "stored": "Salvata",
+        "notStored": "Non salvata",
+        "placeholder": "Incolla la chiave",
+        "replacePlaceholder": "Incolla una nuova chiave per sostituire quella salvata",
+        "store": "Salva",
+        "remove": "Rimuovi"
+      }
+    }
+  }
+}

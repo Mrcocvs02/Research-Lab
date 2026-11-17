@@ -10,7 +10,7 @@ import { canRead, useReader } from '../../lib/reader';
 import { rl } from '../../lib/rl';
 import { splitLines } from '../../lib/validate';
 import { useDecide, type ReviewField } from '../review/useDecide';
-import { Lazy, lazyRetry } from '../../components/Lazy';
+import { Lazy, lazyView } from '../../components/Lazy';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { NoteEditor } from '../notes/NoteEditor';
@@ -21,8 +21,8 @@ import { resolveId } from './taxonomyModel';
 import type { DocRow } from './useDocumentList';
 import { useTaxonomy } from './useTaxonomy';
 
-const CitationsPanel = lazyRetry(() => import('../citations/CitationsPanel').then((m) => ({ default: m.CitationsPanel })));
-const JobDialog = lazyRetry(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })));
+const CitationsPanel = lazyView(() => import('../citations/CitationsPanel').then((m) => ({ default: m.CitationsPanel })), ['citations']);
+const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);
 
 const STUDY: StudyState[] = ['to-read', 'reading', 'read'];
 

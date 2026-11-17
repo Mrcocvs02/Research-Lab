@@ -1,0 +1,17 @@
+{
+  "profile": {
+    "name": "Name",
+    "namePlaceholder": "Jane Doe",
+    "variants": "Names as they appear among authors",
+    "variantsHint": "One per line. Used to recognise your own papers.",
+    "variantsPlaceholder": "Doe, J.\nDoe, Jane",
+    "email": "Email",
+    "orcid": "ORCID",
+    "openAlexId": "OpenAlex author id"
+  },
+  "library": {
+    "name": "Library name",
+    "language": "Language of the documents",
+    "languageHint": "Used for tags, summaries and answers about this library."
+  }
+}

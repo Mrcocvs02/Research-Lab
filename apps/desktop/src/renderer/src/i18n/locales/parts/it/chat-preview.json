@@ -1,0 +1,17 @@
+{
+  "chat": {
+    "preview": {
+      "title": "Inviare a Claude?",
+      "intro": "Questi documenti verranno inviati al modello {{model}}. Controllali prima di confermare.",
+      "allowed_one": "Inviato: {{count}} documento",
+      "allowed_other": "Inviati: {{count}} documenti",
+      "noneAllowed": "Nessun documento verrà inviato: parte solo il tuo messaggio.",
+      "refused_one": "Non inviato: {{count}} documento",
+      "refused_other": "Non inviati: {{count}} documenti",
+      "introAgent": "Il tuo messaggio verrà inviato al modello {{model}}. Mentre risponde, Claude può leggere con i suoi strumenti documenti delle cartelle qui sotto; ogni lettura è registrata nel registro. Confermi una sola volta per questa conversazione.",
+      "agentFolders": "Claude può leggere documenti in queste cartelle:",
+      "note": "L'invio viene registrato nel registro delle impostazioni dell'AI.",
+      "send": "Invia"
+    }
+  }
+}

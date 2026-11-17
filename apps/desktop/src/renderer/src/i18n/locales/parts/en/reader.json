@@ -1,0 +1,82 @@
+{
+  "reader": {
+    "back": "Back to the library",
+    "untitled": "(untitled)",
+    "regionLabel": "Reader: {{title}}",
+    "navigation": "Pages",
+    "goToPage": "Go to page",
+    "pageOf": "of {{count}}",
+    "prev": "Previous page",
+    "next": "Next page",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "zoomLevel": "Zoom {{percent}}%",
+    "fitWidth": "Fit width",
+    "find": "Find",
+    "findHint": "Find in the document (Ctrl+F)",
+    "findLabel": "Find in the document",
+    "findPrev": "Previous match",
+    "findNext": "Next match",
+    "findClose": "Close find",
+    "findCount": "{{current}} of {{total}}",
+    "findNone": "No matches",
+    "findHighlight": "Highlight match",
+    "findUnderline": "Underline match",
+    "findAnnotateHint": "Highlight the current match with Ctrl+Shift+H, underline it with Ctrl+Shift+U.",
+    "findNoMatch": "There is no current match to highlight. Search for some text first.",
+    "skipped_one": "{{count}} page of the selection was not loaded yet and was left out. Scroll through it and select again to include it.",
+    "skipped_other": "{{count}} pages of the selection were not loaded yet and were left out. Scroll through them and select again to include them.",
+    "createStopped": "Stopped at page {{page}}: the highlight could not be saved, so the next pages were not saved either.",
+    "panel": "Notes and highlights",
+    "pagesLabel": "Pages of the document",
+    "loading": "Opening the document…",
+    "studyGroup": "Study",
+    "keys": "Keys: N next page, P previous, Ctrl+F find, Ctrl+G go to page, Ctrl+plus/minus zoom, Ctrl+0 fit width, Ctrl+Shift+H or U highlight or underline the find match, Esc close.",
+    "stale": "The file changed after you made these highlights: their positions may no longer match the text.",
+    "errors": {
+      "notPdf": "Only PDF files can be opened in the reader.",
+      "missing": "The file was not found. It may have been moved or deleted.",
+      "encrypted": "This PDF is protected by a password and cannot be opened here. Open it with another program.",
+      "invalid": "This file is not a valid PDF or it is damaged.",
+      "failed": "The document could not be opened."
+    },
+    "tabs": {
+      "annotations": "Highlights",
+      "pageNote": "Page note",
+      "fileNote": "File note",
+      "notes": "All notes"
+    },
+    "kind": {
+      "highlight": "Highlight",
+      "underline": "Underline"
+    },
+    "colors": {
+      "yellow": "Yellow",
+      "green": "Green",
+      "blue": "Blue",
+      "pink": "Pink",
+      "orange": "Orange"
+    },
+    "ann": {
+      "newLabel": "Highlight or underline the selected text",
+      "editLabel": "Change this annotation",
+      "color": "Colour",
+      "kind": "Type",
+      "comment": "Comment (optional)",
+      "saveComment": "Save comment",
+      "delete": "Delete",
+      "empty": "No highlights or underlines yet. Select text in the document to add one.",
+      "pageHeading": "Page {{page}}",
+      "jump": "Go to the {{kind}} on page {{page}}",
+      "stale": "May be misplaced: the file changed",
+      "reconfirm": "The position is right",
+      "reconfirmHint": "Saves it again on the file as it is now."
+    },
+    "notesList": {
+      "empty": "No notes on this document yet.",
+      "file": "Whole file",
+      "page": "Page {{page}}"
+    }
+  }
+}

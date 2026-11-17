@@ -1,0 +1,22 @@
+{
+  "history": {
+    "empty": "No changes yet.",
+    "undoThis": "Undo this",
+    "redoThis": "Redo this",
+    "undoneBadge": "undone",
+    "otherDevice": "other device",
+    "incompleteBadge": "incomplete",
+    "incompleteWhy": "The log is very large and only its newest part could be read: this change may be missing entries, so it cannot be undone.",
+    "kind": {
+      "change": "change",
+      "undo": "undo",
+      "redo": "redo"
+    },
+    "actions": {
+      "tags_update": "Tags changed on {{documents}} documents",
+      "taxonomy_update": "Taxonomy changed ({{tags}} items)",
+      "document_fields": "Document details edited",
+      "project_update": "Project changed"
+    }
+  }
+}

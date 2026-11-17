@@ -1,12 +1,12 @@
 {
-  "_note": "Measured after the lightness work (D-170..D-176) plus a 15% margin. Raising a value needs a decision in docs/DECISIONS.md.",
+  "_note": "Measured after the lightness work (D-170..D-176) plus a margin (initialJsKB after the per-view strings split, 5%). Raising a value needs a decision in docs/DECISIONS.md.",
   "renderer": {
     "dictionaryChunks": [
       "it",
       "en"
     ],
-    "initialJsKB": 403,
-    "totalJsKB": 1370,
+    "initialJsKB": 391,
+    "totalJsKB": 1395,
     "totalKB": 1600,
     "readerResourcesKB": 2760
   },

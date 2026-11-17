@@ -1,0 +1,41 @@
+{
+  "review": {
+    "acceptSome_one": "Accetta {{count}} tag",
+    "acceptSome_other": "Accetta {{count}} tag",
+    "edit": "Modifica",
+    "saveEdit": "Salva la modifica",
+    "editText": "Testo",
+    "editList": "Un elemento per riga",
+    "edited": "Modificato da te; la proposta originale è conservata.",
+    "tagsLabel": "Tag proposti: clicca per tenerli o toglierli",
+    "newTagKeep": "Crea e applica questo tag",
+    "newTagLabel": "Etichetta",
+    "newTagParent": "Tag padre",
+    "newTagAliases": "Alias (separati da virgole)",
+    "noParent": "(primo livello)",
+    "fields": {
+      "tags": "Tag",
+      "newTags": "Nuovi tag",
+      "description": "Descrizione",
+      "summary": "Riassunto",
+      "keywords": "Parole chiave",
+      "synonyms": "Sinonimi",
+      "relations": "Documenti correlati"
+    },
+    "statsLabel": "Statistiche della revisione",
+    "pending_one": "{{count}} proposta da rivedere",
+    "pending_other": "{{count}} proposte da rivedere",
+    "rateNone": "Nessun tag ancora rivisto",
+    "rate": "Tag accettati: {{percent}}% ({{accepted}} su {{proposed}})",
+    "filter": "Mostra",
+    "allFields": "Tutti i campi",
+    "acceptAll": "Accetta tutto in questa pagina",
+    "rejectAll": "Rifiuta tutto in questa pagina",
+    "empty": "Nessuna proposta dell’AI da rivedere.",
+    "listLabel": "Proposte dell’AI per documento",
+    "pages": "Pagine",
+    "prev": "Precedente",
+    "next": "Successiva",
+    "pageOf": "Pagina {{page}} di {{pages}}"
+  }
+}

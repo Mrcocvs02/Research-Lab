@@ -1,0 +1,91 @@
+{
+  "settings": {
+    "library": {
+      "aiFolders": "Cartelle abilitate a Claude",
+      "aiFoldersHint": "Solo i documenti di queste cartelle (e delle loro sottocartelle) possono essere inviati a Claude.",
+      "confirmBeforeSend": "Chiedi conferma, con anteprima, prima di ogni invio",
+      "modelId": "Id del modello",
+      "modelLabel": "Etichetta",
+      "addModel": "Aggiungi modello",
+      "removeModel": "Rimuovi il modello {{name}}",
+      "defaultModel": "Modello predefinito",
+      "monthlyCap": "Tetto di spesa mensile (USD)",
+      "monthlyCapHint": "Lascia vuoto per nessun tetto.",
+      "batchConfirm": "Conferma i lavori in blocco sopra (USD)",
+      "batchConfirmHint": "I lavori più grandi mostrano una stima e chiedono prima."
+    },
+    "ai": {
+      "title": "Claude (AI)",
+      "intro": "Chat, tag e descrizioni usano Claude. Da nessuna cartella parte nulla finché non la abiliti qui sotto, e ogni invio è elencato nel registro.",
+      "nothingSent": "Nessuna cartella è abilitata: non viene inviato nulla a Claude.",
+      "foldersEnabled_one": "{{count}} cartella abilitata all'invio",
+      "foldersEnabled_other": "{{count}} cartelle abilitate all'invio",
+      "statusTitle": "Stato",
+      "provider": "Fornitore",
+      "access": "Accesso",
+      "refresh": "Ricontrolla",
+      "providers": {
+        "claude-agent-sdk": "Claude (Agent SDK)",
+        "anthropic-api": "API Anthropic",
+        "gemini": "Gemini",
+        "mock": "Fornitore di prova"
+      },
+      "auth": {
+        "claude-code": "Accesso di Claude Code",
+        "api-key": "Chiave API",
+        "none": "Nessuno"
+      },
+      "available": "Disponibile",
+      "notAvailable": "Non disponibile",
+      "reason": {
+        "no-access": "nessun accesso a Claude",
+        "offline": "Claude non è raggiungibile",
+        "cap-reached": "tetto mensile raggiunto",
+        "error": "errore"
+      },
+      "help": "Per attivare l'accesso, accedi con lo strumento a riga di comando Claude Code su questo computer (l'app usa quell'accesso), oppure salva una chiave API qui sotto.",
+      "statusUnknown": "Non è stato possibile leggere lo stato.",
+      "modelsTitle": "Modelli e limiti",
+      "apiKey": {
+        "title": "Chiave API (facoltativa)",
+        "hint": "Serve solo se non usi l'accesso di Claude Code. Resta nell'archivio sicuro del sistema e non viene più mostrata.",
+        "label": "Chiave API Anthropic",
+        "stored": "Salvata",
+        "notStored": "Non salvata",
+        "placeholder": "Incolla la chiave",
+        "replacePlaceholder": "Incolla una nuova chiave per sostituirla",
+        "store": "Salva la chiave",
+        "remove": "Rimuovi la chiave"
+      },
+      "log": {
+        "title": "Cosa è stato inviato a Claude",
+        "hint": "Ogni invio, dal più recente: quando, a quale modello, perché, quali documenti e quanto.",
+        "empty": "Non è ancora stato inviato nulla.",
+        "date": "Data",
+        "model": "Modello",
+        "purpose": "Scopo",
+        "documents": "Documenti",
+        "tokens": "Token",
+        "cost": "Costo",
+        "more": "Mostra altri",
+        "confirmed": "confermato",
+        "moreDocs": "altri {{count}}"
+      },
+      "exe": {
+        "label": "Programma Claude Code",
+        "notFound": "Non trovato",
+        "choose": "Scegli…",
+        "auto": "Automatico",
+        "source_settings": "scelto da te",
+        "source_path": "trovato nel PATH",
+        "source_local-bin": "trovato nella cartella dei programmi locali",
+        "source_sdk": "la copia inclusa nell’app",
+        "source_none": "non trovato"
+      },
+      "rootAll": "Tutta la libreria",
+      "rootAllHint": "Ogni cartella e file, anche quelli aggiunti dopo.",
+      "rootFiles": "File nella radice della libreria",
+      "rootFilesHint": "Solo i file direttamente nella radice, non le cartelle."
+    }
+  }
+}

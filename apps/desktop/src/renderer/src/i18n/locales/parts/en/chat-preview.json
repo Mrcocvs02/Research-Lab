@@ -1,0 +1,17 @@
+{
+  "chat": {
+    "preview": {
+      "title": "Send to Claude?",
+      "intro": "These documents will be sent to the model {{model}}. Review them before confirming.",
+      "allowed_one": "Sent: {{count}} document",
+      "allowed_other": "Sent: {{count}} documents",
+      "noneAllowed": "No document will be sent: only your message goes.",
+      "refused_one": "Not sent: {{count}} document",
+      "refused_other": "Not sent: {{count}} documents",
+      "introAgent": "Your message will be sent to the model {{model}}. While it answers, Claude may read documents of the folders below with its tools; each read is recorded in the log. You confirm once for this conversation.",
+      "agentFolders": "Claude may read documents in these folders:",
+      "note": "The send is recorded in the log of the AI settings.",
+      "send": "Send"
+    }
+  }
+}

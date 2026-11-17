@@ -1,0 +1,42 @@
+{
+  "chat": {
+    "paletteSearch": "Cerca un comando",
+    "paletteCustom": "tuo",
+    "paletteNone": "Nessun comando corrisponde.",
+    "paletteHint": "Scegliere un comando riempie la casella del messaggio. Non viene inviato nulla finché non premi Invia.",
+    "commands": {
+      "describe": {
+        "label": "Descrivi questo articolo",
+        "prompt": "Descrivi l'articolo selezionato: di cosa parla, il metodo e i risultati principali, in poche frasi."
+      },
+      "tags": {
+        "label": "Tag e parole chiave",
+        "prompt": "Suggerisci tag e parole chiave per i documenti selezionati, usando i tag della mia tassonomia dove si adattano."
+      },
+      "related": {
+        "label": "Trova documenti correlati",
+        "prompt": "Trova nella mia libreria i documenti correlati a quello selezionato e spiega perché ciascuno lo è."
+      },
+      "readNext": {
+        "label": "Cosa leggere dopo",
+        "prompt": "In base a ciò che ho letto e ai miei progetti, cosa dovrei leggere dopo? Dammi un breve elenco ordinato con i motivi."
+      },
+      "summarizeSelection": {
+        "label": "Riassumi la selezione",
+        "prompt": "Riassumi insieme i documenti selezionati: temi comuni, differenze e domande aperte."
+      },
+      "updateProject": {
+        "label": "Aggiorna il progetto",
+        "prompt": "Aggiorna le note del mio progetto corrente con le novità dei documenti selezionati e proponi documenti da aggiungere."
+      },
+      "whatsNew": {
+        "label": "Controlla le novità",
+        "prompt": "Controlla le novità sugli argomenti della mia libreria dall'ultima volta ed elenca le pubblicazioni più rilevanti."
+      },
+      "secondBrain": {
+        "label": "Esporta il secondo cervello",
+        "prompt": "Prepara un'esportazione della mia libreria come secondo cervello: note, collegamenti tra documenti e un riassunto di ogni argomento."
+      }
+    }
+  }
+}

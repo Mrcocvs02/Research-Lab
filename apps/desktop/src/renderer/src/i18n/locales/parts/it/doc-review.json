@@ -1,0 +1,24 @@
+{
+  "ai": {
+    "legacy": "Importato dal vecchio indice",
+    "review": {
+      "proposed": "proposto",
+      "accepted": "accettato",
+      "rejected": "rifiutato",
+      "edited": "modificato"
+    }
+  },
+  "review": {
+    "done_accept": "Proposta accettata.",
+    "done_reject": "Proposta rifiutata.",
+    "done_edit": "Proposta modificata e conservata.",
+    "many_accept_one": "{{count}} proposta accettata.",
+    "many_accept_other": "{{count}} proposte accettate.",
+    "many_reject_one": "{{count}} proposta rifiutata.",
+    "many_reject_other": "{{count}} proposte rifiutate.",
+    "someFailed_one": "{{count}} proposta non è stata decisa (nel frattempo è cambiata).",
+    "someFailed_other": "{{count}} proposte non sono state decise (nel frattempo sono cambiate).",
+    "accept": "Accetta",
+    "reject": "Rifiuta"
+  }
+}

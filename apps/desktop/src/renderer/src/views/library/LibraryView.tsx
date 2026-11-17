@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Lazy, lazyRetry } from '../../components/Lazy';
+import { Lazy, lazyView } from '../../components/Lazy';
 import { useTranslation } from 'react-i18next';
 import { ErrorNote } from '../../components/ui';
 import { useAiUi } from '../../lib/aiUi';
@@ -21,12 +21,12 @@ import { useScanStatus } from './useScanStatus';
 import { TaxonomyProvider } from './useTaxonomy';
 
 // The detail panel, the bulk tag editor, the taxonomy manager and the project dialog load when they are first used.
-const DocumentCard = lazyRetry(() => import('./DocPanel').then((m) => ({ default: m.DocumentCard })));
-const BulkTagEditor = lazyRetry(() => import('./DocPanel').then((m) => ({ default: m.BulkTagEditor })));
-const TaxonomyManager = lazyRetry(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })));
-const JobDialog = lazyRetry(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })));
-const AdvancedSearchDialog = lazyRetry(() => import('../ai/AdvancedSearchDialog').then((m) => ({ default: m.AdvancedSearchDialog })));
-const AddToProject = lazyRetry(() => import('./AddToProject').then((m) => ({ default: m.AddToProject })));
+const DocumentCard = lazyView(() => import('./DocPanel').then((m) => ({ default: m.DocumentCard })), ['doc', 'doc-projects-reader', 'doc-reader', 'doc-review']);
+const BulkTagEditor = lazyView(() => import('./DocPanel').then((m) => ({ default: m.BulkTagEditor })), ['doc', 'doc-projects-reader', 'doc-reader', 'doc-review']);
+const TaxonomyManager = lazyView(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })), ['taxonomy']);
+const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);
+const AdvancedSearchDialog = lazyView(() => import('../ai/AdvancedSearchDialog').then((m) => ({ default: m.AdvancedSearchDialog })), ['advSearch']);
+const AddToProject = lazyView(() => import('./AddToProject').then((m) => ({ default: m.AddToProject })), ['addToProject']);
 
 type PaneTab = 'folders' | 'tags' | 'filters';
 const TABS: PaneTab[] = ['folders', 'tags', 'filters'];

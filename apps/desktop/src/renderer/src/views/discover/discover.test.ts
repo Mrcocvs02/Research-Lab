@@ -343,8 +343,8 @@ describe('Discover in Italian', () => {
     const c = memoryCitations();
     setHandlers({ ...handlers, ...c.handlers });
     render(PROVIDERS.reduceRight((child, P) => createElement(P, null, child), createElement(DiscoverView)));
-    await act(async () => void (await new Promise((r) => setTimeout(r, 40))));
-    expect(screen.getByTestId('discover-tab-readnext').textContent).toBe('Da leggere dopo');
+    // The Italian core and the parts load first (many small chunks in a test run).
+    await waitFor(() => expect(screen.getByTestId('discover-tab-readnext').textContent).toBe('Da leggere dopo'), { timeout: 5000 });
     tab('new');
     expect(screen.getByTestId('watch-check').textContent).toBe('Controlla ora');
   });

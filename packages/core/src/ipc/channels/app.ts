@@ -23,6 +23,8 @@ export const appNoticeSchema = z.discriminatedUnion('kind', [
     foundVersion: z.number(),
     supportedVersion: z.number(),
   }),
+  /** The automatic backup at start-up did not run or failed (D-256): only a code, e.g. 'no-destination', 'IO_ERROR', 'inside-library'. */
+  z.object({ id: z.string(), kind: z.literal('backup-failed'), code: z.string().max(60) }),
 ]);
 export type AppNotice = z.infer<typeof appNoticeSchema>;
 

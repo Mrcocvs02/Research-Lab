@@ -116,17 +116,17 @@ async function main(): Promise<void> {
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
       const options: Electron.OpenDialogOptions = {
         title,
-        properties: purpose === 'export-destination' ? ['openDirectory', 'createDirectory'] : ['openDirectory'],
+        properties: purpose === 'export-destination' || purpose === 'backup-destination' ? ['openDirectory', 'createDirectory'] : ['openDirectory'],
       };
       const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
-    async pickFile(_purpose, title) {
+    async pickFile(purpose, title) {
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
       const options: Electron.OpenDialogOptions = {
         title,
         properties: ['openFile'],
-        filters: [{ name: 'JSON', extensions: ['json'] }],
+        filters: purpose === 'backup-file' ? [{ name: 'Research Lab backup', extensions: ['rlbackup'] }] : [{ name: 'JSON', extensions: ['json'] }],
       };
       const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
       return result.canceled ? null : (result.filePaths[0] ?? null);

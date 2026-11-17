@@ -35,9 +35,9 @@ export interface MainServices {
   /** Opens files with the system (injected so that handlers are testable without Electron). Receives absolute paths resolved in main only. */
   shell: ShellService;
   /** Native folder picker; resolves null when cancelled. */
-  pickFolder(purpose: 'library-root' | 'legacy-index' | 'export-destination', title?: string): Promise<string | null>;
+  pickFolder(purpose: 'library-root' | 'legacy-index' | 'export-destination' | 'backup-destination', title?: string): Promise<string | null>;
   /** Native single-file picker; resolves null when cancelled. */
-  pickFile(purpose: 'taxonomy-file', title?: string): Promise<string | null>;
+  pickFile(purpose: 'taxonomy-file' | 'backup-file', title?: string): Promise<string | null>;
   /** Native multi-file picker for PDF files (inbox); resolves [] when cancelled. */
   pickPdfFiles?(): Promise<string[]>;
   /** Native single-file picker for the Claude Code executable; resolves null when cancelled. */

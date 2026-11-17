@@ -10,3 +10,4 @@ export * from './model/index.js';
 export * from './security.js';
 export * from './services/index.js';
 export * from './settings.js';
+export * from './shortcuts.js';

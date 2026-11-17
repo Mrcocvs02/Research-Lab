@@ -52,6 +52,7 @@
   },
   "notices": {
     "settingsReset": "Your settings file could not be used ({{reason}}), so the app restarted with default settings. The damaged file was kept as \"{{backup}}\" in the app data folder; libraries must be added again.",
+    "backupFailed": "The automatic backup did not run ({{code}}). Check the backup settings.",
     "settingsReadOnly": "Your settings were saved by a newer version of the app (format {{found}}, this app understands {{supported}}). They are shown read-only and nothing will be changed. Update the app to edit them.",
     "fields": "Fields: {{fields}}.",
     "dismiss": "Dismiss",

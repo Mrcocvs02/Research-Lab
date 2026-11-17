@@ -42,7 +42,9 @@ export function NoticeBanner() {
           <p>
             {n.kind === 'settings-reset'
               ? t('notices.settingsReset', { reason: t(`notices.reason.${n.reason}`), backup: n.backupName ?? '' })
-              : t('notices.settingsReadOnly', { found: n.foundVersion, supported: n.supportedVersion })}
+              : n.kind === 'backup-failed'
+                ? t('notices.backupFailed', { code: n.code })
+                : t('notices.settingsReadOnly', { found: n.foundVersion, supported: n.supportedVersion })}
             {n.kind === 'settings-reset' && n.fields.length > 0 ? ` ${t('notices.fields', { fields: n.fields.join(', ') })}` : ''}
           </p>
           <button type="button" onClick={() => dismiss(n.id)}>

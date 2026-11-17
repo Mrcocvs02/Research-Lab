@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isoDateSchema, itemIdSchema, languageSchema, relativePathSchema, schemaVersionSchema } from './common.js';
 import { endsWithSpaceOrDot, isReservedWindowsName } from './fs-names.js';
+import { shortcutOverridesSchema } from './shortcuts.js';
 
 /* ------------------------------------------------------------------ */
 /* Shared AI configuration vocabulary                                  */
@@ -91,6 +92,13 @@ export const libraryProfileSchema = z.object({
 });
 export type LibraryProfile = z.infer<typeof libraryProfileSchema>;
 
+export const themeSchema = z.enum(['system', 'light', 'dark']);
+export type Theme = z.infer<typeof themeSchema>;
+
+/** Automatic backup cadence (phase 8): checked once at start-up, no background timer. */
+export const backupAutoSchema = z.enum(['off', 'daily', 'weekly', 'monthly']);
+export type BackupAuto = z.infer<typeof backupAutoSchema>;
+
 export const appSettingsSchema = z.object({
   schemaVersion: schemaVersionSchema,
   /** Random id of this installation; used to name per-device log files. */
@@ -117,6 +125,24 @@ export const appSettingsSchema = z.object({
       claudeCodePath: z.string().min(1).max(1024).nullable().default(null),
     })
     .prefault({}),
+  /** Look of the window (phase 8); 'system' follows the OS. */
+  appearance: z.object({ theme: themeSchema.default('system') }).prefault({}),
+  /** Overrides of the keyboard shortcuts (see shortcuts.ts); empty: all defaults. */
+  shortcuts: shortcutOverridesSchema.default([]),
+  /** State of the usage guide (phase 8): the welcome card was shown, and the tips the user closed for good. */
+  guide: z.object({ welcomeSeen: z.boolean().default(false), dismissedTips: z.array(z.string().max(64)).max(100).default([]) }).prefault({}),
+  /**
+   * Backups (phase 8). Set only through backup:* (the destination comes from a dialog in main), never through
+   * settings:set. destination is an absolute folder of THIS machine, outside every library root.
+   */
+  backup: z
+    .object({
+      destination: z.string().min(1).max(1024).nullable().default(null),
+      auto: backupAutoSchema.default('off'),
+      /** Automatic backups kept per library (older ones are removed; manual ones are never removed). */
+      keep: z.number().int().min(1).max(50).default(5),
+    })
+    .prefault({}),
 });
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 
@@ -129,6 +155,9 @@ export const appSettingsPatchSchema = z.object({
   user: userProfilePatchSchema.optional(),
   firstRunDone: z.boolean().optional(),
   network: z.object({ openAlexEmail: z.boolean().optional() }).optional(),
+  appearance: z.object({ theme: themeSchema.optional() }).optional(),
+  shortcuts: shortcutOverridesSchema.optional(),
+  guide: z.object({ welcomeSeen: z.boolean().optional(), dismissedTips: z.array(z.string().max(64)).max(100).optional() }).optional(),
 });
 export type AppSettingsPatch = z.infer<typeof appSettingsPatchSchema>;
 

@@ -24,6 +24,8 @@ export const annotationSchema = z.object({
    * none: such an annotation inherits the file-level `forHash`.
    */
   forHash: sha256Schema.optional(),
+  /** Geometry generation: 2 = rectangles computed on the corrected (unstretched) text layer. Absent = legacy, to be repaired. */
+  geom: z.literal(2).optional(),
   createdAt: isoDateSchema,
   updatedAt: isoDateSchema,
 });

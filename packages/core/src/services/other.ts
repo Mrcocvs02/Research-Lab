@@ -1,7 +1,6 @@
 import type { DocumentId, RelativePath } from '../common.js';
 import type { CitationFile, CitationLink } from '../model/citation.js';
 import type { DocumentRecord } from '../model/document.js';
-import type { ExportPreset } from '../settings.js';
 
 /* --------------------------- Citations --------------------------- */
 
@@ -65,49 +64,9 @@ export interface GraphService {
   neighbors(nodeId: string): Promise<Array<{ id: string; kind: 'document' | 'tag' | 'author' | 'venue'; weight: number }>>;
 }
 
-/* ----------------------------- Export ---------------------------- */
+/* ------------------------- Export and MCP ------------------------ */
 
-export interface ExportSelection {
-  projectId?: string;
-  folders?: RelativePath[];
-  tagIds?: string[];
-  docIds?: DocumentId[];
-  preset: ExportPreset;
-}
-
-export interface ExportEstimate {
-  files: number;
-  approxTokens: number;
-  indexTokens: number;
-}
-
-export interface Exporter {
-  estimate(selection: ExportSelection): Promise<ExportEstimate>;
-  /** `destinationDir` is an absolute folder chosen by the user through the main-process dialog. */
-  export(selection: ExportSelection, destinationDir: string): Promise<{ written: string[] }>;
-}
-
-/* ------------------------------- MCP ----------------------------- */
-
-export interface McpServerOptions {
-  /** Always loopback. */
-  host: '127.0.0.1';
-  /** 0 = pick a free port. */
-  port: number;
-  /** Random bearer token required on every request. */
-  token: string;
-  writeEnabled: boolean;
-}
-
-export interface McpServerHandle {
-  readonly url: string;
-  readonly port: number;
-  stop(): Promise<void>;
-}
-
-export interface McpServerService {
-  start(options: McpServerOptions): Promise<McpServerHandle>;
-}
+// Phase 7: contracts in `ipc/channels/export.ts` and `ipc/channels/mcp.ts`; the services live in `@rl/export` and `@rl/mcp`.
 
 /* ----------------------------- Secrets --------------------------- */
 

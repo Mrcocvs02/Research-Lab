@@ -1,6 +1,2 @@
-import type { Exporter, LibraryStore } from '@rl/core';
-
-/** Owner: export-mcp. Second-brain export. */
-export function createExporter(_store: LibraryStore): Exporter {
-  throw new Error('not implemented');
-}
+/** Phase 7: second-brain export (plan §6, contract in `@rl/core` `ipc/channels/export.ts`). Not implemented yet. */
+export {};

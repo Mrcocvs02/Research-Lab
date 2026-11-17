@@ -12,12 +12,14 @@ import type { MainServices } from './services.js';
 import { aiHandlers, chatHandlers, commandsHandlers } from './ai-handlers.js';
 import { annotationsHandlers, notesHandlers, readerHandlers, thumbsHandlers } from './study-handlers.js';
 import { inboxHandlers } from './inbox-handlers.js';
+import { mcpHandlers } from './mcp-handlers.js';
 import { jobsHandlers } from './jobs-handlers.js';
 import { reviewHandlers } from './review-handlers.js';
 import { citationsHandlers } from './citations-handlers.js';
 import { recommendHandlers } from './recommend-handlers.js';
 import { watchHandlers } from './watch-handlers.js';
 import { exploreHandlers } from './explore-handlers.js';
+import { exportHandlers } from './export-handlers.js';
 import { graphHandlers } from './graph-handlers.js';
 
 export type { MainServices } from './services.js';
@@ -53,5 +55,7 @@ export function buildHandlers(s: MainServices): HandlerMap<Channels> {
     ...watchHandlers(s),
     ...graphHandlers(s),
     ...exploreHandlers(s),
+    ...exportHandlers(s),
+    ...mcpHandlers(s),
   };
 }

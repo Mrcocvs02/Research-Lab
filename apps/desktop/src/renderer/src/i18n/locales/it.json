@@ -599,7 +599,18 @@
       "intro": "Citazioni e monitoraggio usano OpenAlex, arXiv e Semantic Scholar, e solo su tua richiesta. Escono dal computer solo identificatori e titoli, mai il testo dei documenti.",
       "openAlexEmail": "Invia a OpenAlex l’email del mio profilo",
       "openAlexEmailHint": "OpenAlex risponde più in fretta e in modo più affidabile se conosce un’email di contatto. Spento di default: l’email lascia il computer solo se lo attivi.",
-      "noEmail": "Aggiungi un’email al profilo qui sopra per attivarlo."
+      "noEmail": "Aggiungi un’email al profilo qui sopra per attivarlo.",
+      "apiKey": {
+        "title": "Chiave API di OpenAlex (facoltativa)",
+        "hint": "Una chiave gratuita, dalle impostazioni del tuo account OpenAlex, dà un budget giornaliero tutto tuo ed è necessaria per leggere più dei 200 lavori più recenti di \"citato da\" di un documento. Resta nell’archivio sicuro del sistema e non viene più mostrata.",
+        "label": "Chiave API di OpenAlex",
+        "stored": "Salvata",
+        "notStored": "Non salvata",
+        "placeholder": "Incolla la chiave",
+        "replacePlaceholder": "Incolla una nuova chiave per sostituire quella salvata",
+        "store": "Salva",
+        "remove": "Rimuovi"
+      }
     }
   },
   "notify": {

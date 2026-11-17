@@ -599,7 +599,18 @@
       "intro": "Citations and monitoring use OpenAlex, arXiv and Semantic Scholar, and only when you ask. Only identifiers and titles leave this computer, never the text of your documents.",
       "openAlexEmail": "Send my profile email to OpenAlex",
       "openAlexEmailHint": "OpenAlex answers faster and more reliably when it knows an email to contact. Off by default: the email leaves this computer only if you turn this on.",
-      "noEmail": "Add an email to your profile above to turn this on."
+      "noEmail": "Add an email to your profile above to turn this on.",
+      "apiKey": {
+        "title": "OpenAlex API key (optional)",
+        "hint": "A free key from your OpenAlex account settings gives you your own daily budget, and is needed to read more than the 200 most recent \"cited by\" works of a document. It is kept in the system's secure storage and is never shown again.",
+        "label": "OpenAlex API key",
+        "stored": "Saved",
+        "notStored": "Not saved",
+        "placeholder": "Paste the key",
+        "replacePlaceholder": "Paste a new key to replace the saved one",
+        "store": "Save",
+        "remove": "Remove"
+      }
     }
   },
   "notify": {

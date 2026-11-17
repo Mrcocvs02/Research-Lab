@@ -9,8 +9,20 @@ interface Net {
   service: CitationServiceX;
   watch: (q: WatchQuery, signal?: AbortSignal) => Promise<WatchResult>;
   email: { value: string | null };
+  /** The optional OpenAlex API key: read from the secure store lazily and cached briefly (never kept anywhere else). */
+  key: { value: string | null; at: number };
 }
 const nets = new WeakMap<MainServices, Net>();
+
+/** The secret holding the optional OpenAlex API key (scope `app`). */
+export const OPENALEX_KEY_SECRET = 'openalex-api-key';
+const KEY_TTL_MS = 60_000;
+
+/** The key changed (saved or removed): it is read again on the next use. */
+export function invalidateOpenAlexKey(s: MainServices): void {
+  const n = nets.get(s);
+  if (n) n.key.at = 0;
+}
 
 /** Tests replace the waiting of the throttle and of the retries (it is real time otherwise). */
 export const netTuning: { sleep?: (ms: number, signal?: AbortSignal) => Promise<void>; timeoutMs?: number } = {};
@@ -24,12 +36,20 @@ export async function online(s: MainServices): Promise<Net & { profile: UserProf
   let n = nets.get(s);
   if (!n) {
     const email = { value: null as string | null };
-    const net = createNet({ fetch: s.fetch ?? fetch, email: () => email.value, ...(netTuning.sleep ? { sleep: netTuning.sleep } : {}), ...(netTuning.timeoutMs ? { timeoutMs: netTuning.timeoutMs } : {}) });
+    const key = { value: null as string | null, at: 0 };
+    const net = createNet({ fetch: s.fetch ?? fetch, email: () => email.value, apiKey: () => key.value, ...(netTuning.sleep ? { sleep: netTuning.sleep } : {}), ...(netTuning.timeoutMs ? { timeoutMs: netTuning.timeoutMs } : {}) });
     const sources = createCitationSources({ fetch: s.fetch ?? fetch, net });
-    n = { sources, service: createCitationService(sources), watch: createWatchFetcher(net), email };
+    n = { sources, service: createCitationService(sources), watch: createWatchFetcher(net), email, key };
     nets.set(s, n);
   }
   const st = await s.settings.get();
+  if (Date.now() - n.key.at >= KEY_TTL_MS) {
+    // A store that cannot be read simply means no key: the key is optional.
+    n.key.value = await Promise.resolve()
+      .then(() => s.secrets.get({ kind: 'app' }, OPENALEX_KEY_SECRET))
+      .catch(() => null);
+    n.key.at = Date.now();
+  }
   n.email.value = st.network.openAlexEmail && st.user.email ? st.user.email : null;
   return { ...n, profile: st.user };
 }

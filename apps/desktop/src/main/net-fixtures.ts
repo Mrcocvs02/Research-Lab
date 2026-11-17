@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 /**
  * Test hook (development run with `RL_E2E=1` only, see `runtime.ts`): a JSON file of canned answers that replaces `fetch`
- * for every online source (OpenAlex, Semantic Scholar, arXiv). Keys are URLs without the `mailto` parameter, tried in
+ * for every online source (OpenAlex, Semantic Scholar, arXiv). Keys are URLs without the `mailto` and `api_key` parameters, tried in
  * this order: the URL with its query parameters decoded and sorted by name (`https://host/path?a=1&b=2`), then the URL
  * without a query (`https://host/path`). A value is the JSON body, a string (sent as is, for arXiv's Atom), or
  * `{ "status": 404 }` for an empty answer with that status. Any URL not listed answers 404. The file is read at every call.
@@ -16,7 +16,7 @@ export function fixtureFetch(file: string): typeof fetch {
     } catch {
       return new Response(null, { status: 500 });
     }
-    const pairs = [...u.searchParams.entries()].filter(([k]) => k !== 'mailto').sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    const pairs = [...u.searchParams.entries()].filter(([k]) => k !== 'mailto' && k !== 'api_key').sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
     const base = `${u.origin}${decodeURIComponent(u.pathname)}`;
     const key = [pairs.length > 0 ? `${base}?${pairs.map(([k, v]) => `${k}=${v}`).join('&')}` : null, base].find((k) => k !== null && Object.hasOwn(table, k));
     if (!key) return new Response(null, { status: 404 });

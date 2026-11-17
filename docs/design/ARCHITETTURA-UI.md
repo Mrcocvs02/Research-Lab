@@ -1,6 +1,6 @@
 # Architettura dell'interfaccia e sistema visivo (riprogettazione)
 
-Stato: **finale (giro 3)**, giro 3 chiuso con la critica del progetto finale (§16, D-368 … D-382); prototipo P0 **approvato dall'utente** per la grafica (D-383); reti per tag, argomenti e autori aggiunte su richiesta dell'utente (§4.21, D-384 … D-388), 2026-11-17, ramo `design-arch`. Il giro 3 integra l'audit completo (ramo `design-audit` 8c0d950, italiano e inglese) e due richieste nuove dell'utente (composizione moderna e minimale; mappa bella e giocabile): §0.3-§0.5, §1.1, §4.14-§4.20, §8.1.2, §8.3 rivisto, §14 riordinato, decisioni D-345 … D-367. In caso di dubbio vale questo documento. Primo giro scritto dal codice, dai documenti e dalle richieste dell'utente (D-310 … D-324); secondo giro rivisto con l'audit del designer avversario (`docs/design/AUDIT.md` sul ramo `design-audit`, parziale, 138 schermate misurate) e con nuove verifiche nel codice (D-325 … D-344). Le quattro domande del primo giro hanno ora una risposta **provvisoria, da confermare con l'utente** (§15): nessuna blocca il lavoro.
+Stato: **finale (giro 3)**, giro 3 chiuso con la critica del progetto finale (§16, D-368 … D-382); prototipo P0 **approvato dall'utente** per la grafica (D-383); reti per tag, argomenti e autori aggiunte su richiesta dell'utente (§4.21, D-384 … D-388), 2026-11-17; funzioni scelte dall'utente integrate senza affollare l'interfaccia (§17, onde 7-11 in §14.1, budget in §13, D-395 … D-409), 2026-11-18, ramo `design-arch`. Il giro 3 integra l'audit completo (ramo `design-audit` 8c0d950, italiano e inglese) e due richieste nuove dell'utente (composizione moderna e minimale; mappa bella e giocabile): §0.3-§0.5, §1.1, §4.14-§4.20, §8.1.2, §8.3 rivisto, §14 riordinato, decisioni D-345 … D-367. In caso di dubbio vale questo documento. Primo giro scritto dal codice, dai documenti e dalle richieste dell'utente (D-310 … D-324); secondo giro rivisto con l'audit del designer avversario (`docs/design/AUDIT.md` sul ramo `design-audit`, parziale, 138 schermate misurate) e con nuove verifiche nel codice (D-325 … D-344). Le quattro domande del primo giro hanno ora una risposta **provvisoria, da confermare con l'utente** (§15): nessuna blocca il lavoro.
 
 Le richieste dell'utente a cui risponde questo documento:
 
@@ -212,15 +212,15 @@ Richiesta dell'utente: "moderna, minimale ma completa". Regole valide per **ogni
 | Vista | Primario (destra dell'intestazione o piede) | Secondari visibili | Nel ⋯ della vista | Contestuali (selezione o elemento) | Spostati da dove sono oggi |
 | --- | --- | --- | --- | --- | --- |
 | Guscio | — | ‹ ›, ricerca, ↶ ↷ 🕘, Comandi, Attività (barra in alto) | — | — | lingua → Impostazioni › Generale; barra di stato → Attività/pannello Claude; Annulla/Cronologia dalle viste → barra in alto |
-| Libreria | + Aggiungi PDF | Vista ▾ (Elenco/Griglia e ordinamento), poi ◫ scheda dopo il ⋯ | Gestisci tag, Esporta come secondo cervello…, Scansiona ora | riga dei filtri con tutti i facet e "Mostra i file mancanti" (D-369); barra di selezione: Tag, Progetto, ✦ Claude, ⋯ (Aggiorna citazioni, Esporta…, Apri con il programma predefinito); riga attiva: Leggi, Scheda, ⋯ | "Chiedi a Claude" → ✦ "Cerca con Claude" nel campo di ricerca; Scansiona/Ricostruisci → Attività/Avanzate; Tassonomia → Gestisci tag; scheda "Filtri" → riga dei filtri |
-| Scheda del documento | Leggi | ✦ Chiedi a Claude | Apri con il programma predefinito, Mostra nella cartella, Proponi con Claude…, Aggiorna citazioni, Esporta… | Modifica i dati (sezione), Aggiorna (Citazioni) | modulo di modifica → "Modifica i dati" chiuso |
-| Lettore | — (la lettura è l'azione) | strumenti, colori, pagine, zoom, ricerca, PDF, Studio, ◫ | Apri con il programma predefinito, Mostra nella cartella, Tasti del lettore, Esporta copia annotata… | popover dell'annotazione; mini popover della selezione | barra di studio → menu Studio; scorciatoie → [?]/⋯; barra di annotazione in fondo → popover |
+| Libreria | + Aggiungi ▾ (PDF, DOI/arXiv/URL, Zotero/BibTeX, Risorsa; §17.4.1) | Vista ▾ (Elenco/Griglia e ordinamento), poi ◫ scheda dopo il ⋯ | Gestisci tag, Esporta come secondo cervello…, Scansiona ora | riga dei filtri con tutti i facet e "Mostra i file mancanti" (D-369); barra di selezione: Tag, Progetto, ✦ Claude ▾ (Proponi…, Note di letteratura…, Tabella di confronto…, Gruppi di ricerca…, Estendi la bibliografia…, Trova un ponte con 2), ⋯ (Aggiorna citazioni, Esporta…, Esporta la bibliografia…, Leggi affiancati con 2, Linea del tempo, Apri con il programma predefinito); riga attiva: Leggi (Apri per una risorsa), Scheda, ⋯ | "Chiedi a Claude" → ✦ "Cerca con Claude" nel campo di ricerca; Scansiona/Ricostruisci → Attività/Avanzate; Tassonomia → Gestisci tag; scheda "Filtri" → riga dei filtri |
+| Scheda del documento | Leggi | ✦ Chiedi a Claude | Apri con il programma predefinito, Mostra nella cartella, Proponi con Claude…, Aggiorna citazioni, Esporta…, ✦ Panoramica dei gruppi di ricerca… | Modifica i dati (sezione), Aggiorna (Citazioni) | modulo di modifica → "Modifica i dati" chiuso |
+| Lettore | — (la lettura è l'azione) | strumenti (con Ritaglia), colori, pagine, zoom, ricerca, PDF, Studio, Annulla, ◫ | Cronologia, Affianca un altro paper…, Apri con il programma predefinito, Mostra nella cartella, Tasti del lettore, Esporta copia annotata…, ✦ Evidenziazioni guida (sperimentale) | popover dell'annotazione (⋯: Usa come prova…); mini popover della selezione (Evidenzia, Sottolinea, Copia, ✦ Spiega); schede delle citazioni sui riferimenti | barra di studio → menu Studio; scorciatoie → [?]/⋯; barra di annotazione in fondo → popover |
 | Da rivedere · Nuovi file | + Aggiungi PDF… | Modello e Ragionamento (chip) | Segna tutti come visti | riga: Conferma, Ignora, Modifica; selezione: Conferma i selezionati | Modello/Ragionamento dalla testa della vista → chip spiegati |
 | Da rivedere · Proposte | Accetta tutte (pagina) | Filtra, Rifiuta tutte | — | gruppo: Accetta il documento; campo: ✓ ✗ Modifica | Annulla/Cronologia → barra in alto |
 | Progetti (elenco) | + Nuovo progetto | Mostra gli archiviati (filtro) | — | riga: Apri, ⋯ (Archivia, Esporta…) | creazione dal modulo fisso in alto → popover |
-| Progetto | Aggiungi documenti… | Piano di lettura, Note (schede) | Esporta come secondo cervello…, Archivia, Rinomina | barra di selezione dei membri | "Tutti i progetti" → briciole |
-| Scopri | Aggiorna le citazioni | schede, filtri (riga) | Fonti seguite: Aggiungi fonte | riga: Leggi dopo, Apri, ⋯ | stato vuoto senza azione → con il primario |
-| Mappa | Costruisci / Aggiorna la mappa | cerca un nodo, filtri (anni, tag), schede | Opzioni del modello (seme, livelli), Esporta l'immagine, Etichette con Claude… | nodo: scheda nel pannello, Leggi, Espandi, Fissa; cluster: ⋯ (Esporta come secondo cervello…, Rinomina) | Seme → Opzioni del modello; Esporta del cluster da link → ⋯ |
+| Progetto | Aggiungi documenti… | Piano di lettura, Note (schede); Schema e Prove dopo il primo uso | Esporta come secondo cervello…, Archivia, Rinomina, Scrivi lo schema della ricerca, Collega un manoscritto…, Collega un file .bib…, Esporta la bibliografia…, Estendi la bibliografia…, Nuova tabella di confronto, ✦ Resoconto del periodo… | barra di selezione dei membri | "Tutti i progetti" → briciole |
+| Scopri | Nuova ricerca ▾ (Da una domanda…, Estendi la bibliografia…, Trova un ponte…; §17.4.17) | schede (Ricerche · Da leggere dopo · Novità · Pubblicati), filtri (riga) | Aggiorna le citazioni, Fonti seguite… (Aggiungi fonte), Elimina le ricerche vecchie | riga: Leggi dopo, Importa, Scarta, Apri, ⋯ | stato vuoto senza azione → con il primario |
+| Mappa | Costruisci / Aggiorna la mappa | cerca un nodo, filtri (anni, tag), schede | Opzioni del modello (seme, livelli), Disponi per anno, Esporta l'immagine, Etichette con Claude… | nodo: scheda nel pannello, Leggi, Espandi, Fissa, ⋯ (Trova un ponte con…); cluster: ⋯ (Esporta come secondo cervello…, Rinomina) | Seme → Opzioni del modello; Esporta del cluster da link → ⋯ |
 | Pannello Claude | Invia | Modello, Ragionamento (chip) | Conversazioni, Nuova, Registro degli invii | blocco: copia, apri il documento | Cronologia → Conversazioni |
 | Impostazioni | — (salvataggio automatico) | sottonavigazione, ricerca | — | riga: controllo e "Ripristina" (Avanzate) | pagina unica → 7 sezioni |
 | Procedura guidata | Avanti / Crea | Indietro | — | — | Annulla da link → pulsante terziario nel piede |
@@ -238,7 +238,7 @@ Research Lab
 │     └── Gestisci librerie…         → Impostazioni › Libreria
 │
 ├── 1 Libreria (Alt+1)              vista iniziale
-│     ├── barra: filtri, Elenco|Griglia, ordina, + Aggiungi PDF (ricerca e "Cerca con Claude" nella barra in alto)
+│     ├── barra: filtri, Elenco|Griglia, ordina, + Aggiungi ▾ (PDF, DOI, Zotero/BibTeX, risorse; ricerca e "Cerca con Claude" nella barra in alto)
 │     ├── pannello sinistro: Cartelle | Tag (› Gestisci tag = editor della tassonomia, sottovista)
 │     ├── risultati (elenco virtuale o griglia)
 │     ├── pannello destro: Scheda documento (metadati, stato, tag, area AI, citazioni)
@@ -252,10 +252,10 @@ Research Lab
 │
 ├── 3 Progetti (Alt+3)
 │     ├── elenco progetti
-│     └── progetto: membri, piano di lettura, note, esporta
+│     └── progetto: membri, piano di lettura, note, esporta; Schema e Prove dopo il primo uso (§17.4.13, §17.4.15)
 │
 ├── 4 Scopri (Alt+4)
-│     ├── Da leggere dopo | Novità | Pubblicati | Fonti seguite
+│     ├── Ricerche | Da leggere dopo | Novità | Pubblicati   (Fonti seguite nel ⋯; §17.4.17)
 │
 ├── 5 Mappa (Alt+5)                 ex "Rete"
 │     ├── Panorama | Collegamenti (rete di Documenti · Tag · Argomenti · Autori) | Esplora | Vicini inattesi (§4.20, §4.21)
@@ -480,7 +480,7 @@ Nel lettore la barra in alto del guscio **diventa** la barra del lettore (D-360)
 | Ricerca | `[⌕]` apre la barra di ricerca sotto (`reader-find*`) | 32 | uguale |
 | PDF | chip `PDF ✓ ▾` (`reader-pdf-chip`, §8.3) | 72 | icona di stato |
 | Studio | menu `Studio ▾` (`reader-study-menu`, voci `reader-study-*`) | 88 | nel ⋯ |
-| Fine | Annulla, Cronologia (le stesse della barra del guscio), `[◫]` pannello (`reader-side`), `[⋯]` (Apri con il programma predefinito, Mostra nella cartella, Tasti del lettore, Esporta copia annotata…, voci ridotte) | 4×32 | uguale |
+| Fine | Annulla, Cronologia (le stesse della barra del guscio; dall'onda 7 Cronologia passa nel ⋯ per far posto a Ritaglia, §17.4.8), `[◫]` pannello (`reader-side`), `[⋯]` (Apri con il programma predefinito, Mostra nella cartella, Tasti del lettore, Esporta copia annotata…, voci ridotte) | 4×32 | uguale |
 
 Nel lettore la barra laterale si comprime a 56 px ("modo lettura") e torna com'era all'uscita (D-370). A 1024 px tutta la barra sta in una riga: spazio 1024 − 56 − 16 = 952 px; sotto 1100 px anche Pagine si riduce (campo senza "/ 38", totale nel tooltip); somma dei gruppi ridotti ≤ 880 px con gli spazi, margine ≥ 72 px. Ricerca globale, Comandi e chip Attività del guscio restano raggiungibili con Ctrl+L, Ctrl+K e dalla voce "Attività" della tavolozza; il chip Attività compare nella barra del lettore solo quando c'è un errore o una scrittura in attesa.
 
@@ -1829,6 +1829,19 @@ Correzioni aggiunte dal giro 3 (audit finale, D-362):
 | Primo contenuto | tetto 530 ms | invariato | nessuna richiesta nuova all'avvio |
 | Cartella sincronizzata | — | una scrittura per documento per sessione di lettura (non ogni 4 s); copie degli originali annotati (D-327, provvisoria) | §8.3.3 |
 
+**Funzioni aggiunte (§17, D-407).** Le funzioni scelte dall'utente non toccano la prima schermata né l'avvio:
+
+| Voce | Dopo le onde del design | Stima dopo le onde 7-10 | Tetto | Come |
+| --- | --- | --- | --- | --- |
+| JS main caricato all'avvio (`main.entryJsKB`) | 1064-1082 KiB | 1066-1085 KiB | **1090** | solo il registro `main/features/registry.ts` (+2-3); schemi delle funzioni in `@rl/core/features/*` importati dai moduli pigri |
+| JS main su richiesta (`main.lazyJsKB`) | 0 | 76-111 KiB | **120** (ogni modulo ≤ 30) | un modulo per funzione con `import()` al primo uso: bib 18-24, discover 14-20, literature 8-12, project 8-12, resources 5-8, synthesis 4-6, importId 4-6, refs 3-4, links 3-5, crops ed explain 3-5, guides 2-3, ai 2-3, citectx 2-3 |
+| JS iniziale renderer | 385,5-389 KiB | 386-389,5 KiB | 391 (invariato) | solo la voce Riprendi nel menu della ricerca (+0,5) |
+| JS totale renderer | 1625-1650 KiB | 1714-1769 KiB | **1775** | chunk pigri ≤ 16 KiB ciascuno: X1 7-9, X2 8-11, X3 19-23, X4 9-12, X5 10-14, X6 10-14, X7 15-20, X8 11-16 |
+| Memoria a riposo, primo contenuto | tetti 501 MB, 530 ms | invariati | invariati | nessun modulo caricato prima del primo uso; nessuna richiesta di rete all'avvio |
+| Dipendenze | — | nessuna nuova | — | LaTeX con un convertitore proprio (D-406); `.docx` con un lettore ZIP minimo su `zlib`; WebP dalla tela del lettore |
+
+Perché due voci per il main: il tetto unico di 1085 KiB misurava tutto il JS del main, ma il costo che conta (avvio, memoria a riposo) dipende solo dal codice caricato all'avvio. Il codice su richiesta ha un tetto proprio, così ogni funzione resta misurata. `tools/check-budget.mjs` riporta le due voci separate (X1); un modulo che entra nel grafo statico fa fallire il controllo.
+
 Regola per ogni compito: `npm run check:budget` prima del rapporto; oltre la stima di più del 10% il compito si ferma e lo riporta (non alza budget da solo). Nessuna dipendenza nuova.
 
 ---
@@ -1927,6 +1940,169 @@ Prima di H0 l'agente principale aggiunge `geom` all'`annotationSchema`. Dopo l'o
 | `reader-underlined` | scheda Info del pannello del lettore (etichetta "Annotato") |
 | nuovi del giro 3 | `reader-geometry-*` (solo e2e), `annotation-needs-review`, `annotation-reposition`, `pdf-consent`, `pdf-consent-yes`, `pdf-consent-app-only`, `pdf-remove`, `restore-open-library`, `detail-edit-data` |
 | tutti gli altri | invariati |
+
+### 14.1 Onde 7-11: funzioni aggiunte (D-408)
+
+Dopo l'onda 6 (accensione), con le stesse regole comuni di §14. In più:
+
+- **Al massimo 2 compiti Sonnet in parallelo, con file disgiunti.**
+- Ogni compito riesegue `e2e/crowding.spec.ts` (§17.1); se un conteggio di §17.3 cresce, il compito non si unisce.
+- Ogni compito misura `main.entryJsKB`, `main.lazyJsKB` e il totale del renderer con `npm run check:budget`; oltre la stima di più del 10% si ferma e lo riporta.
+
+**Prima dell'onda 7, l'agente principale** (lavoro piccolo, nessun compito in parallelo):
+
+1. scrive i contratti in `@rl/core/features/*` (un sottopercorso per funzione, importato solo dal modulo pigro e dal chunk del renderer che lo usano);
+2. scrive il registro `apps/desktop/src/main/features/registry.ts`:
+   - una riga per funzione `nome → () => import('./<nome>/index')`, con i moduli vuoti che rispondono "non ancora disponibile";
+   - il canale generico `feature:<nome>:<azione>` sul ponte esistente;
+   - la validazione dell'involucro `{ canale, dati }` nel registro e quella dei dati nel modulo;
+3. con Haiku (spostamento meccanico), divide la scheda e i menu della selezione in file per parte, così due compiti della stessa onda non toccano lo stesso file:
+   - `views/library/docpanel/{Notes,Files,Citations}Section.tsx`;
+   - `views/library/selection/{ClaudeMenu,MoreMenu}.tsx`;
+   - `views/reader/menus/ReaderMoreMenu.tsx`;
+   - `views/projects/ProjectMoreMenu.tsx`.
+
+#### Onda 7 (X1 ∥ X2)
+
+**X1 · Moduli pigri del main, prova dell'affollamento, Zotero e BibTeX (7, 52; 13 da confermare)**
+
+- **File:**
+  - `tools/check-budget.mjs` (+test): divide `main.entryJsKB` (chunk raggiungibili per import statico da `out/main/index.js` e dai worker) e `main.lazyJsKB` (il resto); tetto per singolo modulo;
+  - `tools/budgets.json` (valori di D-407);
+  - `apps/desktop/electron.vite.config.ts` (solo `output.chunkFileNames` del main e la verifica che gli `import()` restino chunk separati);
+  - `main/features/bib/**` (+test con file sintetici BibTeX, BibLaTeX, CSL JSON, RDF);
+  - nuovi `views/import/**` (dialogo in tre passi) e `views/library/AddMenu.tsx` (pulsante diviso, con la voce PDF e quella di Zotero);
+  - una riga nell'intestazione della Libreria (`views/library/LibraryHeader.tsx`);
+  - `views/projects/ProjectMoreMenu.tsx` (Collega un file .bib…, Esporta la bibliografia…);
+  - `views/library/selection/MoreMenu.tsx` (Esporta la bibliografia…);
+  - parti i18n `import`;
+  - nuovi `e2e/crowding.spec.ts` ed `e2e/helpers/visible-controls.ts` (conteggi di §17.3).
+- **Criteri:** §17.4.1, §17.4.2; gli originali mai spostati; chiavi stabili; `.bib` riscritto in modo atomico solo nella cartella di export; il main all'avvio non carica `features/bib` (test: il modulo non è nel grafo statico).
+- **e2e (proprietà):** `crowding.spec.ts`, nuova `import-bib.spec.ts`.
+- **Budget:** main entry +2-3 (in parte dell'agente principale), lazy 18-24; renderer 7-9.
+
+**X2 · Strumenti del lettore: Ritaglia (27), ✦ Spiega (31), significato dei colori (36), componente comune dei costi**
+
+- **File:**
+  - `views/reader/toolMachine.ts` (+test; stato `crop`);
+  - `views/reader/ReaderBar.tsx` (quinto strumento; Cronologia nel `⋯`);
+  - `views/reader/menus/ReaderMoreMenu.tsx`;
+  - nuovi `views/reader/CropLayer.tsx` ed `ExplainCard.tsx`;
+  - `views/reader/SelectionPopover.tsx`;
+  - `views/reader/AnnotationList*` (miniature dei ritagli, filtro per significato);
+  - nuovo `components/AiCostPreview.tsx` (+test);
+  - nuovo `settings/ColorMeaningsGroup.tsx` e `settings/ClaudeSpendGroup.tsx` (una riga ciascuno in `LibraryConfigSection.tsx` e `ClaudeSection.tsx`);
+  - `main/features/crops/**`, `main/features/explain/**`;
+  - `main/features/ai/batch.ts` (+test: blocchi, cache per hash, stima, tetto; interfaccia fissa per i compiti successivi);
+  - parti i18n `reader` (solo le voci nuove).
+- **Criteri:** §17.4.8-§17.4.10; tabella §8.2.4 estesa con le righe di Ritaglia (un test per riga); barra del lettore larga come prima a 1024 px; nessun invio senza conferma; cache verificata (seconda richiesta uguale: 0 invii).
+- **e2e (proprietà):** `study-ui.spec.ts`, nuova `reader-crop.spec.ts`.
+- **Budget:** renderer 8-11; main lazy 3-5 (crops, explain) + 2-3 (ai).
+
+#### Onda 8 (X3 ∥ X4)
+
+**X3 · Note di letteratura (2), modelli (35), LaTeX (37), link e collegamenti in entrata (38)**
+
+- **File:**
+  - `views/notes/**`;
+  - nuovi `views/literature/**` e `lib/mathml.ts` (+test con una tabella di casi LaTeX → MathML e casi non capiti);
+  - `views/library/docpanel/NotesSection.tsx`;
+  - `views/library/selection/ClaudeMenu.tsx` (Scrivi le note di letteratura…);
+  - nuovo `settings/NoteTemplatesGroup.tsx` (una riga in `LibraryConfigSection.tsx`);
+  - `main/features/literature/**` (estrazione delle immagini incorporate nel worker esistente, con un messaggio nuovo in `worker-protocol.ts` e `worker-service.ts`);
+  - `main/features/links/**`, `main/features/templates/**`;
+  - parti i18n `notes`, `literature`.
+- **Criteri:** §17.4.6; regola 5 (✦, modello e data; approvazione); link alle pagine; consenso per cartella; LaTeX senza dipendenze; i collegamenti in entrata si aggiornano alla scrittura di una nota.
+- **e2e (proprietà):** nuova `literature-note.spec.ts`, `notes.spec.ts` se esiste.
+- **Budget:** renderer 19-23; main lazy 11-17.
+
+**X4 · Risorse (48), importazione da DOI, arXiv o URL (23), Riprendi (25)**
+
+- **File:**
+  - `main/features/resources/**`, `main/features/importId/**`;
+  - nuovi `views/resources/**`;
+  - `views/library/AddMenu.tsx` (voci nuove);
+  - `views/library/docpanel/FilesSection.tsx`;
+  - `views/library/ResultRow*.tsx` (badge del tipo, "Apri");
+  - il facet Tipo (`views/library/facets*`);
+  - `shell/SearchMenu*.tsx` (Riprendi e DOI incollato);
+  - `views/chat/paletteModel.ts` (solo le voci nuove);
+  - stato di studio (`lastPage`, `lastOpenedAt`) in `main/study/**` (solo quei campi);
+  - parti i18n `resources`, `library` (voci nuove).
+- **Criteri:** §17.4.3-§17.4.5; `openExternal` solo `http/https` (test); anteprima senza cookie con il limite di dimensione (test con un server locale finto); nessun download senza conferma.
+- **e2e (proprietà):** `ui-library.spec.ts`, nuova `resources.spec.ts`.
+- **Budget:** renderer 9-12 (iniziale +0,5); main lazy 9-14.
+
+#### Onda 9 (X5 ∥ X6)
+
+**X5 · Lettura affiancata (3), schede delle citazioni (29), esperimento delle evidenziazioni guida (30)**
+
+- **File:**
+  - `views/reader/**`, esclusi `toolMachine.ts` e `CropLayer.tsx` (nuovi `SplitReader.tsx`, `CitationCard.tsx`, `GuideLayer.tsx`);
+  - `lib/reader.tsx`;
+  - `views/library/selection/MoreMenu.tsx` (Leggi affiancati, Linea del tempo come voce che apre la Mappa con un parametro: la disposizione è di X8);
+  - `main/features/refs/**`, `main/features/guides/**`;
+  - una riga in `settings/AdvancedSection.tsx` (Funzioni sperimentali);
+  - parti i18n `reader`.
+- **Criteri:**
+  - §17.4.11, §17.4.12, §17.4.21;
+  - una sola barra con il fuoco visibile;
+  - sotto 1280 px le schede;
+  - schede delle citazioni raggiungibili da tastiera;
+  - esperimento spento di base e senza traccia visiva a funzione spenta.
+- **e2e (proprietà):** `reader-geometry.spec.ts` (caso affiancato), nuova `reader-refs.spec.ts`.
+- **Budget:** renderer 10-14; main lazy 5-7.
+
+**X6 · Motore di scoperta: Estendi la bibliografia, ricerca approfondita (41), Trova un ponte (42 + nuova)**
+
+- **File:**
+  - `views/discover/**` (scheda Ricerche, primario "Nuova ricerca ▾", `⋯` con Fonti seguite e Aggiorna le citazioni);
+  - `views/library/selection/ClaudeMenu.tsx` (Estendi la bibliografia…, Trova un ponte);
+  - `views/network/BridgePath.ts` e il `⋯` del cartellino (`views/network/HoverCard.tsx`, solo la voce);
+  - `main/features/discover/**` (+test con un OpenAlex finto: soglia "nessun ponte", esclusione dei documenti in libreria, motivi);
+  - parti i18n `discover`.
+- **Criteri:**
+  - §17.4.17;
+  - la soglia produce "Nessun ponte convincente" sui casi finti senza ponte;
+  - ritrovamento senza Claude;
+  - sintesi a blocchi di 10 con cache per abstract;
+  - nessun download;
+  - Scopri con lo stesso numero di controlli.
+- **e2e (proprietà):** nuova `discover-runs.spec.ts`, `network.spec.ts` (solo il percorso del ponte).
+- **Budget:** renderer 10-14; main lazy 14-20.
+
+#### Onda 10 (X7 ∥ X8)
+
+**X7 · Progetto: Schema (49 da confermare, 54), Prove (40), suggerimenti di citazione (51)**
+
+- **File:**
+  - `views/projects/**` (schede che compaiono, Schema con Elenco e Matrice, Prove, resoconto, elenco di tabelle e resoconti nelle Note);
+  - `views/reader/AnnotationPopover.tsx` (solo la voce "Usa come prova…" nel suo `⋯`; X5 è unito);
+  - `main/features/project/**` (titoli da `.md`, `.tex`, `.docx`; +test);
+  - parti i18n `projects`.
+- **Criteri:** §17.4.13-§17.4.16; il manoscritto mai scritto dall'app (test); "Resoconto" disattivato senza schema, con il motivo; schede del progetto 3 finché non servono.
+- **e2e (proprietà):** `ui-projects.spec.ts`, nuova `project-outline.spec.ts`.
+- **Budget:** renderer 15-20; main lazy 8-12.
+
+**X8 · Sintesi: tabella di confronto (16), gruppi di ricerca (12), contesto delle citazioni (11), linea del tempo (19)**
+
+- **File:**
+  - nuovi `views/compare/**` e `views/groups/**`;
+  - `views/library/selection/ClaudeMenu.tsx` (Tabella di confronto…, Panoramica dei gruppi…; X6 è unito);
+  - `views/library/docpanel/CitationsSection.tsx`;
+  - `views/network/timeline.ts`, con il `⋯` della Mappa (`views/network/NetworkView.tsx`, solo la voce) e il parametro di apertura con una selezione;
+  - `main/features/synthesis/**`, `main/features/citectx/**`;
+  - parti i18n `compare`, `groups`, `network` (voci nuove).
+- **Criteri:** §17.4.7, §17.4.18-§17.4.20; celle riusate dalle note di letteratura senza invii (test); "Disponi per anno" con il movimento ridotto; tabella salvata nel progetto.
+- **e2e (proprietà):** nuova `compare-table.spec.ts`; `citations.spec.ts` (solo il contesto).
+- **Budget:** renderer 11-16; main lazy 6-9.
+
+#### Onda 11: verifica (Y1, poi Y2)
+
+| Id | Compito | Criteri |
+| --- | --- | --- |
+| Y1 | **Designer avversario** sulle funzioni aggiunte, in italiano e in inglese:<ul><li>conteggio dei controlli per vista contro §17.3;</li><li>giro di schermate (1024×700, 1280×800, 1920×1080);</li><li>prova dell'esperimento 30 (§17.4.21) su 10 letture di prova;</li><li>ogni funzione raggiungibile dalla tavolozza.</li></ul> | nessun conteggio cresciuto; esperimento 30 stabile o tolto, con il motivo; rapporto in `docs/design/` |
+| Y2 | Budget e suite completa:<ul><li>`check:budget` con `main.entryJsKB` ≤ 1090, `main.lazyJsKB` ≤ 120, renderer iniziale ≤ 391 e totale ≤ 1775;</li><li>memoria a riposo e primo contenuto invariati (`qa-budget.spec.ts`);</li><li>e2e una spec alla volta, poi `test:e2e:heavy` da solo;</li><li>`docs/STATUS.md`, `docs/HISTORY.md` e guida aggiornati.</li></ul> | verde |
 
 ---
 
@@ -2039,3 +2215,632 @@ Ogni menu: valori ordinati per conteggio, conteggi con cifre tabellari a destra 
 - **Stati vuoti illustrati:** sei disegni a tratto 1,75 px in `--text-muted` con un dettaglio nella tinta dell'accento, 96×72 px, SVG in linea ≤ 1 KiB l'uno, in `components/illustrations.tsx` (pigro con le viste): libreria vuota (scaffale con un foglio che entra), tutto fatto (vassoio vuoto con una spunta), mappa da costruire (tre punti che si collegano), nessun risultato (lente su un foglio bianco), nessun backup (scatola aperta), offline (nuvola con una linea interrotta).
 - **Microanimazioni con un significato** (`--dur`, mai con `prefers-reduced-motion`): riga confermata in Da rivedere che scivola a destra e svanisce; chip Attività il cui anello si chiude a fine scansione; pallino del colore che "salta" (scala 1 → 1,25 → 1) sul pennello scelto.
 - **Prototipo:** `docs/design/prototipo/index.html`, un solo file (CSS e JS in linea, nessuna rete, dati sintetici, nessun nome reale), con i token di §5 e gli interruttori Tema e Accento; schermate: guscio con chip Attività, Libreria (filtri, elenco, barra di selezione), Lettore (barra unica in modo strumento), Impostazioni (sezioni, Avanzate), Account Claude, Mappa dal vivo (~40 nodi, forze, trascinamento con puntina, cartellino, Mescola, Sorprendimi). L'utente lo approva prima dell'onda 1; i ritocchi ai token si fanno prima nel prototipo, poi in `tokens.css` (A1).
+
+---
+
+## 17. Funzioni aggiunte (scelte dell'utente, D-389 … D-409)
+
+Funzioni scelte dall'utente nei due giri di `docs/design/PROPOSTE-FUNZIONI.md`, collocate nell'interfaccia del giro 3 **senza affollarla**. Vincolo dell'utente: «I do not want the graphics to be crowded with functionalities» (D-402). Le onde che le costruiscono sono in §14.1 e il peso in §13.
+
+### 17.1 Regole contro l'affollamento (D-402)
+
+1. **Nessuna voce nuova nella barra laterale** e nessuna vista principale nuova. Le funzioni sono azioni su qualcosa che c'è già: un documento, una selezione, un progetto, una ricerca.
+2. **Il conteggio dei controlli sempre visibili non cresce** in Libreria, Lettore, Da rivedere, Scopri, Mappa e Progetti (tabella §17.3). Chi aggiunge un controllo visibile ne toglie uno o lo unisce a un menu.
+3. **Ingressi contestuali, nell'ordine di preferenza:**
+   - l'oggetto stesso: popover della selezione nel lettore, cartellino del nodo, riga attiva;
+   - la barra di selezione: menu `✦ Claude ▾` per ciò che usa Claude, `⋯` per il resto;
+   - il `⋯` della vista o dell'oggetto;
+   - una sezione **chiusa** della scheda;
+   - la tavolozza (Ctrl+K), che elenca **tutte** le funzioni.
+4. **Rivelazione progressiva:** una scheda, una sezione o un livello compare solo dopo il primo uso o quando c'è un contenuto. Esempi: le schede Schema e Prove del progetto, la scheda Ricerche di Scopri al posto di Fonti seguite, lo strato delle evidenziazioni guida.
+5. **Una funzione, un nome, un'icona:** ✦ significa "usa Claude" ovunque; nessuna icona nuova nelle barre.
+6. **Stati vuoti che insegnano:** una funzione nascosta nel `⋯` è nominata nello stato vuoto del posto dove serve, con una frase e un pulsante. Esempio: progetto senza schema → "Scrivi lo schema della ricerca".
+7. **Criterio di accettazione:** la prova `e2e/crowding.spec.ts` (§14.1, X1) conta i controlli visibili per vista a 1280×800 e a 1024×700; un compito che fa crescere un numero di §17.3 non si unisce.
+
+### 17.2 Uso di Claude, dati e peso in comune
+
+**Claude (D-404).** L'uso di Claude dell'utente è limitato, quindi ogni funzione ✦ segue queste regole:
+
+- **Solo su richiesta.** Nessun invio automatico, nemmeno in background.
+- **Modello:**
+  - Haiku come predefinito, con il chip Modello nel dialogo (lo stesso del pannello Claude);
+  - Sonnet proposto solo dove la qualità conta molto (note di letteratura, resoconto), sempre scelto dall'utente.
+- **Invii in blocco:** fino a 10 abstract per richiesta (sintesi dei candidati, classificazione dei ponti, tabelle).
+- **Cache** per `hash(contenuto) + modello + versione del prompt`, nella cartella cache locale (non sincronizzata). Una richiesta già fatta non si ripete e lo dice ("Già pronto, 0 invii").
+- **Anteprima prima di partire**, nel componente comune `AiCostPreview`, con una sola conferma:
+  - cosa si invia (titoli e abstract pubblici, oppure il testo del documento solo se la sua cartella è abilitata, regola 4);
+  - quante richieste;
+  - token stimati e la quota del limite, oppure il costo in valuta con una chiave API;
+  - il tetto di spesa.
+- **Tetto di spesa** per la singola azione e per il giorno, in Impostazioni › Claude. Oltre il tetto, il dialogo propone meno elementi o Haiku.
+- **Marcatura:** ogni testo prodotto porta ✦, il modello e la data (regola 5). Diventa dell'utente solo quando lui lo approva o lo riscrive.
+- **Ripiego senza Claude:** ogni funzione ✦ che ha un risultato utile anche senza Claude lo mostra comunque:
+  - Trova un ponte: i candidati bibliometrici senza classificazione;
+  - Ricerca approfondita: l'elenco senza sintesi;
+  - Tabella di confronto: le colonne dei dati.
+
+**Dati (D-405, regola 1).**
+
+- Tutto ciò che è testo dell'utente o di Claude è un file Markdown nella cartella dati della libreria, uno per elemento, scritto in modo atomico.
+- Indici e cache sono locali e rigenerabili.
+- Nessuna funzione scrive fuori dalla cartella dati, tranne due casi, sempre scelti dall'utente:
+  - il `.bib` collegato a un progetto (7, nella cartella di export scelta dall'utente);
+  - le esportazioni.
+
+**Peso (D-407).**
+
+- **Renderer:** ogni funzione ha un chunk pigro ≤ 16 KiB, caricato all'apertura del suo dialogo o pannello.
+- **Main:** ogni funzione ha un modulo caricato su richiesta (`import()` al primo uso, ≤ 30 KiB) dietro il registro `main/features/registry.ts`.
+- La prima schermata, l'avvio e la memoria a riposo non cambiano.
+
+### 17.3 Affollamento per vista (prima → dopo)
+
+Conteggio dei controlli **sempre visibili**: pulsanti, campi, schede e chip fissi; non contano le righe di contenuto né le voci dentro i menu. Misura a 1280×800, nello stato normale, senza selezione salvo dove indicato.
+
+| Vista (zona) | Prima | Dopo | Come |
+| --- | --- | --- | --- |
+| Barra laterale | 5 sezioni + 3 in basso | **5 + 3** | nessuna voce nuova |
+| Barra in alto del guscio | 8 (‹ ›, ricerca, ↶ ↷ 🕘, Comandi, Attività) | **8** | Riprendi nel menu del campo di ricerca vuoto (al fuoco), non come pulsante |
+| Libreria · intestazione | 4 (Vista ▾, + Aggiungi PDF, ⋯, ◫) | **4** | "+ Aggiungi PDF" → "+ Aggiungi ▾", stesso pulsante con un menu |
+| Libreria · riga dei filtri | 8 (6 facet, Pulisci, Mostra i file mancanti) | **8** | "Risorse" è un valore del facet Tipo |
+| Libreria · barra di selezione | 5 (Tag, Progetto, ✦ Claude, ⋯, Deseleziona) | **5** | voci nuove dentro `✦ Claude ▾` e `⋯` |
+| Libreria · riga attiva | 3 (Leggi, Scheda, ⋯) | **3** | una risorsa mostra "Apri" al posto di "Leggi" |
+| Scheda del documento | 3 azioni + 5 sezioni chiuse | **3 + 5** | "Note sul file" → "Note" (file, letteratura ✦, collegamenti in entrata); "File" → "File e risorse" |
+| Lettore · barra | 24 | **24** | strumenti 4 → 5 (Ritaglia); Cronologia → ⋯ del lettore; larghezza invariata (+36 −36 px) |
+| Lettore · mini popover della selezione | 3 (Evidenzia · Sottolinea · Copia) | **4** | + "✦ Spiega" (compare solo con una selezione: non è sempre visibile) |
+| Lettore · pannello | 3 schede | **3** | "Letteratura ✦" è un valore del `Segmented` Note (Pagina · File · Letteratura · Tutte) |
+| Da rivedere | invariata | **invariata** | nessuna funzione nuova qui |
+| Scopri · intestazione e schede | 2 + 4 schede | **2 + 4** | primario "Aggiorna le citazioni" → "Nuova ricerca ▾" (Aggiorna le citazioni nel ⋯); "Fonti seguite" da scheda a voce del ⋯; nuova scheda "Ricerche" |
+| Progetto · intestazione e schede | 2 + 3 schede | **2 + 3** (fino a 5) | Schema e Prove compaiono solo dopo il primo uso (17.4.13, 17.4.15) |
+| Mappa | invariata | **invariata** | Linea del tempo e Trova un ponte nel ⋯ della vista e nel ⋯ del cartellino |
+| Pannello Claude | invariato | **invariato** | le funzioni ✦ usano dialoghi propri con `AiCostPreview` |
+| Impostazioni | 7 sezioni | **7** | 3 gruppi nuovi dentro le sezioni esistenti: Libreria › Modelli di nota e Significato dei colori; Claude › Tetto di spesa; Avanzate › Funzioni sperimentali |
+
+Totale dei controlli sempre visibili nelle viste principali: **invariato**. L'unica crescita è nel popover della selezione del lettore (+1), che compare solo con una selezione.
+
+### 17.4 Le funzioni, una per una
+
+Schema di ogni voce: **Dove** (superficie e ingresso), **Stati**, **Claude**, **Dati**, **Peso** (R = chunk pigro del renderer, M = modulo pigro del main), **Carico visivo**.
+
+#### 17.4.1 Aggiungere: il menu "+ Aggiungi ▾" (7, 13, 23, 48)
+
+```
+[[+ Aggiungi ▾]]
+ ┌───────────────────────────────────┐
+ │ PDF…                       Ctrl+O │  ← come oggi (clic sul corpo del pulsante)
+ │ Da DOI, arXiv o URL…              │  23
+ │ Da Zotero o BibTeX…               │  7
+ │ Risorsa o link…                   │  48: codice, dati, pagina web, notebook, cartella
+ └───────────────────────────────────┘
+```
+
+Pulsante diviso: il corpo aggiunge un PDF come oggi, la freccia apre il menu. Lo stesso menu è nello stato vuoto della Libreria e nella tavolozza ("Aggiungi da DOI…", "Importa da Zotero…", "Aggiungi una risorsa…").
+
+#### 17.4.2 Importazione da Zotero e BibTeX gestito direttamente (7, con 52; 13 da confermare)
+
+- **Dove:** "+ Aggiungi ▾ › Da Zotero o BibTeX…" apre un dialogo in tre passi:
+  1. scegli il file (BibTeX/BibLaTeX, CSL JSON, RDF di Zotero);
+  2. abbinamento ai PDF per percorso o hash, con conteggi ("212 con file · 9 senza file · 4 già in libreria");
+  3. riepilogo con tag, collezioni → progetti o tag (scelta), note → note sul file.
+- **BibTeX gestito:**
+  - nel `⋯` del progetto, "Collega un file .bib…" sceglie un file nella cartella di export scelta dall'utente; l'app lo **riscrive** a ogni cambiamento del progetto (52: sempre aggiornato), in modo atomico;
+  - "Esporta la bibliografia…" (BibTeX, RIS, CSL JSON; 13 da confermare) sta nel `⋯` della barra di selezione e nel `⋯` del progetto;
+  - chiavi stabili `autoreAnnoParola`, salvate nei dati del documento, che non cambiano più dopo la prima esportazione.
+- **Stati:**
+  - analisi del file, con avanzamento nel chip Attività;
+  - anteprima;
+  - importazione annullabile, con il ripristino come nella Cronologia;
+  - errori per voce in un elenco "Non importate (motivo)";
+  - `.bib` collegato: riga "Aggiornato alle 10:42" nel `⋯` del progetto; in caso di errore di scrittura, un banner nel progetto.
+- **Claude:** nessuno.
+- **Dati:**
+  - i documenti come oggi;
+  - il collegamento `.bib` in `projects/<id>/project.json` (`bibLink`: percorso relativo alla cartella di export);
+  - le chiavi in `docs/<id>.json` (`citeKey`);
+  - gli originali non si spostano mai.
+- **Peso:** R 6-8 (dialogo); M 18-24 (`features/bib`: lettura e scrittura BibTeX, CSL JSON, RDF minimo, abbinamento).
+- **Carico visivo:** nessun controllo nuovo visibile; una voce di menu e una voce nel `⋯` del progetto.
+
+#### 17.4.3 Importazione da DOI, arXiv o URL (23)
+
+- **Dove:** "+ Aggiungi ▾ › Da DOI, arXiv o URL…" apre un popover con un campo che accetta più righe.
+- **Comportamento:**
+  - i dati arrivano da OpenAlex e arXiv, già consentiti;
+  - il PDF aperto, se esiste, si scarica **solo dopo conferma**, nella cartella di arrivo;
+  - senza PDF il documento entra come voce "solo dati", con lo stato "Senza file" (facet Stato).
+  - Incollare un DOI nel campo di ricerca propone la stessa azione nel menu del campo.
+- **Stati:** riconosciuto (titolo, autori, anno) · già in libreria (link) · non trovato · offline (spiegazione e Riprova).
+- **Claude:** nessuno.
+- **Dati:** `docs/<id>.json` come oggi, `source: "doi"|"arxiv"|"url"`.
+- **Peso:** R 2-3; M 4-6.
+- **Carico visivo:** zero controlli visibili.
+
+#### 17.4.4 Risorse oltre i PDF (48 generalizzata, D-398)
+
+```
+Libreria (facet Tipo: Risorse)
+| ⌘ repo   Codice del metodo X            github.com · collegata a 2 paper     [Apri][Scheda][⋯] |
+| ▦ dati   Dataset delle misure 2019       zenodo.org · collegata al progetto P   |
+| ◫ nb     Analisi preliminare.ipynb       cartella locale                        |
+
+Scheda › File e risorse
+| ▤ paper-1.pdf · 1,8 MB · Capitolo 1/                                          |
+| ⌘ Codice del metodo X · github.com                         (Apri) (⋯)          |
+| Trovati nel testo: 2 link a codice o dati   (Rivedi)                          |  ← suggerimenti, mai aggiunti da soli
+| (+ Collega una risorsa)                                                       |
+```
+
+- **Dove:**
+  - "+ Aggiungi ▾ › Risorsa o link…";
+  - nella Libreria, le risorse sono righe con il badge del tipo e il facet Tipo "Risorse";
+  - scheda del documento › "File e risorse": risorse collegate, suggerimenti dal testo, "+ Collega una risorsa";
+  - progetto › Documenti: le risorse del progetto in fondo all'elenco, con lo stesso badge.
+- **Anteprima:**
+  - a richiesta ("Carica l'anteprima"), dalla pagina indicata dall'utente;
+  - richiesta senza cookie, limite di 512 KB, solo `<title>` e la descrizione meta;
+  - nessuna immagine remota (icona generica per tipo).
+- **Apri:** `shell.openExternal` solo per `http/https`; una cartella o un notebook locale si apre con il programma predefinito.
+- **Stati:** senza anteprima · anteprima caricata · link non raggiungibile (avviso, la risorsa resta) · file locale mancante (come i file mancanti).
+- **Claude:** nessuno.
+- **Dati:** `resources/<id>.json` con tipo, URL o percorso relativo, titolo, descrizione, collegamenti `{docs:[], projects:[]}`, anteprima e data.
+- **Peso:** R 6-8; M 5-8 (rilevamento dei link nel testo già estratto, anteprima con limiti).
+- **Carico visivo:** nessun controllo nuovo nelle barre; "Apri" sostituisce "Leggi" sulla riga attiva di una risorsa.
+
+#### 17.4.5 Riprendi da dove avevo lasciato (25)
+
+- **Dove:**
+  - il campo di ricerca della barra in alto, **vuoto e col fuoco**, mostra in cima al suo menu "Riprendi: *Titolo* · p. 12 · ieri" e gli ultimi 3 documenti;
+  - la tavolozza ha "Riprendi la lettura" (Ctrl+Maiusc+R);
+  - nella Libreria vuota di filtri, all'avvio, compare un `Banner` informativo chiudibile per la sessione: "Stavi leggendo *Titolo* (p. 12). Riprendi".
+- **Stati:** nessuna lettura recente → la voce non compare.
+- **Claude:** nessuno.
+- **Dati:** la posizione di lettura già salvata; se manca, due campi nello stato di studio del documento (`lastPage`, `lastOpenedAt`).
+- **Peso:** R iniziale +0,5 (voce del menu di ricerca, che è già nel primo caricamento).
+- **Carico visivo:** zero controlli fissi. Il banner è uno solo, chiudibile, e non torna nella stessa sessione.
+
+#### 17.4.6 Note di letteratura estese (2, D-390) con modelli (35), LaTeX (37) e link (38)
+
+```
+Scheda › ▾ Note
+| Note sul file          (2)                        (Apri) |
+| ┃✦ Nota di letteratura · Haiku · 18/11  (Approva)(⋯)    |  ← "Scrivi la nota di letteratura ✦" se non c'è
+| Collegamenti in entrata (3)                              |  ← note che puntano a questo paper con [[ ]]
+
+Nota di letteratura (pannello del lettore › Note › Letteratura, o "Apri" a tutta area)
+# Titolo del paper
+## Problema           ✦ … (p. 2)
+## Contributo         ✦ …
+## Metodo             ✦ … (p. 4-5)
+## Risultati          ✦ … (p. 7)  «evidenziazione dell'utente» (p. 7)
+## Dati usati         ✦ … · ⌘ Codice del metodo X (risorsa)
+## Figure e grafici   [miniatura Fig. 3, p. 6] didascalia…
+## Limiti e prospettive ✦ …
+```
+
+- **Dove:**
+  - scheda del documento › sezione "Note", che unisce le note sul file, la nota di letteratura e i collegamenti in entrata;
+  - nel lettore, valore "Letteratura" del `Segmented` della scheda Note;
+  - per più paper, nella barra di selezione, `✦ Claude ▾ › Scrivi le note di letteratura…`.
+- **Generazione:**
+  1. anteprima con `AiCostPreview`;
+  2. un paper alla volta, in coda nel chip Attività, annullabile;
+  3. il testo arriva solo dalle cartelle abilitate (regola 4);
+  4. le figure sono quelle incorporate nel PDF (estratte così come sono) o la zona della pagina resa dal lettore in WebP (stessa via del Ritaglio, 17.4.8);
+  5. ogni affermazione ha il link `lab://doc/<id>?page=N`, e le evidenziazioni dell'utente entrano come citazioni con pagina.
+- **Modelli di nota (35):** Impostazioni › Libreria › "Modelli di nota" (elenco di `.md` con segnaposto `{{titolo}}`, `{{autori}}`, `{{anno}}`, `{{evidenziazioni}}`). La nota di letteratura usa il modello "Letteratura", con le 7 sezioni predefinite, modificabile. "Nuova nota" propone il modello solo se ce n'è più di uno (menu del pulsante).
+- **LaTeX (37, D-406):** `$…$` e `$$…$$` nelle note, resi in MathML dal convertitore proprio quando la riga non ha il fuoco; ciò che non è capito resta codice, con "Copia LaTeX".
+- **Link (38):** `[[` apre il completamento (documenti, note, progetti, risorse); un link è `[[Titolo|lab://doc/<id>]]` nel Markdown. I "Collegamenti in entrata" stanno nella sezione Note della scheda e in fondo a ogni nota.
+- **Stati:**
+  - nessuna nota (riga con "Scrivi la nota di letteratura ✦");
+  - in coda;
+  - in scrittura (le sezioni arrivano una alla volta);
+  - pronta da approvare (bordo `--ai`);
+  - approvata (bordo normale, ✦ resta nei metadati);
+  - cartella non abilitata (spiegazione e "Abilita la cartella");
+  - errore (Riprova).
+- **Claude:**
+  - Haiku predefinito, Sonnet a scelta;
+  - circa 12-18 mila token in ingresso e 1,5-2 mila in uscita per paper;
+  - cache per hash del testo;
+  - "Rigenera una sezione" invia solo quella sezione e il contesto.
+- **Dati:**
+  - `literature/<docId>.md`, con le figure in `literature/<docId>/fig-<n>.webp` (≤ 300 KB ciascuna);
+  - modelli in `templates/*.md`;
+  - indice dei link nella cache SQLite locale, rigenerato dalle note.
+- **Peso:** R 19-23 (vista della nota 8-10, modelli 2, convertitore LaTeX 4-6, link e completamento 4-6); M literature 8-12, links 3-5.
+- **Carico visivo:** nessuna sezione nuova nella scheda (due sezioni unite in una); nessun pulsante nuovo nel lettore.
+
+#### 17.4.7 Tabella di confronto (16)
+
+```
+Progetto P › Note › Tabella: Metodi a confronto                         [Esporta CSV] [⋯]
+| Paper            | Problema ✦ | Metodo ✦ | Dati ✦      | Risultati ✦ | Limiti ✦ | + colonna |
+| Autore A 2021    | …   p. 2   | …   p. 4 | Dataset X   | … p. 7      | …        |           |
+| Autore B 2019    | …          | …        | non dichiarato | …        | …        |           |
+```
+
+- **Dove:**
+  - barra di selezione `✦ Claude ▾ › Tabella di confronto…`, da 2 a 30 paper;
+  - nel progetto, `⋯ › Nuova tabella di confronto`.
+- **Comportamento:**
+  - si apre a tutta area, come il lettore, con le briciole "Progetto › Tabella";
+  - colonne predefinite dal modello "Letteratura", aggiungibili con un nome libero ("Dimensione del campione");
+  - ogni cella ha il link alla pagina;
+  - le celle già presenti nella nota di letteratura del paper **si riusano senza invii**;
+  - la tabella si salva nel progetto scelto (o in un progetto nuovo dal dialogo).
+- **Stati:** celle in attesa (grigie), in scrittura, pronte (✦), modificate dall'utente (senza ✦), "non trovato nel testo".
+- **Claude:** solo le celle mancanti, in blocchi (fino a 10 paper per colonna per richiesta), Haiku. Anteprima: "18 celle già pronte dalle note, 42 da scrivere: 6 richieste".
+- **Dati:** `projects/<id>/tables/<id>.md` (tabella Markdown e metadati in testa); CSV solo su "Esporta CSV".
+- **Peso:** R 6-8; M parte di `features/synthesis` (4-6 con gruppi e linea del tempo).
+- **Carico visivo:** una voce del menu ✦; la tabella vive nel progetto, non in una vista nuova.
+
+#### 17.4.8 Ritaglio di figure, tabelle ed equazioni (27)
+
+- **Dove:** quinto strumento del lettore, "Ritaglia" (tasto `R`). Si trascina un rettangolo; al rilascio un popover chiede il tipo (Figura · Tabella · Equazione · Altro), una didascalia, e offre "Copia immagine" e "✦ Spiega".
+- **Comportamento:**
+  - il ritaglio è un'annotazione di tipo `area`, nell'elenco delle Annotazioni con la miniatura;
+  - entra nella nota di letteratura (sezione Figure) e nelle note con `![[ritaglio]]`.
+- **Stati:** trascinamento (rettangolo tratteggiato `--accent`) · salvato · rettangolo troppo piccolo (< 24 px, ignorato) · pagina non ancora resa (attesa).
+- **Claude:** nessuno, salvo "✦ Spiega" (17.4.9).
+- **Dati:** `crops/<docId>/<annId>.webp` (resa dal lettore con la tela di pdf.js, `toBlob('image/webp')`, ≤ 300 KB, alla risoluzione della pagina × 2); l'annotazione negli annotazioni del documento come oggi (`kind: "area"`, `geom: 2`). Non entra nel PDF (le aree non sono nel piano della scrittura, §8.3).
+- **Peso:** R 3-4 (chunk del lettore); M 1-2 (salvataggio, in `features/crops`).
+- **Carico visivo:** strumenti da 4 a 5; Cronologia passa nel `⋯` del lettore, quindi conteggio e larghezza della barra non cambiano (§17.3).
+
+#### 17.4.9 Spiega formula, tabella o figura (31)
+
+```
+┌ ✦ Spiega · Haiku ───────────────────────────── × ┐
+│ Cosa dice: …                                     │
+│ Simboli: α = …, β = …                            │
+│ Nel paper: serve a … (p. 5)                      │
+│ (Copia) (Aggiungi alle note) (Più dettagli ✦)     │
+└──────────────────────────────────────────────────┘
+```
+
+- **Dove:**
+  - popover della selezione del lettore, "✦ Spiega" (su testo selezionato);
+  - popover di un ritaglio, "✦ Spiega" (su una figura o tabella);
+  - menu contestuale di un'equazione ritagliata.
+- **Comportamento:** la spiegazione appare in una carta accanto alla selezione (il popover cresce, non si apre un pannello).
+- **Stati:** in attesa (righe scheletro) · pronta · cartella non abilitata · limite raggiunto (con il tetto).
+- **Claude:**
+  - Haiku;
+  - si inviano il testo selezionato e il paragrafo intorno (≤ 1.500 token);
+  - per una figura, la didascalia e il testo intorno; l'immagine solo se l'utente sceglie "Includi l'immagine" (il costo cresce ed è mostrato);
+  - la prima richiesta della giornata mostra l'anteprima, poi una riga di costo nel piede della carta;
+  - cache per hash della selezione.
+- **Dati:** niente di salvato salvo "Aggiungi alle note": un blocco marcato ✦ nella nota della pagina.
+- **Peso:** R 2-3; M 2-3 (`features/explain`).
+- **Carico visivo:** +1 voce nel popover della selezione, che compare solo con una selezione.
+
+#### 17.4.10 Colori con un significato (36)
+
+- **Dove:**
+  - Impostazioni › Libreria › "Significato dei colori": 5 righe "● Giallo — *Risultato chiave*";
+  - nel lettore i nomi compaiono nel tooltip dei pallini e nel popover dell'annotazione;
+  - nel pannello Annotazioni c'è un filtro per significato, un menu dentro il `⋯` del pannello.
+- **Stati:** nessun significato (tooltip con il solo nome del colore, come oggi).
+- **Claude:** nessuno.
+- **Dati:** `library.json`, `annotations.colorMeanings` (5 stringhe).
+- **Peso:** R 2.
+- **Carico visivo:** zero controlli nuovi.
+
+#### 17.4.11 Lettura affiancata (3)
+
+```
+| [×] Libreria › A ⇄ B │ strumenti … │ [⇆ Scambia] [◫] [⋯] |
++--------------------------------+--------------------------------+
+|  Paper A (fuoco: bordo --accent) |  Paper B                       |
+|  pagine…                         |  pagine…                       |
++--------------------------------+--------------------------------+
+```
+
+- **Dove:**
+  - nel `⋯` del lettore, "Affianca un altro paper…" (scelta con la ricerca della tavolozza);
+  - con esattamente 2 selezionati, nel `⋯` della barra di selezione, "Leggi affiancati".
+- **Comportamento:**
+  - una barra sola, che agisce sul lato con il fuoco (bordo 2 px `--accent` sul lato attivo);
+  - divisore trascinabile;
+  - `Ctrl+Alt+←/→` sposta il fuoco;
+  - "Scorrimento legato" nel `⋯`, spento di base.
+  - Sotto 1280 px il secondo paper sta in una scheda alternabile, non affiancato.
+- **Stati:** un lato in caricamento · un file mancante (stato vuoto in quel lato) · larghezza insufficiente (schede).
+- **Claude:** nessuno.
+- **Dati:** nessuno di nuovo (posizioni come per ogni lettura).
+- **Peso:** R 5-7.
+- **Carico visivo:** la barra resta una. In questo modo "Scambia" sostituisce il gruppo Pagine del secondo lato, quindi il conteggio non cresce.
+
+#### 17.4.12 Schede delle citazioni nel lettore (29)
+
+```
+… come mostrato in [12] …
+        ┌──────────────────────────────────────────┐
+        │ Autore C, Autore D · 2018 · Rivista      │
+        │ Titolo del lavoro citato                 │
+        │ ✓ in libreria (Apri)  oppure  (Leggi dopo) (Importa) │
+        └──────────────────────────────────────────┘
+```
+
+- **Dove:** al passaggio del mouse (500 ms) o al clic su un riferimento nel testo (`[12]`, "Autore, 2018"), una carta ancorata; tastiera: `Tab` sul riferimento evidenziato, poi `Invio`.
+- **Riconoscimento:**
+  1. elenco dei riferimenti dal testo estratto;
+  2. abbinamento ai riferimenti di OpenAlex già in cache (o con "Aggiorna citazioni");
+  3. un riferimento non abbinato mostra il testo grezzo della bibliografia.
+- **Stati:** riconosciuto in libreria · riconosciuto fuori libreria · solo testo · bibliografia non trovata (nessuna sottolineatura, nessuna carta).
+- **Claude:** nessuno.
+- **Dati:** mappa dei riferimenti in cache locale (`refs` nella cache SQLite, rigenerabile).
+- **Peso:** R 3-4; M 3-4 (`features/refs`).
+- **Carico visivo:** nessun controllo; i riferimenti riconosciuti hanno solo una sottolineatura punteggiata `--text-subtle` al passaggio del mouse.
+
+#### 17.4.13 Schema del progetto: schema della ricerca e manoscritto ↔ fonti (49 generalizzata da confermare, 54)
+
+```
+Progetto P   [Documenti] [Piano di lettura] [Note] [Schema] [Prove]        [[Aggiungi documenti…]] [⋯]
+Schema   ( Ricerca | Manoscritto )
+Ricerca:  Idea · Domande (3) · Ipotesi (2) · Piano                    (Modifica)
+Manoscritto: Articolo per la rivista X   (fonte: bozza.tex, sola lettura · Aggiorna)   ( Elenco | Matrice )
+
+Matrice           | A 2021 | B 2019 | C 2018 | Nota 4 | Affermazione 2 |
+1 Introduzione    |   ●    |        |   ●    |        |                |
+2 Metodo          |   ●    |   ●    |        |   ●    |                |
+3 Risultati       |        |        |        |        |  ⚠ nessuna fonte |
+4 Discussione     |   ●    |        |        |        |       ●        |
+```
+
+- **Dove:**
+  - la scheda "Schema" del progetto compare quando si sceglie, dal `⋯` del progetto, "Scrivi lo schema della ricerca" o "Collega un manoscritto…", oppure dallo stato vuoto della scheda Note ("Aggiungi uno schema");
+  - due valori: **Ricerca** (idea, domande, ipotesi, piano: Markdown a sezioni) e **Manoscritto** (sezioni scritte a mano o lette in sola lettura dai titoli di un `.md`, `.tex` o `.docx` scelto dall'utente).
+  - Le fonti (paper, note, evidenziazioni, affermazioni) si assegnano trascinandole su una sezione, o con "Assegna a una sezione" nel `⋯` della riga.
+  - Vista **Elenco** (sezioni con le fonti) o **Matrice** (sezioni × fonti, i buchi in `--warning`).
+- **Stati:**
+  - nessuno schema (la scheda non c'è);
+  - schema vuoto (inviti per ogni parte);
+  - manoscritto collegato e cambiato su disco ("Aggiorna le sezioni", senza toccare le assegnazioni che restano valide);
+  - sezione sparita (assegnazioni in "Senza sezione").
+- **Claude:** nessuno di base. Su richiesta, "✦ Proponi le assegnazioni" invia titoli e sezioni, mai il manoscritto intero (Haiku, una richiesta).
+- **Dati:** `projects/<id>/outline.md` con le sezioni "Ricerca" e "Manoscritto" e le assegnazioni in un blocco `lab:assign` per sezione. Il manoscritto collegato è solo un percorso relativo: l'app non lo scrive mai.
+- **Peso:** R 6-8 (con la matrice); M parte di `features/project` (lettura dei titoli da `.tex` e `.md`; `.docx` con un lettore ZIP minimo su `zlib`, 3-4 KiB).
+- **Carico visivo:**
+  - il progetto ha 3 schede finché lo Schema non serve;
+  - Ricerca/Manoscritto e Elenco/Matrice sono `Segmented` nella scheda stessa, non nell'intestazione.
+- **Da confermare** con l'utente (D-399): la generalizzazione oltre la tesi.
+
+#### 17.4.14 Resoconto per il relatore o il gruppo di lettura (54, D-400)
+
+- **Dove:** nel `⋯` del progetto, "✦ Resoconto del periodo…". Il dialogo propone un periodo (ultime 2 settimane), un pubblico (relatore · gruppo di lettura · me) e le parti (letture, evidenziazioni chiave, note, affermazioni e prove, paper aggiunti, prossimi passi).
+- **Condizione:**
+  - richiede lo schema della ricerca (17.4.13) con almeno l'idea;
+  - altrimenti la voce è disattivata con il motivo "Serve lo schema della ricerca del progetto", collegato a "Scrivilo ora".
+- **Stati:** anteprima di cosa si invia · in scrittura · pronto (Markdown modificabile, marcato ✦) · esportato (Markdown o PDF via stampa).
+- **Claude:**
+  - Sonnet proposto, Haiku a scelta;
+  - si inviano lo schema, i titoli e le note e citazioni del periodo (non i PDF), circa 3-6 mila token in ingresso.
+- **Dati:** `projects/<id>/reports/<AAAA-MM-GG>.md`, elencato nella scheda Note del progetto.
+- **Peso:** R 2-3; M parte di `features/project`.
+- **Carico visivo:** una voce nel `⋯` del progetto.
+
+#### 17.4.15 Domande, affermazioni e prove (40)
+
+```
+Progetto P › Prove
+Domanda 1: Il metodo X funziona con pochi dati?
+  Affermazione: «Con meno di 100 campioni l'errore cresce»   sostiene: A 2021 p. 7 ▌ · C 2018 p. 3
+                                                             contraddice: B 2019 p. 9 ▌     (+ prova) (⋯)
+```
+
+- **Dove:**
+  - la scheda "Prove" del progetto compare alla prima affermazione;
+  - un'affermazione si crea dal popover di un'evidenziazione nel lettore ("Usa come prova…", nel `⋯` del popover), dalla barra di selezione delle Annotazioni o da "+ Affermazione" nella scheda;
+  - le domande arrivano dallo schema della ricerca, se c'è.
+- **Stati:** domanda senza affermazioni · affermazione senza prove (`--warning` leggero) · prove in contrasto (etichetta "In discussione").
+- **Claude:** facoltativo, "✦ Cerca prove" per un'affermazione:
+  1. ricerca locale nell'indice (nessun invio);
+  2. Haiku classifica i 10 passaggi migliori come sostiene, contraddice o non pertinente;
+  3. ogni proposta resta tale finché l'utente non la accetta.
+- **Dati:** `projects/<id>/claims/<id>.md` (affermazione, domanda, prove con `lab://doc/<id>?page=N&ann=<annId>`).
+- **Peso:** R 4-5; M parte di `features/project`.
+- **Carico visivo:** la scheda compare solo con un contenuto; nel lettore c'è una voce in più nel `⋯` del popover dell'annotazione, non nei suoi controlli.
+
+#### 17.4.16 Suggerimenti di citazione dentro un progetto (51)
+
+- **Dove:** nel progetto, sul manoscritto collegato (Schema › Manoscritto) o su una nota del progetto, "✦ Suggerisci citazioni" nel `⋯` della sezione o della nota.
+- **Comportamento:**
+  - per ogni paragrafo senza citazione, fino a 3 candidati, prima dalla libreria e dal progetto, poi (a scelta) da OpenAlex;
+  - motivo leggibile e il passaggio con pagina;
+  - "Assegna alla sezione", "Copia la chiave" (`\cite{chiave}` o `[@chiave]`).
+- **Stati:** nessun paragrafo da coprire · suggerimenti · nessun candidato convincente (detto chiaramente).
+- **Claude:**
+  - recupero locale senza invii;
+  - Haiku riordina i candidati di ogni paragrafo, a blocchi di 10 paragrafi;
+  - il testo del paragrafo è dell'utente e va nell'anteprima.
+- **Dati:** nessun file nuovo; le assegnazioni accettate vanno in `outline.md`.
+- **Peso:** R 3-4; M parte di `features/project`.
+- **Carico visivo:** voci di menu solo dentro il progetto.
+
+#### 17.4.17 Scopri › Ricerche: Estendi la bibliografia, ricerca approfondita, Trova un ponte
+
+L'intestazione di Scopri ha un solo primario, "Nuova ricerca ▾":
+
+```
+Scopri                                                                  [[Nuova ricerca ▾]] [⋯]
+( Ricerche | Da leggere dopo | Novità | Pubblicati )
+┌ Ricerche ───────────────────────────────────────────────────────────────────────────────┐
+│ ▸ Estendi la bibliografia · Progetto P · 18/11 · 42 candidati, 6 nuovi da ieri   (Riesegui) │
+│ ▾ Da una domanda: «metodi di stima con pochi dati» · 30 migliori · ✦ Haiku          │
+│   1  Titolo del candidato · Autore E 2022 · pertinenza 0,86                         │
+│      Problema: …   Metodo: …   Risultati: …   Dati: …   Limiti: non dichiarato       │
+│      (Leggi dopo) (Importa) (Scarta) (Apri la fonte)                                │
+│ ▸ Ponte tra A 2021 e B 2019 · 3 ponti                                               │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+⋯: Aggiorna le citazioni · Fonti seguite… · Elimina le ricerche vecchie
+```
+
+Ogni ricerca è una riga apribile: si vede l'elenco solo di quella aperta. La scheda "Ricerche" è la prima solo se esiste almeno una ricerca; altrimenti la prima è "Da leggere dopo", come oggi.
+
+**a. Estendi la bibliografia (D-392, indispensabile)**
+
+- **Dove:**
+  - Scopri, "Nuova ricerca ▾ › Estendi la bibliografia…" (scelta del progetto o della selezione);
+  - barra di selezione, `✦ Claude ▾ › Estendi la bibliografia…` (nel menu ✦ perché il motivo può essere spiegato da Claude, ma il ritrovamento non usa Claude);
+  - `⋯` del progetto;
+  - cartellino del cluster nella Mappa (`⋯`).
+- **Candidati:**
+  - da riferimenti, citazioni, co-citazione, accoppiamento e somiglianza (OpenAlex già consentito, ripieghi come oggi);
+  - esclusi i documenti già in libreria;
+  - motivo bibliometrico leggibile ("citato da 4 dei tuoi 12 paper, cita 3 dei tuoi");
+  - mai scaricati da soli.
+  - "Riesegui" sostituisce il digest periodico: all'apertura di Scopri, solo se l'utente lo ha acceso per quella ricerca, si mostrano i nuovi con il badge "nuovi" sulla riga.
+- **Claude:** nessuno di base; "✦ Riassumi i migliori" usa le sintesi strutturate di b.
+
+**b. Ricerca approfondita da una domanda (41, D-397)**
+
+- **Dove:** "Nuova ricerca ▾ › Da una domanda…" e la tavolozza.
+- **Comportamento:**
+  - ritrovamento senza Claude (indice locale e OpenAlex);
+  - i **migliori N** (predefinito 20, fino a 50) con la sintesi strutturata su 5 righe (problema, metodo, risultati, dati, limiti), dal solo abstract pubblico, con "non dichiarato nell'abstract" quando manca;
+  - pertinenza e motivo.
+- **Claude:** Haiku, blocchi da 10 abstract (20 candidati = 2 richieste, circa 7 mila token in ingresso e 3 mila in uscita), cache per abstract (lo stesso candidato in un'altra ricerca non costa).
+
+**c. Trova un ponte (nuova, unita alla 42, D-396)**
+
+```
+Ponte tra  A 2021 (metodo)  e  B 2019 (dominio)
+1  Titolo del ponte · Autore F 2020          forza ●●●○
+   Applica il metodo di A al dominio di B · cita entrambi · ✦ dal suo abstract
+   (Leggi dopo) (Importa) (Mostra nella Mappa)
+2  …
+— oppure —
+Nessun ponte convincente. I candidati più vicini condividono solo l'argomento generale.
+Prova con due insiemi più ampi (progetti o tag) o (Mostra i candidati deboli).
+```
+
+- **Dove:**
+  - con esattamente 2 paper selezionati, `✦ Claude ▾ › Trova un ponte` nella barra di selezione;
+  - nella Mappa, `⋯` del cartellino del nodo › "Trova un ponte con…", poi clic sul secondo nodo (il cursore lo indica, Esc annulla);
+  - per due insiemi (progetti, tag, selezioni), "Nuova ricerca ▾ › Trova un ponte…".
+- **Candidati:** lavori che citano entrambi, citati da entrambi, co-citati, con riferimenti in comune, sul percorso più breve nel grafo delle citazioni, vicini nel contenuto a entrambi.
+- **Classifica:**
+  - punteggio combinato;
+  - Claude (Haiku, un blocco dei primi 20) classifica il tipo di legame dai soli titoli e abstract;
+  - sotto la soglia, l'esito è **"Nessun ponte convincente"**, con i candidati deboli nascosti dietro un link.
+- **Nella Mappa:** "Mostra nella Mappa" disegna il percorso A → ponte → B tratteggiato in `--accent`, con il ponte come nodo fantasma (fuori libreria, contorno tratteggiato) finché non si importa.
+
+**Stati comuni:**
+
+- in corso (chip Attività, annullabile);
+- pronta;
+- senza risultati (spiegazione);
+- offline (ricerca locale soltanto, detto);
+- limite di Claude (risultati senza sintesi, con "Aggiungi le sintesi più tardi").
+
+**Dati:** `discover/runs/<id>.json` (parametri, candidati, punteggi, motivi, stato di ogni candidato); le sintesi ✦ in cache per abstract. "Elimina le ricerche vecchie" (`⋯`) toglie quelle oltre 90 giorni, con conferma.
+
+**Peso:** R 10-14 (scheda Ricerche, righe con sintesi, percorso nella Mappa); M 14-20 (`features/discover`: candidati, punteggi, soglie, cache).
+
+**Carico visivo:** Scopri ha lo stesso numero di controlli (primario sostituito, Fonti seguite nel `⋯`, una scheda al posto di un'altra); la Mappa non ha controlli nuovi.
+
+#### 17.4.18 Contesto delle citazioni (11)
+
+- **Dove:** scheda del documento › sezione "Citazioni" (già presente). Ogni lavoro che cita il documento ha sotto una riga con la frase in cui lo cita ("…come proposto da [Autore A 2021], …") e la pagina, quando il lavoro citante è in libreria (dal testo) o quando OpenAlex fornisce il contesto. Il filtro "Con il contesto" è un `Chip` dentro la sezione aperta.
+- **Stati:** contesto disponibile · solo citazione (nessuna riga) · in calcolo (scheletro, per i documenti in libreria).
+- **Claude:** nessuno.
+- **Dati:** cache locale (`citeContext`), rigenerabile.
+- **Peso:** R 1-2; M 2-3 (`features/citectx`, riusa `features/refs`).
+- **Carico visivo:** contenuto dentro una sezione chiusa; nessun controllo fuori.
+
+#### 17.4.19 Gruppi di ricerca su richiesta (12, D-393)
+
+- **Dove:**
+  - barra di selezione `✦ Claude ▾ › Panoramica dei gruppi di ricerca…`;
+  - `⋯` della scheda del documento;
+  - nella Mappa, modo Autori, `⋯` della scheda dell'entità.
+- **Comportamento:**
+  - una panoramica in Markdown (autori, istituzioni, coautori ricorrenti, temi, lavori principali, con link) dai dati già scaricati e da OpenAlex;
+  - Claude scrive solo i temi e la sintesi, su richiesta (✦), e la parte dei dati è pronta anche senza.
+- **Stati:** dati incompleti (detto per autore) · pronta · aggiornata (data).
+- **Claude:** facoltativo, Haiku, circa 3 mila token.
+- **Dati:** `notes/groups/<id>.md`.
+- **Peso:** R 1-2; M parte di `features/synthesis`.
+- **Carico visivo:** voci di menu.
+
+#### 17.4.20 Linea del tempo su richiesta (19)
+
+- **Dove:**
+  - nel `⋯` della Mappa, "Disponi per anno" (nei modi Documenti e Collegamenti), che porta i nodi su un asse orizzontale degli anni con il volo animato;
+  - con una selezione, nel `⋯` della barra di selezione, "Linea del tempo", che apre la Mappa con solo la selezione disposta per anno.
+  - Si esce con lo stesso comando o con Esc.
+- **Stati:** documenti senza anno (raccolti a destra in "Senza anno") · movimento ridotto (nessun volo).
+- **Claude:** nessuno.
+- **Dati:** nessuno.
+- **Peso:** R 3-4 (nel chunk della Mappa).
+- **Carico visivo:** nessun controllo nuovo; un'etichetta "Per anno · Esc per uscire" in alto a sinistra mentre è attiva.
+
+#### 17.4.21 Evidenziazioni guida, esperimento (30, D-401)
+
+- **Dove:**
+  - visibile solo con Impostazioni › Avanzate › "Funzioni sperimentali" acceso;
+  - allora nel `⋯` del lettore compare "✦ Evidenziazioni guida (sperimentale)…".
+- **Comportamento:**
+  - per il paper aperto, Claude propone 5-12 passaggi (contributo, metodo, risultato chiave, limite);
+  - i passaggi stanno in uno **strato separato**: contorno tratteggiato `--ai`, mai riempito, mai nel PDF;
+  - si spegne con un chip "Guida ✦ ×" in cima al pannello Annotazioni, che compare solo quando lo strato c'è;
+  - "Tieni" trasforma un passaggio in un'evidenziazione dell'utente.
+- **Stati:** spenta · in scrittura · attiva · nessun passaggio sicuro (detto).
+- **Claude:** Haiku, circa 12-15 mila token in ingresso, cache per hash del testo; se esiste la nota di letteratura, i passaggi si ricavano da quella senza un nuovo invio.
+- **Dati:** `guides/<docId>.json` (marcato AI).
+- **Peso:** R 2-3; M 2-3 (`features/guides`).
+- **Carico visivo:** zero a funzione spenta; un chip quando lo strato è attivo.
+- **Prova avversaria in Y1 (§14.1):**
+  - utilità: usata in almeno metà delle letture di prova;
+  - affollamento: il conteggio del lettore non cresce;
+  - leggibilità: lo strato non copre le evidenziazioni dell'utente (sovrapposizione disegnata sotto).
+  - Se non passa, la voce sparisce e il codice resta spento.
+
+### 17.5 Dove vive ogni funzione (riepilogo)
+
+| N. | Funzione | Ingresso principale | Altri ingressi | Claude |
+| --- | --- | --- | --- | --- |
+| 2 | Note di letteratura | Scheda › Note | lettore › Note › Letteratura; selezione ✦ | sì, su richiesta |
+| 3 | Lettura affiancata | `⋯` del lettore | selezione di 2 › `⋯` | no |
+| 7 (+52, 13) | Zotero e BibTeX | + Aggiungi ▾ | `⋯` del progetto (Collega .bib, Esporta) | no |
+| 11 | Contesto delle citazioni | Scheda › Citazioni | — | no |
+| 12 | Gruppi di ricerca | selezione ✦ | `⋯` della scheda; Mappa › Autori | facoltativo |
+| 16 | Tabella di confronto | selezione ✦ | `⋯` del progetto | sì (celle mancanti) |
+| 19 | Linea del tempo | `⋯` della Mappa | selezione › `⋯` | no |
+| 23 | DOI, arXiv, URL | + Aggiungi ▾ | DOI incollato nella ricerca | no |
+| 25 | Riprendi | menu del campo di ricerca | tavolozza; banner all'avvio | no |
+| — | Estendi la bibliografia | Scopri › Nuova ricerca | selezione ✦; `⋯` del progetto; cluster della Mappa | facoltativo |
+| 27 | Ritaglio | strumento del lettore (R) | — | no |
+| 29 | Schede delle citazioni | riferimento nel testo | — | no |
+| 30 | Evidenziazioni guida (esperimento) | `⋯` del lettore (con Funzioni sperimentali) | — | sì |
+| 31 | Spiega | popover della selezione | popover del ritaglio | sì |
+| 35 | Modelli di nota | Impostazioni › Libreria | menu di "Nuova nota" | no |
+| 36 | Significato dei colori | Impostazioni › Libreria | tooltip dei colori | no |
+| 37 | LaTeX nelle note | editor delle note | — | no |
+| 38 | Link e collegamenti in entrata | `[[` nell'editor | Scheda › Note | no |
+| 40 | Domande, affermazioni e prove | Progetto › Prove | `⋯` del popover dell'annotazione | facoltativo |
+| 41 | Ricerca approfondita | Scopri › Nuova ricerca | tavolozza | sì (sintesi) |
+| 42 + nuova | Trova un ponte | selezione di 2 ✦ | cartellino della Mappa; Scopri › Nuova ricerca | sì (classificazione) |
+| 48 | Risorse | + Aggiungi ▾ | Scheda › File e risorse; Libreria (Tipo) | no |
+| 49 | Schema del manoscritto ↔ fonti (da confermare) | Progetto › Schema | `⋯` del progetto | facoltativo |
+| 51 | Suggerimenti di citazione | Progetto › Schema/Note › `⋯` | — | sì |
+| 54 | Resoconto | `⋯` del progetto | — | sì |
+
+### 17.6 Testi nuovi (it / en, estratto)
+
+| Italiano | English |
+| --- | --- |
+| + Aggiungi ▾ · Da DOI, arXiv o URL… · Da Zotero o BibTeX… · Risorsa o link… | + Add ▾ · From DOI, arXiv or URL… · From Zotero or BibTeX… · Resource or link… |
+| Riprendi: *Titolo* · p. 12 | Resume: *Title* · p. 12 |
+| Scrivi la nota di letteratura ✦ | Write the literature note ✦ |
+| Collegamenti in entrata | Backlinks |
+| Ritaglia (R) | Crop (R) |
+| ✦ Spiega | ✦ Explain |
+| Affianca un altro paper… | Read side by side… |
+| Nuova ricerca ▾ · Da una domanda… · Estendi la bibliografia… · Trova un ponte… | New search ▾ · From a question… · Extend the bibliography… · Find a bridge… |
+| Nessun ponte convincente. | No convincing bridge found. |
+| Schema · Ricerca · Manoscritto · Prove | Outline · Research · Manuscript · Evidence |
+| Serve lo schema della ricerca del progetto. Scrivilo ora | This needs the project's research outline. Write it now |
+| Disponi per anno | Arrange by year |
+| Funzioni sperimentali | Experimental features |
+| Già pronto, 0 invii | Already done, nothing sent |

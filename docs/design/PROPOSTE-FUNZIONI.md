@@ -542,3 +542,40 @@ https://ctan.org/tex-archive/support/checkcites
 https://manusights.com/blog/revision-response-matrix-template
 https://authorservices.taylorandfrancis.com/blog/peer-review/how-to-respond-to-reviewer-comments/
 https://www.skillsdirectory.com/skills/yha9806-map
+
+## Scelte dell'utente (giro 2)
+
+Data: 2026-11-18. Parole dell'utente tradotte. Decisioni in `docs/DECISIONS.md` (D-395 … D-409); dove vivono le funzioni nell'interfaccia: `docs/design/ARCHITETTURA-UI.md` §17.
+
+**Vincolo forte dell'utente:** «I do not want the graphics to be crowded with functionalities». Ogni funzione accettata vive dove si trova ma resta silenziosa: contestuale (barra di selezione, popover del lettore, menu ⋯, schede del progetto, tavolozza dei comandi), su richiesta, rivelata a poco a poco; nessuna voce nuova nella barra laterale; principi di composizione di §1.1 (D-402).
+
+| N. | Funzione | Scelta | Note |
+| --- | --- | --- | --- |
+| 27 | Ritaglio di figure, tabelle ed equazioni | **Sì** | |
+| 28 | Indice automatico di figure e tabelle | **No** | |
+| 29 | Schede delle citazioni nel lettore | **Sì** | |
+| 30 | Evidenziazioni guida su richiesta | **Sì, come esperimento** | «could be nice, let's try it»; il designer avversario la prova contro affollamento e utilità prima di renderla stabile (D-401) |
+| 31 | Spiega formula, tabella o figura | **Sì** | |
+| 35 | Modelli di nota | **Sì** | |
+| 36 | Colori con un significato | **Sì** | |
+| 37 | Formule LaTeX nelle note | **Sì** | convertitore proprio verso MathML, niente libreria da 150 KB (D-406) |
+| 38 | Link tra note e collegamenti in entrata | **Sì** | |
+| 40 | Domande, affermazioni e prove | **Sì** | |
+| 41 | Ricerca approfondita da una domanda | **Sì, con i migliori risultati e una sintesi strutturata per candidato** | per ogni candidato una scheda breve nello stesso senso delle note di letteratura (problema, metodo, risultati, dati, limiti) per scegliere bene (D-397) |
+| 42 | Ponte tra due insiemi di paper | **Sì** | unificata con la nuova "Trova un ponte" (D-396) |
+| 43 | Screening con criteri e diagramma PRISMA | in sospeso | l'utente non sapeva cos'è: spiegazione sotto |
+| 48 | Codice, dati e notebook | **Sì, generalizzata** | la libreria tiene **più dei PDF**: risorse (repository di codice, dataset, pagine web, notebook) con anteprima e "Apri", collegate a paper e progetti (D-398) |
+| 49 | Mappa capitoli ↔ fonti | **Sì, generalizzata, da confermare** | «perché la tesi?»: qualsiasi manoscritto o scaletta di un progetto (articolo, tesi, domanda di finanziamento, presentazione): matrice sezioni ↔ fonti (D-399) |
+| 50 | Controllo delle citazioni di un manoscritto | **No** | |
+| 51 | Suggerimenti di citazione per una bozza | **Sì, dentro un progetto** | |
+| 54 | Resoconto per il relatore o il gruppo di lettura | **Sì, solo tramite un progetto** | serve uno "schema della ricerca" nel progetto (idea, domande, ipotesi, piano); il resoconto nasce da quello e dall'attività di lettura; senza, non si può fare (D-400) |
+| nuova | **Trova un ponte** tra due paper | **Sì (richiesta dell'utente)** | si scelgono due paper (Libreria o Mappa) e si cerca un lavoro che li colleghi senza forzare: applica il metodo dell'uno al dominio dell'altro, condivide i dati, cita entrambi o è citato da entrambi; classifica con il motivo e un risultato onesto "nessun ponte convincente" (D-396) |
+| 52 | `.bib` sempre aggiornato | unita alla 7 | |
+| 13 | Esportazione con chiavi stabili | con la 7, **da confermare** | |
+| 4, 5, 6 (forse), 8, 9, 14, 15, 17, 18, 20, 21, 22, 24, 26, 32, 33, 34, 39, 43, 44, 45, 46, 47, 53, 55 | — | in sospeso | le non citate del giro 2 restano in sospeso |
+
+### Proposta 43 spiegata in modo semplice (da mostrare all'utente)
+
+**PRISMA** è il modo standard, usato nelle rassegne sistematiche, per dire **come** si è arrivati all'elenco finale dei paper di una rassegna. Si parte da tutti i paper trovati (per esempio 400 dalle ricerche), si tolgono i doppioni, poi si leggono titolo e abstract e si scartano quelli fuori tema secondo **criteri scritti prima** ("solo studi su dati reali", "dal 2015 in poi"), poi si leggono i testi completi dei rimasti e si scartano altri con il motivo. Il **diagramma PRISMA** è il disegno a scatole con i numeri di ogni passaggio (400 trovati → 360 senza doppioni → 80 dopo l'abstract → 25 inclusi, con i motivi delle esclusioni).
+
+Nell'app vorrebbe dire: dai candidati di "Estendi la bibliografia" o della ricerca approfondita, una vista in cui si decide paper per paper con un tasto (includi, escludi con il motivo, forse), con Claude che può proporre una decisione marcata ✦, e alla fine il diagramma con i numeri, pronto per il capitolo di stato dell'arte o per un articolo di rassegna. Serve soprattutto a chi scrive una **rassegna sistematica** o deve documentare la ricerca bibliografica della tesi; per una lettura normale non serve.

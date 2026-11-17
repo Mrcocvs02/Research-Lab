@@ -21,6 +21,7 @@ import { watchHandlers } from './watch-handlers.js';
 import { exploreHandlers } from './explore-handlers.js';
 import { exportHandlers } from './export-handlers.js';
 import { graphHandlers } from './graph-handlers.js';
+import { backupHandlers, maintenanceHandlers } from './backup-handlers.js';
 
 export type { MainServices } from './services.js';
 
@@ -57,5 +58,7 @@ export function buildHandlers(s: MainServices): HandlerMap<Channels> {
     ...exploreHandlers(s),
     ...exportHandlers(s),
     ...mcpHandlers(s),
+    ...backupHandlers(s),
+    ...maintenanceHandlers(s),
   };
 }

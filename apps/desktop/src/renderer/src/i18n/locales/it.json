@@ -52,6 +52,7 @@
   },
   "notices": {
     "settingsReset": "Il file delle impostazioni non era utilizzabile ({{reason}}): l\\’app è ripartita con le impostazioni predefinite. Il file danneggiato è stato conservato come \"{{backup}}\" nella cartella dati dell\\’app; le librerie vanno aggiunte di nuovo.",
+    "backupFailed": "Il backup automatico non è stato eseguito ({{code}}). Controlla le impostazioni del backup.",
     "settingsReadOnly": "Le impostazioni sono state salvate da una versione più recente dell\\’app (formato {{found}}, questa app capisce {{supported}}). Sono mostrate in sola lettura e non verrà modificato nulla. Aggiorna l\\’app per modificarle.",
     "fields": "Campi: {{fields}}.",
     "dismiss": "Chiudi",

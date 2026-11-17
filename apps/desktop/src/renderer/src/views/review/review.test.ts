@@ -138,7 +138,7 @@ describe('review of AI proposals', () => {
     await screen.findAllByTestId('review-item');
     fireEvent.click(screen.getByTestId('review-accept-all'));
     await waitFor(() => expect(w.state.manyDecisions).toHaveLength(1));
-    expect(w.state.manyDecisions[0]).toEqual({ items: [{ docId: D1, field: 'description' }, { docId: D2, field: 'summary' }], decision: 'accept' });
+    expect(w.state.manyDecisions[0]).toEqual({ items: [{ docId: D1, field: 'description', metaDate: meta.date }, { docId: D2, field: 'summary', metaDate: meta.date }], decision: 'accept' });
     await waitFor(() => expect(screen.getByTestId('review-empty')).toBeTruthy());
     expect((await screen.findAllByTestId('toast'))[0]!.textContent).toContain('2 proposals accepted');
   });
@@ -192,5 +192,24 @@ describe('AI fields in the document panel', () => {
     await waitFor(() => expect(work.state.decisions[0]).toEqual({ docId: D1, field: 'description', decision: 'accept', expectedRevision: 7 }));
     fireEvent.click(within(screen.getByTestId('ai-suggestedNewTags')).getByTestId('ai-reject'));
     await waitFor(() => expect(callsTo('review:decide')).toHaveLength(2));
+  });
+});
+
+describe('review queue while a job runs', () => {
+  it('reloads at most about every 2 seconds, and the last progress still arrives', async () => {
+    const w = setup([item(D1, 'tags', ['tag-a'])], (x) => {
+      x.state.jobs = [{ jobId: 'j1', kind: 'suggest', fields: ['tags'], model: 'm', state: 'running', total: 50, done: 0, failed: 0, skipped: 0, usd: 0, createdAt: meta.date }];
+    });
+    await screen.findByTestId('review-item');
+    const loads = () => callsTo('review:list').length;
+    const first = loads();
+    for (let i = 1; i <= 12; i++) w.progress({ done: i });
+    await new Promise((r) => setTimeout(r, 300));
+    // a burst of twelve progress events does not reload twelve times
+    expect(loads() - first).toBeLessThanOrEqual(1);
+    await waitFor(() => expect(loads() - first).toBeGreaterThanOrEqual(1), { timeout: 4000 });
+    const settled = loads();
+    await new Promise((r) => setTimeout(r, 2300));
+    expect(loads()).toBe(settled);
   });
 });

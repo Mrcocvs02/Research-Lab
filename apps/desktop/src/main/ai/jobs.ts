@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { activeTagNodes, cleanSuggestion, folderOf, inEnabledFolder, suggestPrompt, suggestSchema, suggestSystem, taxonomyBlock, usdFor, type SuggestClean, type SuggestField, type SuggestRaw } from '@rl/ai';
-import { AI_LIMITS, AppError, type AiJobStatus, type AiMeta, type DocumentId, type DocumentRecord, type ReasoningLevel, type ReviewStatus } from '@rl/core';
+import { activeTagNodes, cleanSuggestion, folderOf, inEnabledFolder, suggestPrompt, suggestSchema, suggestSystem, taxonomyBlock, type SuggestClean, type SuggestField, type SuggestRaw } from '@rl/ai';
+import { AI_LIMITS, AppError, type AiJobStatus, type AiMeta, type DocumentId, type DocumentRecord, type ReasoningLevel, type ReviewStatus, type TokenUsage } from '@rl/core';
 import type { z } from 'zod';
 import type { aiJobRequestSchema, aiPreviewSchema } from '@rl/core';
 import type { MainServices } from '../ipc/handlers/services.js';
 import { availability, buildDataBlock, classifyDocs, computePreview, loadCtx, monthUsage, type AiCtx } from './service.js';
+import { abortTracked } from './abort-registry.js';
 import { createToolsHost } from './tools-host.js';
-import { monthOf } from './usage.js';
+import { monthOf, usdOfUsage } from './usage.js';
 
 type JobRequest = z.infer<typeof aiJobRequestSchema>;
 type Preview = z.infer<typeof aiPreviewSchema>;
@@ -15,11 +16,15 @@ type Preview = z.infer<typeof aiPreviewSchema>;
 export const JOB_EXCERPT_CHARS = 4000;
 /** Pages read for the excerpt. */
 const EXCERPT_PAGES = [1, 2, 3];
+/** Consecutive provider failures after which a job stops (Claude unavailable would otherwise fail every document). */
+export const JOB_MAX_PROVIDER_FAILURES = 3;
 /** Progress events per second, at most. */
 const PROGRESS_INTERVAL_MS = 250;
 
 /** The `document.ai` key a job field fills, and the extra key tags also fill. */
 const AI_KEY = { tags: 'suggestedTags', description: 'description', summary: 'summary', keywords: 'keywords', synonyms: 'synonyms' } as const;
+
+const isUsage = (u: unknown): u is TokenUsage => typeof u === 'object' && u !== null && typeof (u as TokenUsage).inputTokens === 'number' && typeof (u as TokenUsage).outputTokens === 'number';
 
 const status = (rec: DocumentRecord, key: keyof typeof rec.ai): ReviewStatus | undefined => rec.ai[key]?.review.status;
 
@@ -143,6 +148,7 @@ export function listJobs(): AiJobStatus[] {
 
 /** Aborts every job (app quit or another library opened): the Claude Code processes end with them. */
 export function abortAllJobs(): void {
+  abortTracked();
   for (const j of jobs) if (j.status.state === 'queued' || j.status.state === 'running') j.controller.abort();
 }
 
@@ -186,6 +192,7 @@ async function run(j: JobRec): Promise<void> {
   const provider = ctx.provider;
   const host = createToolsHost({ s, rt: ctx.rt, provider: provider.id, model: req.model, confirmed: j.confirmed });
   const deviceId = (await s.settings.get()).deviceId;
+  let providerFailures = 0;
   for (const item of j.plan) {
     if (j.controller.signal.aborted) return finish(j, 'cancelled');
     // The library may have changed (another one opened): stop, nothing is sent for the wrong library.
@@ -223,6 +230,7 @@ async function run(j: JobRec): Promise<void> {
     emit(j, false);
     try {
       await suggestOne({ s, ctx, provider, host, j, rec, fields, deviceId });
+      providerFailures = 0;
     } catch (e) {
       const err = AppError.from(e);
       if (j.controller.signal.aborted || err.code === 'CANCELLED') return finish(j, 'cancelled');
@@ -230,6 +238,9 @@ async function run(j: JobRec): Promise<void> {
       j.status.failed++;
       j.status.error = { code: err.code === 'INTERNAL' ? 'AI_PROVIDER_ERROR' : err.code, message: err.message.slice(0, 300) };
       emit(j, false);
+      // Circuit breaker: Claude not answering is not going to get better one document later.
+      providerFailures = err.code === 'AI_PROVIDER_ERROR' ? providerFailures + 1 : 0;
+      if (providerFailures >= JOB_MAX_PROVIDER_FAILURES) return finish(j, 'failed', { code: 'AI_PROVIDER_ERROR', message: `Stopped after ${JOB_MAX_PROVIDER_FAILURES} failures in a row: ${err.message}`.slice(0, 300) });
     }
   }
   finish(j, 'done');
@@ -277,13 +288,25 @@ async function suggestOne(a: OneArgs): Promise<void> {
   try {
     result = await provider.completeStructured({ model: req.model, reasoning: req.reasoning as ReasoningLevel, system, prompt, schema: suggestSchema(fields), source: 'job:suggest', signal: j.controller.signal });
   } catch (e) {
-    // The content was sent even if no usable answer came back: it is in the log.
-    await sendLog(approxIn, undefined, null).catch(() => undefined);
+    const d = AppError.from(e).details;
+    // Logged when the content was (or may have been) sent, even if no usable answer came back; NOT when the provider
+    // says nothing left the machine (a process that never started). The tokens it spent, when it reports them, count.
+    if (d?.['sent'] !== false) {
+      const spent = isUsage(d?.['usage']) ? d['usage'] : null;
+      const usd = spent ? usdOfUsage(cfg.ai.models, req.model, spent) : null;
+      j.status.usd += usd ?? 0;
+      await sendLog(spent?.inputTokens ?? approxIn, spent?.outputTokens, usd).catch((err: unknown) => s.log.warn('could not log an AI send', { error: err }));
+    }
     throw e;
   }
-  const usd = usdFor(cfg.ai.models, req.model, result.usage.inputTokens, result.usage.outputTokens);
-  await sendLog(result.usage.inputTokens, result.usage.outputTokens, usd);
+  const usd = usdOfUsage(cfg.ai.models, req.model, result.usage);
   j.status.usd += usd ?? 0;
+  // The record of the send comes first and never decides the outcome; the write that follows needs a live, current library.
+  await sendLog(result.usage.inputTokens, result.usage.outputTokens, usd).catch((err: unknown) => s.log.warn('could not log an AI send', { error: err }));
+  // The job may have been cancelled, or another library opened, while the model was answering: write nothing then.
+  if (j.controller.signal.aborted) throw new AppError('CANCELLED', 'Cancelled');
+  const active = await s.runtime.require().catch(() => null);
+  if (!active || active.libraryId !== j.libraryId) throw new AppError('CANCELLED', 'The library changed');
   const clean = cleanSuggestion(result.value as SuggestRaw, fields, tax);
   await writeProposals(s, rt, rec.id, clean, { ...result.meta, source: 'job:suggest' }, a.deviceId);
   j.status.done++;

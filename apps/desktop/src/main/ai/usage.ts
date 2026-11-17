@@ -1,4 +1,14 @@
-import type { AiSendEntry, LogEntry } from '@rl/core';
+import { usdFor } from '@rl/ai';
+import type { AiSendEntry, LogEntry, ModelConfig, TokenUsage } from '@rl/core';
+
+/**
+ * Cost of one call, the same way for the chat, the jobs and the inbox: the provider's own figure when it gave one (it
+ * prices cache reads correctly), else the price hints of the model. Null when neither is known.
+ */
+export function usdOfUsage(models: readonly ModelConfig[], model: string, u: TokenUsage): number | null {
+  if (typeof u.costUsd === 'number' && Number.isFinite(u.costUsd)) return Math.max(0, u.costUsd);
+  return usdFor(models as ModelConfig[], model, u.inputTokens, u.outputTokens);
+}
 
 /** Log purpose of a read made by an agent tool (`chat:tool:<name>`): sizes of what the model saw, no cost of its own. */
 export const isToolPurpose = (purpose: string): boolean => purpose.includes(':tool:');

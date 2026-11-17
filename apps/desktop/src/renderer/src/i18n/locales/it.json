@@ -988,6 +988,7 @@
     "badge_one": "{{count}} file nella posta in arrivo",
     "badge_other": "{{count}} file nella posta in arrivo",
     "needsLibrary": "Apri prima una libreria: i file vengono aggiunti alla libreria attiva.",
+    "noPath": "Questo elemento non è un file di questo computer, quindi non può essere aggiunto. Salvalo prima, poi trascina il file salvato.",
     "dropHint": "Rilascia qui i file PDF per aggiungerli alla posta in arrivo",
     "tabs": "Posta in arrivo",
     "tab_arrivals": "Arrivi",

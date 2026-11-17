@@ -44,6 +44,7 @@ export class WorkLookupError extends Error {
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_BYTES = 1024 * 1024;
 const ABSTRACT_MAX = 20_000;
+const ENTRY_MAX = 200_000;
 const USER_AGENT = 'ResearchLab';
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) : s);
@@ -57,9 +58,9 @@ async function readCapped(res: Response, maxBytes: number): Promise<string> {
   const len = Number(res.headers.get('content-length'));
   if (Number.isFinite(len) && len > maxBytes) throw new WorkLookupError('response too large');
   if (!res.body) {
-    const t = await res.text();
-    if (t.length > maxBytes) throw new WorkLookupError('response too large');
-    return t;
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > maxBytes) throw new WorkLookupError('response too large');
+    return new TextDecoder().decode(buf);
   }
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -77,7 +78,10 @@ async function readCapped(res: Response, maxBytes: number): Promise<string> {
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
-/** GET of an https URL with a timeout, a size cap and no cookies. Null on 404; throws `WorkLookupError` on anything else. */
+/** The only hosts a lookup may talk to, whatever a redirect says. */
+const ALLOWED_HOSTS = new Set(['api.openalex.org', 'export.arxiv.org']);
+
+/** GET of an https URL with a timeout, a size cap and no cookies. Null on 404; throws `WorkLookupError` on anything else. Redirects are refused. */
 async function get(url: string, accept: string, o: FetchWorkOptions): Promise<string | null> {
   if (!url.startsWith('https://')) throw new WorkLookupError('only https is used');
   const ctl = new AbortController();
@@ -86,8 +90,18 @@ async function get(url: string, accept: string, o: FetchWorkOptions): Promise<st
   o.signal?.addEventListener('abort', onAbort, { once: true });
   try {
     if (o.signal?.aborted) throw new WorkLookupError('cancelled');
-    const res = await o.fetch(url, { signal: ctl.signal, headers: { 'User-Agent': USER_AGENT, Accept: accept }, credentials: 'omit' } as RequestInit);
-    if (res.url && !res.url.startsWith('https://')) throw new WorkLookupError('redirected to a non-https address');
+    const res = await o.fetch(url, { signal: ctl.signal, headers: { 'User-Agent': USER_AGENT, Accept: accept }, credentials: 'omit', redirect: 'manual' } as RequestInit);
+    // No hop is followed (not even to the other fixed host), and a final address that is not a fixed host is refused too.
+    if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) throw new WorkLookupError('redirect refused');
+    if (res.url) {
+      let host = '';
+      try {
+        host = new URL(res.url).host;
+      } catch {
+        /* refused below */
+      }
+      if (!res.url.startsWith('https://') || !ALLOWED_HOSTS.has(host)) throw new WorkLookupError('answer from an unexpected address');
+    }
     if (res.status === 404) return null;
     if (!res.ok) throw new WorkLookupError(`status ${res.status}`);
     return await readCapped(res, o.maxBytes ?? DEFAULT_MAX_BYTES);
@@ -162,8 +176,10 @@ const tag = (xml: string, name: string): string | null => {
 
 /** The first `<entry>` of an arXiv Atom answer; null when there is none or it is an error entry. */
 export function parseArxivAtom(xml: string): WorkMetadata | null {
-  const entry = /<entry>([\s\S]*?)<\/entry>/.exec(xml)?.[1];
-  if (!entry) return null;
+  const raw = /<entry>([\s\S]*?)<\/entry>/.exec(xml)?.[1];
+  if (!raw) return null;
+  // A real entry is a few KB; capping it keeps the tag scans below cheap on a hostile answer.
+  const entry = raw.length > ENTRY_MAX ? raw.slice(0, ENTRY_MAX) : raw;
   const idUrl = tag(entry, 'id') ?? '';
   const idMatch = /arxiv\.org\/abs\/([^\s<]+)$/.exec(idUrl.trim());
   if (!idMatch) return null;
@@ -223,7 +239,7 @@ export async function fetchWorkMetadata(ref: WorkRef, o: FetchWorkOptions): Prom
       const text = await get(`https://export.arxiv.org/api/query?id_list=${encodeURIComponent(arxiv.replace(/v\d+$/i, ''))}`, 'application/atom+xml', o);
       const metadata = text === null ? null : parseArxivAtom(text);
       if (metadata) return { source: 'arxiv', metadata };
-      failed = null;
+      // Not found there: an earlier OpenAlex ERROR stays the outcome (retryable), not a sticky not-found.
     } catch (e) {
       if (!(e instanceof WorkLookupError) || o.signal?.aborted) throw e;
       failed = e;

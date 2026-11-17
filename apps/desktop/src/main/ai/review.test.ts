@@ -210,3 +210,67 @@ describe('review:decideMany', () => {
     expect((await get(1)).tags).toEqual([]);
   });
 });
+
+describe('review: atomic and serialized decisions', () => {
+  /** Makes the next `get` of one document return a stale copy, as if the job regenerated the field before the write. */
+  const staleOnce = (n: number, mutate: (d: any) => any) => {
+    const orig = store.documents.get.bind(store.documents);
+    let done = false;
+    store.documents.get = (async (id: never) => {
+      const rec = await orig(id);
+      if (!done && id === (hex(n) as never)) {
+        done = true;
+        await store.documents.update(id, (c) => mutate(c!));
+      }
+      return rec;
+    }) as never;
+  };
+  const taken = (c: any, key: string) => ({ ...c, ai: { ...c.ai, [key]: { ...c.ai[key], review: { status: 'accepted' } } } });
+
+  it('a record that became non-proposed before the write: no orphan nodes, failed reported, changeId for what was written', async () => {
+    await store.documents.put(doc(3, { suggestedNewTags: field([{ label: 'Zeta', parentId: null, aliases: [] }]), summary: field('s3') }));
+    staleOnce(3, (c) => taken(c, 'suggestedNewTags'));
+    const call = harness();
+    const r = ok(await call('review:decideMany', { decision: 'accept', items: [{ docId: hex(3), field: 'newTags' }, { docId: hex(2), field: 'summary' }] }));
+    expect(r.changed).toBe(1);
+    expect(r.changeId).toBeTruthy();
+    expect(r.failed).toEqual([{ docId: hex(3), field: 'newTags', code: 'CONFLICT' }]);
+    expect((await store.readTaxonomy()).nodes.map((n) => n.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('a single decision that loses the race throws and leaves no node behind', async () => {
+    await store.documents.put(doc(3, { suggestedNewTags: field([{ label: 'Zeta', parentId: null, aliases: [] }]) }));
+    staleOnce(3, (c) => taken(c, 'suggestedNewTags'));
+    expect(fail(await harness()('review:decide', { docId: hex(3), field: 'newTags', decision: 'accept' })).code).toBe('CONFLICT');
+    expect((await store.readTaxonomy()).nodes).toHaveLength(3);
+  });
+
+  it('two concurrent decisions that create the same label make one node', async () => {
+    await store.documents.put(doc(3, { suggestedNewTags: field([{ label: 'Zeta', parentId: null, aliases: [] }]) }));
+    await store.documents.put(doc(4, { suggestedNewTags: field([{ label: 'zeta', parentId: null, aliases: [] }]) }));
+    const call = harness();
+    const [a, b] = await Promise.all([call('review:decide', { docId: hex(3), field: 'newTags', decision: 'accept' }), call('review:decide', { docId: hex(4), field: 'newTags', decision: 'accept' })]);
+    ok(a);
+    ok(b);
+    expect((await store.readTaxonomy()).nodes.filter((n) => n.label.toLowerCase() === 'zeta')).toHaveLength(1);
+    expect((await get(3)).tags).toEqual((await get(4)).tags);
+  });
+
+  it('keepTagIds [] is a rejection; a deprecated node is not reused by label', async () => {
+    const call = harness();
+    const r = ok(await call('review:decide', { docId: hex(1), field: 'tags', decision: 'accept', keepTagIds: [] }));
+    expect(r.document.ai.suggestedTags.review.status).toBe('rejected');
+    expect(r.document.tags).toEqual([]);
+    await store.updateTaxonomy((t) => ({ ...t, nodes: [...t.nodes, ...taxonomyFileSchema.parse({ nodes: [{ id: 'old', label: 'Epsilon', status: 'deprecated' }] }).nodes] }));
+    const n = ok(await call('review:decide', { docId: hex(1), field: 'newTags', decision: 'accept', keepNewTags: [{ index: 1 }] }));
+    expect(n.createdNodeIds).toHaveLength(1);
+    expect(n.document.tags).toEqual(n.createdNodeIds);
+  });
+
+  it('bulk accept skips a proposal regenerated after it was listed', async () => {
+    const r = ok(await harness()('review:decideMany', { decision: 'accept', items: [{ docId: hex(2), field: 'summary', metaDate: '2025-01-01T00:00:00.000Z' }, { docId: hex(1), field: 'keywords', metaDate: '2999-01-01T00:00:00.000Z' }] }));
+    expect(r.changed).toBe(1);
+    expect(r.failed).toEqual([{ docId: hex(2), field: 'summary', code: 'CONFLICT' }]);
+    expect((await get(2)).ai.summary!.review.status).toBe('proposed');
+  });
+});

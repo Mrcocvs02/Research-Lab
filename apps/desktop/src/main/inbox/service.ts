@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { constants as fsConstants } from 'node:fs';
 import { copyFile, open, readFile, realpath, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { activeTagNodes, cleanSuggestion, estimateCostFromModels, folderOf, inEnabledFolder, suggestPrompt, suggestSchema, suggestSystem, tagResolver, taxonomyBlock, usdFor, type SuggestRaw } from '@rl/ai';
+import { activeTagNodes, cleanSuggestion, estimateCostFromModels, folderOf, inEnabledFolder, suggestPrompt, suggestSchema, suggestSystem, tagResolver, taxonomyBlock, type SuggestRaw } from '@rl/ai';
 import { fetchWorkMetadata, WorkLookupError } from '@rl/citations';
 import {
   AppError,
@@ -21,11 +21,12 @@ import {
   type LibraryConfig,
   type TaxonomyFile,
 } from '@rl/core';
-import { isInside, resolveInRoot, sha256File } from '@rl/core/node';
+import { isInside, normalizeRelativePath, resolveInRoot, sha256File } from '@rl/core/node';
 import { applyTaxonomyOps, createTextExtractor, type OrganizerStore } from '@rl/data';
 import { availability, monthUsage, type AiCtx } from '../ai/service.js';
 import { JOB_EXCERPT_CHARS } from '../ai/jobs.js';
-import { monthOf } from '../ai/usage.js';
+import { trackAbort } from '../ai/abort-registry.js';
+import { monthOf, usdOfUsage } from '../ai/usage.js';
 import type { MainServices } from '../ipc/handlers/services.js';
 import type { LibraryRuntime } from '../library/library-runtime.js';
 import { isValidCopyName, proposedFileName } from './names.js';
@@ -94,7 +95,27 @@ async function snapshot(c: Ctx): Promise<Snap> {
   return snap;
 }
 
-const isExcluded = (folder: string, excluded: readonly string[]) => excluded.some((e) => folder === e || folder.startsWith(`${e}/`));
+/** Windows folders are case-insensitive: `private` is the excluded `Private`. */
+const fold = (p: string) => (process.platform === 'win32' ? p.toLowerCase() : p);
+
+/** `folder` must already be normalised (`normalizeRelativePath`); the excluded entries are normalised the same way. */
+const isExcluded = (folder: string, excluded: readonly string[]) => {
+  const f = fold(folder);
+  return excluded.some((raw) => {
+    let e: string;
+    try {
+      e = normalizeRelativePath(raw);
+    } catch {
+      e = raw;
+    }
+    e = fold(e);
+    return f === e || f.startsWith(`${e}/`);
+  });
+};
+
+const BACKSLASH = String.fromCharCode(92);
+/** Network and device paths (UNC, verbatim and device forms all start with two separators): resolving one would contact that host. */
+const isNetworkPath = (p: string) => p.startsWith(BACKSLASH + BACKSLASH) || p.startsWith('//');
 
 /** Duplicate of a file already in the library (`same-file` > `same-work` > `version`); `selfId` is skipped (a library item is not its own duplicate). */
 function duplicateOf(snap: Snap, who: { selfId: string | null; id: string; hash: string | null; metas: Detected[] }): InboxItem['duplicate'] {
@@ -264,12 +285,16 @@ export async function whenInboxIdle(): Promise<void> {
   } while (last !== background);
 }
 
-function schedule(c: Ctx, key: string, job: () => Promise<void>): void {
+function schedule(c: Ctx, key: string, job: () => Promise<void>, onFail?: () => Promise<void>): void {
   if (inflight.has(key)) return;
   inflight.add(key);
   background = background
     .then(job)
-    .catch((e: unknown) => c.s.log.warn('inbox lookup failed', { error: e }))
+    .catch(async (e: unknown) => {
+      c.s.log.warn('inbox lookup failed', { error: e });
+      // A failed enrichment leaves a negative entry: the next listing must not schedule it again (no reload loop).
+      await onFail?.().catch(() => undefined);
+    })
     .finally(() => {
       inflight.delete(key);
       void emitChanged(c.s);
@@ -281,6 +306,7 @@ async function emitChanged(s: MainServices): Promise<void> {
     const c = await openCtx(s);
     const file = await c.store.read();
     const flagged = (await c.rt.store.documents.list()).filter((r) => r.inbox && !r.missing).length;
+    if (file.flagged !== flagged) await c.store.update((d) => void (d.flagged = flagged));
     s.emit('inbox:changed', { count: Math.min(INBOX_LIMITS.items, file.items.length + flagged) });
   } catch {
     /* no library open: nobody listens */
@@ -309,6 +335,22 @@ async function enrich(c: Ctx, target: { kind: 'dropped'; id: string } | { kind: 
 
 /* ----------------------------------------------------- list ----------------------------------------------------- */
 
+/**
+ * The badge: dropped items of the local queue plus the flagged library files remembered from the last listing or
+ * recount. Reads no document (unless `recount`) and never looks anything up online.
+ */
+export async function countInbox(s: MainServices, recount: boolean): Promise<{ count: number }> {
+  const c = await openCtx(s);
+  const file = await c.store.read();
+  let flagged = file.flagged ?? 0;
+  if (recount) {
+    flagged = (await c.rt.store.documents.list()).filter((r) => r.inbox && !r.missing).length;
+    if (file.flagged !== flagged) await c.store.update((d) => void (d.flagged = flagged));
+  }
+  return { count: Math.min(INBOX_LIMITS.items, file.items.length + flagged) };
+}
+
+/** Lists the inbox. Online lookups of flagged library files start here, so only when the Inbox view is open or on an explicit action. */
 export async function listInbox(s: MainServices): Promise<{ items: InboxItem[] }> {
   const c = await openCtx(s);
   const file = await c.store.read();
@@ -321,13 +363,20 @@ export async function listInbox(s: MainServices): Promise<{ items: InboxItem[] }
     // First time listed (or offline before and online now): the lookup runs once, in the background.
     const online = !s.isOnline || s.isOnline() || Boolean(s.metadataFile);
     const again = cached?.lookup.state === 'offline' && online && !retried.has(r.id);
-    if (!cached || again) {
+    if ((!cached && !retried.has(r.id)) || again) {
       retried.add(r.id);
-      schedule(c, `lib:${r.id}`, () => enrich(c, { kind: 'library', id: r.id }, false));
+      schedule(
+        c,
+        `lib:${r.id}`,
+        () => enrich(c, { kind: 'library', id: r.id }, false),
+        () => c.store.update((d) => void (d.cache[r.id] ??= { lookup: { state: 'error', checkedAt: new Date().toISOString() }, metadata: null, similar: [] })),
+      );
     }
     items.push(libraryView(snap, r, entry));
   }
-  return { items: items.slice(0, INBOX_LIMITS.items) };
+  const total = Math.min(INBOX_LIMITS.items, items.length);
+  if (file.flagged !== flagged.length) await c.store.update((d) => void (d.flagged = flagged.length));
+  return { items: items.slice(0, total) };
 }
 
 /* ------------------------------------------------------ add ------------------------------------------------------ */
@@ -343,7 +392,12 @@ async function readHeader(file: string): Promise<string> {
   }
 }
 
-export async function addToInbox(s: MainServices, paths: readonly string[]): Promise<{ added: InboxItem[]; refused: Refused[] }> {
+/**
+ * `trusted`: the paths come from the dialog main itself showed (`inbox:choose`). Paths from the renderer (`inbox:add`)
+ * are untrusted: a network or device path is never opened (merely resolving it would contact that host) and the file
+ * must have the `.pdf` extension.
+ */
+export async function addToInbox(s: MainServices, paths: readonly string[], trusted = false): Promise<{ added: InboxItem[]; refused: Refused[] }> {
   const c = await openCtx(s);
   const rootReal = await realpath(c.root).catch(() => c.root);
   const refused: Refused[] = [];
@@ -353,8 +407,12 @@ export async function addToInbox(s: MainServices, paths: readonly string[]): Pro
   for (const p of paths) {
     const name = path.basename(p).slice(0, 260) || 'file';
     const refuse = (reason: Refused['reason']) => void refused.push({ name, reason });
-    if (!path.isAbsolute(p)) {
+    if (!path.isAbsolute(p) || (!trusted && isNetworkPath(p))) {
       refuse('not-found');
+      continue;
+    }
+    if (!trusted && !p.toLowerCase().endsWith('.pdf')) {
+      refuse('not-pdf');
       continue;
     }
     let real: string;
@@ -390,6 +448,11 @@ export async function addToInbox(s: MainServices, paths: readonly string[]): Pro
     const id = documentIdFromHash(hash);
     // Text and identifiers: read by the scan worker (never pdf.js on the main thread); the text lands in the cache by hash.
     const res = await c.rt.extractFile(path.dirname(real), path.basename(real), hash).catch(() => null);
+    // The worker reads the file itself: when what it read is not what was hashed, the file changed in between; refuse it.
+    if (res?.ok && res.readHash !== undefined && res.readHash !== hash) {
+      refuse('not-found');
+      continue;
+    }
     const m = res?.ok ? res.meta : undefined;
     const detected: Detected = compact({
       title: m?.title ?? null,
@@ -429,7 +492,7 @@ export async function addToInbox(s: MainServices, paths: readonly string[]): Pro
 export async function chooseForInbox(s: MainServices) {
   const picked = (await s.pickPdfFiles?.()) ?? [];
   if (picked.length === 0) return { added: [], refused: [] };
-  return addToInbox(s, picked.slice(0, INBOX_LIMITS.addBatch));
+  return addToInbox(s, picked.slice(0, INBOX_LIMITS.addBatch), true);
 }
 
 /* ------------------------------------------------ lookup, dismiss ------------------------------------------------ */
@@ -459,6 +522,7 @@ export async function lookupItem(s: MainServices, id: string): Promise<InboxItem
 }
 
 export async function dismissItem(s: MainServices, id: string): Promise<{ ok: true }> {
+  tagRuns.get(id)?.abort();
   const c = await openCtx(s);
   const f = await findItem(c, id);
   if (f.dropped) await c.store.update((d) => void (d.items = d.items.filter((i) => i.id !== id)));
@@ -561,6 +625,9 @@ export async function previewTags(s: MainServices, req: { id: string; model: str
   return (await previewOf(c, req.id, req.model, p)).preview;
 }
 
+/** Tag proposals in flight, by item: removing the item (confirm, dismiss) cancels its call. */
+const tagRuns = new Map<string, AbortController>();
+
 export async function proposeTags(s: MainServices, aiCtx: AiCtx, req: { id: string; model: string; reasoning: 'low' | 'medium' | 'high'; folder?: string | undefined; confirmed: boolean }): Promise<InboxItem> {
   const c = await openCtx(s);
   const { cfg } = c;
@@ -591,14 +658,23 @@ export async function proposeTags(s: MainServices, aiCtx: AiCtx, req: { id: stri
       ...(usd !== null ? { estimatedCostUsd: usd } : {}),
       confirmed: req.confirmed,
     });
+  // Cancellable: the library switch, quit, and the removal of the item end the call (and the Claude process with it).
+  const run = trackAbort();
+  tagRuns.get(req.id)?.abort();
+  tagRuns.set(req.id, run.controller);
   let result;
   try {
-    result = await provider.completeStructured({ model: req.model, reasoning: req.reasoning, system: prep.system, prompt: prep.prompt, schema: suggestSchema(['tags']), source: 'inbox:tags' });
+    result = await provider.completeStructured({ model: req.model, reasoning: req.reasoning, system: prep.system, prompt: prep.prompt, schema: suggestSchema(['tags']), source: 'inbox:tags', signal: run.controller.signal });
   } catch (e) {
-    await sendLog(est.inputTokens, undefined, null).catch(() => undefined);
+    const d = AppError.from(e).details;
+    if (d?.['sent'] !== false) await sendLog(est.inputTokens, undefined, null).catch(() => undefined);
     throw e;
+  } finally {
+    run.release();
+    if (tagRuns.get(req.id) === run.controller) tagRuns.delete(req.id);
   }
-  await sendLog(result.usage.inputTokens, result.usage.outputTokens, usdFor(cfg.ai.models, req.model, result.usage.inputTokens, result.usage.outputTokens));
+  await sendLog(result.usage.inputTokens, result.usage.outputTokens, usdOfUsage(cfg.ai.models, req.model, result.usage));
+  if (run.controller.signal.aborted) throw new AppError('CANCELLED', 'Cancelled');
   const clean = cleanSuggestion(result.value as SuggestRaw, ['tags'], prep.tax);
   const meta: AiMeta = { ...result.meta, source: 'inbox:tags' };
   const ai = { tagIds: clean.tags ?? [], newTags: clean.newTags ?? [], meta };
@@ -627,6 +703,7 @@ type ConfirmReq = {
 const EXTRACTABLE = ['title', 'authors', 'year', 'doi', 'arxivId'] as const;
 
 export async function confirmItem(s: MainServices, req: ConfirmReq): Promise<{ docId: DocumentId; path: string; changeId: string | null }> {
+  tagRuns.get(req.id)?.abort();
   const c = await openCtx(s);
   const f = await findItem(c, req.id);
   const file = await c.store.read();
@@ -654,12 +731,24 @@ export async function confirmItem(s: MainServices, req: ConfirmReq): Promise<{ d
 
   let docId = req.id as DocumentId;
   let relPath: string;
+  /** What this call created (the copy, the record, new nodes): undone, newest first, when the confirmation fails before it is committed. */
+  const undo: Array<() => Promise<unknown>> = [];
+  const rollback = async () => {
+    for (const u of undo.reverse()) await u().catch((e: unknown) => s.log.warn('could not undo a failed inbox confirmation', { error: e }));
+  };
   const now = new Date().toISOString();
   const store = c.rt.store as OrganizerStore;
 
   if (f.dropped) {
     // 3. The copy: the ONE write outside the data folder (D-217). New file, never overwriting, original untouched.
-    const folder = req.folder ?? proposeFolder(snap, tagIds, entry.nearFolder);
+    // The folder is normalised FIRST (`.`, `./x`, `a//b`, trailing slashes, reserved names), and every check below, the
+    // stored path and the copy use that one form: a variant of an excluded folder cannot slip past a string compare.
+    let folder: string;
+    try {
+      folder = normalizeRelativePath(req.folder ?? proposeFolder(snap, tagIds, entry.nearFolder));
+    } catch {
+      throw new AppError('INVALID_REQUEST', 'The folder is not valid', { reason: 'name' });
+    }
     const name = req.name ?? proposedFileName(meta, f.dropped.fileName);
     if (!isValidCopyName(name)) throw new AppError('INVALID_REQUEST', 'The file name is not valid', { reason: 'name' });
     relPath = folder ? `${folder}/${name}` : name;
@@ -668,7 +757,9 @@ export async function confirmItem(s: MainServices, req: ConfirmReq): Promise<{ d
     const folderAbs = await resolveInRoot(c.root, folder);
     const fst = await stat(folderAbs).catch(() => null);
     if (!fst?.isDirectory()) throw new AppError('NOT_FOUND', 'The target folder does not exist', { folder });
-    if (isInside(c.dataDir, folderAbs)) throw new AppError('INVALID_REQUEST', 'The data folder cannot receive files', { reason: 'data-folder' });
+    // The data folder as it really is on disk (a junction or a substituted drive in the root path must not hide it).
+    const dataReal = await realpath(c.dataDir).catch(() => c.dataDir);
+    if (isInside(dataReal, folderAbs) || isInside(c.dataDir, folderAbs)) throw new AppError('INVALID_REQUEST', 'The data folder cannot receive files', { reason: 'data-folder' });
     const dst = await resolveInRoot(c.root, relPath);
     try {
       await copyFile(f.dropped.srcPath, dst, fsConstants.COPYFILE_EXCL);
@@ -678,6 +769,7 @@ export async function confirmItem(s: MainServices, req: ConfirmReq): Promise<{ d
       if (code === 'ENOENT') throw new AppError('NOT_FOUND', 'The original file is no longer there');
       throw new AppError('IO_ERROR', 'The file could not be copied', { code: code ?? 'unknown' });
     }
+    undo.push(() => unlink(dst));
     // The copy is ours: verify it; on a mismatch delete only the file just created.
     const got = await sha256File(dst).catch(() => null);
     if (got !== f.dropped.hash) {
@@ -687,7 +779,17 @@ export async function confirmItem(s: MainServices, req: ConfirmReq): Promise<{ d
     const cst = await stat(dst);
     // 4. Index that one file directly, so the watcher and the next scan see it as known (never as new).
     const rec = documentRecordSchema.parse({ schemaVersion: SCHEMA_VERSION, id: docId, hash: f.dropped.hash, path: relPath, size: cst.size, mtimeMs: cst.mtimeMs, addedAt: now, updatedAt: now });
-    await c.rt.store.documents.update(docId, (cur) => cur ?? rec);
+    try {
+      let made = false;
+      await c.rt.store.documents.update(docId, (cur) => {
+        if (!cur) made = true;
+        return cur ?? rec;
+      });
+      if (made) undo.push(() => c.rt.store.documents.remove(docId));
+    } catch (e) {
+      await rollback();
+      throw e;
+    }
   } else {
     relPath = f.rec!.path;
     docId = f.rec!.id as DocumentId;
@@ -700,8 +802,17 @@ export async function confirmItem(s: MainServices, req: ConfirmReq): Promise<{ d
   for (const n of snap.tax.nodes) for (const t of [n.label, ...n.aliases]) idByLabel.set(norm(t), n.id);
   const create = [...new Map(req.newTags.filter((t) => !idByLabel.has(norm(t.label))).map((t) => [norm(t.label), t])).entries()];
   const createdIds: string[] = [];
+  /** A failure up to the document write undoes what this call made; after that write the confirmation stands. */
+  const guard = async <T,>(fn: () => Promise<T>): Promise<T> => {
+    try {
+      return await fn();
+    } catch (e) {
+      await rollback();
+      throw e;
+    }
+  };
   if (create.length > 0) {
-    await cs.updateTaxonomy((cur) => {
+    await guard(() => cs.updateTaxonomy((cur) => {
       const ops = create.map(([, t]) => ({ op: 'create' as const, label: t.label, ...(t.parentId ? { parents: [t.parentId] } : {}), ...(t.aliases.length ? { aliases: t.aliases } : {}) }));
       const r = applyTaxonomyOps(cur, ops, new Map(), now);
       for (const x of r.created) {
@@ -711,11 +822,12 @@ export async function confirmItem(s: MainServices, req: ConfirmReq): Promise<{ d
         createdIds.push(x.id);
       }
       return r.taxonomy;
-    });
+    }));
+    if (createdIds.length > 0) undo.push(() => cs.updateTaxonomy((cur) => ({ ...cur, nodes: cur.nodes.filter((n) => !createdIds.includes(n.id)) })));
   }
   const newTagNodeIds = req.newTags.map((t) => idByLabel.get(norm(t.label))).filter((x): x is string => x !== undefined);
   const reviewed: Array<{ key: 'suggestedTags' | 'suggestedNewTags'; before: unknown; after: unknown }> = [];
-  await cs.documents.update(docId, (cur) => {
+  await guard(() => cs.documents.update(docId, (cur) => {
     if (!cur) throw new AppError('NOT_FOUND', 'Unknown document');
     const next: DocumentRecord = { ...cur, ref: { ...cur.ref }, tags: [...cur.tags], ai: { ...cur.ai } };
     const md = req.metadata;
@@ -755,18 +867,20 @@ export async function confirmItem(s: MainServices, req: ConfirmReq): Promise<{ d
     delete next.inbox;
     next.updatedAt = now;
     return next;
-  });
+  }));
   const deviceId = (await s.settings.get()).deviceId;
   for (const r of reviewed) {
-    await cs.appendLog({ type: 'change', at: now, deviceId, actor: 'user', target: { kind: 'document', id: docId }, action: 'ai.review', before: { ai: { [r.key]: r.before } }, after: { ai: { [r.key]: r.after } } });
+    await cs
+      .appendLog({ type: 'change', at: now, deviceId, actor: 'user', target: { kind: 'document', id: docId }, action: 'ai.review', before: { ai: { [r.key]: r.before } }, after: { ai: { [r.key]: r.after } } })
+      .catch((e: unknown) => s.log.warn('could not log the review of an inbox item', { error: e }));
   }
   c.rt.organizer.invalidate();
   await c.rt.reindexDocuments([docId]).catch((e: unknown) => s.log.warn('index refresh after the inbox failed', { error: e }));
   if (f.dropped) {
-    await c.store.update((d) => void (d.items = d.items.filter((i) => i.id !== req.id)));
+    await c.store.update((d) => void (d.items = d.items.filter((i) => i.id !== req.id))).catch((e: unknown) => s.log.warn('could not leave the inbox queue', { error: e }));
     // The text of the new file is read and indexed by the next (targeted) scan; the file is known already, so it does not land in the inbox.
     c.rt.startScan?.({ paths: [relPath] });
-  } else await c.store.update((d) => void delete d.cache[req.id]);
+  } else await c.store.update((d) => void delete d.cache[req.id]).catch((e: unknown) => s.log.warn('could not clear an inbox cache entry', { error: e }));
   if (createdIds.length > 0) s.emit('library:changed', { kind: 'taxonomy' });
   s.emit('library:changed', { kind: 'documents', ids: [docId] });
   void emitChanged(s);

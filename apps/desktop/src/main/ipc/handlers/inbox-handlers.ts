@@ -2,11 +2,12 @@
  * The inbox (phase 4, wave 4.2): contract in `packages/core/src/ipc/channels/inbox.ts`, logic in `main/inbox/`.
  */
 import { loadCtx } from '../../ai/service.js';
-import { addToInbox, chooseForInbox, confirmItem, dismissItem, listInbox, lookupItem, previewTags, proposeTags } from '../../inbox/service.js';
+import { addToInbox, chooseForInbox, confirmItem, countInbox, dismissItem, listInbox, lookupItem, previewTags, proposeTags } from '../../inbox/service.js';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
 
 export const inboxHandlers = (s: MainServices): DomainHandlers<'inbox'> => ({
+  'inbox:count': ({ recount }) => countInbox(s, recount),
   'inbox:list': () => listInbox(s),
   'inbox:add': ({ paths }) => addToInbox(s, paths),
   'inbox:choose': () => chooseForInbox(s),

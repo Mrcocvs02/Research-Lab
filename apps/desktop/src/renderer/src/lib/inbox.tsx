@@ -60,14 +60,22 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     setRefused([]);
     if (!activeLibraryId) return;
     let live = true;
-    rl.invoke('inbox:list', {}).then(
-      (r) => live && setCount(r.items.length),
-      () => {},
-    );
+    // Only the count, from the local queue: no document is read and nothing is looked up online until the Inbox opens.
+    const count = (recount: boolean) =>
+      rl.invoke('inbox:count', { recount }).then(
+        (r) => live && setCount(r.count),
+        () => {},
+      );
+    void count(false);
     const off = rl.on('inbox:changed', (e) => setCount(e.count));
+    // Files a scan flagged count too: recount (a local pass over the records) when a scan has finished.
+    const offScan = rl.on('scan:progress', (s) => {
+      if (s.libraryId === activeLibraryId && s.state === 'done') void count(true);
+    });
     return () => {
       live = false;
       off();
+      offScan();
     };
   }, [activeLibraryId]);
 
@@ -116,7 +124,11 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       const paths = Array.from(e.dataTransfer?.files ?? [])
         .map(pathOf)
         .filter((p) => p !== '');
-      if (paths.length === 0) return;
+      // Dropped from somewhere that is not a file on this computer (a browser, another app's window): say so.
+      if (paths.length === 0) {
+        if ((e.dataTransfer?.files.length ?? 0) > 0) fail(t('inbox.noPath'));
+        return;
+      }
       void (async () => {
         try {
           const results: AddResult[] = [];

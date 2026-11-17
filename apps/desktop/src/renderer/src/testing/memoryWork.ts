@@ -30,6 +30,7 @@ export function memoryWork(ai: { handlers: Record<string, Handler>; state: { con
     confirms: [] as any[],
     dismissed: [] as string[],
     lookups: [] as string[],
+    counts: [] as unknown[],
     previews: [] as any[],
     proposals: [] as any[],
     chooseResult: { added: [] as any[], refused: [] as any[] },
@@ -135,6 +136,10 @@ export function memoryWork(ai: { handlers: Record<string, Handler>; state: { con
       };
     },
 
+    'inbox:count': (p) => {
+      state.counts.push(p);
+      return { count: state.inbox.length };
+    },
     'inbox:list': () => ({ items: structuredClone(state.inbox) }),
     'inbox:add': (p) => {
       state.added.push(p.paths);

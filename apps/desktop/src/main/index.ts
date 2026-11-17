@@ -148,7 +148,7 @@ async function main(): Promise<void> {
     createImporter: (options) => createLegacyImporter(options),
     backupDataDir: (libraryId, dataDir) => backupPolicy(libraryId, dataDir, { force: true }),
     // RL_AI_PROVIDER=mock is honoured only in a development run (runtime.aiProvider is null when packaged).
-    aiProvider: createProviderFactory({ forceMock: runtime.aiProvider === 'mock', mockScript: { demo: true }, localDataDir: dirs.localData, secrets, clientApp: `research-lab/${app.getVersion()}` }),
+    aiProvider: createProviderFactory({ forceMock: runtime.aiProvider === 'mock', mockScript: { demo: true }, localDataDir: dirs.localData, secrets, clientApp: `research-lab/${app.getVersion()}`, onErrorDetail: (detail) => log.warn('Claude provider error', { detail }) }),
     isOnline: () => !runtime.offline && net.isOnline(),
     fetch: (input, init) => net.fetch(input as string, init as never) as Promise<Response>,
     metadataFile: runtime.metadataFile,

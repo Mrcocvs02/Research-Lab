@@ -6,6 +6,8 @@ export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
   cachedInputTokens?: number;
+  /** The cost the provider itself reported (Agent SDK `total_cost_usd`), when it did: it prices cache reads correctly. */
+  costUsd?: number;
 }
 
 export interface CostEstimate extends TokenUsage {

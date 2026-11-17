@@ -26,7 +26,8 @@ export function familyName(author: string): string {
  * Falls back to the original name when there is no title to build it from.
  */
 export function proposedFileName(meta: { title?: string | null | undefined; authors?: readonly string[] | undefined; year?: number | null | undefined }, original: string): string {
-  const fallback = /\.pdf$/i.test(original) ? original : `${original}.pdf`;
+  // The original name is whatever the file system gave (an alternate data stream, a reserved name): a safe segment too.
+  const fallback = `${safeSegment(original.replace(/\.pdf$/i, ''), INBOX_LIMITS.name - 4) || 'document'}.pdf`;
   const title = meta.title?.trim();
   if (!title) return fallback;
   const lead = [meta.authors?.[0] ? familyName(meta.authors[0]) : '', meta.year ? String(meta.year) : ''].filter(Boolean).join(' ');

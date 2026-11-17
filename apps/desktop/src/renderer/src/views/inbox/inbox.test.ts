@@ -15,7 +15,7 @@ import { Shell } from '../../shell/Shell';
 import { AppProvider } from '../../state/app-context';
 import { memoryAi } from '../../testing/memoryAi';
 import { memoryWork } from '../../testing/memoryWork';
-import { callsTo, memoryBackend, setHandlers } from '../../testing/mockRl';
+import { callsTo, emitEvent, memoryBackend, setHandlers } from '../../testing/mockRl';
 import { clearLabels } from '../chat/useLabels';
 import { InboxView } from './InboxView';
 
@@ -304,5 +304,30 @@ describe('inbox: tabs', () => {
     fireEvent.click(screen.getByTestId('inbox-tab-proposals'));
     expect(await screen.findByTestId('review-view')).toBeTruthy();
     expect(callsTo('review:list')).toHaveLength(1);
+  });
+});
+
+describe('inbox: startup cost and refusals in the provider', () => {
+  it('at library open only the cheap count is asked (never the full list); a finished scan asks for a recount', async () => {
+    const work = setup({ items: [] });
+    await screen.findByTestId('inbox-view');
+    await waitFor(() => expect(callsTo('inbox:count').length).toBeGreaterThanOrEqual(1));
+    expect(callsTo('inbox:count')[0]).toEqual({ recount: false });
+    // the view itself lists when it opens: that is where lookups may start
+    expect(callsTo('inbox:list').length).toBeGreaterThanOrEqual(1);
+    const before = callsTo('inbox:count').length;
+    work.state.inbox = [work.makeItem('x.pdf')];
+    act(() => emitEvent('scan:progress', { libraryId: 'lib-a', state: 'done', seen: 1, processed: 1, indexed: 1 }));
+    await waitFor(() => expect(callsTo('inbox:count').length).toBe(before + 1));
+    expect(callsTo('inbox:count').at(-1)).toEqual({ recount: true });
+    await waitFor(() => expect(screen.getByTestId('inbox-badge').textContent).toBe('1'));
+  });
+
+  it('a drop that carries no usable path (from a browser) shows a refusal instead of nothing', async () => {
+    const work = setup();
+    await screen.findByTestId('inbox-view');
+    drag('drop', [pdf('nopath.pdf')]);
+    expect((await screen.findAllByTestId('toast')).some((t) => /not a file on this computer/i.test(t.textContent ?? ''))).toBe(true);
+    expect(work.state.added).toEqual([]);
   });
 });

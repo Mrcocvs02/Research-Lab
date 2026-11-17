@@ -1,3 +1,4 @@
+import { copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import { aiMetaSchema, aiNewTagSchema, documentIdSchema, inboxMetadataSchema, isoDateSchema, itemIdSchema } from '@rl/core';
@@ -34,7 +35,13 @@ export const droppedSchema = z.object({
 });
 export type Dropped = z.infer<typeof droppedSchema>;
 
-const fileSchema = z.object({ version: z.literal(1), items: z.array(droppedSchema).max(2000), cache: z.record(z.string(), entrySchema) });
+const fileSchema = z.object({
+  version: z.literal(1),
+  items: z.array(droppedSchema).max(2000),
+  cache: z.record(z.string(), entrySchema),
+  /** Flagged library files at the last listing or recount: the badge needs a number without reading any document. */
+  flagged: z.number().int().nonnegative().optional(),
+});
 export type InboxFile = z.infer<typeof fileSchema>;
 
 const empty = (): InboxFile => ({ version: 1, items: [], cache: {} });
@@ -53,8 +60,13 @@ export class InboxStore {
       return await readJsonFile(this.file, fileSchema, { maxBytes: 64 * 1024 * 1024 });
     } catch (e) {
       const code = (e as { code?: string }).code;
-      // Missing or unreadable: an empty inbox (nothing here is the only copy of anything: the originals stay where they are).
-      if (code === 'NOT_FOUND' || code === 'SCHEMA_INVALID' || code === 'INVALID_REQUEST') return empty();
+      // Missing: an empty inbox. Unreadable (a version this app does not know, a damaged file): empty too, but the file is
+      // kept as `.bad` first, because the next update would overwrite the queue (the originals stay where they are either way).
+      if (code === 'NOT_FOUND') return empty();
+      if (code === 'SCHEMA_INVALID' || code === 'INVALID_REQUEST') {
+        await copyFile(this.file, `${this.file}.bad`).catch(() => undefined);
+        return empty();
+      }
       throw e;
     }
   }

@@ -98,7 +98,7 @@ export const reviewChannels = defineChannels('review', {
    */
   decideMany: {
     request: z.object({
-      items: z.array(z.object({ docId: documentIdSchema, field: reviewFieldSchema })).min(1).max(AI_LIMITS.reviewPage),
+      items: z.array(z.object({ docId: documentIdSchema, field: reviewFieldSchema, metaDate: z.string().max(40).optional() })).min(1).max(AI_LIMITS.reviewPage),
       decision: z.enum(['accept', 'reject']),
     }),
     response: z.object({

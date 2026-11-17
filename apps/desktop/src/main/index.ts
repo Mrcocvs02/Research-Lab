@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, net, safeStorage, session, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, net, safeStorage, session, shell } from 'electron';
 import path from 'node:path';
 import { backupDataDir, createLegacyImporter, createLibraryStore, createWatcher } from '@rl/data';
 import { createSearchIndex } from '@rl/search';
@@ -31,6 +31,7 @@ import { RuntimeManager } from './library/runtime-manager.js';
 import { spawnScanWorker, watchdogFromEnv } from './library/worker-host.js';
 import { spawnGraphWorker } from './graph/host.js';
 import { closeGraph } from './graph/service.js';
+import { reconcileMcp, stopMcp } from './mcp/service.js';
 import { LibraryService } from './library-service.js';
 import { applyResourceSwitches } from './resources.js';
 import { configureRuntime, resolveRuntimeConfig } from './runtime.js';
@@ -147,6 +148,7 @@ async function main(): Promise<void> {
       const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
+    clipboard: { writeText: (text) => clipboard.writeText(text) },
     appInfo: () => ({ name: APP_NAME, version: app.getVersion(), platform: process.platform, electron: process.versions.electron ?? '' }),
     createImporter: (options) => createLegacyImporter(options),
     backupDataDir: (libraryId, dataDir) => backupPolicy(libraryId, dataDir, { force: true }),
@@ -192,7 +194,7 @@ async function main(): Promise<void> {
     for (const notice of settings.notices()) emit('app:notice', notice);
   });
   // Open the active library: index, worker thread and the first incremental scan, off the main thread.
-  void runtimeManager.sync({ autoScan: true });
+  void runtimeManager.sync({ autoScan: true }).then(() => reconcileMcp(services));
   let quitting = false;
   app.on('before-quit', (event) => {
     if (quitting) return;
@@ -204,7 +206,7 @@ async function main(): Promise<void> {
     void closeGraph(services);
     // A worker stuck in a synchronous loop must not keep the app from quitting: after a limit it is killed.
     const limit = new Promise<void>((resolve) => setTimeout(resolve, 15_000).unref());
-    void Promise.race([runtimeManager.closeAll(), limit])
+    void Promise.race([Promise.all([runtimeManager.closeAll(), stopMcp(services)]), limit])
       .then(() => runtimeManager.terminateAll())
       .catch((e: unknown) => log.warn('closing the library runtime failed', { error: e }))
       .finally(() => app.quit());

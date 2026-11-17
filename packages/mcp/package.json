@@ -3,8 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "dependencies": { "@rl/core": "*" },
+  "dependencies": {
+    "@rl/core": "*",
+    "zod": "4.6.7"
+  },
   "exports": {
     ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@rl/ai": "*"
   }
 }

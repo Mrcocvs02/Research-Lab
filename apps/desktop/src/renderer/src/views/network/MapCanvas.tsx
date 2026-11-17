@@ -1,3 +1,4 @@
+import { isDarkTheme } from '../../lib/theme';
 import { useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent, type Ref } from 'react';
 import { clusterText, pointsInView, stepPoint, type PreparedMap } from './mapModel';
 import { groupColor, placeLabels, toScreenX, toScreenY, toWorldX, toWorldY } from './geometry';
@@ -66,7 +67,7 @@ export function MapCanvas({ map, level, selected, onSelect, aiBadge, label, fitK
 
   const view = useCanvasView<number>({
     draw(ctx, w, h, v) {
-      const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+      const dark = isDarkTheme();
       if (theme.current?.dark !== dark) {
         const css = getComputedStyle(ctx.canvas);
         theme.current = { dark, text: css.color, ai: css.getPropertyValue('--ai').trim() || '#7a3fd0', surface: css.getPropertyValue('--surface').trim() || '#ffffff' };

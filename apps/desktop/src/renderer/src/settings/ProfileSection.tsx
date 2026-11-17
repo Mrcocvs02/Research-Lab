@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { userProfileSchema } from '@rl/core';
-import { ErrorNote, LanguageSelect, TextAreaField, TextField } from '../components/ui';
+import { ErrorNote, LanguageSelect, SelectField, TextAreaField, TextField } from '../components/ui';
 import { errorMessage } from '../lib/errors';
 import { rl } from '../lib/rl';
 import { splitLines, validateWith, validationKey } from '../lib/validate';
@@ -66,6 +66,22 @@ export function ProfileSection() {
         }}
       />
       {langError ? <ErrorNote>{errorMessage(langError, t)}</ErrorNote> : null}
+      <SelectField
+        label={t('settings.appearance.label')}
+        hint={t('settings.appearance.hint')}
+        value={app.settings?.appearance?.theme ?? 'system'}
+        data-testid="settings-theme"
+        onChange={(e) => {
+          setLangError(null);
+          rl.invoke('settings:set', { appearance: { theme: e.target.value as 'system' | 'light' | 'dark' } })
+            .then(() => app.refresh())
+            .catch((err: unknown) => setLangError(err));
+        }}
+      >
+        <option value="system">{t('settings.appearance.system')}</option>
+        <option value="light">{t('settings.appearance.light')}</option>
+        <option value="dark">{t('settings.appearance.dark')}</option>
+      </SelectField>
       <TextField label={t('profile.name')} placeholder={t('profile.namePlaceholder')} value={draft.name} onChange={(e) => edit({ name: e.target.value })} data-testid="settings-profile-name" />
       <TextAreaField label={t('profile.variants')} hint={t('profile.variantsHint')} placeholder={t('profile.variantsPlaceholder')} rows={3} value={draft.variants} onChange={(e) => edit({ variants: e.target.value })} />
       <TextField label={t('profile.email')} type="email" placeholder="name@example.org" value={draft.email} error={err('email')} onChange={(e) => edit({ email: e.target.value })} />

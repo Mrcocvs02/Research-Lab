@@ -1,4 +1,4 @@
-/* Design tokens. Light by default, dark when the system asks for it. No remote fonts (CSP). */
+/* Design tokens. Light by default, dark when the system asks for it or when the user chose it (data-theme on <html>). No remote fonts (CSP). */
 :root {
   color-scheme: light dark;
   --font: system-ui, 'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -32,7 +32,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #12151c;
     --surface: #1a1e28;
     --surface-2: #232834;
@@ -49,6 +49,23 @@
     --focus: #9db3ff;
     --shadow: 0 8px 28px rgb(0 0 0 / 0.5);
   }
+}
+:root[data-theme="dark"] {
+  --bg: #12151c;
+  --surface: #1a1e28;
+  --surface-2: #232834;
+  --border: #333a49;
+  --text: #e6e9f0;
+  --text-muted: #a0a9ba;
+  --accent: #7c9cff;
+  --accent-contrast: #0d1220;
+  --accent-soft: #232c4d;
+  --danger: #ff8a80;
+  --danger-soft: #3a1f1d;
+  --ok: #66d19a;
+  --ok-soft: #173326;
+  --focus: #9db3ff;
+  --shadow: 0 8px 28px rgb(0 0 0 / 0.5);
 }
 
 *,
@@ -802,12 +819,18 @@ legend {
   --warn-soft: #fff1d6;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --ai: #c3a2ff;
     --ai-soft: #2b2140;
     --warn: #ffc266;
     --warn-soft: #3a2d12;
   }
+}
+:root[data-theme="dark"] {
+  --ai: #c3a2ff;
+  --ai-soft: #2b2140;
+  --warn: #ffc266;
+  --warn-soft: #3a2d12;
 }
 .sr-only {
   position: absolute;

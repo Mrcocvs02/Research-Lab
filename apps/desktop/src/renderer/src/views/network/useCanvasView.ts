@@ -103,10 +103,12 @@ export function useCanvasView<T>(opts: CanvasOptions<T>) {
     const dark = window.matchMedia?.('(prefers-color-scheme: dark)');
     const onTheme = () => requestDraw();
     dark?.addEventListener?.('change', onTheme);
+    window.addEventListener('rl:theme', onTheme);
     return () => {
       ro.disconnect();
       el.removeEventListener('wheel', onWheel);
       dark?.removeEventListener?.('change', onTheme);
+      window.removeEventListener('rl:theme', onTheme);
       if (raf.current) cancelAnimationFrame(raf.current);
       raf.current = 0;
     };

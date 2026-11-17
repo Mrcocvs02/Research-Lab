@@ -67,6 +67,13 @@
         "store": "Salva",
         "remove": "Rimuovi"
       }
+    },
+    "appearance": {
+      "label": "Aspetto",
+      "hint": "Segui il sistema oppure scegli chiaro o scuro. Si applica subito.",
+      "system": "Segui il sistema",
+      "light": "Chiaro",
+      "dark": "Scuro"
     }
   }
 }

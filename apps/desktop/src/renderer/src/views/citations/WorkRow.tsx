@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNotify } from '../../lib/notify';
 import { useReader } from '../../lib/reader';
-import { openExternal, shortAuthors, workLink, type WorkIds } from '../../lib/workLinks';
+import { openWork, shortAuthors, workLink, type WorkIds } from '../../lib/workLinks';
 import { safeText } from '../library/safeText';
 
 export interface WorkRowProps {
@@ -46,7 +46,7 @@ export function WorkRow({ testId, title, authors = [], year, venue, ids, matched
             <button
               type="button"
               className="link"
-              onClick={() => void openExternal(link.url).catch(reportError)}
+              onClick={() => void openWork(link).catch(reportError)}
               aria-label={t('citations.openExternal', { target: t(TARGET[link.kind]), title: shownTitle })}
               data-testid={`${testId}-external`}
               data-kind={link.kind}

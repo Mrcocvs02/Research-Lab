@@ -44,7 +44,12 @@
     "INTERNAL": "Something went wrong.",
     "networkOffline": "No connection: the online sources could not be reached. What was fetched before stays available offline.",
     "networkRateLimited": "An online source asked to slow down (rate limit). Try again in a few minutes.",
-    "networkHttp": "An online source answered with an error. Try again later."
+    "networkHttp": "An online source answered with an error. Try again later.",
+    "networkTimeout": "An online source did not answer in time. Try again in a moment.",
+    "doiOwned": "Another document of your library already has this DOI, so the published version was not applied.",
+    "STOPPED": "not tried: the sources before it kept failing",
+    "PARTIAL": "more works than one check reads: check again to continue",
+    "OWN_AUTHOR_UNKNOWN": "no OpenAlex author matches your profile: add your OpenAlex author id in Settings"
   },
   "notices": {
     "settingsReset": "Your settings file could not be used ({{reason}}), so the app restarted with default settings. The damaged file was kept as \"{{backup}}\" in the app data folder; libraries must be added again.",
@@ -1184,10 +1189,11 @@
     "bulkHint": "Fetches references and citing works of the selected documents from the online sources.",
     "tooMany": "At most {{limit}} documents can be refreshed at once; {{n}} are selected.",
     "started": "Citation refresh started. Follow it in the status bar.",
+    "alreadyRunning": "A citation refresh is already running. Wait for it to end or cancel it first.",
     "job": {
       "label": "Citations refresh",
       "running": "Citations: {{done}}/{{total}}",
-      "ended_done": "Citations updated: {{done}}/{{total}} ({{skipped}} skipped, {{failed}} failed)",
+      "ended_done": "Citations updated: {{done}}/{{total}} ({{skipped}} skipped, {{notFound}} not found, {{failed}} failed)",
       "ended_cancelled": "Citations stopped: {{done}}/{{total}} done",
       "ended_failed": "Citations refresh failed: {{done}}/{{total}} done, {{failed}} failed",
       "cancel": "Cancel",
@@ -1197,6 +1203,9 @@
   "discover": {
     "title": "Discover",
     "tabs": "Discover sections",
+    "cancel": "Cancel",
+    "damaged": "The file of followed sources could not be read. You can set it aside (a copy is kept next to it) and start again with no sources.",
+    "reset": "Set aside and start again",
     "needsLibrary": "Open a library to discover related work.",
     "tab_readnext": "Read next",
     "tab_new": "New",
@@ -1229,6 +1238,7 @@
       "intro": "Works found by the sources you follow. Nothing is checked in the background: use “Check now” when you want to look.",
       "checkNow": "Check now",
       "checking": "Checking…",
+      "progress": "Checking… {{done}} of {{total}} sources",
       "checked_one": "{{count}} source checked, {{newItems}} new.",
       "checked_other": "{{count}} sources checked, {{newItems}} new.",
       "failedSource": "Could not check “{{source}}”: {{reason}}",
@@ -1244,6 +1254,8 @@
       "intro": "Preprints of your library that may now have a published version. Nothing changes until you confirm a proposal.",
       "check": "Look for published versions",
       "checking": "Looking…",
+      "progress": "Looking… {{done}} of {{total}} documents",
+      "alreadyOwned": "Another document of your library already has this DOI: this may be that document, so applying is not offered.",
       "ownOnly": "Only my papers",
       "ownOnlyHint": "Uses the author names of your profile (Settings).",
       "checked": "{{checked}} documents checked, {{count}} proposals, {{failed}} could not be checked.",

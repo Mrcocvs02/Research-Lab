@@ -44,7 +44,12 @@
     "INTERNAL": "Qualcosa è andato storto.",
     "networkOffline": "Nessuna connessione: le fonti online non sono raggiungibili. Quanto già scaricato resta disponibile offline.",
     "networkRateLimited": "Una fonte online chiede di rallentare (limite di richieste). Riprova fra qualche minuto.",
-    "networkHttp": "Una fonte online ha risposto con un errore. Riprova più tardi."
+    "networkHttp": "Una fonte online ha risposto con un errore. Riprova più tardi.",
+    "networkTimeout": "Una fonte online non ha risposto in tempo. Riprova tra poco.",
+    "doiOwned": "Un altro documento della libreria ha già questo DOI, quindi la versione pubblicata non è stata applicata.",
+    "STOPPED": "non provata: le fonti precedenti continuavano a fallire",
+    "PARTIAL": "più lavori di quelli che un controllo legge: controlla di nuovo per continuare",
+    "OWN_AUTHOR_UNKNOWN": "nessun autore OpenAlex corrisponde al tuo profilo: aggiungi il tuo id autore OpenAlex nelle Impostazioni"
   },
   "notices": {
     "settingsReset": "Il file delle impostazioni non era utilizzabile ({{reason}}): l\\’app è ripartita con le impostazioni predefinite. Il file danneggiato è stato conservato come \"{{backup}}\" nella cartella dati dell\\’app; le librerie vanno aggiunte di nuovo.",
@@ -1184,10 +1189,11 @@
     "bulkHint": "Scarica dalle fonti online riferimenti e opere citanti dei documenti selezionati.",
     "tooMany": "Si possono aggiornare al massimo {{limit}} documenti alla volta; ne sono selezionati {{n}}.",
     "started": "Aggiornamento delle citazioni avviato. Seguilo nella barra di stato.",
+    "alreadyRunning": "Un aggiornamento delle citazioni è già in corso. Aspetta che finisca o annullalo prima.",
     "job": {
       "label": "Aggiornamento delle citazioni",
       "running": "Citazioni: {{done}}/{{total}}",
-      "ended_done": "Citazioni aggiornate: {{done}}/{{total}} ({{skipped}} saltati, {{failed}} falliti)",
+      "ended_done": "Citazioni aggiornate: {{done}}/{{total}} ({{skipped}} saltati, {{notFound}} non trovati, {{failed}} falliti)",
       "ended_cancelled": "Citazioni interrotte: {{done}}/{{total}} fatti",
       "ended_failed": "Aggiornamento delle citazioni fallito: {{done}}/{{total}} fatti, {{failed}} falliti",
       "cancel": "Annulla",
@@ -1197,6 +1203,9 @@
   "discover": {
     "title": "Scopri",
     "tabs": "Sezioni di Scopri",
+    "cancel": "Annulla",
+    "damaged": "Il file delle fonti seguite non si può leggere. Puoi metterlo da parte (ne resta una copia accanto) e ricominciare senza fonti.",
+    "reset": "Metti da parte e ricomincia",
     "needsLibrary": "Apri una libreria per scoprire opere collegate.",
     "tab_readnext": "Da leggere dopo",
     "tab_new": "Novità",
@@ -1229,6 +1238,7 @@
       "intro": "Opere trovate dalle fonti che segui. Niente viene controllato in background: usa «Controlla ora» quando vuoi guardare.",
       "checkNow": "Controlla ora",
       "checking": "Controllo in corso…",
+      "progress": "Controllo in corso… {{done}} fonti su {{total}}",
       "checked_one": "{{count}} fonte controllata, {{newItems}} nuove.",
       "checked_other": "{{count}} fonti controllate, {{newItems}} nuove.",
       "failedSource": "Impossibile controllare «{{source}}»: {{reason}}",
@@ -1244,6 +1254,8 @@
       "intro": "Preprint della tua libreria che potrebbero avere ora una versione pubblicata. Non cambia nulla finché non confermi una proposta.",
       "check": "Cerca versioni pubblicate",
       "checking": "Ricerca in corso…",
+      "progress": "Ricerca in corso… {{done}} documenti su {{total}}",
+      "alreadyOwned": "Un altro documento della libreria ha già questo DOI: potrebbe essere quel documento, quindi non si offre di applicarlo.",
       "ownOnly": "Solo i miei articoli",
       "ownOnlyHint": "Usa i nomi d’autore del tuo profilo (Impostazioni).",
       "checked": "{{checked}} documenti controllati, {{count}} proposte, {{failed}} non controllabili.",

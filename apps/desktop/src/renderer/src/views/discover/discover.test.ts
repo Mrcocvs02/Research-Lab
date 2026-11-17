@@ -16,6 +16,7 @@ import { AppProvider } from '../../state/app-context';
 import { memoryCitations } from '../../testing/memoryCitations';
 import { callsTo, emitEvent, memoryBackend, setHandlers } from '../../testing/mockRl';
 import { DiscoverView } from './DiscoverView';
+import { resetWatchOps } from './watchOps';
 
 vi.mock('../../lib/rl', async () => (await import('../../testing/mockRl')).rlModule);
 
@@ -53,6 +54,7 @@ const tab = (id: string) => fireEvent.click(screen.getByTestId(`discover-tab-${i
 const NETWORK_CHANNELS = ['watch:check', 'watch:checkPublished', 'citations:refresh', 'citations:refreshMany'];
 
 beforeEach(async () => {
+  resetWatchOps();
   await i18n.changeLanguage('en');
 });
 afterEach(() => cleanup());
@@ -84,7 +86,7 @@ describe('Discover: read next', () => {
     fireEvent.click(chips[0]!);
     expect(screen.getByTestId('reader-target').textContent).toBe('c1a');
     fireEvent.click(within(item).getByTestId('readnext-item-external'));
-    await waitFor(() => expect(callsTo('reader:openLink')).toEqual([{ url: 'https://doi.org/10.1000/w1' }]));
+    await waitFor(() => expect(callsTo('citations:openExternal')).toEqual([{ kind: 'doi', id: '10.1000/w1' }]));
     expect(screen.queryByTestId('readnext-few')).toBeNull();
   });
 
@@ -150,7 +152,7 @@ describe('Discover: new works', () => {
     expect(screen.getByTestId('reader-target').textContent).toBe('d9');
     fireEvent.click(within(items[0]!).getByTestId('watch-item-external'));
     fireEvent.click(within(items[2]!).getByTestId('watch-item-external'));
-    await waitFor(() => expect(callsTo('reader:openLink')).toEqual([{ url: 'https://doi.org/10.1000/s11' }, { url: 'https://openalex.org/W77' }]));
+    await waitFor(() => expect(callsTo('citations:openExternal')).toEqual([{ kind: 'doi', id: '10.1000/s11' }, { kind: 'openalex', id: 'W77' }]));
 
     fireEvent.change(screen.getByTestId('watch-filter'), { target: { value: 's2' } });
     await waitFor(() => expect(screen.getAllByTestId('watch-item')).toHaveLength(1));
@@ -216,7 +218,7 @@ describe('Discover: published versions', () => {
     expect(within(items[0]!).getByTestId('published-found-doi').textContent).toBe('10.1000/pub1');
 
     fireEvent.click(within(items[0]!).getByTestId('published-open'));
-    await waitFor(() => expect(callsTo('reader:openLink')).toEqual([{ url: 'https://doi.org/10.1000/pub1' }]));
+    await waitFor(() => expect(callsTo('citations:openExternal')).toEqual([{ kind: 'doi', id: '10.1000/pub1' }]));
 
     fireEvent.click(within(items[0]!).getByTestId('published-confirm'));
     await waitFor(() => expect(c.state.applied).toHaveLength(1));
@@ -345,5 +347,93 @@ describe('Discover in Italian', () => {
     expect(screen.getByTestId('discover-tab-readnext').textContent).toBe('Da leggere dopo');
     tab('new');
     expect(screen.getByTestId('watch-check').textContent).toBe('Controlla ora');
+  });
+});
+
+describe('Discover: long checks', () => {
+  const held = () => {
+    let release!: () => void;
+    const p = new Promise<void>((r) => (release = r));
+    return { p, release };
+  };
+  const proposal = (n: number, over: Record<string, unknown> = {}) => ({
+    docId: `d${n}`,
+    title: `Preprint ${n}`,
+    current: { doi: null, arxivId: `2101.0000${n}`, venue: null, year: 2021 },
+    found: { doi: `10.1000/pub${n}`, venue: 'A Journal', venueRef: null, year: 2022, source: 'openalex' },
+    revision: 1,
+    ...over,
+  });
+
+  it('shows the progress of a source check and cancels it, then shows what was checked', async () => {
+    const c = memoryCitations({ sources: [source('s1'), source('s2')] });
+    const h = held();
+    c.state.hold = h.p;
+    c.state.checkResult = { checked: 1, newItems: 0, failed: [] };
+    await mount(c);
+    tab('new');
+    fireEvent.click(await screen.findByTestId('watch-check'));
+    act(() => emitEvent('watch:progress', { op: 'check', done: 1, total: 2, failed: 0 }));
+    expect((await screen.findByTestId('watch-progress')).textContent).toContain('1 of 2 sources');
+    fireEvent.click(screen.getByTestId('watch-cancel'));
+    await waitFor(() => expect(c.state.watchCancelled).toEqual(['check']));
+    h.release();
+    await screen.findByTestId('watch-result');
+    expect(screen.queryByTestId('watch-progress')).toBeNull();
+  });
+
+  it('keeps a running published check when the tab is left and shows its answer on return', async () => {
+    const c = memoryCitations();
+    const h = held();
+    c.state.hold = h.p;
+    c.state.published = { checked: 2, proposals: [proposal(1)], failed: 0 };
+    await mount(c);
+    tab('published');
+    fireEvent.click(screen.getByTestId('published-check'));
+    act(() => emitEvent('watch:progress', { op: 'checkPublished', done: 3, total: 9, failed: 1 }));
+    expect((await screen.findByTestId('published-progress')).textContent).toContain('3 of 9 documents');
+    tab('sources');
+    tab('published');
+    expect((await screen.findByTestId('published-progress')).textContent).toContain('Looking');
+    expect(screen.getByTestId('published-check')).toHaveProperty('disabled', true);
+    h.release();
+    await screen.findByTestId('published-item');
+    expect(callsTo('watch:checkPublished')).toHaveLength(1);
+    // the answer outlives the tab too
+    tab('new');
+    tab('published');
+    expect(screen.getByTestId('published-item')).toBeTruthy();
+  });
+
+  it('does not offer to apply a published version whose DOI another document already has', async () => {
+    const c = memoryCitations();
+    c.state.published = { checked: 1, proposals: [proposal(1, { ownedBy: 'd9' })], failed: 0 };
+    await mount(c);
+    tab('published');
+    fireEvent.click(screen.getByTestId('published-check'));
+    await screen.findByTestId('published-item');
+    expect(screen.getByTestId('published-owned').textContent).toContain('already has this DOI');
+    expect(screen.getByTestId('published-confirm')).toHaveProperty('disabled', true);
+  });
+
+  it('offers to set a damaged watch file aside and starts again', async () => {
+    const c = memoryCitations({ sources: [source('s1')] });
+    c.state.listError = new AppError('SCHEMA_INVALID', 'bad');
+    await mount(c);
+    fireEvent.click(await screen.findByTestId('watch-reset'));
+    await waitFor(() => expect(c.state.resets).toBe(1));
+    await waitFor(() => expect(screen.queryByTestId('watch-damaged')).toBeNull());
+  });
+
+  it('waits for a pause before asking again when the minimum changes', async () => {
+    await mount();
+    await screen.findByTestId('readnext-few');
+    const before = callsTo('recommend:readNext').length;
+    fireEvent.change(screen.getByTestId('readnext-min'), { target: { value: '3' } });
+    fireEvent.change(screen.getByTestId('readnext-min'), { target: { value: '4' } });
+    await act(async () => void (await new Promise((r) => setTimeout(r, 120))));
+    expect(callsTo('recommend:readNext').length).toBe(before);
+    await waitFor(() => expect(callsTo('recommend:readNext').length).toBe(before + 1));
+    expect(callsTo('recommend:readNext').at(-1)).toEqual({ minCiting: 4 });
   });
 });

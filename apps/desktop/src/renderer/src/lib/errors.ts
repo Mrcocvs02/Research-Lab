@@ -12,12 +12,14 @@ export function errorMessage(error: unknown, t: TFunction): string {
   if (err.code === 'INVALID_REQUEST' && err.details?.reason === 'annotations-size') return t('reader.annotationsSize');
   // A project that would hold more documents than it can (the server's own check, for an existing project).
   if (err.code === 'INVALID_REQUEST' && err.details?.reason === 'members-limit') return t('projects.tooManyResult', { limit: err.details.limit, n: err.details.count });
+  // Applying a published version that would give two documents one DOI.
+  if (err.code === 'CONFLICT' && err.details?.reason === 'doi-owned') return t('errors.doiOwned');
   // A change group that may be incomplete in the log (very large log): never undone partially.
   if (err.code === 'CONFLICT' && err.details?.reason === 'partial-group') return t('history.partialRefused');
   // An online source could not be reached: say why (offline, rate limit, an HTTP error).
   if (err.code === 'NETWORK_ERROR') {
     const reason = err.details?.reason;
-    return t(reason === 'offline' ? 'errors.networkOffline' : reason === 'rate-limited' ? 'errors.networkRateLimited' : reason === 'http' ? 'errors.networkHttp' : 'errors.NETWORK_ERROR');
+    return t(reason === 'offline' ? 'errors.networkOffline' : reason === 'rate-limited' ? 'errors.networkRateLimited' : reason === 'timeout' ? 'errors.networkTimeout' : reason === 'http' ? 'errors.networkHttp' : 'errors.NETWORK_ERROR');
   }
   // Codes the dictionary does not know show the generic message.
   return t(`errors.${err.code}`, { defaultValue: t('errors.INTERNAL') });

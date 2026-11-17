@@ -83,6 +83,8 @@ In PowerShell: `$env:RL_FIXTURE_LIBRARY = "<cartella>"; npm run test:e2e`. La ca
 
 `RL_E2E`, `RL_E2E_DIALOG_PATH`, `RL_USER_DATA_DIR`, `RL_LOCAL_DATA_DIR` ed `ELECTRON_RENDERER_URL` valgono solo per l'app non impacchettata (sviluppo e test); l'app installata le ignora (D-014, D-015).
 
+Con `RL_E2E=1`, `RL_E2E_DIALOG_PATH` vale per ogni dialogo di apertura (cartella della libreria, eseguibile di Claude Code, PDF della cartella di arrivo). `RL_E2E_METADATA` è il percorso di un file JSON `{ "doi:<doi minuscolo>": <record>, "arxiv:<id senza versione>": <record> }` (forma di `inboxMetadataSchema`) che sostituisce la rete per la ricerca dei metadati; chiave mancante = non trovato.
+
 ## Criterio della fase 1 (scansione, ricerca, osservatore)
 
 `npm run test:phase1` compila l'app e lancia `qa-offline`, `qa-scan-nondestructive`, `qa-search-perf`, `qa-watcher` (in `e2e/`). Un singolo spec: `npx playwright test -c e2e/playwright.config.ts qa-watcher` (dopo `npm run build`). I tempi (scansione, mediana/p95/massimo delle query) escono nel log come righe `[perf]` e nelle annotazioni del test (`scan-ms`, `search-p95-ms`).
@@ -148,3 +150,8 @@ Ogni script controlla prima la memoria disponibile (`tools/mem-guard.mjs`: 1,2 G
 - E2E: `e2e/ai-chat.spec.ts` con `RL_AI_PROVIDER=mock` (solo in sviluppo): flusso degli eventi, cartella non abilitata rifiutata, registro, cronologia dopo il riavvio, originali invariati. Si lancia con `node tools/mem-guard.mjs 2 e2e && node tools/mem-sample.mjs --abort-below=0.8 -- npx playwright test -c e2e/playwright.config.ts ai-chat smoke qa-security` dopo `npm run build`.
 - Prova dal vivo (non automatica, saltata di norma): serve la CLI Claude Code con login, oppure una chiave API salvata come segreto `anthropic-api-key` (ambito `app`); si abilita con `RL_LIVE_AI=1`. Lo smoke test è `packages/ai/src/live.test.ts` (una domanda di una parola).
 - Chat dal vivo nell'app: `e2e/ai-live.spec.ts` (saltato senza `RL_LIVE_AI=1`), sulla libreria sintetica `papers`. Prima domanda sul documento selezionato (le prime pagine vanno col turno: nessuno strumento), seconda sulla libreria (almeno una scheda di `search_library`); i chip non ripetono la pagina. Comando: `npm run build`, poi `RL_LIVE_AI=1 npx playwright test -c e2e/playwright.config.ts e2e/ai-live.spec.ts`. Costo con Haiku: meno di un centesimo.
+
+## Onda 4.2 (lavori AI, revisione, cartella di arrivo)
+- `e2e/ai-review.spec.ts`: radice "Tutta la libreria" abilitata per l'AI, lavoro in blocco sulla selezione con stima e conferma (fornitore simulato), revisione con accettazione parziale dei tag, annulla dalla notifica, rifiuto di una descrizione, statistiche; originali intatti.
+- `e2e/inbox.spec.ts`: un PDF fuori dalla libreria (`writeSyntheticPdf` di `@rl/testkit`, con DOI) arriva con `inbox:add` (la stessa chiamata del trascinamento), metadati dal file `RL_E2E_METADATA`, nome e cartella proposti, conferma: copia identica nella libreria in meno di un minuto, metadati giusti, originale intatto, lo stesso file di nuovo riconosciuto come già presente.
+- Il trascinamento vero non si prova in e2e (Playwright non porta il percorso del file): il gestore è coperto dai test unitari del renderer.

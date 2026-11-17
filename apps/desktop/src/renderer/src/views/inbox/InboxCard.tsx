@@ -82,13 +82,15 @@ export function InboxCard({ item, folders, model, reasoning, models, onItem, onG
     if (!dirty.current) setMeta(initialMeta(item));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metaKey]);
-  // A new proposal (from the AI) replaces the tags and new nodes shown.
+  // A new proposal (from the AI) replaces the tags and new nodes shown. Reset while rendering, not in an effect: the
+  // first frame with the new proposal must never show (or confirm) the previous tags and keep boxes.
   const proposalKey = JSON.stringify([item.proposal.tagIds, item.proposal.newTags, item.proposal.tagsFrom]);
-  useEffect(() => {
+  const [shownProposal, setShownProposal] = useState(proposalKey);
+  if (shownProposal !== proposalKey) {
+    setShownProposal(proposalKey);
     setTagIds(item.proposal.tagIds);
     setKeepNew(item.proposal.newTags.map(() => true));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proposalKey]);
+  }
 
   const editMeta = (patch: Partial<MetaDraft>) => {
     dirty.current = true;

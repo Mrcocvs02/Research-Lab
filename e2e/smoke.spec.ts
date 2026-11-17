@@ -27,8 +27,24 @@ test('renderer is isolated: contextIsolation on, nodeIntegration off, sandbox on
     process: typeof (window as unknown as { process?: unknown }).process,
     ipcRenderer: typeof (window as unknown as { ipcRenderer?: unknown }).ipcRenderer,
     bridge: Object.keys((window as unknown as { rlBridge: object }).rlBridge).sort(),
+    // `pathForFile` (dropped files, wave 4.2) only maps a File to a string: anything else gives '' and nothing leaks.
+    pathOfNonFile: (() => {
+      try {
+        return (window as unknown as { rlBridge: { pathForFile(f: unknown): string } }).rlBridge.pathForFile({ name: 'x' });
+      } catch {
+        return 'threw';
+      }
+    })(),
+    pathOfSyntheticFile: (window as unknown as { rlBridge: { pathForFile(f: File): string } }).rlBridge.pathForFile(new File(['x'], 'x.pdf')),
   }));
-  expect(inPage).toEqual({ require: 'undefined', process: 'undefined', ipcRenderer: 'undefined', bridge: ['invokeRaw', 'subscribe'] });
+  expect(inPage).toEqual({
+    require: 'undefined',
+    process: 'undefined',
+    ipcRenderer: 'undefined',
+    bridge: ['invokeRaw', 'pathForFile', 'subscribe'],
+    pathOfNonFile: '',
+    pathOfSyntheticFile: '',
+  });
 });
 
 test('typed IPC round trip and strict CSP', async () => {

@@ -519,6 +519,17 @@ describe('extraction cache', () => {
     for (const [i, b] of bad.entries()) expect(v(b), `case ${i}`).toBeUndefined();
   });
 
+  it('serves a smaller request from an entry extracted with more pages, cut to the pages asked', () => {
+    const five = { ...good, result: { ...good.result, pages: Array.from({ length: 5 }, (_, i) => ({ page: i + 1, text: 'p' })), meta: { pageCount: 5 } } };
+    const cut = validCacheEntry(five, 3, 100, 1000);
+    expect(cut?.pages.map((p) => p.page)).toEqual([1, 2, 3]);
+    expect(cut?.truncated).toBe(true);
+    expect(validCacheEntry(five, 400, 100, 1000)?.pages).toHaveLength(5);
+    expect(validCacheEntry(good, 3, 100, 1000)?.truncated).toBe(false); // nothing beyond page 3: not cut
+    expect(validCacheEntry({ ...five, maxPages: 3 }, 400, 100, 1000)).toBeUndefined(); // fewer pages than asked
+    for (const n of [Number.NaN, Infinity, 2.5, '400']) expect(validCacheEntry({ ...five, maxPages: n }, 3, 100, 1000)).toBeUndefined();
+  });
+
   it('ignores and regenerates an invalid cache file', async () => {
     await writeFile(path.join(dir, 'a.txt'), 'some plain text of the document');
     const ex = createTextExtractor({ cacheDir: cache });

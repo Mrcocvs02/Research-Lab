@@ -58,9 +58,20 @@ const optStr = (v: unknown, max: number): boolean => v === undefined || (typeof 
 const strList = (v: unknown, maxItems: number, maxLen: number): boolean =>
   v === undefined || (Array.isArray(v) && v.length <= maxItems && v.every((x) => typeof x === 'string' && x.length <= maxLen));
 
-/** Returns the entry's result when it has exactly the shape (and sizes) we write, else undefined. */
+/**
+ * Returns the entry's result when it has exactly the shape (and sizes) we write, else undefined. An entry extracted
+ * with MORE pages than asked also serves the request, cut to `maxPages` (the scan stores up to 400 pages, the AI asks
+ * for the first few: without this the small request missed, re-extracted the PDF and overwrote the big entry).
+ */
 export function validCacheEntry(entry: unknown, maxPages: number, maxCharsPerPage: number, maxCharsPerFile: number): ExtractedText | undefined {
-  if (!isObj(entry) || entry['v'] !== CACHE_VERSION || entry['maxPages'] !== maxPages) return undefined;
+  const full = validFullEntry(entry, maxPages, maxCharsPerPage, maxCharsPerFile);
+  if (!full || (entry as Record<string, unknown>)['maxPages'] === maxPages) return full;
+  const pages = full.pages.filter((p) => p.page <= maxPages);
+  return pages.length === full.pages.length ? full : { ...full, pages, truncated: true };
+}
+
+function validFullEntry(entry: unknown, maxPages: number, maxCharsPerPage: number, maxCharsPerFile: number): ExtractedText | undefined {
+  if (!isObj(entry) || entry['v'] !== CACHE_VERSION || !Number.isInteger(entry['maxPages']) || (entry['maxPages'] as number) < maxPages) return undefined;
   const r = entry['result'];
   if (!isObj(r) || !Array.isArray(r['pages']) || r['pages'].length > MAX_CACHE_PAGES) return undefined;
   let chars = 0;

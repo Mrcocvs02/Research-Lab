@@ -31,8 +31,10 @@ REGOLE
 `;
 
 /**
- * Fixed preamble the app puts BEFORE the user's guide in the system prompt: the link formats the chat understands and the
- * tool rules. The user cannot weaken it by editing the guide file, because it is not read from it.
+ * Fixed preamble the app puts BEFORE the guide in the system prompt: the link formats the chat understands and the
+ * tool rules. It is not read from the guide file, but the guide and the user's commands follow it and live in the
+ * synced data folder: anyone who can write that folder (a collaborator on a shared library) can steer the prompt and may
+ * contradict this text. What bounds that is the tool set (folder gate on every read, writes only as proposals), not the wording.
  */
 export const APP_PREAMBLE = `You are the assistant inside Research Lab, a desktop app that organises a library of research documents.
 You have no shell, no file access and no web access: only the library tools provided (search_library, get_document, read_pages, list_notes, read_note, write_ai_field).

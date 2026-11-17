@@ -65,7 +65,8 @@ export function findClaudeExecutable(o: ExecutableLookup = {}): { path: string |
   if (o.configured && exists(o.configured)) return { path: o.configured, source: 'settings' };
   const pathVar = env.PATH ?? env.Path ?? '';
   for (const dir of pathVar.split(platform === 'win32' ? ';' : ':')) {
-    if (!dir) continue;
+    // A relative entry would resolve against the app's working directory: never an executable that receives the key.
+    if (!dir || !pathMod.isAbsolute(dir)) continue;
     const p = pathMod.join(dir, exe);
     if (exists(p)) return { path: p, source: 'path' };
   }
@@ -136,16 +137,37 @@ export interface QueryOptionsInput {
   stderr?: (data: string) => void;
 }
 
-/** Variables the child never needs from the app: test hooks and Electron switches. */
-const ENV_DROP = /^(RL_|ELECTRON_)/;
+/**
+ * What the child process receives of the app's environment (an allow-list, compared case-insensitively because Windows
+ * names are): where to find things (PATH, system and user folders, temp), locale, proxies and certificates, and the
+ * Claude / Anthropic settings of the user. Everything else (NODE_OPTIONS, test hooks, Electron switches, other secrets)
+ * stays behind.
+ */
+const ENV_ALLOW = new Set([
+  'PATH', 'PATHEXT', 'SYSTEMROOT', 'SYSTEMDRIVE', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR', 'USERPROFILE', 'HOME', 'HOMEDRIVE', 'HOMEPATH',
+  'USERNAME', 'USER', 'LOGNAME', 'APPDATA', 'LOCALAPPDATA', 'PROGRAMDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)', 'PROGRAMW6432', 'COMMONPROGRAMFILES',
+  'SHELL', 'LANG', 'TERM', 'TZ', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_RUNTIME_DIR',
+  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'ALL_PROXY', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'NODE_EXTRA_CA_CERTS',
+]);
+const ENV_ALLOW_PREFIX = /^(LC_|ANTHROPIC_|CLAUDE_)/;
+const envAllowed = (k: string) => {
+  const u = k.toUpperCase();
+  return ENV_ALLOW.has(u) || ENV_ALLOW_PREFIX.test(u);
+};
+
+/** The environment of the child process: the allow-list applied to `base`. */
+export function childEnv(base: NodeJS.ProcessEnv): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(base)) if (envAllowed(k)) env[k] = v;
+  return env;
+}
 
 /**
  * Builds the options of `query()`. Pure, so that it is unit-tested: this is where "only our tools, no user settings, no
  * terminal prompt, empty cwd, key only in env" is decided.
  */
 export function buildQueryOptions(i: QueryOptionsInput): Options {
-  const env: Record<string, string | undefined> = {};
-  for (const [k, v] of Object.entries(i.baseEnv)) if (!ENV_DROP.test(k)) env[k] = v;
+  const env = childEnv(i.baseEnv);
   if (i.apiKey) env.ANTHROPIC_API_KEY = i.apiKey;
   env.CLAUDE_AGENT_SDK_CLIENT_APP = i.clientApp ?? 'research-lab';
   const options: Options = {
@@ -198,14 +220,26 @@ export interface ClaudeProviderOptions {
   bundled?: () => string | null;
   /** Loads the SDK; default: dynamic import on first use (nothing resident before). */
   loadSdk?: () => Promise<SdkModule>;
+  /** Receives the unabridged error text (key removed) of a failed call: for the local log, never for the renderer. */
+  onErrorDetail?: (detail: string) => void;
 }
 
-const scrub = (text: string, key: string | null): string => {
+/**
+ * Provider error text as it may leave the main process (renderer, persisted turn, job status): the API key, token-like
+ * strings and absolute paths (they name the machine and the user) are replaced. The unabridged text goes to the local log only.
+ */
+export const scrub = (text: string, key: string | null): string => {
   let t = key ? text.split(key).join('[key]') : text;
-  t = t.replace(/sk-ant-[A-Za-z0-9_-]{8,}/g, '[key]');
+  t = t.replace(/sk-[A-Za-z0-9_-]{8,}/g, '[key]');
+  t = t.replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, '$1 [token]');
+  t = t.replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]*)?/g, '[token]');
+  t = t.replace(/\b[A-Za-z0-9_-]{32,}\b/g, '[token]');
+  t = t.replace(/\\[^\s"'`<>|]+/g, '[path]'); // UNC and \?\ forms
+  t = t.replace(/\b[A-Za-z]:[\/][^\s"'`<>|*?]*/g, '[path]');
+  t = t.replace(/(^|[\s("'=])\/(?:[\w.@~+-]+\/)+[\w.@~+-]*/g, '$1[path]');
+  t = t.replace(/(^|[\s("'=])~\/[^\s"'`]*/g, '$1[path]');
   return t;
 };
-
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 /** Plain-text rendering of the earlier turns (nothing is kept on disk by the SDK: the app keeps the history). */
@@ -261,6 +295,15 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
     });
   const executable = () => executableInfo().path;
   const loadSdk = options.loadSdk ?? (async () => (await import('@anthropic-ai/claude-agent-sdk')) as unknown as SdkModule);
+  /** The text safe for the renderer; the full detail (key removed) goes to the local log. */
+  const outward = (text: string, key: string | null): string => {
+    try {
+      options.onErrorDetail?.(key ? text.split(key).join('[key]') : text);
+    } catch {
+      /* logging must not fail a call */
+    }
+    return clip(scrub(text, key), 300);
+  };
 
   const access = async (): Promise<AiAccess> =>
     detectAccess({ apiKey: await getKey(), env: env(), ...(options.home ? { home: options.home } : {}), ...(options.exists ? { exists: options.exists } : {}) });
@@ -366,14 +409,14 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
         }
         if (usage) yield { type: 'usage', usage };
         if (request.signal?.aborted) return yield { type: 'error', code: 'CANCELLED', message: 'Cancelled' };
-        if (failure) return yield { type: 'error', code: 'AI_PROVIDER_ERROR', message: clip(scrub(failure, key), 300) };
+        if (failure) return yield { type: 'error', code: 'AI_PROVIDER_ERROR', message: outward(failure, key) };
         const meta: AiMeta = { model: request.model, provider: 'claude-agent-sdk', date: new Date().toISOString(), source: 'chat' };
         yield { type: 'done', meta };
       } catch (e) {
         if (request.signal?.aborted || abort.signal.aborted) return yield { type: 'error', code: 'CANCELLED', message: 'Cancelled' };
         const base = e instanceof Error ? e.message : 'Claude could not be reached';
         const tail = stderrTail.trim().split(/\r?\n/).at(-1) ?? '';
-        yield { type: 'error', code: 'AI_PROVIDER_ERROR', message: clip(scrub(tail ? `${base}: ${tail}` : base, key), 300) };
+        yield { type: 'error', code: 'AI_PROVIDER_ERROR', message: outward(tail ? `${base}: ${tail}` : base, key) };
       } finally {
         request.signal?.removeEventListener('abort', onAbort);
         // The SDK started a Claude Code process: it ends with the turn, nothing stays resident.
@@ -393,11 +436,17 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
       const system = `${request.system}\nAnswer with a single JSON value that matches the requested schema and nothing else.`;
       let lastIssue = '';
       let total: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+      let cost: number | undefined;
+      /** True once the Claude process answered with anything: before that nothing can have reached the model. */
+      let received = false;
+      const usageNow = (): TokenUsage => ({ ...total, ...(cost !== undefined ? { costUsd: cost } : {}) });
+      /** Errors carry what was spent (a failed second attempt still cost tokens) and whether anything was sent. */
+      const fail = (code: 'AI_PROVIDER_ERROR' | 'CANCELLED', message: string) => new AppError(code, message, { sent: received, usage: usageNow() });
       for (let attempt = 0; attempt < 2; attempt++) {
         const abort = new AbortController();
         const onAbort = () => abort.abort();
         request.signal?.addEventListener('abort', onAbort, { once: true });
-        if (request.signal?.aborted) throw new AppError('CANCELLED', 'Cancelled');
+        if (request.signal?.aborted) throw fail('CANCELLED', 'Cancelled');
         const q = sdk.query({
           prompt: attempt === 0 ? request.prompt : `${request.prompt}\n\nYour previous answer was invalid (${lastIssue}). Answer again with valid JSON only.`,
           options: buildQueryOptions({
@@ -418,16 +467,18 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
         let failure: string | null = null;
         try {
           for await (const msg of q) {
+            received = true;
             if (msg.type !== 'result') continue;
             const u = usageOf(msg);
             total = { inputTokens: total.inputTokens + u.inputTokens, outputTokens: total.outputTokens + u.outputTokens };
+            if (u.costUsd !== undefined) cost = (cost ?? 0) + u.costUsd;
             if (msg.subtype === 'success' && !msg.is_error) {
               raw = msg.structured_output ?? msg.result;
             } else failure = msg.subtype === 'success' ? msg.result : (msg.errors ?? []).join('; ') || msg.subtype;
           }
         } catch (e) {
-          if (request.signal?.aborted) throw new AppError('CANCELLED', 'Cancelled');
-          throw new AppError('AI_PROVIDER_ERROR', clip(scrub(e instanceof Error ? e.message : 'Claude could not be reached', key), 300));
+          if (request.signal?.aborted) throw fail('CANCELLED', 'Cancelled');
+          throw fail('AI_PROVIDER_ERROR', outward(e instanceof Error ? e.message : 'Claude could not be reached', key));
         } finally {
           request.signal?.removeEventListener('abort', onAbort);
           try {
@@ -436,8 +487,8 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
             /* already closed */
           }
         }
-        if (request.signal?.aborted) throw new AppError('CANCELLED', 'Cancelled');
-        if (failure) throw new AppError('AI_PROVIDER_ERROR', clip(scrub(failure, key), 300));
+        if (request.signal?.aborted) throw fail('CANCELLED', 'Cancelled');
+        if (failure) throw fail('AI_PROVIDER_ERROR', outward(failure, key));
         let candidate = raw;
         if (typeof candidate === 'string') {
           try {
@@ -449,11 +500,11 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
         }
         const parsed = request.schema.safeParse(candidate);
         if (parsed.success) {
-          return { value: parsed.data, usage: total, meta: { model: request.model, provider: 'claude-agent-sdk', date: new Date().toISOString(), source: request.source } };
+          return { value: parsed.data, usage: usageNow(), meta: { model: request.model, provider: 'claude-agent-sdk', date: new Date().toISOString(), source: request.source } };
         }
         lastIssue = parsed.error.issues.slice(0, 3).map((x) => `${x.path.join('.') || 'value'}: ${x.message}`).join('; ');
       }
-      throw new AppError('AI_PROVIDER_ERROR', `The answer did not match the schema (${clip(lastIssue, 200)})`);
+      throw fail('AI_PROVIDER_ERROR', `The answer did not match the schema (${clip(lastIssue, 200)})`);
     },
 
     estimateCost(request) {

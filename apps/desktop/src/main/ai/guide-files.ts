@@ -8,6 +8,7 @@ const MAX_GUIDE_BYTES = 64 * 1024;
 /**
  * Makes sure `<dataDir>/CLAUDE.md` exists (written once, with the starting text of the plan; never overwritten: the user
  * edits it) and returns its content for the system prompt. A guide that cannot be read falls back to the starting text.
+ * The file (like `commands/*.md`) lives in the synced data folder: whoever can write it can steer the prompt, within the tool set.
  */
 export async function ensureGuide(dataDir: string): Promise<string> {
   const file = path.join(dataDir, AGENT_GUIDE_FILE);

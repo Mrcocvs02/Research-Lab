@@ -1,4 +1,4 @@
-import { AppError, defaultAppSettings, type AppSettings, type LibraryProfile } from '@rl/core';
+import { AppError, defaultAppSettings, effectiveShortcuts, findShortcutConflicts, type AppSettings, type BackupInfo, type LibraryProfile } from '@rl/core';
 
 type Handler = (payload: any) => unknown;
 
@@ -43,7 +43,33 @@ export function memoryBackend(init: { settings?: Partial<AppSettings>; profiles?
     settings: { ...defaultAppSettings(), uiLanguage: 'en', ...init.settings } as AppSettings,
     profiles: init.profiles ?? [],
     active: init.profiles?.[0]?.id ?? (null as string | null),
+    backup: {
+      destination: '/tmp/backups' as string | null,
+      auto: 'off' as 'off' | 'daily' | 'weekly' | 'monthly',
+      keep: 5,
+      lastBackupAt: null as string | null,
+      lastAutoError: null as string | null,
+      items: [] as BackupInfo[],
+      /** Refusal at start time (`details.reason`, plus `needed`/`free`) for the next create / verify / restore, or null. */
+      startRefusal: null as { code?: 'CONFLICT' | 'INVALID_REQUEST'; reason: string; needed?: number; free?: number } | null,
+      /** Error of the finished job (`{ code, message, reason }`), or null for a job that ends well. */
+      jobError: null as { code: string; message: string; reason: string } | null,
+      /** Fields of a finished job's result (`skipped`, `resetOnRestore`, `secretsToEnter`, ...). */
+      resultExtra: {} as Record<string, unknown>,
+    },
+    report: { documents: 0, dataBytes: 0, local: { index: 0, cache: 0, thumbs: 0, graph: 0, chats: 0, backups: 0 }, logsBytes: 0, process: { rssMb: 100, heapMb: 20, uptimeSec: 1, startupMs: 400 }, workers: 0 },
   };
+  const jobs = new Map<string, Record<string, unknown>>();
+  const startJob = (kind: 'create' | 'verify' | 'restore', extra: Record<string, unknown> = {}) => {
+    const r = state.backup.startRefusal;
+    if (r) throw new AppError(r.code ?? 'CONFLICT', `${r.reason}: refused`, { reason: r.reason, ...(r.needed !== undefined ? { needed: r.needed } : {}), ...(r.free !== undefined ? { free: r.free } : {}) });
+    const jobId = `job-${jobs.size + 1}`;
+    const e = state.backup.jobError;
+    const result = { file: '/tmp/backups/x.rlbackup', bytes: 4096, files: 40, problemCount: 0, problems: [], restoredLibraryId: null, settingsRestored: false, secretsToEnter: [], ...extra, ...state.backup.resultExtra };
+    jobs.set(jobId, { jobId, kind, state: e ? 'failed' : 'done', phase: e ? 'verify' : 'done', done: 0, total: 0, result: e ? null : result, error: e });
+    return { jobId };
+  };
+  const backupSettings = () => ({ destination: state.backup.destination, auto: state.backup.auto, keep: state.backup.keep, lastBackupAt: state.backup.lastBackupAt, lastAutoError: state.backup.lastAutoError });
   const handlers: Record<string, Handler> = {
     'app:info': () => ({ name: 'Research Lab', version: '0.0.0', platform: 'test', electron: 'x' }),
     'settings:get': () => ({ ...state.settings, libraries: state.profiles, activeLibraryId: state.active }),
@@ -52,7 +78,12 @@ export function memoryBackend(init: { settings?: Partial<AppSettings>; profiles?
       if (p.firstRunDone !== undefined) state.settings.firstRunDone = p.firstRunDone;
       if (p.user) state.settings.user = { ...state.settings.user, ...p.user };
       if (p.appearance) state.settings.appearance = { ...state.settings.appearance, ...p.appearance };
-      if (p.shortcuts) state.settings.shortcuts = p.shortcuts;
+      if (p.shortcuts) {
+        // Same check as main: two commands on one key are refused, naming them (details.conflicts).
+        const conflicts = findShortcutConflicts(effectiveShortcuts(p.shortcuts));
+        if (conflicts.length > 0) throw new AppError('INVALID_REQUEST', 'Two shortcuts share a key', { reason: 'shortcut-conflict', conflicts });
+        state.settings.shortcuts = p.shortcuts;
+      }
       if (p.guide) state.settings.guide = { ...state.settings.guide, ...p.guide };
       if (p.network) state.settings.network = { ...state.settings.network, ...p.network };
       return { ...state.settings, libraries: state.profiles, activeLibraryId: state.active };
@@ -72,6 +103,39 @@ export function memoryBackend(init: { settings?: Partial<AppSettings>; profiles?
       return profile;
     },
     'library:listFolders': () => ({ folders: [] }),
+    'backup:settings': backupSettings,
+    'backup:configure': (p: any) => {
+      if (p.auto) state.backup.auto = p.auto;
+      if (p.keep) state.backup.keep = p.keep;
+      if (p.clearDestination) state.backup.destination = null;
+      return backupSettings();
+    },
+    'backup:chooseDestination': () => backupSettings(),
+    'backup:preview': () => ({ dataFiles: 0, dataBytes: 0, localFiles: 0, localBytes: 0, freeBytes: null }),
+    'backup:list': () => ({ items: state.backup.items }),
+    'backup:inspect': (p: any) => {
+      const found = state.backup.items.find((i) => i.file === p.file);
+      if (!found) throw new AppError('INVALID_REQUEST', 'file-not-listed: not listed', { reason: 'file-not-listed' });
+      return found;
+    },
+    'backup:create': () => startJob('create'),
+    'backup:verify': () => startJob('verify'),
+    'backup:restore': () => startJob('restore', { restoredLibraryId: 'lib-restored', secretsToEnter: [] }),
+    'backup:status': (p: any) => {
+      const j = jobs.get(p.jobId);
+      if (!j) throw new AppError('NOT_FOUND', 'no such job');
+      return j;
+    },
+    'backup:cancel': () => ({ cancelled: true }),
+    'backup:reveal': () => ({ ok: true }),
+    'backup:remove': (p: any) => {
+      state.backup.items = state.backup.items.filter((i) => i.file !== p.file);
+      return { ok: true };
+    },
+    'maintenance:report': () => state.report,
+    'maintenance:clean': () => ({ freedBytes: 0 }),
+    'maintenance:openLogs': () => ({ ok: true }),
+    'maintenance:copyDiagnostics': () => ({ text: 'app 0.0.0' }),
   };
   return { state, handlers };
 }

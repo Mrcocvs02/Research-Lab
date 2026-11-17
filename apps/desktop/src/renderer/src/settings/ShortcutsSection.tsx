@@ -4,6 +4,7 @@ import { SHORTCUT_COMMANDS, SHORTCUT_IDS, effectiveShortcuts, findShortcutConfli
 import { ErrorNote } from '../components/ui';
 import { errorMessage } from '../lib/errors';
 import { FIXED_ACCELERATORS, eventAccelerator } from '../lib/keymap';
+import { RlError } from '../lib/rl-error';
 import { rl } from '../lib/rl';
 import { useApp } from '../state/app-context';
 import './shortcuts.css';
@@ -79,6 +80,17 @@ export function ShortcutsSection() {
   };
 
   const label = (id: ShortcutId) => t(`shortcuts.commands.${id}`);
+  // The main process refuses a conflict too (a race with another window, D-301): name the commands it found.
+  const saveErrorText = (e: unknown): string => {
+    const err = RlError.from(e);
+    if (err.code === 'INVALID_REQUEST' && err.details?.reason === 'shortcut-conflict') {
+      const ids = new Set<string>();
+      const raw = err.details.conflicts;
+      for (const c of Array.isArray(raw) ? raw : []) for (const id of Array.isArray(c) ? c : c && typeof c === 'object' ? Object.values(c) : [c]) if (typeof id === 'string' && (SHORTCUT_IDS as readonly string[]).includes(id)) ids.add(id);
+      return t('shortcuts.conflictRefused', { commands: [...ids].map((id) => label(id as ShortcutId)).join(', ') || '-' });
+    }
+    return errorMessage(e, t);
+  };
   const conflictText = (a: ShortcutId, b: ShortcutId) => t('shortcuts.conflict', { a: label(a), b: label(b), key: draft[a] ?? '' });
 
   return (
@@ -181,7 +193,7 @@ export function ShortcutsSection() {
           {justSaved && !dirty ? t('common.saved') : ''}
         </span>
       </div>
-      {error ? <ErrorNote testId="shortcuts-error">{errorMessage(error, t)}</ErrorNote> : null}
+      {error ? <ErrorNote testId="shortcuts-error">{saveErrorText(error)}</ErrorNote> : null}
     </section>
   );
 }

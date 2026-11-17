@@ -12,7 +12,7 @@ import { WelcomeCard } from '../views/guide/WelcomeCard';
 import { BackupSection } from './BackupSection';
 import { MaintenanceSection } from './MaintenanceSection';
 import { ShortcutsSection, overridesOf } from './ShortcutsSection';
-import { daysSince } from './backupText';
+import { daysSince, jobErrorText } from './backupText';
 
 vi.mock('../lib/rl', async () => (await import('../testing/mockRl')).rlModule);
 
@@ -254,7 +254,7 @@ describe('restore dialog', () => {
   it('explains a conflict that arrives as the error of the job', async () => {
     await open({
       'backup:restore': () => ({ jobId: 'r2' }),
-      'backup:status': () => job({ jobId: 'r2', kind: 'restore', state: 'failed', phase: 'verify', error: { code: 'CONFLICT', message: 'integrity check failed' } }),
+      'backup:status': () => job({ jobId: 'r2', kind: 'restore', state: 'failed', phase: 'verify', error: { code: 'CONFLICT', message: 'integrity: check failed', reason: 'integrity' } }),
     });
     fireEvent.click(screen.getByTestId('restore-choose-root'));
     await screen.findByTestId('restore-root');
@@ -385,6 +385,130 @@ describe('shortcuts editor', () => {
     await waitFor(() => expect(callsTo('settings:set')).toEqual([{ shortcuts: [{ id: 'nav.review', accelerator: null }] }]));
   });
 
+});
+
+describe('fixes of the phase 8 review', () => {
+  const t = i18n.t.bind(i18n);
+  const startRestore = async () => {
+    fireEvent.click(await screen.findByTestId('backup-restore'));
+    await screen.findByTestId('restore-dialog');
+    fireEvent.click(screen.getByTestId('restore-choose-root'));
+    await screen.findByTestId('restore-root');
+    fireEvent.click(screen.getByTestId('restore-start'));
+  };
+  const withBackups = (state: ReturnType<typeof setup>['state']) => {
+    state.backup.items = [info()];
+    state.backup.lastBackupAt = daysAgo(2);
+  };
+  const withFolder = { 'dialog:chooseFolder': () => ({ path: '/tmp/new-root', name: 'new-root' }) };
+
+  it('jobErrorText uses the reason first, then the exact "<reason>: " prefix, never a substring', () => {
+    expect(jobErrorText({ code: 'CONFLICT', message: 'anything', reason: 'integrity' }, t)).toContain('damaged or incomplete');
+    expect(jobErrorText({ code: 'CONFLICT', message: 'not-empty: the folder has files' }, t)).toContain('already exists in the chosen folder');
+    // "busy" and "running" appear inside the message but not as its prefix: the generic text is used.
+    expect(jobErrorText({ code: 'IO_ERROR', message: 'the disk was busy while running' }, t)).not.toContain('scan');
+    expect(jobErrorText({ code: 'IO_ERROR', message: 'the disk was busy while running' }, t)).not.toContain('already running');
+    expect(jobErrorText({ code: 'CONFLICT', message: 'x', reason: 'something-new' }, t)).toBe(t('errors.CONFLICT'));
+    expect(jobErrorText(null, t)).toBe('The operation failed.');
+  });
+
+  it('explains the new reasons of a refused start, and not-enough-space on restore with needed and free', async () => {
+    const { state } = setup(createElement(BackupSection), withFolder);
+    withBackups(state);
+    for (const [reason, text] of [
+      ['file-not-listed', 'not in the backup folder'],
+      ['invalid-path', 'path cannot be used'],
+      ['running', 'already running'],
+    ] as const) {
+      state.backup.startRefusal = { code: 'INVALID_REQUEST', reason };
+      fireEvent.click(await screen.findByTestId('backup-verify'));
+      await waitFor(() => expect(screen.getByTestId('backup-error').textContent).toContain(text));
+    }
+    state.backup.startRefusal = { reason: 'not-enough-space', needed: 10 * 1024 * 1024, free: 1024 * 1024 };
+    await startRestore();
+    expect((await screen.findByTestId('restore-error')).textContent).toBe('Not enough free space in the destination: 10 MB needed, 1 MB free.');
+  });
+
+  it('shows the reason carried by the error of a failed job', async () => {
+    const { state } = setup(createElement(BackupSection), withFolder);
+    withBackups(state);
+    state.backup.jobError = { code: 'CONFLICT', message: 'not-enough-space: more room needed', reason: 'not-enough-space' };
+    await startRestore();
+    expect((await screen.findByTestId('restore-failed')).textContent).toContain('Not enough free space');
+  });
+
+  it('lists the settings reset by a restore, and refreshes the app when the dialog closes', async () => {
+    const { state } = setup(createElement(BackupSection), withFolder);
+    withBackups(state);
+    state.backup.resultExtra = { resetOnRestore: ['mcp', 'mcp-write', 'confirm-before-send'] };
+    await startRestore();
+    const note = await screen.findByTestId('restore-reset');
+    expect(within(note).getAllByRole('listitem').map((l) => l.getAttribute('data-reset'))).toEqual(['mcp', 'mcp-write', 'confirm-before-send']);
+    expect(note.textContent).toContain('MCP server is off');
+    expect(note.textContent).toContain('Turn them on again');
+    const before = callsTo('settings:get').length;
+    fireEvent.click(screen.getByTestId('restore-close'));
+    await waitFor(() => expect(callsTo('settings:get').length).toBeGreaterThan(before));
+  });
+
+  it('refreshes the app on close whenever the result holds a restored library, even if the job did not end as done', async () => {
+    const { state } = setup(createElement(BackupSection), {
+      ...withFolder,
+      'backup:status': () => job({ jobId: 'r9', kind: 'restore', state: 'cancelled', phase: 'finish', result: result({ restoredLibraryId: 'lib-new' }) }),
+      'backup:restore': () => ({ jobId: 'r9' }),
+    });
+    withBackups(state);
+    await startRestore();
+    await screen.findByTestId('restore-cancelled');
+    const before = callsTo('settings:get').length;
+    fireEvent.click(screen.getByTestId('restore-close'));
+    await waitFor(() => expect(callsTo('settings:get').length).toBeGreaterThan(before));
+  });
+
+  it('warns about files that vanished during the backup, and not otherwise', async () => {
+    const { state } = setup(createElement(BackupSection));
+    state.backup.resultExtra = { skipped: 3 };
+    fireEvent.click(await screen.findByTestId('backup-now'));
+    expect((await screen.findByTestId('backup-skipped')).textContent).toContain('3 files disappeared');
+    fireEvent.click(screen.getByTestId('backup-job-close'));
+    state.backup.resultExtra = { skipped: 0 };
+    fireEvent.click(screen.getByTestId('backup-now'));
+    await screen.findByTestId('backup-result');
+    expect(screen.queryByTestId('backup-skipped')).toBeNull();
+  });
+
+  it('says that a synced destination holds the backup files and which chats are included', async () => {
+    setup(createElement(BackupSection));
+    const note = await screen.findByTestId('backup-sync-note');
+    expect(note.textContent).toContain('synced folder');
+    expect(note.textContent).toContain('chat history');
+  });
+
+  it('shows the size of the internal safety copy and that it is not cleaned', async () => {
+    const { state } = setup(createElement(MaintenanceSection));
+    state.report.local.backups = 5 * 1024;
+    expect((await screen.findByTestId('maintenance-backups')).textContent).toBe('5 KB');
+    expect(screen.getByTestId('maintenance-backups-note').textContent).toContain('not touched by cleaning');
+  });
+
+  it('names the commands of a shortcut-conflict refusal from main', async () => {
+    setup(createElement(ShortcutsSection), {
+      'settings:set': () => {
+        throw new AppError('INVALID_REQUEST', 'x', { reason: 'shortcut-conflict', conflicts: [['palette.open', 'chat.toggle']] });
+      },
+    });
+    const off = (await screen.findAllByTestId('shortcut-row')).find((r) => r.getAttribute('data-command') === 'nav.review')!;
+    fireEvent.click(within(off).getByTestId('shortcut-off'));
+    fireEvent.click(screen.getByTestId('shortcuts-save'));
+    const err = await screen.findByTestId('shortcuts-error');
+    expect(err.textContent).toContain(t('shortcuts.commands.palette.open'));
+    expect(err.textContent).toContain(t('shortcuts.commands.chat.toggle'));
+  });
+
+  it('the mock of settings:set runs the same conflict check as main', async () => {
+    const { handlers } = memoryBackend();
+    await expect(Promise.resolve().then(() => handlers['settings:set']!({ shortcuts: [{ id: 'chat.toggle', accelerator: 'Ctrl+K' }] }))).rejects.toMatchObject({ code: 'INVALID_REQUEST', details: { reason: 'shortcut-conflict' } });
+  });
 });
 
 describe('guide', () => {

@@ -133,6 +133,8 @@ export interface QueryOptionsInput {
   executable?: string | null;
   clientApp?: string;
   maxTurns?: number;
+  /** Stop when the estimated cost of this query passes it (SDK `error_max_budget_usd`). */
+  maxBudgetUsd?: number;
   outputFormat?: Options['outputFormat'];
   stderr?: (data: string) => void;
 }
@@ -189,6 +191,7 @@ export function buildQueryOptions(i: QueryOptionsInput): Options {
     ...(i.mcpServer ? { mcpServers: { [MCP_SERVER_NAME]: i.mcpServer } } : {}),
     ...(i.executable ? { pathToClaudeCodeExecutable: i.executable } : {}),
     ...(i.maxTurns ? { maxTurns: i.maxTurns } : {}),
+    ...(i.maxBudgetUsd !== undefined ? { maxBudgetUsd: i.maxBudgetUsd } : {}),
     ...(i.outputFormat ? { outputFormat: i.outputFormat } : {}),
     ...(i.stderr ? { stderr: i.stderr } : {}),
   };
@@ -364,6 +367,7 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
           executable: executable(),
           ...(options.clientApp ? { clientApp: options.clientApp } : {}),
           maxTurns: 12,
+          ...(request.maxBudgetUsd !== undefined ? { maxBudgetUsd: request.maxBudgetUsd } : {}),
           stderr: (d) => {
             stderrTail = (stderrTail + d).slice(-2000);
           },
@@ -373,6 +377,7 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
         let streamed = false;
         let usage: TokenUsageWithCost | null = null;
         let failure: string | null = null;
+        let overBudget = false;
         for await (const msg of q) {
           if (msg.type === 'stream_event') {
             const ev = msg.event;
@@ -401,7 +406,8 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
             }
           } else if (msg.type === 'result') {
             usage = usageOf(msg);
-            if (msg.subtype !== 'success' || msg.is_error) {
+            if (msg.subtype === 'error_max_budget_usd') overBudget = true;
+            else if (msg.subtype !== 'success' || msg.is_error) {
               const detail = msg.subtype === 'success' ? msg.result : (msg.errors ?? []).join('; ');
               failure = failure ?? (detail || msg.subtype);
             }
@@ -409,6 +415,7 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
         }
         if (usage) yield { type: 'usage', usage };
         if (request.signal?.aborted) return yield { type: 'error', code: 'CANCELLED', message: 'Cancelled' };
+        if (overBudget) return yield { type: 'error', code: 'AI_BUDGET_EXCEEDED', message: 'The monthly AI spending cap was reached during this answer' };
         if (failure) return yield { type: 'error', code: 'AI_PROVIDER_ERROR', message: outward(failure, key) };
         const meta: AiMeta = { model: request.model, provider: 'claude-agent-sdk', date: new Date().toISOString(), source: 'chat' };
         yield { type: 'done', meta };

@@ -173,6 +173,16 @@ describe('claude provider chat', () => {
     expect(ev2.at(-1)).toMatchObject({ type: 'error', code: 'CANCELLED' });
   });
 
+  it('passes what is left of the cap as maxBudgetUsd and maps a budget stop to AI_BUDGET_EXCEEDED', async () => {
+    const stopped = fakeSdk([resultMsg({ subtype: 'error_max_budget_usd', is_error: true, errors: [] })]);
+    const ev = await collect(mk(stopped.sdk).chat({ model: 'm', reasoning: 'low', system: '', messages: [{ role: 'user', content: 'x' }], maxBudgetUsd: 0.25 }));
+    expect(stopped.captured().options.maxBudgetUsd).toBe(0.25);
+    expect(ev.at(-1)).toMatchObject({ type: 'error', code: 'AI_BUDGET_EXCEEDED' });
+    const free = fakeSdk([resultMsg()]);
+    await collect(mk(free.sdk).chat({ model: 'm', reasoning: 'low', system: '', messages: [{ role: 'user', content: 'x' }] }));
+    expect(free.captured().options.maxBudgetUsd).toBeUndefined();
+  });
+
   it('an access error of the assistant message ends the turn with AI_PROVIDER_ERROR', async () => {
     const { sdk } = fakeSdk([{ type: 'assistant', parent_tool_use_id: null, error: 'authentication_failed', message: { content: [] } }, resultMsg()]);
     const ev = await collect(mk(sdk).chat({ model: 'm', reasoning: 'low', system: '', messages: [{ role: 'user', content: 'x' }] }));

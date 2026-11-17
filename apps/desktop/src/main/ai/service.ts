@@ -455,7 +455,10 @@ async function runTurn(a: RunArgs): Promise<void> {
       },
     }));
 
-    for await (const ev of provider.chat({ model: input.model, reasoning: input.reasoning, system, messages: [...a.history, { role: 'user', content }], tools, signal: controller.signal })) {
+    // What is left of the monthly cap bounds the whole agent turn (up to 12 steps), not only its start.
+    const cap = cfg.ai.usageCap.monthlyUsd;
+    const left = cap === null ? undefined : Math.max(0.0001, cap - (await monthUsage(rt, monthOf(new Date()))).usd);
+    for await (const ev of provider.chat({ model: input.model, reasoning: input.reasoning, system, messages: [...a.history, { role: 'user', content }], tools, signal: controller.signal, ...(left !== undefined ? { maxBudgetUsd: left } : {}) })) {
       if (ev.type === 'text-delta') {
         turn.text += ev.text;
         emit({ type: 'text-delta', text: ev.text });

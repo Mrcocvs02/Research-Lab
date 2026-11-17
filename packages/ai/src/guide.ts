@@ -47,6 +47,10 @@ You may write only through write_ai_field (generated fields, marked as proposed 
 The user's agent guide follows.
 `;
 
+/** Repeated AFTER the guide: the guide may be in another language, and the last instruction weighs most. */
+export const LANGUAGE_REMINDER =
+  "Always answer in the language of the user's latest request (English request, English answer), even when this guide or the documents are in another language.";
+
 export function buildSystemPrompt(guide: string): string {
-  return `${APP_PREAMBLE}\n${guide.trim()}\n`;
+  return `${APP_PREAMBLE}\n${guide.trim()}\n\n${LANGUAGE_REMINDER}\n`;
 }

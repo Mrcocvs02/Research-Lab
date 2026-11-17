@@ -39,6 +39,11 @@ export interface ChatRequest {
   messages: ChatMessage[];
   tools?: ToolSpec[];
   signal?: AbortSignal;
+  /**
+   * Most the whole request may cost (USD): what is left of the monthly cap. A provider that can stop on its own
+   * (the Agent SDK's `maxBudgetUsd`) ends with AI_BUDGET_EXCEEDED instead of going over during a long agent turn.
+   */
+  maxBudgetUsd?: number;
 }
 
 /** Events of a streaming chat. Tool calls are shown by the UI as cards. */

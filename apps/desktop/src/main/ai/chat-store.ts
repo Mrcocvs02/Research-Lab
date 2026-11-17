@@ -12,15 +12,18 @@ const conversationFileSchema = z.object({
   version: z.literal(1),
   id: itemIdSchema,
   title: z.string().max(AI_LIMITS.title),
+  /** Files written before the advanced search have no mode: they are chats. */
+  mode: z.enum(['chat', 'search']).default('chat'),
   createdAt: isoDateSchema,
   updatedAt: isoDateSchema,
   turns: z.array(chatTurnSchema).max(10_000),
 });
-export type Conversation = z.infer<typeof conversationFileSchema>;
+export type Conversation = z.output<typeof conversationFileSchema>;
 
 export interface ConversationSummary {
   id: string;
   title: string;
+  mode: 'chat' | 'search';
   updatedAt: string;
   turns: number;
 }
@@ -88,7 +91,7 @@ export class ChatStore {
     const items: ConversationSummary[] = [];
     for (const name of names) {
       const c = await this.get(name.slice(0, -5)).catch(() => null);
-      if (c) items.push({ id: c.id, title: c.title, updatedAt: c.updatedAt, turns: c.turns.length });
+      if (c) items.push({ id: c.id, title: c.title, mode: c.mode, updatedAt: c.updatedAt, turns: c.turns.length });
     }
     return items.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0)).slice(0, limit);
   }

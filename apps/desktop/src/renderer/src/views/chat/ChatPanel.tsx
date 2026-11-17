@@ -86,7 +86,8 @@ export function ChatPanel() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const log = useRef<HTMLOListElement>(null);
-  const chat = useChat(() => setInput(''));
+  // A search leaves the draft of the input alone.
+  const chat = useChat((mode) => mode === 'search' || setInput(''));
 
   const ai = app.config?.ai;
   const models = ai?.models ?? [];
@@ -111,6 +112,16 @@ export function ChatPanel() {
     area.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillNonce]);
+
+  // The advanced search asked by the dialog of the library runs here, as a new conversation that streams in this panel.
+  const search = ui.searchRequest;
+  useEffect(() => {
+    if (!search) return;
+    ui.takeSearch(search.nonce);
+    setView('chat');
+    void chat.sendSearch({ text: search.text, model: search.model, reasoning: search.reasoning });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search?.nonce]);
 
   // Keep the newest text in view while it streams.
   useEffect(() => {
@@ -173,7 +184,7 @@ export function ChatPanel() {
           {chat.history?.length === 0 && <p className="hint">{t('chat.historyEmpty')}</p>}
           <ul className="chat-history-list">
             {chat.history?.map((c) => (
-              <li key={c.id} data-testid="history-item" data-conversation-id={c.id} className={c.id === chat.conversationId ? 'current' : undefined}>
+              <li key={c.id} data-testid="history-item" data-conversation-id={c.id} data-mode={c.mode} className={c.id === chat.conversationId ? 'current' : undefined}>
                 {confirmDelete === c.id ? (
                   <div className="confirm" role="alertdialog" aria-label={t('chat.deleteTitle')}>
                     <p>{t('chat.deleteConfirm', { title: safeText(c.title) })}</p>
@@ -191,6 +202,11 @@ export function ChatPanel() {
                     <button type="button" className="link history-open" onClick={() => void chat.openConversation(c.id).then((ok) => ok && setView('chat'))} data-testid="history-open">
                       {safeText(c.title)}
                     </button>
+                    {c.mode === 'search' && (
+                      <span className="badge" data-testid="history-mode-search">
+                        {t('chat.searchLabel')}
+                      </span>
+                    )}
                     <span className="hint">{t('chat.turns', { count: c.turns })}</span>
                     <button type="button" className="link" onClick={() => setConfirmDelete(c.id)} aria-label={t('chat.deleteOne', { title: safeText(c.title) })} data-testid="history-delete">
                       {t('chat.delete')}

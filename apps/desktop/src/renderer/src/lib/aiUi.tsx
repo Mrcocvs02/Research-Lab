@@ -13,6 +13,15 @@ export interface ReaderContext {
   docId: string;
   page: number;
 }
+/** An advanced search the dialog asks the chat panel to run (a new conversation, streamed in the panel). */
+/** Same values as `ReasoningLevel` of the contracts (not imported: this file is part of the first screen). */
+type Reasoning = 'low' | 'medium' | 'high';
+export interface SearchRequest {
+  text: string;
+  model: string;
+  reasoning: Reasoning;
+  nonce: number;
+}
 export interface Navigation {
   to: 'settings' | 'project' | 'inbox' | 'review';
   projectId?: string;
@@ -33,6 +42,10 @@ interface AiUiValue {
   /** Text the palette chose for the prompt (never sent by the palette); `nonce` changes at every request. */
   prefill: { text: string; nonce: number } | null;
   fillPrompt(text: string): void;
+  /** Opens the chat panel and asks it to run an advanced search; the panel takes the request (`takeSearch`) once. */
+  searchRequest: SearchRequest | null;
+  startSearch(req: Omit<SearchRequest, 'nonce'>): void;
+  takeSearch(nonce: number): void;
   navigation: Navigation | null;
   openProject(id: string): void;
   openSettings(): void;
@@ -52,6 +65,9 @@ const NONE: AiUiValue = {
   publishReader() {},
   prefill: null,
   fillPrompt() {},
+  searchRequest: null,
+  startSearch() {},
+  takeSearch() {},
   navigation: null,
   openProject() {},
   openSettings() {},
@@ -69,11 +85,20 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   const [selection, setSelection] = useState<readonly string[]>([]);
   const [reader, setReader] = useState<ReaderContext | null>(null);
   const [prefill, setPrefill] = useState<AiUiValue['prefill']>(null);
+  const [searchRequest, setSearchRequest] = useState<SearchRequest | null>(null);
   const [navigation, setNavigation] = useState<Navigation | null>(null);
 
   const publishSelection = useCallback((ids: readonly string[]) => setSelection((cur) => (sameIds(cur, ids) ? cur : ids)), []);
   const publishReader = useCallback((ctx: ReaderContext | null) => setReader((cur) => (cur?.docId === ctx?.docId && cur?.page === ctx?.page ? cur : ctx)), []);
   const fillPrompt = useCallback((text: string) => setPrefill((cur) => ({ text, nonce: (cur?.nonce ?? 0) + 1 })), []);
+  const startSearch = useCallback(
+    (req: Omit<SearchRequest, 'nonce'>) => {
+      setSearchRequest((cur) => ({ ...req, nonce: (cur?.nonce ?? 0) + 1 }));
+      setChatOpen(true);
+    },
+    [setChatOpen],
+  );
+  const takeSearch = useCallback((nonce: number) => setSearchRequest((cur) => (cur?.nonce === nonce ? null : cur)), []);
   const openProject = useCallback((id: string) => setNavigation((cur) => ({ to: 'project', projectId: id, nonce: (cur?.nonce ?? 0) + 1 })), []);
   const openSettings = useCallback(() => setNavigation((cur) => ({ to: 'settings', nonce: (cur?.nonce ?? 0) + 1 })), []);
 
@@ -97,8 +122,8 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   }, [chatOpen, setChatOpen]);
 
   const value = useMemo(
-    () => ({ chatOpen, setChatOpen, paletteOpen, setPaletteOpen, selection, publishSelection, reader, publishReader, prefill, fillPrompt, navigation, openProject, openSettings, openInbox, openReview }),
-    [chatOpen, setChatOpen, paletteOpen, selection, publishSelection, reader, publishReader, prefill, fillPrompt, navigation, openProject, openSettings, openInbox, openReview],
+    () => ({ chatOpen, setChatOpen, paletteOpen, setPaletteOpen, selection, publishSelection, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview }),
+    [chatOpen, setChatOpen, paletteOpen, selection, publishSelection, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

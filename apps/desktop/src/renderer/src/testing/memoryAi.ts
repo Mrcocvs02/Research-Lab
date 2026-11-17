@@ -32,6 +32,7 @@ export interface FakeTurn {
 interface FakeConversation {
   id: string;
   title: string;
+  mode?: 'chat' | 'search';
   updatedAt: string;
   turns: FakeTurn[];
 }
@@ -164,6 +165,7 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
         state.sendError = null;
         throw e;
       }
+      if (p.mode === 'search' && p.conversationId) throw new AppError('INVALID_REQUEST', 'search starts a new conversation');
       if (!state.available) throw new AppError('AI_PROVIDER_ERROR', 'no access', { reason: state.reason ?? 'no-access' });
       if (state.overCap) throw new AppError('AI_BUDGET_EXCEEDED', 'cap');
       if (state.confirm && p.contextDocIds?.length > 0 && !p.confirmed) throw new AppError('CONFLICT', 'confirmation needed', { reason: 'needs-confirmation' });
@@ -171,7 +173,7 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
       const conversationId = p.conversationId ?? `conv-${n}`;
       const turnId = `turn-${n}`;
       const at = new Date(Date.UTC(2026, 10, 16, 10, n)).toISOString();
-      const conv: FakeConversation = state.conversations.get(conversationId) ?? { id: conversationId, title: String(p.text).slice(0, 60), updatedAt: at, turns: [] };
+      const conv: FakeConversation = state.conversations.get(conversationId) ?? { id: conversationId, title: p.mode === 'search' ? `Search: ${String(p.text).slice(0, 53)}` : String(p.text).slice(0, 60), mode: p.mode === 'search' ? 'search' : 'chat', updatedAt: at, turns: [] };
       conv.turns.push({ id: `user-${n}`, role: 'user', text: p.text, at, cards: [], contextDocIds: p.contextDocIds ?? [] });
       conv.turns.push({ id: turnId, role: 'assistant', text: '', at, model: p.model, reasoning: p.reasoning, cards: [], contextDocIds: [] });
       conv.updatedAt = at;
@@ -203,7 +205,7 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
       return { cancelled: true };
     },
     'chat:list': () => ({
-      items: [...state.conversations.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt, turns: c.turns.length })),
+      items: [...state.conversations.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map((c) => ({ id: c.id, title: c.title, mode: c.mode ?? 'chat', updatedAt: c.updatedAt, turns: c.turns.length })),
     }),
     'chat:get': (p) => {
       const c = state.conversations.get(p.conversationId);

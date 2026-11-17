@@ -78,6 +78,14 @@ export function inEnabledFolder(relPath: string, enabled: readonly string[]): bo
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
 const stripMarks = (s: string) => s.replace(/[\u0001\u0002]/g, '');
+/** Fewer allowed hits than this from the AND search triggers the OR retry. */
+const RECALL_MIN_HITS = 3;
+/** The terms of a plain-words query (no quotes, operators, filters or wildcards) with at least two distinct terms, else null. */
+export function plainWords(query: string): string[] | null {
+  const words = [...new Set(query.trim().split(/\s+/))];
+  if (words.length < 2 || !words.every((w) => /^[\p{L}\p{N}\p{M}-]+$/u.test(w) && w !== 'OR')) return null;
+  return words;
+}
 const docIdField = z.string().regex(/^[0-9a-f]{16}$/, 'document id: 16 lowercase hex characters');
 
 export function createLibraryTools(options: LibraryToolsOptions): ToolSpec[] {
@@ -114,7 +122,7 @@ export function createLibraryTools(options: LibraryToolsOptions): ToolSpec[] {
 
   const searchLibrary: ToolSpec = {
     name: 'search_library',
-    description: 'Full-text search of the library (documents in AI-enabled folders only). Returns ids, titles, years and matching pages with snippets.',
+    description: 'Full-text search of the library (documents in AI-enabled folders only). Returns ids, titles, years and matching pages with snippets. Several plain words must all match; with few hits the search is retried with OR between the words (data.matched is then "any").',
     input: searchInput,
     writes: false,
     async run(raw): Promise<ToolResult> {
@@ -123,8 +131,21 @@ export function createLibraryTools(options: LibraryToolsOptions): ToolSpec[] {
       if (enabled.length === 0) throw refuse([]);
       const limit = input.limit ?? 8;
       // Ask for more than needed: hits outside the enabled folders are dropped afterwards (never sent).
-      const page = await host.search({ text: input.query, limit: Math.min(TOOL_LIMITS.searchHits * 3, limit * 3) });
-      const allowed = page.hits.filter((h) => inEnabledFolder(h.path, enabled)).slice(0, limit);
+      const fetchLimit = Math.min(TOOL_LIMITS.searchHits * 3, limit * 3);
+      const keep = (hits: SearchResultPage['hits']) => hits.filter((h) => inEnabledFolder(h.path, enabled));
+      let allowed = keep((await host.search({ text: input.query, limit: fetchLimit })).hits).slice(0, limit);
+      let matched: 'all' | 'any' = 'all';
+      // A natural multi-word query is an AND of all its terms and often finds nothing: with few hits, retry with OR and append.
+      const words = plainWords(input.query);
+      if (words && allowed.length < RECALL_MIN_HITS) {
+        const more = keep((await host.search({ text: words.join(' OR '), limit: fetchLimit })).hits);
+        const seen = new Set(allowed.map((h) => h.docId));
+        const extra = more.filter((h) => !seen.has(h.docId));
+        if (extra.length > 0) {
+          allowed = [...allowed, ...extra].slice(0, limit);
+          matched = 'any';
+        }
+      }
       const items = allowed.map((h) => ({
         id: h.docId,
         title: h.title,
@@ -135,7 +156,7 @@ export function createLibraryTools(options: LibraryToolsOptions): ToolSpec[] {
       }));
       const docIds = allowed.map((h) => h.docId);
       if (docIds.length > 0) await logRead('search_library', docIds, allowed.map((h) => folderOf(h.path)), items);
-      return { summary: `Searched the library for "${clip(input.query, 80)}": ${items.length} document(s)`, docIds, data: { total: items.length, items } };
+      return { summary: `Searched the library for "${clip(input.query, 80)}": ${items.length} document(s)`, docIds, data: { total: items.length, matched, items } };
     },
   };
 

@@ -785,6 +785,26 @@ describe('LibraryView: bulk actions and their limits (D-178)', () => {
   });
 });
 
+describe('LibraryView: advanced search button', () => {
+  it('sits next to the search box, opens the dialog with the typed text and leaves the normal search alone', async () => {
+    setup({ docs: makeDocs(3) }, {
+      'library:getConfig': () => ({ ai: { models: [{ id: 'm1', label: 'M1' }], defaultModel: 'm1', defaultReasoning: 'low' } }),
+      'ai:status': () => ({ provider: 'claude-agent-sdk', available: false, auth: 'none', reason: 'offline', enabledFolders: ['x'], monthUsd: 0, capUsd: null }),
+    });
+    await ready();
+    type('search-input', 'paper words');
+    fireEvent.click(screen.getByTestId('adv-search'));
+    expect(await screen.findByTestId('adv-search-dialog')).toBeTruthy();
+    expect((screen.getByTestId('adv-search-text') as HTMLTextAreaElement).value).toBe('paper words');
+    expect((await screen.findByTestId('adv-search-unavailable')).getAttribute('data-reason')).toBe('offline');
+    expect((screen.getByTestId('adv-search-go') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByTestId('adv-search-cancel'));
+    expect(screen.queryByTestId('adv-search-dialog')).toBeNull();
+    expect((screen.getByTestId('adv-search') as HTMLButtonElement).disabled).toBe(false);
+    await waitFor(() => expect(callsTo('search:run').length).toBeGreaterThan(0));
+  });
+});
+
 describe('LibraryView: propose with AI', () => {
   it('opens the bulk job dialog for the selection and estimates it', async () => {
     const docs = makeDocs(4);

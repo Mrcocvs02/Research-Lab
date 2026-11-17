@@ -142,6 +142,7 @@
     "noFolders": "Nessuna cartella è abilitata per l'AI, quindi nessun documento viene mai inviato.",
     "new": "Nuova conversazione",
     "history": "Cronologia",
+    "searchLabel": "ricerca",
     "historyEmpty": "Ancora nessuna conversazione.",
     "deleteTitle": "Elimina la conversazione",
     "deleteConfirm": "Eliminare la conversazione \"{{title}}\" dalla cronologia? Il registro di ciò che è stato inviato a Claude conserva le sue voci.",
@@ -252,6 +253,18 @@
     "languageHint": "Usata per tag, riassunti e risposte su questa libreria.",
     "dataDirName": "Nome della cartella dati",
     "dataDirNameHint": "Viene creata dentro la cartella della libreria. Qui stanno note e metadati; i tuoi documenti non vengono mai modificati."
+  },
+  "advSearch": {
+    "button": "Chiedi a Claude",
+    "buttonHint": "Ricerca avanzata: Claude trasforma la richiesta in ricerche per parole chiave nella libreria ed elenca i documenti più pertinenti",
+    "title": "Chiedi a Claude di cercare nella libreria",
+    "intro": "Descrivi con parole tue cosa cerchi. Claude fa alcune ricerche per parole chiave nei documenti delle cartelle abilitate per l’AI, legge le pagine solo se serve e risponde con i documenti più pertinenti. La ricerca normale non cambia.",
+    "text": "Cosa stai cercando?",
+    "placeholder": "Per esempio: articoli che confrontano metodi di attenzione efficiente per documenti lunghi",
+    "needText": "Scrivi la richiesta per vedere la stima.",
+    "estimateNote": "Approssimativa: comprende la richiesta e le istruzioni. Le pagine che Claude legge si aggiungono. Con la richiesta non parte nessun documento.",
+    "go": "Cerca",
+    "fix_no-folders": "Abilita almeno una cartella per l’AI nelle impostazioni della libreria. La ricerca normale funziona come sempre."
   },
   "search": {
     "label": "Cerca nella libreria",

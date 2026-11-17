@@ -24,6 +24,7 @@ const DocumentCard = lazyRetry(() => import('./DocPanel').then((m) => ({ default
 const BulkTagEditor = lazyRetry(() => import('./DocPanel').then((m) => ({ default: m.BulkTagEditor })));
 const TaxonomyManager = lazyRetry(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })));
 const JobDialog = lazyRetry(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })));
+const AdvancedSearchDialog = lazyRetry(() => import('../ai/AdvancedSearchDialog').then((m) => ({ default: m.AdvancedSearchDialog })));
 const AddToProject = lazyRetry(() => import('./AddToProject').then((m) => ({ default: m.AddToProject })));
 
 type PaneTab = 'folders' | 'tags' | 'filters';
@@ -60,6 +61,7 @@ function LibraryInner() {
   const [mode, setMode] = useState<'browse' | 'taxonomy'>('browse');
   const [addOpen, setAddOpen] = useState(false);
   const [jobOpen, setJobOpen] = useState(false);
+  const [advOpen, setAdvOpen] = useState(false);
   const set = (patch: Partial<BrowseState>) => setBrowse((b) => ({ ...b, ...patch }));
 
   // Scan on opening the view when nothing ran in this session (a new library, for instance).
@@ -138,18 +140,23 @@ function LibraryInner() {
         <h1>{t('sections.library')}</h1>
         <div className="search-bar" role="search">
           <label htmlFor={inputId}>{t('search.label')}</label>
-          <input
-            id={inputId}
-            type="search"
-            value={browse.text}
-            maxLength={500}
-            placeholder={t('search.placeholder')}
-            aria-describedby={helpId}
-            onChange={(e) => set({ text: e.target.value })}
-            data-testid="search-input"
-            autoComplete="off"
-            spellCheck={false}
-          />
+          <div className="search-row">
+            <input
+              id={inputId}
+              type="search"
+              value={browse.text}
+              maxLength={500}
+              placeholder={t('search.placeholder')}
+              aria-describedby={helpId}
+              onChange={(e) => set({ text: e.target.value })}
+              data-testid="search-input"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button type="button" onClick={() => setAdvOpen(true)} title={t('advSearch.buttonHint')} data-testid="adv-search">
+              {t('advSearch.button')}
+            </button>
+          </div>
           <p className="hint" id={helpId}>
             {t('search.help')}
           </p>
@@ -282,6 +289,11 @@ function LibraryInner() {
             </aside>
           )}
         </div>
+      )}
+      {advOpen && (
+        <Lazy>
+          <AdvancedSearchDialog initialText={browse.text} onClose={() => setAdvOpen(false)} />
+        </Lazy>
       )}
       {jobOpen && (
         <Lazy>

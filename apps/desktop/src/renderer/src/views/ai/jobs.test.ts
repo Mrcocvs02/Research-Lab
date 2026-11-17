@@ -45,6 +45,16 @@ beforeEach(async () => {
 });
 afterEach(() => cleanup());
 
+describe('bulk AI job: unavailable AI', () => {
+  it.each(['offline', 'no-access'] as const)('says why at once (%s) and does not allow starting', async (reason) => {
+    const { work } = setup({ tweak: (ai) => ((ai.state.available = false), (ai.state.reason = reason)) });
+    expect((await screen.findByTestId('job-unavailable')).getAttribute('data-reason')).toBe(reason);
+    await waitFor(() => expect(screen.getByTestId('job-to-send')).toBeTruthy());
+    expect((screen.getByTestId('job-confirm') as HTMLButtonElement).disabled).toBe(true);
+    expect(work.state.started).toHaveLength(0);
+  });
+});
+
 describe('bulk AI job: estimate, confirm, progress', () => {
   it('estimates what goes (allowed, refused, tokens, cost) before anything starts', async () => {
     const { work } = setup();

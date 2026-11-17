@@ -16,6 +16,8 @@ export interface SendRequest {
   reasoning: ReasoningLevel;
   contextDocIds: string[];
   contextPage?: number | undefined;
+  /** 'search': the advanced search (always a new conversation, no documents). */
+  mode?: 'chat' | 'search';
 }
 
 /** A message shown above the input when a send did not start (the text stays in the input). */
@@ -49,7 +51,7 @@ let localCounter = 0;
  * history and the AI status and usage. Events of a turn can arrive before `chat:send` has answered, so the ones of an
  * unknown turn are held until the answer names it.
  */
-export function useChat(onStarted: () => void) {
+export function useChat(onStarted: (mode: 'chat' | 'search') => void) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [active, setActive] = useState<string | null>(null);
@@ -128,7 +130,8 @@ export function useChat(onStarted: () => void) {
       };
       try {
         const r = await rl.invoke('chat:send', {
-          ...(conv.current ? { conversationId: conv.current } : {}),
+          ...(conv.current && req.mode !== 'search' ? { conversationId: conv.current } : {}),
+          ...(req.mode === 'search' ? { mode: 'search' as const } : {}),
           text: req.text,
           model: req.model,
           reasoning: req.reasoning,
@@ -145,7 +148,7 @@ export function useChat(onStarted: () => void) {
         early.current.clear();
         setTurns((ts) => ts.map((t) => (t.id === answer.id ? buffered.reduce(applyEvent, { ...t, id: r.turnId }) : t)));
         if (buffered.some((e) => e.type === 'done' || e.type === 'error')) finish(r.turnId);
-        started.current();
+        started.current(req.mode ?? 'chat');
         return 'sent';
       } catch (e) {
         drop();
@@ -193,6 +196,19 @@ export function useChat(onStarted: () => void) {
         }
       }
       return start(req, false);
+    },
+    [start],
+  );
+
+  /** The advanced search: a new conversation, sent at once (the user confirmed in the dialog; no document goes with it). */
+  const sendSearch = useCallback(
+    async (req: Omit<SendRequest, 'contextDocIds' | 'mode'>) => {
+      if (!sendingRef.current) {
+        conv.current = null;
+        setConversationId(null);
+        setTurns([]);
+      }
+      return start({ ...req, contextDocIds: [], contextPage: undefined, mode: 'search' }, true);
     },
     [start],
   );
@@ -260,6 +276,6 @@ export function useChat(onStarted: () => void) {
 
   return {
     conversationId, turns, active, sending, held, banner, status, statusError, usage, history, historyError,
-    send, confirmHeld, dismissHeld, cancel, newConversation, loadHistory, openConversation, deleteConversation, refreshMeta,
+    send, sendSearch, confirmHeld, dismissHeld, cancel, newConversation, loadHistory, openConversation, deleteConversation, refreshMeta,
   };
 }

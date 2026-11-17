@@ -1,13 +1,9 @@
-/** Phase 5: contract in `packages/core/src/ipc/channels/citations.ts`. Stub until the main side is merged. */
-import { AppError } from '@rl/core';
+/** Read-next recommendations (phase 5): contract in `packages/core/src/ipc/channels/citations.ts`, logic in `main/citations/recommend.ts`. */
+import { dismissRecommendation, readNext } from '../../citations/recommend.js';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
 
-const todo = (): never => {
-  throw new AppError('NOT_IMPLEMENTED', 'Not implemented yet');
-};
-
-export const recommendHandlers = (_s: MainServices): DomainHandlers<'recommend'> => ({
-  'recommend:readNext': todo,
-  'recommend:dismiss': todo,
+export const recommendHandlers = (s: MainServices): DomainHandlers<'recommend'> => ({
+  'recommend:readNext': (req) => readNext(s, req),
+  'recommend:dismiss': ({ key }) => dismissRecommendation(s, key),
 });

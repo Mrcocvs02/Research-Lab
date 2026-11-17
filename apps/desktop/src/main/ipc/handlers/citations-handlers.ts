@@ -1,15 +1,12 @@
-/** Phase 5: contract in `packages/core/src/ipc/channels/citations.ts`. Stub until the main side is merged. */
-import { AppError } from '@rl/core';
+/** Citations (phase 5): contract in `packages/core/src/ipc/channels/citations.ts`, logic in `main/citations/`. */
+import type { DocumentId } from '@rl/core';
+import { cancelCitationJob, citationView, refreshCitations, startRefreshMany } from '../../citations/refresh.js';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
 
-const todo = (): never => {
-  throw new AppError('NOT_IMPLEMENTED', 'Not implemented yet');
-};
-
-export const citationsHandlers = (_s: MainServices): DomainHandlers<'citations'> => ({
-  'citations:get': todo,
-  'citations:refresh': todo,
-  'citations:refreshMany': todo,
-  'citations:cancel': todo,
+export const citationsHandlers = (s: MainServices): DomainHandlers<'citations'> => ({
+  'citations:get': async ({ docId }) => citationView(await s.runtime.require(), docId as DocumentId),
+  'citations:refresh': ({ docId, what }) => refreshCitations(s, docId as DocumentId, what),
+  'citations:refreshMany': ({ docIds }) => startRefreshMany(s, docIds as DocumentId[]),
+  'citations:cancel': async ({ jobId }) => ({ cancelled: cancelCitationJob(jobId, s) }),
 });

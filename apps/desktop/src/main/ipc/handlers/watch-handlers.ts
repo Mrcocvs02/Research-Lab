@@ -1,19 +1,16 @@
-/** Phase 5: contract in `packages/core/src/ipc/channels/watch.ts`. Stub until the main side is merged. */
-import { AppError } from '@rl/core';
+/** Monitoring (phase 5): contract in `packages/core/src/ipc/channels/watch.ts`, logic in `main/citations/watch.ts`. */
+import { applyPublished, checkPublished, checkSources, dismissItem, listSources, removeSource, saveSource, watchItems } from '../../citations/watch.js';
 import type { DomainHandlers } from '../types.js';
+import { settle } from './organize-handlers.js';
 import type { MainServices } from './services.js';
 
-const todo = (): never => {
-  throw new AppError('NOT_IMPLEMENTED', 'Not implemented yet');
-};
-
-export const watchHandlers = (_s: MainServices): DomainHandlers<'watch'> => ({
-  'watch:list': todo,
-  'watch:saveSource': todo,
-  'watch:removeSource': todo,
-  'watch:check': todo,
-  'watch:items': todo,
-  'watch:dismiss': todo,
-  'watch:checkPublished': todo,
-  'watch:applyPublished': todo,
+export const watchHandlers = (s: MainServices): DomainHandlers<'watch'> => ({
+  'watch:list': () => listSources(s),
+  'watch:saveSource': (req) => saveSource(s, req),
+  'watch:removeSource': ({ id }) => removeSource(s, id),
+  'watch:check': (req) => checkSources(s, req),
+  'watch:items': (req) => watchItems(s, req),
+  'watch:dismiss': (req) => dismissItem(s, req),
+  'watch:checkPublished': (req) => checkPublished(s, req),
+  'watch:applyPublished': (req) => applyPublished(s, req, (rt, ids) => settle(s, rt, { reindex: ids }, ids.length > 0 ? [{ kind: 'documents', ids }] : [])),
 });

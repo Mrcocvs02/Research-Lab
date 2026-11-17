@@ -1,6 +1,6 @@
 import { AppError, SCHEMA_VERSION, type CitationFile, type CitationLink, type CitationService, type DocumentRecord } from '@rl/core';
 import { buildOwnedIndex, matchLinks, titleKey, type OwnedIndex } from './match.js';
-import { createNet, type NetOptions } from './net.js';
+import { createNet, type Net, type NetOptions } from './net.js';
 import { createArxiv, createOpenAlex, createSemanticScholar, type CitationSourceX, type LookupResult, type SourceRef } from './sources.js';
 
 export interface RefreshOptions {
@@ -15,8 +15,8 @@ export interface CitationServiceX extends CitationService {
 }
 
 /** OpenAlex (primary), Semantic Scholar (when OpenAlex does not know the work or fails), arXiv (metadata only). */
-export function createCitationSources(o: NetOptions & { now?: () => Date }): CitationSourceX[] {
-  const net = createNet(o);
+export function createCitationSources(o: NetOptions & { now?: () => Date; net?: Net }): CitationSourceX[] {
+  const net = o.net ?? createNet(o);
   const now = o.now ?? (() => new Date());
   return [createOpenAlex(net, now), createSemanticScholar(net, now), createArxiv(net)];
 }

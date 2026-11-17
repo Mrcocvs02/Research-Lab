@@ -25,6 +25,7 @@ import { buildHandlers, type MainServices } from './ipc/handlers/index.js';
 import { createProviderFactory } from './ai/provider-factory.js';
 import { abortAllChatTurns } from './ai/service.js';
 import { abortAllJobs } from './ai/jobs.js';
+import { fixtureFetch } from './net-fixtures.js';
 import { createBackupPolicy } from './library/backup-policy.js';
 import { RuntimeManager } from './library/runtime-manager.js';
 import { spawnScanWorker, watchdogFromEnv } from './library/worker-host.js';
@@ -149,8 +150,10 @@ async function main(): Promise<void> {
     backupDataDir: (libraryId, dataDir) => backupPolicy(libraryId, dataDir, { force: true }),
     // RL_AI_PROVIDER=mock is honoured only in a development run (runtime.aiProvider is null when packaged).
     aiProvider: createProviderFactory({ forceMock: runtime.aiProvider === 'mock', mockScript: { demo: true }, localDataDir: dirs.localData, secrets, clientApp: `research-lab/${app.getVersion()}`, onErrorDetail: (detail) => log.warn('Claude provider error', { detail }) }),
-    isOnline: () => !runtime.offline && net.isOnline(),
-    fetch: (input, init) => net.fetch(input as string, init as never) as Promise<Response>,
+    // With canned answers (tests) the machine's connection does not matter; the offline switch still does.
+    isOnline: () => !runtime.offline && (runtime.netFixturesFile !== null || net.isOnline()),
+    // Test hook: canned answers instead of the network (development run with RL_E2E=1 only).
+    fetch: runtime.netFixturesFile ? fixtureFetch(runtime.netFixturesFile) : (input, init) => net.fetch(input as string, init as never) as Promise<Response>,
     metadataFile: runtime.metadataFile,
   };
 

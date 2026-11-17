@@ -3,7 +3,8 @@
 Lista di controllo per la prova finale della fase 8 (D-259, D-263, D-291). Serve un secondo account Windows senza amministratore, mai usato con Research Lab. Segna ogni voce; se qualcosa non va, annota il passo e il messaggio.
 
 ## 0. Preparazione (account principale)
-- [ ] `npm run build` e `npm run dist` dalla radice del repository: crea `apps/desktop/release/ResearchLab-Setup-<versione>.exe`.
+- [ ] `npm run build` e `npm run dist` dalla radice del repository: crea `apps/desktop/release/ResearchLab-Setup-<versione>.exe`. Questa è la build di RILASCIO: rifiuta `--remote-debugging-port` e ignora `--user-data-dir` (D-296). Verifica che `RL_PACKAGED_TEST` non sia impostata nell'ambiente.
+  - Prova automatica dell'app impacchettata (a fine fase, da sola): `npm run dist:test-dir` (build DI PROVA, mai da distribuire) e `npx playwright test -c e2e/playwright.config.ts packaged-app`: avvia, scansiona un piccolo insieme di PDF generati, apre un PDF nel lettore, crea e verifica un backup, apre la sezione AI senza Claude Code. Poi `npm run dist:dir` e la stessa prova con `RL_PACKAGED_RELEASE=1`: la build di rilascio deve rifiutare la porta di debug.
   - Se la costruzione si ferma con un errore su un collegamento simbolico ("privilegio non posseduto"): attiva la Modalità sviluppatore di Windows (Impostazioni, Privacy e sicurezza, Per sviluppatori) o apri il terminale come amministratore, e ripeti.
 - [ ] Copia l'installer in una cartella leggibile da tutti gli account (per esempio `C:\Users\Public\`).
 - [ ] Prepara una cartella di prova con alcuni PDF (non i documenti veri) in un percorso accessibile al secondo account.
@@ -25,7 +26,8 @@ Lista di controllo per la prova finale della fase 8 (D-259, D-263, D-291). Serve
 ## 3. Backup e ripristino
 - [ ] Impostazioni, Backup: scegli una cartella fuori dalla libreria e crea un backup; compare un file `.rlbackup`. La verifica dice 0 problemi.
 - [ ] Scegliendo una cartella dentro la libreria come destinazione, l'app la rifiuta.
-- [ ] Ripristina il backup in una nuova cartella vuota: nasce una libreria nuova, con gli stessi documenti e la stessa tassonomia; l'elenco dice quali chiavi (segreti) rimettere.
+- [ ] Ripristina il backup in una nuova cartella vuota: nasce una libreria nuova, con gli stessi documenti e la stessa tassonomia; l'elenco dice quali chiavi (segreti) rimettere e quali impostazioni sono state riportate al valore sicuro (server MCP spento, scritture MCP spente, conferma prima dell'invio AI accesa; D-295).
+- [ ] Criterio della fase 8: crea una SECONDA libreria con un'altra lingua (se la prima è italiana, inglese) e un'altra tassonomia (temi diversi), falla scansionare; fai il backup di quella libreria, ripristinalo in una cartella nuova: la libreria ripristinata ha lingua, tassonomia e numero di documenti della seconda, e le altre due librerie sono invariate.
 
 ## 4. Dati e disinstallazione
 - [ ] Chiudi l'app e riaprila: libreria e impostazioni ci sono ancora.

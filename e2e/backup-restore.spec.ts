@@ -36,17 +36,6 @@ async function waitJob(window: Page, jobId: string): Promise<JobStatus> {
   }
 }
 
-async function waitScanDone(window: Page): Promise<void> {
-  await ipcData(window, 'scan:start', {});
-  const deadline = Date.now() + 180_000;
-  for (;;) {
-    const st = await ipcData<{ state: string }>(window, 'scan:status', {});
-    if (st.state === 'done' || st.state === 'idle') return;
-    if (Date.now() > deadline) throw new Error('the scan did not finish');
-    await new Promise((r) => setTimeout(r, 500));
-  }
-}
-
 test('a second library (other language, other taxonomy) is backed up and restored as a new library', async () => {
   test.setTimeout(480_000);
   const extra = await mkdtemp(path.join(os.tmpdir(), 'rl-e2e-backup-'));
@@ -73,7 +62,8 @@ test('a second library (other language, other taxonomy) is backed up and restore
     const created = await ipcData<{ id: string }>(two.window, 'library:create', { name: 'Second library', rootPath: root2, language: 'it' });
     await ipcData(two.window, 'library:setActive', { libraryId: created.id });
     await ipcData(two.window, 'taxonomy:apply', { ops: [{ op: 'create', id: 'tema-uno', label: 'Primo tema' }, { op: 'create', id: 'tema-due', label: 'Secondo tema', parents: ['tema-uno'] }] });
-    await waitScanDone(two.window);
+    // The number of documents is known from the fixture: wait for exactly that many, not for a moment when the scan looks idle.
+    await waitForScan(two.window, two.library!.manifest!.files.filter((f) => f.hasText).length);
     const before = await ipcData<{ documents: number }>(two.window, 'maintenance:report', {});
     expect(before.documents).toBeGreaterThan(0);
 

@@ -1,3 +1,4 @@
+import { reconcileMcp } from '../../mcp/service.js';
 import { abortAllJobs } from '../../ai/jobs.js';
 import { invalidateOpenAlexKey, OPENALEX_KEY_SECRET } from '../../citations/context.js';
 import { abortChatTurnsAndWait } from '../../ai/service.js';
@@ -37,6 +38,7 @@ export const libraryHandlers = (s: MainServices): Omit<DomainHandlers<'library'>
     await abortChatTurnsAndWait();
     const activeLibraryId = await s.libraries.setActive(libraryId);
     await s.runtime.sync({ autoScan: true });
+    await reconcileMcp(s);
     return { activeLibraryId };
   },
   'library:forget': async ({ libraryId }) => {
@@ -44,6 +46,7 @@ export const libraryHandlers = (s: MainServices): Omit<DomainHandlers<'library'>
     await abortChatTurnsAndWait();
     const activeLibraryId = await s.libraries.forget(libraryId);
     await s.runtime.sync({ autoScan: true });
+    await reconcileMcp(s);
     return { activeLibraryId };
   },
   'library:rename': ({ libraryId, name }) => s.libraries.rename(libraryId, name),
@@ -51,7 +54,12 @@ export const libraryHandlers = (s: MainServices): Omit<DomainHandlers<'library'>
     folders: await s.libraries.listFolders({ rootPath, libraryId }, parent),
   }),
   'library:getConfig': ({ libraryId }) => s.libraries.getConfig(libraryId),
-  'library:setConfig': ({ libraryId, patch }) => s.libraries.setConfig(patch, libraryId),
+  'library:setConfig': async ({ libraryId, patch }) => {
+    const config = await s.libraries.setConfig(patch, libraryId);
+    // `mcp.enabled` may have changed (or the library name, which names the server).
+    if (patch.mcp) await reconcileMcp(s);
+    return config;
+  },
 });
 
 export const dialogHandlers = (s: MainServices): DomainHandlers<'dialog'> => ({

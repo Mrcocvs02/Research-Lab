@@ -84,11 +84,13 @@ async function aggregate(rt: LibraryRuntime): Promise<Aggregate> {
 }
 
 /** "Read next": works cited by at least `minCiting` library documents (of the scope) and not in the library; offline, from the stored citation files. */
-export async function readNext(s: MainServices, req: { limit: number; minCiting: number; projectId?: string | undefined; folder?: string | undefined }): Res<DomainHandlers<'recommend'>['recommend:readNext']> {
+export async function readNext(s: MainServices, req: { limit: number; minCiting: number; projectId?: string | undefined; folder?: string | undefined; /** Exactly these documents (the MCP server: only AI-enabled folders); citing documents outside it are neither counted nor shown. */ scopeIds?: ReadonlySet<string> | undefined }): Res<DomainHandlers<'recommend'>['recommend:readNext']> {
   const rt = await s.runtime.require();
   const store = rt.store;
   let scope: Set<string> | null = null;
-  if (req.projectId) {
+  if (req.scopeIds) {
+    scope = new Set(req.scopeIds);
+  } else if (req.projectId) {
     const p = await store.projects.get(req.projectId);
     if (!p) throw new AppError('NOT_FOUND', 'Unknown project');
     scope = new Set(p.members.map((m) => m.docId));
@@ -109,7 +111,7 @@ export async function readNext(s: MainServices, req: { limit: number; minCiting:
   ranked.sort((a, b) => b.inScope.length - a.inScope.length || b.e.citing.length - a.e.citing.length || (b.e.link.year ?? 0) - (a.e.link.year ?? 0) || (a.key < b.key ? -1 : 1));
   const top = ranked.slice(0, req.limit);
   const titles = new Map<string, string | null>();
-  const need = [...new Set(top.flatMap((r) => [...r.inScope, ...r.e.citing].slice(0, CITING_SHOWN)))];
+  const need = [...new Set(top.flatMap((r) => (req.scopeIds ? r.inScope : [...r.inScope, ...r.e.citing]).slice(0, CITING_SHOWN)))];
   for (let i = 0; i < need.length; i += 32) {
     await Promise.all(need.slice(i, i + 32).map(async (id) => void titles.set(id, (await store.documents.get(id as DocumentId).catch(() => null))?.title ?? null)));
   }
@@ -117,8 +119,8 @@ export async function readNext(s: MainServices, req: { limit: number; minCiting:
     documentsWithCitations,
     items: top.map(({ key, e, inScope }) => {
       const { matchedDocId: _m, checkedAt: _c, ...work } = e.link;
-      const shown = [...new Set([...inScope, ...e.citing])].slice(0, CITING_SHOWN);
-      return { key, work, citing: shown.map((id) => ({ docId: id as DocumentId, title: titles.get(id) ?? null })), citingCount: e.citing.length, score: inScope.length };
+      const shown = [...new Set(req.scopeIds ? inScope : [...inScope, ...e.citing])].slice(0, CITING_SHOWN);
+      return { key, work, citing: shown.map((id) => ({ docId: id as DocumentId, title: titles.get(id) ?? null })), citingCount: req.scopeIds ? inScope.length : e.citing.length, score: inScope.length };
     }),
   };
 }

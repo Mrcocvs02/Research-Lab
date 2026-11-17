@@ -49,8 +49,8 @@
       "sourcesPaths": "Elenco dei percorsi originali",
       "sourcesCopies": "Copie dei file",
       "sourcesHint_none": "Solo le schede: nessun riferimento ai file originali.",
-      "sourcesHint_paths": "Un elenco di dove stanno i file originali. Non si copia nulla.",
-      "sourcesHint_copies": "Copia i file nell'esportazione (gli originali sono solo letti). Può occupare molto spazio.",
+      "sourcesHint_paths": "Scrive i percorsi completi dei file originali su questo computer (contengono il tuo nome utente e i nomi delle cartelle) perché un agente possa aprirli. Non si copia nulla. Scegli questa opzione solo se non ti dispiace che chi legge l'esportazione veda quei percorsi.",
+      "sourcesHint_copies": "Copia i file nell'esportazione (gli originali sono solo letti). Può occupare molto spazio: sopra 1 GiB ti viene chiesto di confermare.",
       "notes": "Includi le tue note",
       "annotations": "Includi le tue evidenziazioni"
     },
@@ -94,12 +94,14 @@
     "conflict": {
       "busy": "Un'altra esportazione è ancora in corso. Aspetta che finisca e riprova.",
       "not-empty": "Questa cartella contiene già altri file e non è un'esportazione di questa libreria, quindi non è stato scritto nulla. Scegli un'altra cartella o un altro nome.",
-      "other-library": "Questa cartella è un'esportazione di un'altra libreria, quindi non è stato scritto nulla. Scegli un'altra cartella o un altro nome."
+      "other-library": "Questa cartella è un'esportazione di un'altra libreria, quindi non è stato scritto nulla. Scegli un'altra cartella o un altro nome.",
+      "inside-library": "Questa cartella è dentro la cartella della libreria, quindi non è stato scritto nulla. Scegli una cartella fuori dalla libreria: un'esportazione non va mescolata ai tuoi documenti."
     },
     "confirm": {
-      "title": "Documenti non abilitati all'AI",
+      "title": "Conferma richiesta",
       "body_one": "{{count}} documento selezionato è in una cartella che non hai abilitato all'AI. Una volta esportato, chiunque apra la cartella dell'esportazione con un agente (come Claude Code) può leggerlo. Esportarlo comunque?",
       "body_other": "{{count}} documenti selezionati sono in cartelle che non hai abilitato all'AI. Una volta esportati, chiunque apra la cartella dell'esportazione con un agente (come Claude Code) può leggerli. Esportarli comunque?",
+      "bodyCopy": "Le copie dei file originali occupano circa {{size}}. Verifica che la destinazione abbia abbastanza spazio libero. Copiarli comunque?",
       "yes": "Esporta comunque"
     },
     "result": {
@@ -110,14 +112,17 @@
       "updated": "File aggiornati",
       "unchanged": "File invariati",
       "keptEdited": "Mantenuti (modificati da te)",
-      "keptHint": "File la cui sezione generata hai modificato: non sono stati sovrascritti",
+      "keptHint": "File la cui sezione generata hai modificato, o copie che sono file tuoi: non sono stati sovrascritti",
+      "copyErrors": "Copie non riuscite",
+      "copyErrorsHint": "Questi file originali non si sono potuti copiare. Esegui di nuovo l'esportazione per riprovare.",
       "orphaned": "Non più nella selezione",
       "orphanedHint": "Le schede dei documenti usciti dalla selezione non vengono cancellate: l'indice le elenca come non più esportate.",
       "copied": "Copiati",
       "reveal": "Mostra la cartella"
     },
     "errors": {
-      "noModel": "Il modello della rete non è ancora costruito, quindi i cluster non si possono esportare. Costruiscilo nella sezione Rete o togli i cluster."
+      "noModel": "Il modello della rete non è ancora costruito, quindi i cluster non si possono esportare. Costruiscilo nella sezione Rete o togli i cluster.",
+      "tooMany": "La selezione contiene troppi documenti. Restringila e riprova."
     }
   }
 }

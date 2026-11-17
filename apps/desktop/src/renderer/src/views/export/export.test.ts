@@ -38,7 +38,7 @@ interface Opts {
   presets?: unknown[];
   past?: boolean;
   /** `export:preview` fails with this (code) when it has a target (`withTarget`) or always. */
-  previewError?: { code: any; withTarget?: boolean };
+  previewError?: { code: any; withTarget?: boolean; details?: Record<string, unknown> };
 }
 
 function setup(o: Opts = {}) {
@@ -51,7 +51,7 @@ function setup(o: Opts = {}) {
     'taxonomy:get': () => ({ nodes: [{ id: 't1', label: 'Optics', status: 'active' }] }),
     'dialog:chooseFolder': () => DEST,
     'export:preview': (p: any) => {
-      if (o.previewError && (!o.previewError.withTarget || p.target)) throw new AppError(o.previewError.code, 'x');
+      if (o.previewError && (!o.previewError.withTarget || p.target)) throw new AppError(o.previewError.code, 'x', o.previewError.details);
       return estimate(o.preview, p.target ? o.target ?? { state: 'new' } : null);
     },
     'export:run': o.run ?? (() => ({ jobId: 'job-1' })),
@@ -72,7 +72,7 @@ const done = (over: Record<string, unknown> = {}) => ({
   done: 10,
   total: 10,
   error: null,
-  result: { dir: '/tmp/out/thesis', written: 8, updated: 1, unchanged: 5, keptEdited: ['papers/a.md'], orphaned: 2, copiedBytes: 0 },
+  result: { dir: '/tmp/out/thesis', written: 8, updated: 1, unchanged: 5, keptEdited: ['papers/a.md'], copyErrors: [], orphaned: 2, copiedBytes: 0 },
   ...over,
 });
 
@@ -120,7 +120,7 @@ describe('ExportDialog', () => {
     const est = await screen.findByTestId('est-documents');
     expect(est.textContent).toBe('12');
     expect((screen.getByTestId('export-project') as HTMLSelectElement).value).toBe('p1');
-    expect(callsTo('export:preview')[0]).toMatchObject({ selection: { projectId: 'p1', sources: 'paths', includeNotes: true } });
+    expect(callsTo('export:preview')[0]).toMatchObject({ selection: { projectId: 'p1', sources: 'none', includeNotes: true } });
     expect(callsTo('export:preview')[0].target).toBeUndefined();
     expect(runButton().disabled).toBe(true);
     expect((screen.getByTestId('export-folder-name') as HTMLInputElement).value).toBe('Thesis');
@@ -321,13 +321,68 @@ describe('ExportDialog', () => {
   });
 
   it('asks for the folder again when the approval of the earlier destination is gone', async () => {
-    setup({ past: true, previewError: { code: 'INVALID_REQUEST', withTarget: true } });
+    setup({ past: true, previewError: { code: 'INVALID_REQUEST', withTarget: true, details: { reason: 'destination-not-approved' } } });
     fireEvent.click(await screen.findByTestId('export-past-item'));
     expect((screen.getByTestId('export-folder-name') as HTMLInputElement).value).toBe('old-brain');
     expect((screen.getByTestId('export-sources') as HTMLSelectElement).value).toBe('copies');
     expect(await screen.findByTestId('export-pick-again')).toBeTruthy();
     expect(screen.queryByTestId('export-dest-path')).toBeNull();
     expect(runButton().disabled).toBe(true);
+  });
+
+  it('does not loop on another invalid request: the destination stays and the real reason shows', async () => {
+    setup({ previewError: { code: 'INVALID_REQUEST', withTarget: true, details: { reason: 'too-many' } } });
+    await chooseDestination();
+    expect((await screen.findByTestId('export-estimate-error')).textContent).toContain('too many documents');
+    expect(screen.queryByTestId('export-pick-again')).toBeNull();
+    expect(screen.getByTestId('export-dest-path')).toBeTruthy();
+  });
+
+  it('refuses a destination inside the library with a clear message and does not run', async () => {
+    setup({ previewError: { code: 'CONFLICT', withTarget: true, details: { reason: 'inside-library' } } });
+    await chooseDestination();
+    const note = await screen.findByTestId('export-conflict');
+    expect(note.getAttribute('data-reason')).toBe('inside-library');
+    expect(note.textContent).toContain('inside the library folder');
+    await waitFor(() => expect(runButton().disabled).toBe(true));
+  });
+
+  it('asks to confirm a large copy with its size, and runs with confirmed', async () => {
+    setup({
+      preview: { copyBytes: 3 * 1024 ** 3 },
+      run: (p: any) => {
+        if (!p.confirmed) throw new AppError('CONFLICT', 'x', { reason: 'large-copy', documents: 0, copyBytes: 3 * 1024 ** 3 });
+        return { jobId: 'job-1' };
+      },
+    });
+    await chooseDestination();
+    await waitFor(() => expect(runButton().disabled).toBe(false));
+    fireEvent.click(runButton());
+    const confirm = await screen.findByTestId('export-confirm');
+    expect(screen.getByTestId('export-confirm-copy').textContent).toContain('3');
+    expect(confirm.textContent).not.toContain('not enabled for AI');
+    fireEvent.click(screen.getByTestId('export-confirm-yes'));
+    await screen.findByTestId('export-progress-panel');
+    expect(callsTo('export:run')[1].confirmed).toBe(true);
+  });
+
+  it('sources are not included by default, and the paths option says what it writes', async () => {
+    setup();
+    const sources = (await screen.findByTestId('export-sources')) as HTMLSelectElement;
+    expect(sources.value).toBe('none');
+    fireEvent.change(sources, { target: { value: 'paths' } });
+    expect(document.body.textContent).toContain('full paths of the original files');
+  });
+
+  it('lists the copies that failed', async () => {
+    setup();
+    await chooseDestination();
+    await waitFor(() => expect(runButton().disabled).toBe(false));
+    fireEvent.click(runButton());
+    await screen.findByTestId('export-progress-panel');
+    act(() => emitEvent('export:progress', done({ result: { dir: '/tmp/out/thesis', written: 1, updated: 0, unchanged: 0, keptEdited: [], copyErrors: ['sources/a.pdf'], orphaned: 0, copiedBytes: 0 } })));
+    expect((await screen.findByTestId('res-copy-errors')).textContent).toBe('1');
+    expect(screen.getByTestId('res-copy-errors-list').textContent).toContain('sources/a.pdf');
   });
 
   it('explains clusters that cannot be exported while the network model is missing', async () => {

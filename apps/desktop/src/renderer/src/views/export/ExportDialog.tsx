@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { Channels, ExportPreset, ResponseOf } from '@rl/core';
 import { Dialog } from '../../components/Dialog';
 import { FolderTree, type FolderEntry } from '../../components/FolderTree';
@@ -36,6 +37,28 @@ const draftFrom = (init: ExportInit): Draft => ({
 function conflictReason(e: unknown): string | null {
   const err = RlError.from(e);
   return err.code === 'CONFLICT' && typeof err.details?.reason === 'string' ? err.details.reason : null;
+}
+
+/** True only for the refusal that says the approval of the destination is gone (not for any other invalid request). */
+function destinationGone(e: unknown): boolean {
+  const err = RlError.from(e);
+  return err.code === 'INVALID_REQUEST' && err.details?.reason === 'destination-not-approved';
+}
+
+/** Text of an export error: the over-limit selection has its own message, the rest the shared ones. */
+function exportError(e: unknown, t: TFunction): string {
+  const err = RlError.from(e);
+  if (err.code === 'NOT_FOUND') return t('secondBrain.errors.noModel');
+  if (err.code === 'INVALID_REQUEST' && err.details?.reason === 'too-many') return t('secondBrain.errors.tooMany');
+  return errorMessage(e, t);
+}
+
+const KNOWN_CONFLICTS = new Set(['not-empty', 'other-library', 'inside-library']);
+
+/** What the user is asked to confirm: documents outside the AI folders, and/or a large copy. */
+interface Confirm {
+  docs: number;
+  bytes: number;
 }
 
 function Chips({ label, items, onRemove, testId }: { label: string; items: Array<{ id: string; text: string }>; onRemove(id: string): void; testId: string }) {
@@ -81,7 +104,7 @@ function EstimateBlock({ est, loading, error }: { est: Estimate | null; loading:
   return (
     <div className="group" aria-live="polite" data-testid="export-estimate">
       <h3>{t('secondBrain.estimate.title')}</h3>
-      {error ? <ErrorNote testId="export-estimate-error">{RlError.from(error).code === 'NOT_FOUND' ? t('secondBrain.errors.noModel') : errorMessage(error, t)}</ErrorNote> : null}
+      {error ? <ErrorNote testId="export-estimate-error">{exportError(error, t)}</ErrorNote> : null}
       {!est && loading && <p className="hint">{t('secondBrain.estimate.loading')}</p>}
       {est && (
         <dl className="facts" data-testid="export-estimate-facts">
@@ -153,6 +176,12 @@ function Summary({ status, onReveal }: { status: JobStatus; onReveal(): void }) 
             <dd data-testid="res-unchanged">{n(r.unchanged)}</dd>
             <dt>{t('secondBrain.result.keptEdited')}</dt>
             <dd data-testid="res-kept">{n(r.keptEdited.length)}</dd>
+            {r.copyErrors.length > 0 && (
+              <>
+                <dt>{t('secondBrain.result.copyErrors')}</dt>
+                <dd data-testid="res-copy-errors">{n(r.copyErrors.length)}</dd>
+              </>
+            )}
             <dt>{t('secondBrain.result.orphaned')}</dt>
             <dd data-testid="res-orphaned">{n(r.orphaned)}</dd>
             {r.copiedBytes > 0 && (
@@ -167,6 +196,18 @@ function Summary({ status, onReveal }: { status: JobStatus; onReveal(): void }) 
               <summary>{t('secondBrain.result.keptHint')}</summary>
               <ul>
                 {r.keptEdited.slice(0, 50).map((f) => (
+                  <li key={f}>
+                    <code>{safeText(f)}</code>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {r.copyErrors.length > 0 && (
+            <details open data-testid="res-copy-errors-list">
+              <summary>{t('secondBrain.result.copyErrorsHint')}</summary>
+              <ul>
+                {r.copyErrors.slice(0, 50).map((f) => (
                   <li key={f}>
                     <code>{safeText(f)}</code>
                   </li>
@@ -210,7 +251,7 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
   const [estError, setEstError] = useState<unknown>(null);
   const [error, setError] = useState<unknown>(null);
   const [conflict, setConflict] = useState<string | null>(null);
-  const [confirmDocs, setConfirmDocs] = useState<number | null>(null);
+  const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [job, setJob] = useState<{ id: string; status: JobStatus | null } | null>(null);
   const [presetId, setPresetId] = useState('');
   const [needDestination, setNeedDestination] = useState(false);
@@ -218,7 +259,7 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
   const edit = (patch: Partial<Draft>) => {
     setDraft((d) => ({ ...d, ...patch }));
     setConflict(null);
-    setConfirmDocs(null);
+    setConfirm(null);
   };
 
   const nameOk = folderNameValid(folderName);
@@ -237,6 +278,7 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
           if (mine !== ticket.current) return;
           setEst(r);
           setEstError(null);
+          setConflict((c) => (c === 'inside-library' ? null : c));
           setEstLoading(false);
         },
         (e: unknown) => {
@@ -244,9 +286,12 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
           setEstLoading(false);
           setEst(null);
           // The approval of the destination is per session: ask for the folder again.
-          if (RlError.from(e).code === 'INVALID_REQUEST' && target) {
+          if (destinationGone(e) && target) {
             setDest(null);
             setNeedDestination(true);
+          } else if (conflictReason(e) === 'inside-library') {
+            setEstError(null);
+            setConflict('inside-library');
           } else setEstError(e);
         },
       );
@@ -282,7 +327,7 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
     setDest({ path: p.destination, name: p.destination });
     setNeedDestination(false);
     setConflict(null);
-    setConfirmDocs(null);
+    setConfirm(null);
   };
 
   const start = async (confirmed: boolean) => {
@@ -291,13 +336,14 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
     setConflict(null);
     try {
       const { jobId } = await rl.invoke('export:run', { selection: toSelection(draft), target, confirmed });
-      setConfirmDocs(null);
+      setConfirm(null);
       setJob({ id: jobId, status: null });
     } catch (e) {
       const reason = conflictReason(e);
-      if (reason === 'needs-confirmation') setConfirmDocs(Number(RlError.from(e).details?.documents ?? est?.aiDisabledDocuments ?? 0));
+      const details = RlError.from(e).details;
+      if (reason === 'needs-confirmation' || reason === 'large-copy') setConfirm({ docs: Number(details?.documents ?? est?.aiDisabledDocuments ?? 0), bytes: Number(details?.copyBytes ?? 0) });
       else if (reason) setConflict(reason);
-      else if (RlError.from(e).code === 'INVALID_REQUEST') {
+      else if (destinationGone(e)) {
         setDest(null);
         setNeedDestination(true);
       } else setError(e);
@@ -335,7 +381,7 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
     closeExport();
   };
 
-  const blocked = est?.target?.state === 'not-empty' || est?.target?.state === 'other-library' || conflict === 'not-empty' || conflict === 'other-library';
+  const blocked = est?.target?.state === 'not-empty' || est?.target?.state === 'other-library' || (conflict !== null && KNOWN_CONFLICTS.has(conflict));
   const canRun = valid && nameOk && dest !== null && !blocked && !estLoading;
   const finished = status !== null && TERMINAL.has(status.state);
 
@@ -504,32 +550,33 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
             <TargetNote est={est} name={folderName} />
             {conflict && (
               <p className="callout warn" role="alert" data-testid="export-conflict" data-reason={conflict}>
-                {t(`secondBrain.conflict.${conflict === 'other-library' || conflict === 'not-empty' ? conflict : 'busy'}`)}
+                {t(`secondBrain.conflict.${KNOWN_CONFLICTS.has(conflict) ? conflict : 'busy'}`)}
               </p>
             )}
-            {confirmDocs !== null && (
+            {confirm !== null && (
               <div className="callout warn" role="alertdialog" aria-labelledby="export-confirm-title" data-testid="export-confirm">
                 <p id="export-confirm-title">
                   <strong>{t('secondBrain.confirm.title')}</strong>
                 </p>
-                <p>{t('secondBrain.confirm.body', { count: confirmDocs })}</p>
+                {confirm.docs > 0 && <p>{t('secondBrain.confirm.body', { count: confirm.docs })}</p>}
+                {confirm.bytes > 0 && <p data-testid="export-confirm-copy">{t('secondBrain.confirm.bodyCopy', { size: formatSize(confirm.bytes) })}</p>}
                 <div className="actions start">
                   <button type="button" className="danger" onClick={() => void start(true)} data-testid="export-confirm-yes">
                     {t('secondBrain.confirm.yes')}
                   </button>
-                  <button type="button" onClick={() => setConfirmDocs(null)} data-testid="export-confirm-no">
+                  <button type="button" onClick={() => setConfirm(null)} data-testid="export-confirm-no">
                     {t('common.cancel')}
                   </button>
                 </div>
               </div>
             )}
-            {error ? <ErrorNote testId="export-error">{errorMessage(error, t)}</ErrorNote> : null}
+            {error ? <ErrorNote testId="export-error">{exportError(error, t)}</ErrorNote> : null}
 
             <div className="actions">
               <button type="button" onClick={close}>
                 {t('common.cancel')}
               </button>
-              <button type="button" className="primary" disabled={!canRun || confirmDocs !== null} onClick={() => void start(false)} data-testid="export-run">
+              <button type="button" className="primary" disabled={!canRun || confirm !== null} onClick={() => void start(false)} data-testid="export-run">
                 {est?.target?.state === 'previous-export' ? t('secondBrain.runUpdate') : t('secondBrain.run')}
               </button>
             </div>

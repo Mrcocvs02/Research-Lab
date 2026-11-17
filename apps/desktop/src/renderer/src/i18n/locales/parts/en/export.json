@@ -49,8 +49,8 @@
       "sourcesPaths": "List of the original paths",
       "sourcesCopies": "Copies of the files",
       "sourcesHint_none": "Cards only: no reference to the original files.",
-      "sourcesHint_paths": "A list of where the original files are. Nothing is copied.",
-      "sourcesHint_copies": "Copies the files into the export (the originals are only read). It can take a lot of space.",
+      "sourcesHint_paths": "Writes the full paths of the original files on this computer (they include your user and folder names) so an agent can open them. Nothing is copied. Choose this only if you are happy for whoever reads the export to see those paths.",
+      "sourcesHint_copies": "Copies the files into the export (the originals are only read). It can take a lot of space: above 1 GiB you are asked to confirm.",
       "notes": "Include your notes",
       "annotations": "Include your highlights"
     },
@@ -94,12 +94,14 @@
     "conflict": {
       "busy": "Another export is still running. Wait for it to finish and try again.",
       "not-empty": "This folder already has other files and is not an export of this library, so nothing was written. Choose another folder or name.",
-      "other-library": "This folder is an export of another library, so nothing was written. Choose another folder or name."
+      "other-library": "This folder is an export of another library, so nothing was written. Choose another folder or name.",
+      "inside-library": "This folder is inside the library folder, so nothing was written. Choose a folder outside the library: an export must not be mixed with your documents."
     },
     "confirm": {
-      "title": "Documents not enabled for AI",
+      "title": "Please confirm",
       "body_one": "{{count}} selected document is in a folder you did not enable for AI. Once exported, anyone who opens the export folder with an agent (such as Claude Code) can read it. Export it anyway?",
       "body_other": "{{count}} selected documents are in folders you did not enable for AI. Once exported, anyone who opens the export folder with an agent (such as Claude Code) can read them. Export them anyway?",
+      "bodyCopy": "The copies of the original files take about {{size}}. Make sure the destination has enough free space. Copy them anyway?",
       "yes": "Export anyway"
     },
     "result": {
@@ -110,14 +112,17 @@
       "updated": "Updated files",
       "unchanged": "Unchanged files",
       "keptEdited": "Kept (edited by you)",
-      "keptHint": "Files whose generated section you edited: they were not overwritten",
+      "keptHint": "Files whose generated section you edited, or copies that are your own files: they were not overwritten",
+      "copyErrors": "Copies that failed",
+      "copyErrorsHint": "These source files could not be copied. Run the export again to retry them.",
       "orphaned": "No longer in the selection",
       "orphanedHint": "Cards of documents that left the selection are not deleted: the index lists them as no longer exported.",
       "copied": "Copied",
       "reveal": "Show the folder"
     },
     "errors": {
-      "noModel": "The network model is not built yet, so clusters cannot be exported. Build it in the Network section or remove the clusters."
+      "noModel": "The network model is not built yet, so clusters cannot be exported. Build it in the Network section or remove the clusters.",
+      "tooMany": "The selection holds too many documents. Narrow it down and try again."
     }
   }
 }

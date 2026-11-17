@@ -5,6 +5,7 @@ import type { z } from 'zod';
 import type { aiJobRequestSchema, aiPreviewSchema } from '@rl/core';
 import type { MainServices } from '../ipc/handlers/services.js';
 import { availability, buildDataBlock, classifyDocs, computePreview, loadCtx, monthUsage, type AiCtx } from './service.js';
+import { abortTracked } from './abort-registry.js';
 import { createToolsHost } from './tools-host.js';
 import { monthOf, usdOfUsage } from './usage.js';
 
@@ -147,6 +148,7 @@ export function listJobs(): AiJobStatus[] {
 
 /** Aborts every job (app quit or another library opened): the Claude Code processes end with them. */
 export function abortAllJobs(): void {
+  abortTracked();
   for (const j of jobs) if (j.status.state === 'queued' || j.status.state === 'running') j.controller.abort();
 }
 

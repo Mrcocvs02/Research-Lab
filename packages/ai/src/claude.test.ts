@@ -252,7 +252,7 @@ describe('hardening of the child process and of error text', () => {
     const detail: string[] = [];
     const leaky = `spawn ${win('C:', 'Users', 'someone', 'bin', 'claude.exe')} ENOENT; also /home/someone/.local/bin/claude and ${BS}${win('', 'host', 'share', 'x')}, Bearer abcdefghijklmnop, ${KEY}, ${'a1'.repeat(20)}`;
     const sdk = { ...fakeSdk([]).sdk, query: () => Object.assign((async function* () { throw new Error(leaky); })(), { close() {} }) } as unknown as SdkModule;
-    const err = await mk(sdk, { onErrorDetail: (d: string) => detail.push(d) }).completeStructured({ model: 'm', reasoning: 'low', system: 's', prompt: 'p', schema: z.object({}), source: 'c' }).catch((e: unknown) => e as Error);
+    const err = await mk(sdk, { onErrorDetail: (d: string) => detail.push(d) }).completeStructured({ model: 'm', reasoning: 'low', system: 's', prompt: 'p', schema: z.object({}), source: 'c' }).catch((e: unknown) => e as any);
     expect(err.message).not.toMatch(/someone|share|abcdefghijklmnop|SECRET|a1a1a1/);
     expect(err.message).toContain('[path]');
     expect(detail[0]).toContain('someone');
@@ -272,10 +272,10 @@ describe('hardening of the child process and of error text', () => {
     expect(r.usage.costUsd).toBeCloseTo(0.0246, 6);
     expect(r.usage.inputTokens).toBe(300);
     const bad = { ...fakeSdk([]).sdk, query: () => Object.assign((async function* () { yield resultMsg({ structured_output: 1 }); })(), { close() {} }) } as unknown as SdkModule;
-    const e = await mk(bad).completeStructured({ model: 'm', reasoning: 'low', system: 's', prompt: 'p', schema: z.object({ tags: z.array(z.string()) }), source: 'c' }).catch((x: unknown) => x as { details?: any });
+    const e = await mk(bad).completeStructured({ model: 'm', reasoning: 'low', system: 's', prompt: 'p', schema: z.object({ tags: z.array(z.string()) }), source: 'c' }).catch((x: unknown) => x as any);
     expect(e.details).toMatchObject({ sent: true, usage: { inputTokens: 300, costUsd: expect.any(Number) } });
     const never = { ...fakeSdk([]).sdk, query: () => Object.assign((async function* () { throw new Error('spawn failed'); })(), { close() {} }) } as unknown as SdkModule;
-    const e2 = await mk(never).completeStructured({ model: 'm', reasoning: 'low', system: 's', prompt: 'p', schema: z.object({}), source: 'c' }).catch((x: unknown) => x as { details?: any });
+    const e2 = await mk(never).completeStructured({ model: 'm', reasoning: 'low', system: 's', prompt: 'p', schema: z.object({}), source: 'c' }).catch((x: unknown) => x as any);
     expect(e2.details).toMatchObject({ sent: false });
   });
 });

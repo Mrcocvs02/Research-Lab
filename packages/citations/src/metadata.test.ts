@@ -118,6 +118,37 @@ describe('fetchWorkMetadata', () => {
 
   it('refuses a redirect to a non-https address', async () => {
     const f = (async () => ({ ok: true, status: 200, url: 'http://evil.example/', headers: new Headers(), text: async () => '{}' })) as unknown as typeof fetch;
-    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: f })).rejects.toThrow('non-https');
+    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: f })).rejects.toThrow('unexpected address');
+  });
+
+  it('does not follow redirects, not even to another https host or the other fixed host, and asks for manual redirects', async () => {
+    const seen: Array<RequestInit | undefined> = [];
+    const redirect = (async (_u: string, init?: RequestInit) => {
+      seen.push(init);
+      return new Response('', { status: 302, headers: { location: 'https://export.arxiv.org/x' } });
+    }) as unknown as typeof fetch;
+    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: redirect })).rejects.toThrow('redirect refused');
+    expect(seen[0]?.redirect).toBe('manual');
+    const elsewhere = (async () => ({ ok: true, status: 200, url: 'https://evil.example/works', headers: new Headers(), text: async () => '{}' })) as unknown as typeof fetch;
+    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: elsewhere })).rejects.toThrow('unexpected address');
+    const opaque = (async () => ({ ok: false, status: 0, type: 'opaqueredirect', url: '', headers: new Headers() })) as unknown as typeof fetch;
+    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: opaque })).rejects.toThrow('redirect refused');
+  });
+
+  it('caps a body-less answer, and an arXiv entry is capped before parsing', async () => {
+    const noBody = (async () => ({ ok: true, status: 200, url: 'https://api.openalex.org/x', headers: new Headers(), body: null, arrayBuffer: async () => new ArrayBuffer(5000) })) as unknown as typeof fetch;
+    await expect(fetchWorkMetadata({ doi: '10.1/x' }, { fetch: noBody, maxBytes: 1000 })).rejects.toThrow('too large');
+    const hostile = `<entry><id>http://arxiv.org/abs/2401.01234</id><title>T</title>${'<id '.repeat(400_000)}</entry>`;
+    const t0 = Date.now();
+    expect(parseArxivAtom(atom(hostile))?.title).toBe('T');
+    expect(Date.now() - t0).toBeLessThan(3000);
+  });
+
+  it('an OpenAlex error followed by an arXiv not-found stays an error (retryable), not a sticky not-found', async () => {
+    const { f } = fakeFetch({
+      'https://api.openalex.org/': () => reply('', { status: 503 }),
+      'https://export.arxiv.org/': () => reply(atom('')),
+    });
+    await expect(fetchWorkMetadata({ doi: '10.1/x', arxivId: '2401.01234' }, { fetch: f })).rejects.toBeInstanceOf(WorkLookupError);
   });
 });

@@ -17,6 +17,8 @@ export interface FactoryDeps {
   secrets: SecretStore;
   clientApp?: string;
   mockScript?: MockScript;
+  /** Local log for the unabridged text of a provider error (the renderer only gets a scrubbed one). */
+  onErrorDetail?: (detail: string) => void;
 }
 
 /**
@@ -33,6 +35,7 @@ export function createProviderFactory(d: FactoryDeps): AiProviderFactory {
       workDir: path.join(d.localDataDir, 'ai-work'),
       getApiKey: () => d.secrets.get({ kind: 'app' }, API_KEY_SECRET),
       ...(d.clientApp ? { clientApp: d.clientApp } : {}),
+      ...(d.onErrorDetail ? { onErrorDetail: d.onErrorDetail } : {}),
     });
   };
 }

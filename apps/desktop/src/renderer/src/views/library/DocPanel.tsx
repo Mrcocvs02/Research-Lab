@@ -9,6 +9,8 @@ import { useNotify } from '../../lib/notify';
 import { canRead, useReader } from '../../lib/reader';
 import { rl } from '../../lib/rl';
 import { splitLines } from '../../lib/validate';
+import { useDecide, type ReviewField } from '../review/useDecide';
+import { Lazy, lazyRetry } from '../../components/Lazy';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { NoteEditor } from '../notes/NoteEditor';
@@ -18,6 +20,8 @@ import { TagChip, TagPicker } from './TagParts';
 import { resolveId } from './taxonomyModel';
 import type { DocRow } from './useDocumentList';
 import { useTaxonomy } from './useTaxonomy';
+
+const JobDialog = lazyRetry(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })));
 
 const STUDY: StudyState[] = ['to-read', 'reading', 'read'];
 
@@ -155,6 +159,28 @@ function Field({ label, value, onCommit, extracted, multiline, type = 'text', li
   );
 }
 
+/** Accept or reject one proposed AI field of the document, as the review does (one undoable change). */
+function AiQuickDecide({ docId, field, revision }: { docId: string; field: ReviewField; revision: number }) {
+  const { t } = useTranslation();
+  const { decide } = useDecide();
+  const [busy, setBusy] = useState(false);
+  const run = async (decision: 'accept' | 'reject') => {
+    setBusy(true);
+    await decide({ docId, field, decision, expectedRevision: revision });
+    setBusy(false);
+  };
+  return (
+    <div className="actions start">
+      <button type="button" className="primary" disabled={busy} onClick={() => void run('accept')} data-testid="ai-accept" data-field={field}>
+        {t('review.accept')}
+      </button>
+      <button type="button" disabled={busy} onClick={() => void run('reject')} data-testid="ai-reject" data-field={field}>
+        {t('review.reject')}
+      </button>
+    </div>
+  );
+}
+
 /** Everything the AI wrote about the document, apart from the user's own fields and clearly marked as AI output. */
 export function AiArea({ doc }: { doc: DocumentView }) {
   const { t, i18n } = useTranslation();
@@ -169,14 +195,15 @@ export function AiArea({ doc }: { doc: DocumentView }) {
       {safeText(f.meta.provider === 'legacy-import' ? t('ai.legacy') : f.meta.model)} · {date(f.meta.date)} · {t(`ai.review.${f.review.status}`)}
     </p>
   );
-  const block = (key: string, body: ReactNode, f: Parameters<typeof meta>[0]) => (
-    <div className="ai-item" data-testid={`ai-${key}`}>
+  const block = (key: string, body: ReactNode, f: Parameters<typeof meta>[0], field?: ReviewField) => (
+    <div className="ai-item" data-testid={`ai-${key}`} data-status={f.review.status}>
       <h4>{t(`ai.fields.${key}`)}</h4>
       {body}
       {meta(f)}
+      {field && f.review.status === 'proposed' && <AiQuickDecide docId={doc.id} field={field} revision={doc.revision} />}
     </div>
   );
-  const nothing = !ai.summary && !ai.description && !ai.keywords && !ai.synonyms && !ai.suggestedTags && !ai.suggestedType && !ai.relations;
+  const nothing = !ai.summary && !ai.description && !ai.keywords && !ai.synonyms && !ai.suggestedTags && !ai.suggestedNewTags && !ai.suggestedType && !ai.relations;
   return (
     <section className="ai-area" aria-label={t('ai.areaLabel')} data-testid="ai-area">
       <header className="ai-head">
@@ -184,8 +211,8 @@ export function AiArea({ doc }: { doc: DocumentView }) {
         <span className="ai-note">{t('ai.readOnly')}</span>
       </header>
       {nothing && <p className="hint">{t('ai.none')}</p>}
-      {ai.summary && block('summary', <p className="ai-text">{safeText(ai.summary.value)}</p>, ai.summary)}
-      {ai.description && block('description', <p className="ai-text">{safeText(ai.description.value)}</p>, ai.description)}
+      {ai.summary && block('summary', <p className="ai-text">{safeText(ai.summary.value)}</p>, ai.summary, 'summary')}
+      {ai.description && block('description', <p className="ai-text">{safeText(ai.description.value)}</p>, ai.description, 'description')}
       {ai.keywords &&
         block(
           'keywords',
@@ -197,6 +224,7 @@ export function AiArea({ doc }: { doc: DocumentView }) {
             ))}
           </ul>,
           ai.keywords,
+          'keywords',
         )}
       {ai.synonyms &&
         block(
@@ -209,6 +237,7 @@ export function AiArea({ doc }: { doc: DocumentView }) {
             ))}
           </ul>,
           ai.synonyms,
+          'synonyms',
         )}
       {ai.suggestedTags &&
         block(
@@ -221,6 +250,20 @@ export function AiArea({ doc }: { doc: DocumentView }) {
             ))}
           </ul>,
           ai.suggestedTags,
+          'tags',
+        )}
+      {ai.suggestedNewTags &&
+        block(
+          'suggestedNewTags',
+          <ul className="ai-chips">
+            {ai.suggestedNewTags.value.map((n, i) => (
+              <li key={i} className="ai-chip">
+                {safeText(n.label)}
+              </li>
+            ))}
+          </ul>,
+          ai.suggestedNewTags,
+          'newTags',
         )}
       {ai.suggestedType && block('suggestedType', <p className="ai-text">{safeText(ai.suggestedType.value)}</p>, ai.suggestedType)}
       {ai.relations &&
@@ -232,6 +275,7 @@ export function AiArea({ doc }: { doc: DocumentView }) {
             ))}
           </ul>,
           ai.relations,
+          'relations',
         )}
     </section>
   );
@@ -252,6 +296,7 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
   docRef.current = doc;
   const venueListId = useId();
   const { openReader } = useReader();
+  const [jobOpen, setJobOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -330,6 +375,9 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
         </button>
         <button type="button" onClick={() => void reveal()} disabled={doc.missing} data-testid="reveal-file">
           {t('docs.reveal')}
+        </button>
+        <button type="button" onClick={() => setJobOpen(true)} disabled={doc.missing} data-testid="doc-ai-propose">
+          {t('jobs.proposeOne')}
         </button>
         {doc.missing && <span className="badge badge-warn">{t('docs.missing')}</span>}
       </div>
@@ -425,6 +473,11 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
       </Section>
 
       <AiArea doc={doc} />
+      {jobOpen && (
+        <Lazy>
+          <JobDialog docIds={[docId]} onClose={() => setJobOpen(false)} />
+        </Lazy>
+      )}
 
       <Section title={t('doc.file')} className="panel-file">
         <dl className="facts">

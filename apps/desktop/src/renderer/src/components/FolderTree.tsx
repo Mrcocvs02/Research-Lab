@@ -17,12 +17,14 @@ interface Props {
   onChange(next: string[]): void;
   ariaLabel: string;
   testId?: string;
+  /** Everything is included from above (e.g. the whole library is enabled): every folder shows checked and locked. */
+  allIncluded?: boolean;
 }
 
 const isUnder = (child: string, ancestor: string) => child.startsWith(`${ancestor}/`);
 
 /** Lazily loaded folder tree with one checkbox per folder; native controls keep it keyboard accessible. */
-export function FolderTree({ load, value, onChange, ariaLabel, testId }: Props) {
+export function FolderTree({ load, value, onChange, ariaLabel, testId, allIncluded = false }: Props) {
   const { t } = useTranslation();
   const [roots, setRoots] = useState<FolderEntry[] | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -53,7 +55,7 @@ export function FolderTree({ load, value, onChange, ariaLabel, testId }: Props) 
   return (
     <ul className="folder-tree" aria-label={ariaLabel} data-testid={testId}>
       {roots.map((f) => (
-        <FolderNode key={f.path} entry={f} load={load} value={value} toggle={toggle} inherited={false} />
+        <FolderNode key={f.path} entry={f} load={load} value={value} toggle={toggle} inherited={allIncluded} />
       ))}
     </ul>
   );

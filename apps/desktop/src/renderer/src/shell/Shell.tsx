@@ -2,6 +2,8 @@ import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Lazy, lazyRetry } from '../components/Lazy';
 import { useAiUi } from '../lib/aiUi';
+import { useInbox } from '../lib/inbox';
+import { JobIndicator } from '../lib/jobs';
 import { useNotify } from '../lib/notify';
 import { useApp } from '../state/app-context';
 import { scanText } from '../views/library/ScanStatusText';
@@ -28,6 +30,7 @@ export function Shell({ section, onSection, onNewLibrary, children }: Props) {
   const app = useApp();
   const chatCollapsed = !chatOpen;
   const chatId = useId();
+  const inbox = useInbox();
   // The chat is mounted the first time the panel opens and then kept (hidden when collapsed), so a running answer goes on.
   const [chatLoaded, setChatLoaded] = useState(chatOpen);
   useEffect(() => {
@@ -50,6 +53,11 @@ export function Shell({ section, onSection, onNewLibrary, children }: Props) {
               <li key={id} className={id === 'settings' ? 'push-down' : undefined}>
                 <button type="button" className="nav-item" aria-current={section === id ? 'page' : undefined} onClick={() => onSection(id)} data-testid={`nav-${id}`}>
                   {t(`sections.${id}`)}
+                  {id === 'inbox' && inbox.count > 0 && (
+                    <span className="nav-badge" data-testid="inbox-badge" aria-label={t('inbox.badge', { count: inbox.count })}>
+                      {inbox.count}
+                    </span>
+                  )}
                 </button>
               </li>
             ))}
@@ -99,6 +107,11 @@ export function Shell({ section, onSection, onNewLibrary, children }: Props) {
         </Lazy>
       )}
 
+      {inbox.dragging && (
+        <div className="drop-hint" data-testid="drop-hint" role="status">
+          <p>{t('inbox.dropHint')}</p>
+        </div>
+      )}
       <StatusBar />
     </div>
   );
@@ -157,6 +170,7 @@ function StatusBar() {
           {scanText(scan, t)}
         </span>
       )}
+      <JobIndicator />
       <span className="spacer" />
       {app.version && <span>{t('status.version', { version: app.version })}</span>}
     </footer>

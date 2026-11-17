@@ -2351,3 +2351,72 @@ button.page-chip {
 .table-wrap {
   overflow-x: auto;
 }
+
+/* Phase 4 wave 2: inbox, review, job indicator, drop hint */
+.nav-badge {
+  margin-left: var(--space-2);
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 11px;
+}
+.drop-hint {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-content: center;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  border: 3px dashed var(--accent);
+  pointer-events: none;
+  font-size: 18px;
+}
+.job-indicator {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.inbox-list,
+.review-groups,
+.review-items,
+.review-newtags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.inbox-item-head,
+.review-group-head,
+.review-item-head,
+.inbox-ids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.review-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.review-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+.review-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.pager {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: center;
+}

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { activeTagNodes, cleanSuggestion, folderOf, inEnabledFolder, suggestPrompt, suggestSchema, suggestSystem, taxonomyBlock, type SuggestClean, type SuggestField, type SuggestRaw } from '@rl/ai';
+import { activeTagNodes, cleanSuggestion, folderOf, aiVisible, suggestPrompt, suggestSchema, suggestSystem, taxonomyBlock, type SuggestClean, type SuggestField, type SuggestRaw } from '@rl/ai';
 import { AI_LIMITS, AppError, type AiJobStatus, type AiMeta, type DocumentId, type DocumentRecord, type ReasoningLevel, type ReviewStatus, type TokenUsage } from '@rl/core';
 import type { z } from 'zod';
 import type { aiJobRequestSchema, aiPreviewSchema } from '@rl/core';
@@ -213,7 +213,7 @@ async function run(j: JobRec): Promise<void> {
       continue;
     }
     // The folder gate, read again for each document: a change made during the job counts at once.
-    if (!inEnabledFolder(rec.path, cfg.aiEnabledFolders)) {
+    if (!aiVisible(rec.path, cfg)) {
       j.status.failed++;
       j.status.error = { code: 'FOLDER_NOT_AI_ENABLED', message: 'A document is in a folder not enabled for AI' };
       emit(j, false);

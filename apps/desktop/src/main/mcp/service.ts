@@ -10,6 +10,8 @@ import { createMcpTools, listMcpTools } from './tools.js';
 export const MCP_TOKEN_SECRET = 'mcp-token';
 const REQUEST_TIMEOUT_MS = 60_000;
 const NOTIFY_GAP_MS = 2_000;
+/** The copied line holds the token: the clipboard is emptied after this long, if it still holds that line. */
+export const CLIPBOARD_CLEAR_MS = 60_000;
 
 const localSchema = z.object({ port: z.number().int().min(1024).max(65535).nullable().default(null), log: z.array(z.unknown()).default([]) });
 
@@ -18,6 +20,11 @@ interface Running {
   server: RunningMcpServer;
 }
 type CallLog = ReturnType<typeof createCallLog>;
+interface Local {
+  libraryId: string;
+  port: number | null;
+  log: CallLog;
+}
 
 interface State {
   chain: Promise<unknown>;
@@ -27,7 +34,11 @@ interface State {
   token: string | null;
   tokenLib: string | null;
   /** Port and call log of this computer for one library (`<localDataDir>/mcp/<libraryId>.json`, never synced). */
-  local: { libraryId: string; port: number | null; log: CallLog } | null;
+  local: Local | null;
+  /** The load of `local` in progress or done, so that two callers share one object (the log and the port are never split). */
+  localLoad: { libraryId: string; promise: Promise<Local> } | null;
+  /** Clears the clipboard when it still holds the token line (null when nothing is pending). */
+  clipboard: { timer: NodeJS.Timeout; clear(): Promise<void> } | null;
   restart: boolean;
   timer: NodeJS.Timeout | null;
   lastCallAt: string | null;
@@ -36,7 +47,7 @@ interface State {
 const states = new WeakMap<object, State>();
 const stateOf = (s: MainServices): State => {
   let st = states.get(s);
-  if (!st) states.set(s, (st = { chain: Promise.resolve(), running: null, error: null, token: null, tokenLib: null, local: null, restart: false, timer: null, lastCallAt: null }));
+  if (!st) states.set(s, (st = { chain: Promise.resolve(), running: null, error: null, token: null, tokenLib: null, local: null, localLoad: null, clipboard: null, restart: false, timer: null, lastCallAt: null }));
   return st;
 };
 
@@ -50,15 +61,27 @@ async function persist(s: MainServices, st: State): Promise<void> {
 }
 
 /** Port and log of `libraryId` on this computer (the previous library's are saved first). */
-async function localOf(s: MainServices, st: State, libraryId: string) {
-  if (st.local?.libraryId === libraryId) return st.local;
-  await persist(s, st);
-  const saved = await readJsonFile(localFile(s, libraryId), localSchema).catch(() => localSchema.parse({}));
-  const log = createCallLog(MCP_LIMITS.logKept);
-  log.restore(saved.log);
-  st.local = { libraryId, port: saved.port, log };
-  st.lastCallAt = log.snapshot().at(-1)?.at ?? null;
-  return st.local;
+function localOf(s: MainServices, st: State, libraryId: string): Promise<Local> {
+  // Registered before the first await: a concurrent caller (status, log, start) gets the same object.
+  if (st.localLoad?.libraryId === libraryId) return st.localLoad.promise;
+  const previous = st.localLoad?.promise;
+  const promise = (async () => {
+    await previous?.catch(() => {}); // loads of two libraries never overlap: `st.local` ends as the last one asked for
+    await persist(s, st);
+    const saved = await readJsonFile(localFile(s, libraryId), localSchema).catch(() => localSchema.parse({}));
+    const log = createCallLog(MCP_LIMITS.logKept);
+    log.restore(saved.log);
+    const local = { libraryId, port: saved.port, log };
+    st.local = local;
+    st.lastCallAt = log.snapshot().at(-1)?.at ?? null;
+    return local;
+  })();
+  const entry = { libraryId, promise };
+  st.localLoad = entry;
+  promise.catch(() => {
+    if (st.localLoad === entry) st.localLoad = null;
+  });
+  return promise;
 }
 
 async function active(s: MainServices): Promise<{ id: string | null; config: LibraryConfig | null }> {
@@ -221,6 +244,7 @@ export async function stopMcp(s: MainServices): Promise<void> {
   await st.chain;
   if (st.timer) clearTimeout(st.timer);
   st.timer = null;
+  await st.clipboard?.clear(); // the token must not outlive the app on the clipboard
   await stop(s, st);
 }
 
@@ -262,14 +286,37 @@ export async function rotateToken(s: MainServices): Promise<McpStatus> {
   const run = async () => {
     const token = newToken();
     await s.secrets.set({ kind: 'library', libraryId: id }, MCP_TOKEN_SECRET, token);
-    st.token = token;
-    st.tokenLib = id;
+    // The running server's token callback reads this cache: only the library it serves may change it (else `start` reads the store).
+    if (!st.running || st.running.libraryId === id) {
+      st.token = token;
+      st.tokenLib = id;
+    }
   };
   const next = st.chain.then(run, run);
   st.chain = next.catch(() => {});
   await next;
   await notify(s);
   return mcpStatus(s);
+}
+
+/** Empties the clipboard after `CLIPBOARD_CLEAR_MS`, but only when it still holds `line` (the user may have copied something else). */
+function scheduleClipboardClear(s: MainServices, st: State, line: string): void {
+  if (st.clipboard) clearTimeout(st.clipboard.timer); // a new copy restarts the countdown
+  const clipboard = s.clipboard;
+  if (!clipboard) return;
+  const clear = (): Promise<void> => {
+    if (st.clipboard) clearTimeout(st.clipboard.timer);
+    st.clipboard = null;
+    return Promise.resolve()
+      .then(() => clipboard.readText())
+      .then((now) => {
+        if (now === line) clipboard.writeText('');
+      })
+      .catch((e: unknown) => s.log.warn('could not clear the clipboard', { error: e }));
+  };
+  const timer = setTimeout(clear, CLIPBOARD_CLEAR_MS);
+  timer.unref();
+  st.clipboard = { timer, clear };
 }
 
 /** Writes the line (or JSON) for Claude Code to the clipboard in the main process and returns it with the token masked. */
@@ -283,7 +330,9 @@ export async function copyConfig(s: MainServices, format: 'cli' | 'json'): Promi
   const name = serverNameFor(config.name);
   const url = `http://127.0.0.1:${r.server.port}/mcp`;
   const make = format === 'cli' ? cliConfig : jsonConfig;
-  s.clipboard.writeText(make(name, url, st.token));
+  const line = make(name, url, st.token);
+  s.clipboard.writeText(line);
+  scheduleClipboardClear(s, st, line);
   return { preview: make(name, url, MASKED_TOKEN) };
 }
 

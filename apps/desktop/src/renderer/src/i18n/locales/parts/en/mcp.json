@@ -41,7 +41,8 @@
       "warning": "Off by default. When on, Claude Code can only PROPOSE AI fields (such as a summary or tags): they are marked as AI output and go to your review before anything is accepted. It can never change your notes or your own fields.",
       "confirmTitle": "Allow proposals from Claude Code?",
       "confirmBody": "Claude Code will be able to add proposed AI fields to documents in the folders it can see. Each proposal waits for your review. You can turn this off at any time.",
-      "confirmYes": "Allow proposals"
+      "confirmYes": "Allow proposals",
+      "reconnect": "After turning writing on or off, reconnect Claude Code to see the change in its list of tools."
     },
     "port": {
       "title": "Port",
@@ -50,15 +51,17 @@
       "auto": "Automatic",
       "invalid": "Enter a whole number between {{min}} and {{max}}, or leave it empty.",
       "apply": "Apply port",
-      "useAuto": "Use an automatic port"
+      "useAuto": "Use an automatic port",
+      "squat": "The port is remembered while the app is closed: another program on this computer could listen on it and receive the token that Claude Code sends. If in doubt, rotate the token."
     },
     "copy": {
       "title": "Connect Claude Code",
-      "hint": "Copy the configuration and paste it in a terminal (command) or in your project's .mcp.json. The real token goes to the clipboard; this window only shows a masked preview. Clear the clipboard after pasting.",
+      "hint": "Copy the configuration and paste it in a terminal (command) or in a .mcp.json file. The real token goes to the clipboard and is cleared from it after 60 seconds if it is still there; this window only shows a masked preview.",
       "cli": "Copy command",
       "json": "Copy .mcp.json entry",
       "notRunning": "The server must be running to copy its configuration.",
-      "done": "Copied to the clipboard ({{format}}). The token is hidden here:"
+      "done": "Copied to the clipboard ({{format}}). The token is hidden here:",
+      "jsonWarning": "The .mcp.json entry contains the token, a secret: never put it in a file of a repository (a project's .mcp.json is usually committed). The command registers it for you only (local scope)."
     },
     "rotate": {
       "title": "Token",

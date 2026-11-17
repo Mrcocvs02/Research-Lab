@@ -148,7 +148,7 @@ async function main(): Promise<void> {
       const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
-    clipboard: { writeText: (text) => clipboard.writeText(text) },
+    clipboard: { writeText: (text) => clipboard.writeText(text), readText: () => clipboard.readText() },
     appInfo: () => ({ name: APP_NAME, version: app.getVersion(), platform: process.platform, electron: process.versions.electron ?? '' }),
     createImporter: (options) => createLegacyImporter(options),
     backupDataDir: (libraryId, dataDir) => backupPolicy(libraryId, dataDir, { force: true }),

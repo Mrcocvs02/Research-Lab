@@ -1,4 +1,4 @@
-import { folderOf, inEnabledFolder } from '@rl/ai';
+import { folderOf, aiVisible } from '@rl/ai';
 import { AppError, type LibraryConfig, type ReasoningLevel } from '@rl/core';
 import { modelVector, topTermsOf, type GraphModel } from '@rl/graph';
 import { z } from 'zod';
@@ -58,7 +58,7 @@ async function planLabels(s: MainServices, rt: LibraryRuntime, cfg: LibraryConfi
   let enabledDocs = 0;
   for (let i = 0; i < m.ids.length; i++) {
     const rec = view.byId.get(m.ids[i] as string);
-    if (!rec || !inEnabledFolder(rec.path, cfg.aiEnabledFolders)) continue;
+    if (!rec || !aiVisible(rec.path, cfg)) continue;
     enabledDocs++;
     const vi = m.vi[i] as number[];
     const vw = m.vw[i] as number[];
@@ -74,7 +74,7 @@ async function planLabels(s: MainServices, rt: LibraryRuntime, cfg: LibraryConfi
     const cluster = m.clusters[c] as GraphModel['clusters'][number];
     const members: number[] = [];
     for (let i = 0; i < m.ids.length; i++) if ((m.cl[i] as number[]).includes(c) && view.byId.has(m.ids[i] as string)) members.push(i);
-    const allowed = members.filter((i) => inEnabledFolder((view.byId.get(m.ids[i] as string) as { path: string }).path, cfg.aiEnabledFolders));
+    const allowed = members.filter((i) => aiVisible((view.byId.get(m.ids[i] as string) as { path: string }).path, cfg));
     for (const i of members) if (!allowed.includes(i) && refused.length < MAX_REFUSED_LISTED) refused.push(m.ids[i] as string);
     if (allowed.length === 0) continue;
     const near = [...allowed].sort((a, b) => Math.hypot((m.x[a] as number) - cluster.cx, (m.y[a] as number) - cluster.cy) - Math.hypot((m.x[b] as number) - cluster.cx, (m.y[b] as number) - cluster.cy) || a - b).slice(0, MAX_TITLES);

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { documentRecordSchema, type AiField, type DocumentRecord, type SearchResultHit, type ToolSpec } from '@rl/core';
-import { createLibraryTools, folderOf, inEnabledFolder, TOOL_LIMITS, type AiFieldName, type AiFieldValue, type LibraryToolsHost, type ToolNote, type ToolResult } from './tools.js';
+import { aiVisible, createLibraryTools, folderOf, inEnabledFolder, inExcludedFolder, TOOL_LIMITS, type AiFieldName, type AiFieldValue, type LibraryToolsHost, type ToolNote, type ToolResult } from './tools.js';
 
 const NOW = '2026-01-02T03:04:05.000Z';
 const hex = (n: number) => n.toString(16).padStart(16, '0');
 const rec = (n: number, over: Record<string, unknown> = {}): DocumentRecord =>
   documentRecordSchema.parse({ id: hex(n), hash: 'ab'.repeat(32), path: `open/p${n}.pdf`, size: 1, mtimeMs: 1, addedAt: NOW, updatedAt: NOW, title: `Paper ${n}`, year: 2020, ...over });
 
-function setup(opts: { enabled?: string[]; docs?: DocumentRecord[]; notes?: Record<string, ToolNote[]>; search?: (text: string) => string[] } = {}) {
+function setup(opts: { excluded?: string[]; hideRefusal?: boolean; enabled?: string[]; docs?: DocumentRecord[]; notes?: Record<string, ToolNote[]>; search?: (text: string) => string[] } = {}) {
   const docs = new Map((opts.docs ?? [rec(1), rec(2, { path: 'closed/p2.pdf' }), rec(3, { path: 'open/sub/p3.pdf' })]).map((d) => [d.id, d]));
   const searches: string[] = [];
   const sends: Array<Parameters<LibraryToolsHost['logSend']>[0]> = [];
@@ -15,6 +15,7 @@ function setup(opts: { enabled?: string[]; docs?: DocumentRecord[]; notes?: Reco
   let enabled = opts.enabled ?? ['open'];
   const host: LibraryToolsHost = {
     enabledFolders: async () => enabled,
+    ...(opts.excluded ? { excludedFolders: async () => opts.excluded! } : {}),
     search: async (q) => (searches.push(q.text), {
       total: docs.size,
       hits: (opts.search ? opts.search(q.text).map((id) => docs.get(id)!) : [...docs.values()]).map(
@@ -28,7 +29,7 @@ function setup(opts: { enabled?: string[]; docs?: DocumentRecord[]; notes?: Reco
     logSend: async (e) => void sends.push(e),
     now: () => new Date(NOW),
   };
-  const tools = createLibraryTools({ host, model: 'claude-haiku-5-5', provider: 'mock' });
+  const tools = createLibraryTools({ host, model: 'claude-haiku-5-5', provider: 'mock', ...(opts.hideRefusal ? { hideRefusal: true } : {}) });
   const by = (name: string): ToolSpec => tools.find((t) => t.name === name)!;
   const run = async (name: string, input: unknown) => (await by(name).run(input, {})) as ToolResult;
   return { tools, run, searches, sends, writes, setEnabled: (f: string[]) => void (enabled = f) };
@@ -72,6 +73,38 @@ describe('folder rules', () => {
     expect(inEnabledFolder('p.pdf', ['.'])).toBe(true);
     expect(inEnabledFolder('open/p.pdf', ['.'])).toBe(false);
     expect(inEnabledFolder('open/p.pdf', ['.', 'open'])).toBe(true);
+  });
+});
+
+describe('excluded folders and the existence oracle', () => {
+  it('inExcludedFolder folds case, matches sub-folders only on separators and ignores an empty exclusion', () => {
+    expect(inExcludedFolder('Private/a.pdf', ['private'])).toBe(true);
+    expect(inExcludedFolder('private/sub/a.pdf', ['./private/'])).toBe(true);
+    expect(inExcludedFolder('privatex/a.pdf', ['private'])).toBe(false);
+    expect(inExcludedFolder('a.pdf', ['', '.'])).toBe(false);
+    expect(inExcludedFolder('a.pdf')).toBe(false);
+    expect(aiVisible('open/Hidden/a.pdf', { aiEnabledFolders: ['open'], excludedFolders: ['open/hidden'] })).toBe(false);
+    expect(aiVisible('open/a.pdf', { aiEnabledFolders: [''], excludedFolders: ['open/hidden'] })).toBe(true);
+  });
+
+  it('an excluded folder inside an enabled one is refused by every tool and dropped from search', async () => {
+    const docs = [rec(1), rec(4, { path: 'open/Hidden/p4.pdf' })];
+    const t = setup({ docs, excluded: ['open/hidden'] });
+    await expect(t.run('get_document', { docId: hex(4) })).rejects.toMatchObject({ code: 'FOLDER_NOT_AI_ENABLED' });
+    await expect(t.run('read_pages', { docId: hex(4), pages: [1] })).rejects.toMatchObject({ code: 'FOLDER_NOT_AI_ENABLED' });
+    await expect(t.run('list_notes', { docId: hex(4) })).rejects.toMatchObject({ code: 'FOLDER_NOT_AI_ENABLED' });
+    expect((await t.run('search_library', { query: 'paper' })).docIds).toEqual([hex(1)]);
+    expect(t.sends.flatMap((s) => s.docIds)).not.toContain(hex(4));
+  });
+
+  it('hideRefusal answers a hidden document exactly like an unknown id, the app keeps the specific code', async () => {
+    const hidden = setup({ hideRefusal: true });
+    const err = async (id: string) => hidden.run('get_document', { docId: id }).then(() => ({ code: 'NONE', message: '' }), (e: { code: string; message: string }) => ({ code: e.code, message: e.message }));
+    const a = await err(hex(2));
+    const b = await err(hex(99));
+    expect(a).toMatchObject({ code: 'NOT_FOUND', message: 'Unknown document' });
+    expect({ code: a.code, message: a.message }).toEqual({ code: b.code, message: b.message });
+    await expect(setup().run('get_document', { docId: hex(2) })).rejects.toMatchObject({ code: 'FOLDER_NOT_AI_ENABLED' });
   });
 });
 

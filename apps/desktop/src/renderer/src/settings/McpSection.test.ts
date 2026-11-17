@@ -188,6 +188,33 @@ describe('McpSection', () => {
     expect((screen.getByTestId('mcp-copy-cli') as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('reloads the call log when the log is full (the count stays at its cap, the last call time moves)', async () => {
+    const full = { ...running, calls: 500, lastCallAt: '2026-11-11T10:00:00.000Z' };
+    const state = setup({ status: full, log: [call(1)] });
+    await waitFor(() => expect(screen.getAllByTestId('mcp-log-row')).toHaveLength(1));
+    const loads = callsTo('mcp:log').length;
+    state.log = [call(2), call(1)];
+    act(() => emitEvent('mcp:changed', { ...full, lastCallAt: '2026-11-11T10:00:05.000Z' }));
+    await waitFor(() => expect(screen.getAllByTestId('mcp-log-row')).toHaveLength(2));
+    expect(callsTo('mcp:log').length).toBeGreaterThan(loads);
+  });
+
+  it('warns that the JSON entry holds a secret, that the port is remembered, and that tools change after a reconnect', async () => {
+    setup({ status: running });
+    expect((await screen.findByTestId('mcp-json-warning')).textContent).toMatch(/never put it in a file of a repository/);
+    expect(screen.getByTestId('mcp-port-squat').textContent).toContain('rotate the token');
+    expect(screen.getByTestId('mcp-write-group').textContent).toContain('reconnect Claude Code');
+    expect(screen.getByTestId('mcp-copy-group').textContent).toContain('after 60 seconds');
+  });
+
+  it('reads the AI folders again when the status changes (they can change elsewhere)', async () => {
+    setup({ status: running });
+    await screen.findByTestId('mcp-sees');
+    const before = callsTo('library:getConfig').length;
+    act(() => emitEvent('mcp:changed', running));
+    await waitFor(() => expect(callsTo('library:getConfig').length).toBeGreaterThan(before));
+  });
+
   it('pages the call log without showing any content', async () => {
     const log = Array.from({ length: 30 }, (_, i) => call(i));
     setup({ status: { ...running, calls: 30 }, log });

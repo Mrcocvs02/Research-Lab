@@ -10,7 +10,10 @@ export interface McpServerOptions {
   token(): string | Promise<string>;
   rpc: Omit<RpcContext, 'signal'>;
   bodyBytes: number;
+  /** Requests handled at once (more get 429) and, across all requests, messages run at once (a batch counts per message). */
   concurrent: number;
+  /** Most messages of a batch (default 20): a larger one is refused with an error. */
+  batchMax?: number;
   /** A request that takes longer is answered with an error and its tools are told to stop. */
   timeoutMs: number;
   /** A refused request (status and reason only, never headers or the token). */
@@ -22,8 +25,19 @@ export interface RunningMcpServer {
   close(): Promise<void>;
 }
 
+const CLOSE_GRACE_MS = 500;
+
 const send = (res: http.ServerResponse, status: number, body?: unknown, extra: Record<string, string> = {}) => {
   if (res.headersSent || res.writableEnded) return;
+  // A `Connection: close` answer must also end the connection: the client may still be sending a body we will not read.
+  if (extra.Connection === 'close') {
+    // Response first (a hard reset could discard it), then the connection goes: a client that keeps sending is cut after a short grace.
+    res.once('finish', () => {
+      const socket = res.socket;
+      socket?.end();
+      setTimeout(() => socket?.destroy(), CLOSE_GRACE_MS).unref();
+    });
+  }
   const data = body === undefined ? undefined : JSON.stringify(body);
   res.writeHead(status, { ...(data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : { 'Content-Length': 0 }), 'Cache-Control': 'no-store', ...extra });
   res.end(data);
@@ -41,8 +55,7 @@ function readBody(req: http.IncomingMessage, limit: number): Promise<Buffer | nu
       if (size > limit) {
         chunks.length = 0;
         req.removeAllListeners('data');
-        req.resume();
-        resolve(null);
+        resolve(null); // not drained: the caller answers and closes the connection
       } else chunks.push(c);
     });
     req.on('end', () => resolve(Buffer.concat(chunks)));
@@ -57,18 +70,31 @@ function readBody(req: http.IncomingMessage, limit: number): Promise<Buffer | nu
 export function startMcpServer(o: McpServerOptions): Promise<RunningMcpServer> {
   let inflight = 0;
   let port = 0;
+  const batchMax = o.batchMax ?? 20;
+  // Messages run at most `concurrent` at a time over all requests: a batch cannot multiply the cap.
+  let running = 0;
+  const waiting: Array<() => void> = [];
+  const slot = async <T>(work: () => Promise<T>): Promise<T> => {
+    if (running >= o.concurrent) await new Promise<void>((go) => waiting.push(go));
+    else running++;
+    try {
+      return await work();
+    } finally {
+      const next = waiting.shift();
+      if (next) next(); // the slot passes to the next message
+      else running--;
+    }
+  };
   const server = http.createServer((req, res) => {
     void (async () => {
       try {
         const refusal = checkRequest({ method: req.method ?? '', url: req.url ?? '', headers: req.headers, port }, await o.token());
         if (refusal) {
           o.onRefused?.(refusal);
-          req.resume();
-          return send(res, refusal.status, undefined, refusal.status === 405 ? { Allow: 'POST' } : {});
+          return send(res, refusal.status, undefined, { Connection: 'close', ...(refusal.status === 405 ? { Allow: 'POST' } : {}) });
         }
         if (inflight >= o.concurrent) {
-          req.resume();
-          return send(res, 429, undefined, { 'Retry-After': '1' });
+          return send(res, 429, undefined, { 'Retry-After': '1', Connection: 'close' });
         }
         inflight++;
         const abort = new AbortController();
@@ -86,7 +112,12 @@ export function startMcpServer(o: McpServerOptions): Promise<RunningMcpServer> {
             return send(res, 400, rpcError(null, RPC.parse, 'Parse error'));
           }
           const ctx: RpcContext = { ...o.rpc, signal: abort.signal };
-          const out: Array<RpcResponse | null> = Array.isArray(message) ? (message.length === 0 ? [rpcError(null, RPC.invalidRequest, 'Empty batch')] : await Promise.all(message.slice(0, 50).map((m) => handleRpc(m, ctx)))) : [await handleRpc(message, ctx)];
+          if (Array.isArray(message) && message.length > batchMax) return send(res, 400, rpcError(null, RPC.invalidRequest, `Batch too large: at most ${batchMax} messages`));
+          const out: Array<RpcResponse | null> = Array.isArray(message)
+            ? message.length === 0
+              ? [rpcError(null, RPC.invalidRequest, 'Empty batch')]
+              : await Promise.all(message.map((m) => slot(async () => (abort.signal.aborted ? rpcError(null, RPC.internal, 'The request took too long') : handleRpc(m, ctx)))))
+            : [await slot(() => handleRpc(message, ctx))];
           const answers = out.filter((r): r is RpcResponse => r !== null);
           if (answers.length === 0) return send(res, 202);
           send(res, 200, Array.isArray(message) ? answers : answers[0]);

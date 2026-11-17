@@ -1,14 +1,20 @@
-/** Phase 6: contract in `packages/core/src/ipc/channels/graph.ts`. Stub until the main side is merged. */
+/** Phase 6: zoomable exploration of topics, authors and venues (D-238). Contract in `packages/core/src/ipc/channels/graph.ts`. */
 import { AppError } from '@rl/core';
+import { loadView } from '../../graph/view.js';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
 
-const todo = (): never => {
-  throw new AppError('NOT_IMPLEMENTED', 'Not implemented yet');
-};
+const unknown = () => new AppError('NOT_FOUND', 'Unknown node');
 
-export const exploreHandlers = (_s: MainServices): DomainHandlers<'explore'> => ({
-  'explore:level': todo,
-  'explore:documents': todo,
-  'explore:related': todo,
-});
+export const exploreHandlers = (s: MainServices): DomainHandlers<'explore'> => {
+  const index = async () => (await loadView(await s.runtime.require())).explore();
+  return {
+    'explore:level': async ({ dimension, parentId }) => (await index()).level(dimension, parentId) ?? Promise.reject(unknown()),
+    'explore:documents': async ({ dimension, id, limit, offset }) => (await index()).documents(dimension, id, limit, offset) ?? Promise.reject(unknown()),
+    'explore:related': async ({ from, to, limit }) => {
+      const nodes = (await index()).related(from, to, limit);
+      if (!nodes) throw unknown();
+      return { nodes };
+    },
+  };
+};

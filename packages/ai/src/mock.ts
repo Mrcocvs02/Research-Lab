@@ -88,6 +88,18 @@ export function mockStructured(request: { schema: unknown; prompt: string }): un
     else if (k === 'summary') out[k] = 'Mock summary.';
     else if (k === 'keywords') out[k] = ['mock keyword', 'second keyword'];
     else if (k === 'synonyms') out[k] = ['mock synonym'];
+    else if (k === 'labels') out[k] = mockClusterLabels(request.prompt);
+  }
+  return out;
+}
+
+/** Labels for the clusters of a `graph:labels` prompt (`id:` and `terms:` lines of its DATA blocks): the first two terms, capitalised. */
+function mockClusterLabels(prompt: string): Array<{ id: string; label: string }> {
+  const out: Array<{ id: string; label: string }> = [];
+  for (const m of prompt.matchAll(/^id: (\S+)\nterms: (.*)$/gm)) {
+    const words = (m[2] ?? '').split(',').map((w) => w.trim()).filter(Boolean).slice(0, 2);
+    const text = words.join(' ');
+    out.push({ id: m[1] as string, label: text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : 'Mock cluster' });
   }
   return out;
 }

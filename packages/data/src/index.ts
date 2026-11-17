@@ -1,6 +1,8 @@
 import type { Scanner, TextExtractor } from '@rl/core';
 import { createScannerImpl, type ScannerOptions } from './scanner.js';
 import { createTextExtractorImpl, type TextExtractorOptions } from './extract/text-extractor.js';
+
+export { readCachedText } from './extract/text-extractor.js';
 import { createLegacyImporterImpl, type LegacyImporterOptions, type LegacyImporterWithExtras } from './legacy-importer.js';
 
 export { backupDataDir, copyDataDir } from './backup.js';

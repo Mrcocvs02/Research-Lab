@@ -29,6 +29,8 @@ import { fixtureFetch } from './net-fixtures.js';
 import { createBackupPolicy } from './library/backup-policy.js';
 import { RuntimeManager } from './library/runtime-manager.js';
 import { spawnScanWorker, watchdogFromEnv } from './library/worker-host.js';
+import { spawnGraphWorker } from './graph/host.js';
+import { closeGraph } from './graph/service.js';
 import { LibraryService } from './library-service.js';
 import { applyResourceSwitches } from './resources.js';
 import { configureRuntime, resolveRuntimeConfig } from './runtime.js';
@@ -155,6 +157,8 @@ async function main(): Promise<void> {
     // Test hook: canned answers instead of the network (development run with RL_E2E=1 only).
     fetch: runtime.netFixturesFile ? fixtureFetch(runtime.netFixturesFile) : (input, init) => net.fetch(input as string, init as never) as Promise<Response>,
     metadataFile: runtime.metadataFile,
+    // The graph worker thread (build, similarity on the fly): started by the first call, closed when idle.
+    graphEngine: () => spawnGraphWorker(path.join(import.meta.dirname, 'graph-worker.js'), { log }),
   };
 
   // The reader loads PDFs through rl-doc://; every request looks the document up in the active library again.
@@ -197,6 +201,7 @@ async function main(): Promise<void> {
     // A running chat turn owns a Claude Code process: it ends with the app.
     abortAllChatTurns();
     abortAllJobs();
+    void closeGraph(services);
     // A worker stuck in a synchronous loop must not keep the app from quitting: after a limit it is killed.
     const limit = new Promise<void>((resolve) => setTimeout(resolve, 15_000).unref());
     void Promise.race([runtimeManager.closeAll(), limit])

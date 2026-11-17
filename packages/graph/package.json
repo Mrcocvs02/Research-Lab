@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": { "@rl/core": "*" },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/synthetic.ts"
   }
 }

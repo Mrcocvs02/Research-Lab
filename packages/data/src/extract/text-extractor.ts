@@ -93,6 +93,24 @@ function validFullEntry(entry: unknown, maxPages: number, maxCharsPerPage: numbe
 }
 
 /**
+ * The cached text of a content hash (its first `maxPages` pages), or undefined when the cache has no valid entry:
+ * never extracts, never writes. For readers that must not trigger the PDF extractor (the graph build).
+ */
+export async function readCachedText(cacheDir: string, hash: string, maxPages: number): Promise<ExtractedText | undefined> {
+  if (!sha256Schema.safeParse(hash).success) return undefined;
+  const file = path.join(cacheDir, `${hash}.json`);
+  try {
+    const st = await stat(toFsPath(file));
+    if (!st.isFile() || st.size > MAX_CACHE_FILE_BYTES) return undefined;
+    const entry = JSON.parse(await readFile(toFsPath(file), 'utf8')) as unknown;
+    const result = validCacheEntry(entry, maxPages, 400_000, 8_000_000);
+    return result ? { ...result, hash, fromCache: true } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Text and metadata extraction, offline and without AI. The text is data: nothing in it is executed or followed.
  * Failures (malformed or encrypted PDF, too large, too slow) throw `AppError('IO_ERROR', ..., { reason })`,
  * unsupported extensions `INVALID_REQUEST`; callers handle them per file so one bad file never stops a scan.

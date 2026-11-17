@@ -11,6 +11,8 @@ export const EXPORT_LIMITS = {
   folderName: 120,
   selectionItems: 500,
   clusters: 100,
+  /** Copies into `sources/` above this many bytes need the user's confirmation (D-253). */
+  copyConfirmBytes: 1024 ** 3,
 } as const;
 
 /**
@@ -28,8 +30,11 @@ export const exportSelectionSchema = z
     /** Also export the library documents the selection cites, up to `citedDepth` steps. */
     includeCited: z.boolean().default(false),
     citedDepth: z.number().int().min(0).max(3).default(1),
-    /** `sources/`: nothing, a list of the original paths, or copies of the files (originals are only read). */
-    sources: z.enum(['none', 'paths', 'copies']).default('paths'),
+    /**
+     * `sources/`: nothing (the default), a list of the original absolute paths (an explicit choice: they name the user's
+     * folders), or copies of the files (originals are only read; above `EXPORT_LIMITS.copyConfirmBytes` it asks first).
+     */
+    sources: z.enum(['none', 'paths', 'copies']).default('none'),
     includeNotes: z.boolean().default(true),
     includeAnnotations: z.boolean().default(true),
   })
@@ -42,7 +47,8 @@ export type ExportSelection = z.infer<typeof exportSelectionSchema>;
  * Where to write: `destination` is a folder the user picked with `dialog:chooseFolder` (purpose `export-destination`,
  * exact match, D-017); the export goes into `<destination>/<folderName>` (created when missing). A folder that is not
  * empty and has no export manifest of this library is refused (CONFLICT `not-empty`; `other-library` when the manifest
- * belongs to another library): an export never overwrites files it did not write.
+ * belongs to another library): an export never overwrites files it did not write. A destination inside the library
+ * root is refused too (CONFLICT `inside-library`, links and case differences resolved first, D-252).
  */
 export const exportTargetSchema = z.object({
   destination: z.string().min(1).max(1024),
@@ -87,6 +93,8 @@ export const exportResultSchema = z.object({
   unchanged: z.number().int().nonnegative(),
   /** Files whose generated section was edited by hand: left as they are (listed relative to `dir`). */
   keptEdited: z.array(z.string()).max(1000),
+  /** Copies into `sources/` that failed (listed relative to `dir`, at most 200): the next export tries them again. */
+  copyErrors: z.array(z.string()).max(200),
   /** Cards of documents no longer in the selection: never deleted, listed in `INDEX.md` as no longer exported. */
   orphaned: z.number().int().nonnegative(),
   copiedBytes: z.number().int().nonnegative(),
@@ -119,8 +127,10 @@ export const exportChannels = defineChannels('export', {
   },
   /**
    * Starts the export (progress through `export:progress`). CONFLICT `needs-confirmation` when the selection has
-   * documents of folders not enabled for the AI and `confirmed` is false; `not-empty` / `other-library` as above;
-   * INVALID_REQUEST when the destination was not approved or over `EXPORT_LIMITS.documents`.
+   * documents of folders not enabled for the AI, or `sources` is `copies` above `EXPORT_LIMITS.copyConfirmBytes`, and
+   * `confirmed` is false (details: `documents`, `copyBytes`; reason `large-copy` when only the size asks);
+   * `not-empty` / `other-library` / `inside-library` as above; INVALID_REQUEST with reason `destination-not-approved`
+   * or `too-many` (over `EXPORT_LIMITS.documents`).
    */
   run: {
     request: z.object({ selection: exportSelectionSchema, target: exportTargetSchema, confirmed: z.boolean().default(false) }),

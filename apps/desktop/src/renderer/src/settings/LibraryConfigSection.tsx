@@ -170,7 +170,7 @@ export function LibraryConfigSection() {
               edit({
                 presets: [
                   ...draft.presets,
-                  { id: newPresetId(), name: t('settings.library.presetDefaultName', { n: draft.presets.length + 1 }), includeCited: false, citedDepth: 1, sources: 'paths', includeNotes: true, includeAnnotations: true },
+                  { id: newPresetId(), name: t('settings.library.presetDefaultName', { n: draft.presets.length + 1 }), includeCited: false, citedDepth: 1, sources: 'none', includeNotes: true, includeAnnotations: true },
                 ],
               })
             }

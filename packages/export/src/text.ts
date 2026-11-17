@@ -58,5 +58,8 @@ export const mdText = (s: string): string =>
 /** `oneLine` of untrusted text, neutralised (cut first, so an escape is never split). */
 export const safeLine = (s: string, max = 300): string => mdText(oneLine(s, max));
 
+/** Line endings an editor or git may have rewritten (CRLF, lone CR), back to `\n`. */
+export const toLf = (s: string): string => s.replace(/\r\n?/g, '\n');
+
 /** Removes what could close or fake one of our markers inside user or document text. */
 export const stripMarkers = (s: string): string => s.replace(/rl:(begin|end)/g, 'rl-$1');

@@ -1,5 +1,4 @@
-import { constants } from 'node:fs';
-import { copyFile, lstat, mkdir, readFile, readdir, stat } from 'node:fs/promises';
+import { copyFile, lstat, mkdir, readFile, readdir, realpath, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError } from '@rl/core';
 import { atomicWriteFile, isInside } from '@rl/core/node';
@@ -63,19 +62,30 @@ export class ExportTarget {
     await atomicWriteFile(abs, text);
   }
 
-  /** Copies a file into the folder without overwriting; false when the target already exists. The source is only read. */
-  async copyNew(source: string, rel: string): Promise<boolean> {
+  /**
+   * Copies a source file into the folder (the source is only read). The copy is made under `<name>.part` and renamed once
+   * its size is right, so a copy that stops half way never looks complete. An existing file of the same size is the copy
+   * already (`unchanged`). A file of another size is replaced only when it is the one the previous export wrote
+   * (`knownSize`: the original has changed since); otherwise it is the user's and stays (`kept`).
+   */
+  async copySource(source: string, rel: string, knownSize: number | undefined): Promise<{ state: 'copied' | 'unchanged' | 'kept'; size: number }> {
     const abs = this.resolve(rel);
     await this.checkWalk(path.dirname(abs));
     await mkdir(path.dirname(abs), { recursive: true });
-    if (await this.checkWalk(abs)) return false;
-    try {
-      await copyFile(source, abs, constants.COPYFILE_EXCL);
-      return true;
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === 'EEXIST') return false;
-      throw e;
+    const size = (await stat(source)).size;
+    if (await this.checkWalk(abs)) {
+      const have = await lstat(abs);
+      if (!have.isFile()) throw new AppError('CONFLICT', 'Something that is not a file is in the way', { reason: 'not-a-file' });
+      if (have.size === size) return { state: 'unchanged', size };
+      if (knownSize === undefined || have.size !== knownSize) return { state: 'kept', size: have.size };
     }
+    const part = `${abs}.part`;
+    await this.checkWalk(part);
+    await copyFile(source, part);
+    const got = (await stat(part)).size;
+    if (got !== (await stat(source)).size) throw new AppError('IO_ERROR', 'The copy is incomplete');
+    await rename(part, abs);
+    return { state: 'copied', size: got };
   }
 
   /** Creates the folder (and its parents) when missing. */
@@ -83,6 +93,30 @@ export class ExportTarget {
     await mkdir(this.dir, { recursive: true });
     await this.checkWalk(this.dir);
   }
+}
+
+const nodeCase = (p: string) => (process.platform === 'win32' ? p.toLowerCase() : p);
+
+/** The real location of `p`: links resolved on the existing part of the path, the rest (not yet created) appended. */
+async function realLocation(p: string): Promise<string> {
+  const abs = path.resolve(p);
+  try {
+    return await realpath(abs);
+  } catch (e) {
+    const parent = path.dirname(abs);
+    if (!notFound(e) || parent === abs) throw e;
+    return path.join(await realLocation(parent), path.basename(abs));
+  }
+}
+
+/**
+ * Whether `dir` is the library root or inside it, after resolving links and junctions (on the part that exists) and
+ * ignoring case on Windows. An export there would write into the library, and its copies and cards would be scanned
+ * back in as documents (D-252).
+ */
+export async function isInsideLibrary(rootPath: string, dir: string): Promise<boolean> {
+  const [root, target] = await Promise.all([realLocation(rootPath), realLocation(dir)]);
+  return isInside(nodeCase(root), nodeCase(target));
 }
 
 /** What `dir` holds now, and its manifest when it is an export. A link or a file in place of the folder counts as not empty. */

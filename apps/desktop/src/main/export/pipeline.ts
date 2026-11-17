@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { EXPORT_LIMITS, isReservedWindowsName, type CitationLink, type DocumentId, type DocumentRecord, type ExportSelection } from '@rl/core';
+import { EXPORT_LIMITS, type CitationLink, type DocumentId, type DocumentRecord, type ExportSelection } from '@rl/core';
 import { resolveInRoot } from '@rl/core/node';
 import {
   assignCitekeys,
@@ -15,6 +15,8 @@ import {
   layoutCard,
   layoutParts,
   mergeParts,
+  adoptParts,
+  toLf,
   notesReadme,
   sha256,
   type CardInput,
@@ -41,8 +43,8 @@ export type FileOutcome = 'new' | 'updated' | 'unchanged' | 'kept-edited';
 export interface Sink {
   /** Writes (or only counts) one file of the export. */
   put(spec: FileSpec): Promise<FileOutcome>;
-  /** A copy into `sources/`: bytes copied (0 when the file already was there or the original is missing). */
-  copy(source: string, rel: string): Promise<number>;
+  /** A copy into `sources/`: what happened (`kept`: a different file of the user's is in the way) and the bytes copied. */
+  copy(source: string, rel: string): Promise<{ state: 'copied' | 'unchanged' | 'kept'; bytes: number }>;
 }
 
 export interface PipelineOptions {
@@ -53,6 +55,8 @@ export interface PipelineOptions {
   manifest: ExportManifest | null;
   libraryName: string;
   signal?: AbortSignal | undefined;
+  /** Called as soon as the citekeys are known, so a manifest flushed during the run already holds them. */
+  onKeys?: ((keys: { citekeys: Record<string, string>; titles: Record<string, string> }) => void) | undefined;
   onProgress?: ((phase: 'collect' | 'write' | 'copy', done: number, total: number) => void) | undefined;
 }
 
@@ -65,6 +69,9 @@ export interface PipelineOutput {
   citekeys: Record<string, string>;
   titles: Record<string, string>;
   orphaned: number;
+  /** Copies into `sources/` that failed, and ones left alone because the user's own file is there (relative paths). */
+  copyErrors: string[];
+  copyKept: string[];
   cancelled: boolean;
 }
 
@@ -74,8 +81,9 @@ const MAX_CONCEPTS = 300;
 const MAX_CLUSTER_CONCEPTS = 200;
 const COPY_EXT = /^[a-z0-9]{1,8}$/;
 
+/** Only an AI field the user accepted or edited goes into the export: a proposal is not yet theirs (D-253). */
 const marked = (f: { value: string; review: { status: string } } | undefined): MarkedText | undefined =>
-  !f || f.review.status === 'rejected' ? undefined : { text: f.value, ai: true, reviewed: f.review.status === 'accepted' || f.review.status === 'edited' };
+  f && (f.review.status === 'accepted' || f.review.status === 'edited') ? { text: f.value, ai: true, reviewed: true } : undefined;
 
 const linkKey = (l: CitationLink) => (l.doi ? `doi:${l.doi.toLowerCase()}` : l.arxivId ? `arxiv:${l.arxivId.toLowerCase()}` : `t:${(l.title ?? '').toLowerCase().slice(0, 120)}|${l.year ?? ''}`);
 
@@ -86,7 +94,7 @@ export async function generate(o: PipelineOptions, sink: Sink): Promise<Pipeline
   const progress = o.onProgress ?? (() => {});
   const cancelled = () => o.signal?.aborted === true;
   const docs = c.docs;
-  const out: PipelineOutput = { chars: 0, indexTokens: 0, files: 0, copyBytes: 0, citekeys: {}, titles: {}, orphaned: 0, cancelled: false };
+  const out: PipelineOutput = { chars: 0, indexTokens: 0, files: 0, copyBytes: 0, citekeys: {}, titles: {}, orphaned: 0, copyErrors: [], copyKept: [], cancelled: false };
 
   /* ---------------- collect: citekeys, citations, concepts ---------------- */
   const citekeys = assignCitekeys(
@@ -99,6 +107,7 @@ export async function generate(o: PipelineOptions, sink: Sink): Promise<Pipeline
   const titles: Record<string, string> = { ...(o.manifest?.titles ?? {}) };
   for (const d of docs) titles[d.id] = titleOf(d).slice(0, 300);
   out.titles = titles;
+  o.onKeys?.({ citekeys, titles });
 
   const refsOf = new Map<string, CitationLink[]>();
   const citedByOf = new Map<string, CitationLink[]>();
@@ -189,7 +198,7 @@ export async function generate(o: PipelineOptions, sink: Sink): Promise<Pipeline
     clusterList.sort((a, b) => a.level - b.level || b.ids.length - a.ids.length || (a.label < b.label ? -1 : 1));
     clusterList.splice(MAX_CLUSTER_CONCEPTS);
   }
-  const slugList = conceptSlugs([...tagList.map((t) => ({ label: t.label })), ...clusterList.map((k) => ({ label: k.label, prefix: 'cluster-' }))]).map((sl) => (isReservedWindowsName(sl) ? `${sl}-topic` : sl));
+  const slugList = conceptSlugs([...tagList.map((t) => ({ label: t.label })), ...clusterList.map((k) => ({ label: k.label, prefix: 'cluster-' }))]);
   const tagSlug = new Map(tagList.map((t, i) => [t.id, slugList[i] as string]));
   const clusterSlug = new Map(clusterList.map((k, i) => [k.idx, slugList[tagList.length + i] as string]));
   const conceptsOfDoc = new Map<string, Array<{ slug: string; label: string }>>();
@@ -283,7 +292,8 @@ export async function generate(o: PipelineOptions, sink: Sink): Promise<Pipeline
   if (!(await put({ kind: 'whole', rel: 'graph.json', text: graph }, false))) return out;
   if (!(await put({ kind: 'once', rel: 'notes/README.md', text: notesReadme(lang) }))) return out;
   if (selection.sources === 'paths') {
-    const rows = docs.map((d) => `${key(d)}\t${path.join(rt.store.rootPath, ...d.path.split('/'))}`);
+    // A tab or a line break in a path would split the row.
+    const rows = docs.map((d) => `${key(d)}\t${path.join(rt.store.rootPath, ...d.path.split('/')).replace(/[\t\r\n]/g, ' ')}`);
     if (!(await put({ kind: 'whole', rel: 'sources/paths.tsv', text: `${rows.join('\n')}\n` }, false))) return out;
   }
 
@@ -329,10 +339,14 @@ export async function generate(o: PipelineOptions, sink: Sink): Promise<Pipeline
       }
       const ext = path.extname(d.path).slice(1).toLowerCase();
       if (!d.missing && COPY_EXT.test(ext)) {
+        const rel = `sources/${key(d)}.${ext}`;
         try {
           const src = await resolveInRoot(rt.store.rootPath, d.path);
-          out.copyBytes += await sink.copy(src, `sources/${key(d)}.${ext}`);
+          const r = await sink.copy(src, rel);
+          out.copyBytes += r.bytes;
+          if (r.state === 'kept') out.copyKept.push(rel);
         } catch (e) {
+          out.copyErrors.push(rel);
           o.s.log.warn('a source file could not be copied into the export', { error: e });
         }
       }
@@ -347,11 +361,16 @@ export function mergeSpec(spec: FileSpec, existing: string | null, known: { part
   if (spec.kind === 'once') return { outcome: existing === null ? 'new' : 'unchanged', text: existing === null ? spec.text : null, entry: null };
   if (spec.kind === 'whole') {
     if (existing === null) return { outcome: 'new', text: spec.text, entry: { whole: sha256(spec.text) } };
-    if (known?.whole === undefined || sha256(existing) !== known.whole) return { outcome: 'kept-edited', text: null, entry: null };
-    if (existing === spec.text) return { outcome: 'unchanged', text: null, entry: { whole: known.whole } };
+    // Line endings do not count as an edit (an editor or git may have converted them).
+    const now = toLf(existing);
+    // No recorded hash: ours only when an interrupted export wrote exactly this (its manifest was not saved yet).
+    if (known?.whole === undefined) return now === spec.text ? { outcome: 'unchanged', text: null, entry: { whole: sha256(spec.text) } } : { outcome: 'kept-edited', text: null, entry: null };
+    if (sha256(now) !== known.whole) return { outcome: 'kept-edited', text: null, entry: null };
+    if (now === spec.text) return { outcome: 'unchanged', text: null, entry: { whole: known.whole } };
     return { outcome: 'updated', text: spec.text, entry: { whole: sha256(spec.text) } };
   }
-  const r = mergeParts(existing, spec.parts, known?.parts, spec.layout);
+  const adopted = existing !== null && !known?.parts ? adoptParts(existing, spec.parts, spec.layout) : null;
+  const r = adopted ?? mergeParts(existing, spec.parts, known?.parts, spec.layout);
   if (r.status === 'kept-edited') return { outcome: 'kept-edited', text: null, entry: null };
   return { outcome: r.status, text: r.status === 'new' || r.status === 'updated' ? r.text : null, entry: { parts: r.hashes } };
 }

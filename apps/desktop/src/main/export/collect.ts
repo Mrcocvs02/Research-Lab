@@ -21,7 +21,14 @@ export interface Collected {
   model: { m: GraphModel; index: Map<string, number> } | null;
 }
 
-const inFolder = (relPath: string, folder: string) => folder.replace(/\/+$/, '') === '' || inEnabledFolder(relPath, [folder]);
+/**
+ * Whether `relPath` is in `folder` (or below it). Case-insensitive on Windows, where `Private/a.pdf` and `private/a.pdf`
+ * are the same file: an exclusion never fails open on a difference of case (D-253).
+ */
+export function inFolder(relPath: string, folder: string, caseInsensitive = process.platform === 'win32'): boolean {
+  if (folder.replace(/\/+$/, '') === '') return true;
+  return caseInsensitive ? inEnabledFolder(relPath.toLowerCase(), [folder.toLowerCase()]) : inEnabledFolder(relPath, [folder]);
+}
 
 /**
  * The documents an export selection stands for: the union of a project, folders, tags, clusters and documents, plus the

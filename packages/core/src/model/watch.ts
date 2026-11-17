@@ -33,7 +33,7 @@ export const watchSeenSchema = z.object({
   arxivId: z.string().max(L.text).optional(),
   venue: z.string().max(L.text).optional(),
   /** Publication date reported by the source (YYYY-MM-DD). */
-  publishedOn: z.string().regex(/^d{4}-d{2}-d{2}$/).optional(),
+  publishedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 export type WatchSeen = z.infer<typeof watchSeenSchema>;
 

@@ -117,3 +117,12 @@ describe('legacy index shapes', () => {
     expect(t.nodes[0]?.status).toBe('active');
   });
 });
+
+describe('watch seen items', () => {
+  it('accept a YYYY-MM-DD publication date and nothing else', async () => {
+    const { watchSeenSchema } = await import('./watch.js');
+    const base = { sourceId: 'src-1', externalId: 'W1', firstSeenAt: '2026-11-17T00:00:00.000Z' };
+    expect(watchSeenSchema.safeParse({ ...base, publishedOn: '2026-11-03' }).success).toBe(true);
+    for (const bad of ['dddd-dd-dd', '2026-1-3', '2026-11-03T00:00:00Z']) expect(watchSeenSchema.safeParse({ ...base, publishedOn: bad }).success).toBe(false);
+  });
+});

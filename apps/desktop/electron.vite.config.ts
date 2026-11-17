@@ -62,6 +62,9 @@ export default defineConfig({
           index: resolve(import.meta.dirname, 'src/main/index.ts'),
           'scan-worker': resolve(import.meta.dirname, 'src/main/scan-worker.ts'),
         },
+        // Unminified, but without the JSDoc of the sources (it is documentation, not code): names, structure and stack
+        // traces stay readable. Legal comments stay; the sources keep all their comments (D-233).
+        output: { comments: { jsdoc: false, annotation: true, legal: true } },
       },
     },
   },

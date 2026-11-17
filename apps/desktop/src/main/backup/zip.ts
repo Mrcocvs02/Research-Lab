@@ -10,7 +10,7 @@ const deflateRawAsync = promisify(deflateRaw);
 import { AppError } from '@rl/core';
 
 /**
- * Minimal streaming zip container for `.rlbackup` files (D-265). Compression is node:zlib (raw deflate, off the main
+ * Minimal streaming zip container for `.rlbackup` files (D-290). Compression is node:zlib (raw deflate, off the main
  * thread); the container is written here because fflate's `Zip` has no Zip64 and a backup can hold more than 65 535
  * files. Entries are written with a data descriptor (sizes are known only after the stream) and the central directory
  * comes last, so a backup is one forward pass; the reader finds everything through the central directory and never

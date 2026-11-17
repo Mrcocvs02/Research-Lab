@@ -112,8 +112,9 @@ function launch(s: MainServices, kind: JobKind, total: number, file: string | nu
       } else {
         const err = AppError.from(e);
         job.state = 'failed';
-        // The reason (integrity, too-large, ...) is the code when there is one: the status has no room for details.
-        job.error = { code: reasonOf(err), message: err.message };
+        // The reason (integrity, too-large, ...) is a structured field and also the first token of the message.
+        const reason = typeof err.details?.reason === 'string' ? err.details.reason : undefined;
+        job.error = { code: err.code, message: reason ? `${reason}: ${err.message}` : err.message, ...(reason ? { reason } : {}) };
         s.log.warn(`the ${kind} of a backup failed`, { error: e });
       }
     } finally {
@@ -579,7 +580,7 @@ export async function autoBackupOnStart(s: MainServices, now: () => number = Dat
     const { jobId } = await create(s, { includeLocal: true, origin: 'auto' });
     const job = jobOf(s, jobId);
     await job.finished;
-    if (job.state === 'failed') await fail(job.error?.code ?? 'UNKNOWN');
+    if (job.state === 'failed') await fail(job.error?.reason ?? job.error?.code ?? 'UNKNOWN');
   } catch (e) {
     await fail(reasonOf(AppError.from(e)));
   }

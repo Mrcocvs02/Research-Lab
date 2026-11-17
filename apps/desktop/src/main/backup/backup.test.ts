@@ -237,7 +237,8 @@ describe('integrity', () => {
     await whenBackupDone(services);
     const st = ok(await call('backup:status', { jobId: r.jobId })) as { state: string; error: any; result: any };
     expect(st.state).toBe('failed');
-    expect(st.error.code).toBe('integrity');
+    expect(st.error).toMatchObject({ code: 'CONFLICT', reason: 'integrity' });
+    expect(st.error.message).toMatch(/^integrity:/);
     expect(st.result.problemCount).toBeGreaterThanOrEqual(1);
     expect(await readdir(rootB)).toEqual([]);
     expect((await settings.get()).libraries).toHaveLength(before);

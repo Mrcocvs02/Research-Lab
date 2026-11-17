@@ -26,6 +26,7 @@ export type StringPart =
   | 'history'
   | 'inbox'
   | 'jobs'
+  | 'network'
   | 'palette'
   | 'projects'
   | 'reader'

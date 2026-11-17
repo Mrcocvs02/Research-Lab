@@ -1,0 +1,345 @@
+/* Network section (lazy chunk: this file loads with the view). */
+.network-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: var(--space-4) var(--space-5);
+  gap: var(--space-2);
+}
+.network-page h1 {
+  margin: 0;
+  font-size: 20px;
+}
+.net-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.net-status {
+  flex: 1;
+  min-width: 200px;
+  color: var(--text-muted);
+}
+.net-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.net-progress .progress {
+  flex: 1;
+  min-width: 120px;
+}
+.net-progress .phase {
+  display: none;
+}
+.net-build,
+.net-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.net-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 13px;
+}
+.net-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--space-3);
+}
+.net-panels {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.net-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.net-panel[hidden] {
+  display: none;
+}
+.net-tab {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.net-detail {
+  width: 320px;
+  flex: none;
+  overflow: auto;
+  border-left: 1px solid var(--border);
+  padding-left: var(--space-3);
+}
+.net-detail header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: var(--space-2);
+}
+.net-detail h2 {
+  font-size: 15px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.net-detail h3,
+.similar-panel h4 {
+  font-size: 13px;
+  margin: var(--space-3) 0 var(--space-1);
+}
+.map-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--space-3);
+}
+.map-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 240px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.map-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+  color: var(--text);
+}
+.map-canvas:active {
+  cursor: grabbing;
+}
+.map-canvas:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.map-tooltip {
+  position: absolute;
+  pointer-events: none;
+  max-width: 320px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 12px;
+  z-index: 2;
+}
+.legend {
+  width: 220px;
+  flex: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: auto;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 3px 4px;
+  text-align: left;
+}
+.legend-item:hover {
+  background: var(--surface-2);
+}
+.legend-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+.net-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.net-kinds legend {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0;
+  margin-right: var(--space-2);
+  float: left;
+}
+.check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+.net-key {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.net-key .key-doc::before,
+.net-key .key-folder::before,
+.net-key .key-tag::before {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 4px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+.net-key .key-folder::before {
+  background: #a8741a;
+  border-radius: 1px;
+}
+.net-key .key-tag::before {
+  background: var(--ok);
+  border-radius: 1px;
+  transform: rotate(45deg) scale(0.9);
+}
+.net-key .key-line::before {
+  content: '';
+  display: inline-block;
+  width: 18px;
+  margin-right: 4px;
+  vertical-align: middle;
+  border-top: 2px solid var(--text-muted);
+}
+.net-key .key-similar::before {
+  border-top: 2px dashed var(--accent);
+}
+.net-key .key-cites::before {
+  border-top-color: var(--text);
+}
+.net-key .key-tagged::before {
+  border-top: 2px dotted var(--ok);
+}
+.sim-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sim-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+.sim-row.on {
+  background: var(--accent-soft);
+}
+.sim-title {
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.sim-shared {
+  flex-basis: 100%;
+}
+.explore-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--space-4);
+}
+.explore-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.explore-docs {
+  width: 300px;
+  flex: none;
+  overflow: auto;
+}
+.explore-docs h3,
+.explore-related h3 {
+  font-size: 14px;
+  margin: 0;
+}
+.explore-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.explore-node {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+  padding: 6px 8px;
+}
+.explore-node:hover {
+  background: var(--surface-2);
+}
+.explore-node.on {
+  background: var(--accent-soft);
+}
+.explore-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.seg {
+  display: inline-flex;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.labels-list {
+  max-height: 260px;
+  overflow: auto;
+}

@@ -1,0 +1,148 @@
+{
+  "network": {
+    "level": "Level {{level}}",
+    "colorBy": "Colour by",
+    "fit": "Show all",
+    "mapInfo": "{{count}} documents · seed {{seed}}",
+    "noMap": "The map is not available yet.",
+    "noPoints": "No document in this scope.",
+    "mapLabel": "Map of the documents: drag to move, wheel or plus and minus to zoom, click a point to select it.",
+    "legend": "Clusters",
+    "moreClusters": "and {{count}} more clusters",
+    "detail": "Selected document",
+    "openReader": "Open in the reader",
+    "building": "Building the model…",
+    "buildFailed": "The build failed. Try again.",
+    "build": "Build the model",
+    "rebuild": "Rebuild",
+    "seed": "Seed",
+    "seedAuto": "auto",
+    "empty": "The model has not been built yet. Building reads the documents already in the library, computes similarity from text, citations and tags, groups the documents in clusters and lays them out on a map. Nothing is sent online.",
+    "tabs": "Network views",
+    "status": {
+      "none": "Model not built.",
+      "stale_one": "Model usable; {{count}} document was added or changed since the build.",
+      "stale_other": "Model usable; {{count}} documents were added or changed since the build.",
+      "ready": "Model up to date ({{count}} documents).",
+      "builtAt": "built {{date}}"
+    },
+    "phase": {
+      "vectors": "Reading texts",
+      "similarity": "Computing similarity",
+      "clusters": "Grouping",
+      "layout": "Laying out the map"
+    },
+    "tab": {
+      "map": "Map",
+      "network": "Network",
+      "explore": "Explore",
+      "surprising": "Unexpected pairs"
+    },
+    "scope": {
+      "label": "Scope",
+      "all": "Whole library",
+      "folder": "Folder",
+      "project": "Project",
+      "tag": "Tag",
+      "pick": "Choose…"
+    },
+    "labels": {
+      "open": "Label clusters with Claude",
+      "title": "Cluster labels by Claude",
+      "intro": "Claude proposes a short name for each chosen cluster from its characteristic terms and the titles of its documents in AI-enabled folders. The text of the documents is never sent. You see what would be sent before confirming.",
+      "selectLevel": "Level {{level}}",
+      "clearLevel": "Deselect level {{level}}",
+      "none": "none",
+      "clusters": "Clusters ({{count}} chosen)",
+      "tooMany": "At most {{limit}} clusters at a time.",
+      "preview": "Preview what is sent",
+      "previewTitle": "Send cluster labels request",
+      "send": "Send and label",
+      "done_one": "{{count}} cluster labelled.",
+      "done_other": "{{count}} clusters labelled.",
+      "note": "Labels are stored on this computer and always marked as AI-generated."
+    },
+    "net": {
+      "fromDoc": "Start from the selected document",
+      "fromFolder": "Start from folder",
+      "fromTag": "Start from tag",
+      "limit": "Neighbours",
+      "kinds": "Expand by",
+      "kind": {
+        "similar": "similar",
+        "citations": "citations",
+        "tags": "tags",
+        "folder": "folder",
+        "children": "sub-folders",
+        "documents": "documents"
+      },
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "remove": "Remove node",
+      "reset": "Reset",
+      "count": "{{count}} nodes",
+      "legend": "Key",
+      "docNode": "document",
+      "folderNode": "folder",
+      "tagNode": "tag",
+      "edge": {
+        "cites": "cites",
+        "tagged": "tagged",
+        "contains": "contains"
+      },
+      "empty": "Choose a document, folder or tag to start the network.",
+      "help": "Double-click a node (or use Expand, or press Enter) to add its neighbours; drag nodes to move them; wheel to zoom; ] and [ choose the next or previous node.",
+      "label": "Network of documents, folders and tags",
+      "noKinds": "None of the chosen kinds applies to this node.",
+      "alreadyExpanded": "This node is already expanded.",
+      "capped": "The network is limited to {{limit}} nodes.",
+      "nothingNew": "No new neighbours."
+    },
+    "explore": {
+      "documents": "Documents",
+      "noDocuments": "No documents.",
+      "more": "{{count}} more",
+      "dimension": "Dimension",
+      "back": "Back",
+      "backTo": "Back to {{label}}",
+      "breadcrumb": "Where you are",
+      "related": "Related nodes",
+      "relatedTitle": "{{to}} related to {{label}}",
+      "noRelated": "Nothing related.",
+      "empty": "Nothing here.",
+      "nodes": "Nodes of this level",
+      "kind": {
+        "topic": "topic",
+        "author-group": "author group",
+        "author": "author",
+        "venue-area": "area",
+        "venue": "venue"
+      },
+      "count": "Documents",
+      "zoomIn": "Zoom in",
+      "relatedLabel": "Show related:"
+    },
+    "dim": {
+      "topic": "Topics",
+      "author": "Authors",
+      "venue": "Venues"
+    },
+    "reason": {
+      "text": "text",
+      "citations": "citations",
+      "tags": "tags"
+    },
+    "similar": {
+      "title": "Similar papers",
+      "score": "Similarity",
+      "sharedTags": "Shared tags: {{tags}}",
+      "sharedCitations_one": "{{count}} shared citation",
+      "sharedCitations_other": "{{count}} shared citations",
+      "sharedTerms": "Shared terms: {{terms}}",
+      "none": "No similar papers found.",
+      "surprisingTitle": "Close but do not look it",
+      "surprisingHint": "Similar in content, yet with no shared tag, citation or folder.",
+      "noSurprising": "No unexpected pairs found."
+    }
+  }
+}

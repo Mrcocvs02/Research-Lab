@@ -22,6 +22,7 @@ import type { DocRow } from './useDocumentList';
 import { useTaxonomy } from './useTaxonomy';
 
 const CitationsPanel = lazyView(() => import('../citations/CitationsPanel').then((m) => ({ default: m.CitationsPanel })), ['citations']);
+const SimilarPanel = lazyView(() => import('../network/SimilarPanel').then((m) => ({ default: m.SimilarPanel })), ['network']);
 const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);
 
 const STUDY: StudyState[] = ['to-read', 'reading', 'read'];
@@ -299,6 +300,7 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
   const { openReader } = useReader();
   const [jobOpen, setJobOpen] = useState(false);
   const [citationsOpen, setCitationsOpen] = useState(false);
+  const [similarOpen, setSimilarOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -481,6 +483,17 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
         {citationsOpen && (
           <Lazy>
             <CitationsPanel docId={docId} />
+          </Lazy>
+        )}
+      </Section>
+
+      <Section title={t('similarPanel.title')} testId="doc-similar">
+        <button type="button" aria-expanded={similarOpen} onClick={() => setSimilarOpen(!similarOpen)} data-testid="similar-toggle">
+          {similarOpen ? t('similarPanel.hide') : t('similarPanel.show')}
+        </button>
+        {similarOpen && (
+          <Lazy>
+            <SimilarPanel docId={docId} tagLabel={(id) => model.byId.get(resolveId(model, id))?.label ?? id} onOpen={openReader} />
           </Lazy>
         )}
       </Section>

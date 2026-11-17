@@ -35,7 +35,13 @@ export interface FetchWorkOptions {
 }
 
 export class WorkLookupError extends Error {
-  constructor(message: string) {
+  /** `http` / `rate-limited` carry the status; `network` is a failed or timed-out request; `refused` is a safety refusal. */
+  constructor(
+    message: string,
+    readonly reason: 'network' | 'http' | 'rate-limited' | 'refused' | 'cancelled' = 'refused',
+    readonly status = 0,
+    readonly retryAfterMs = 0,
+  ) {
     super(message);
     this.name = 'WorkLookupError';
   }
@@ -47,8 +53,8 @@ const ABSTRACT_MAX = 20_000;
 const ENTRY_MAX = 200_000;
 const USER_AGENT = 'ResearchLab';
 
-const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) : s);
-const clean = (s: unknown, n: number): string | null => {
+export const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) : s);
+export const clean = (s: unknown, n: number): string | null => {
   if (typeof s !== 'string') return null;
   const t = s.replace(/\s+/g, ' ').trim();
   return t ? clip(t, n) : null;
@@ -79,17 +85,17 @@ async function readCapped(res: Response, maxBytes: number): Promise<string> {
 }
 
 /** The only hosts a lookup may talk to, whatever a redirect says. */
-const ALLOWED_HOSTS = new Set(['api.openalex.org', 'export.arxiv.org']);
+const ALLOWED_HOSTS = new Set(['api.openalex.org', 'export.arxiv.org', 'api.semanticscholar.org']);
 
 /** GET of an https URL with a timeout, a size cap and no cookies. Null on 404; throws `WorkLookupError` on anything else. Redirects are refused. */
-async function get(url: string, accept: string, o: FetchWorkOptions): Promise<string | null> {
+export async function httpGet(url: string, accept: string, o: FetchWorkOptions): Promise<string | null> {
   if (!url.startsWith('https://')) throw new WorkLookupError('only https is used');
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), o.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const onAbort = () => ctl.abort();
   o.signal?.addEventListener('abort', onAbort, { once: true });
   try {
-    if (o.signal?.aborted) throw new WorkLookupError('cancelled');
+    if (o.signal?.aborted) throw new WorkLookupError('cancelled', 'cancelled');
     const res = await o.fetch(url, { signal: ctl.signal, headers: { 'User-Agent': USER_AGENT, Accept: accept }, credentials: 'omit', redirect: 'manual' } as RequestInit);
     // No hop is followed (not even to the other fixed host), and a final address that is not a fixed host is refused too.
     if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) throw new WorkLookupError('redirect refused');
@@ -103,11 +109,14 @@ async function get(url: string, accept: string, o: FetchWorkOptions): Promise<st
       if (!res.url.startsWith('https://') || !ALLOWED_HOSTS.has(host)) throw new WorkLookupError('answer from an unexpected address');
     }
     if (res.status === 404) return null;
-    if (!res.ok) throw new WorkLookupError(`status ${res.status}`);
+    if (!res.ok) {
+      const ra = Number(res.headers.get('retry-after'));
+      throw new WorkLookupError(`status ${res.status}`, res.status === 429 ? 'rate-limited' : 'http', res.status, Number.isFinite(ra) && ra > 0 ? Math.min(ra, 10) * 1000 : 0);
+    }
     return await readCapped(res, o.maxBytes ?? DEFAULT_MAX_BYTES);
   } catch (e) {
     if (e instanceof WorkLookupError) throw e;
-    throw new WorkLookupError(ctl.signal.aborted ? 'timeout or cancelled' : 'network error');
+    throw new WorkLookupError(ctl.signal.aborted ? 'timeout or cancelled' : 'network error', o.signal?.aborted ? 'cancelled' : 'network');
   } finally {
     clearTimeout(timer);
     o.signal?.removeEventListener('abort', onAbort);
@@ -120,7 +129,7 @@ export const normaliseDoi = (doi: string): string =>
     .replace(/^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:\s*)/i, '')
     .toLowerCase();
 
-const encodePath = (s: string) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F');
+export const encodePath = (s: string) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F');
 
 /** Abstract of OpenAlex's `abstract_inverted_index` ({ word: [positions] }) back to text. */
 export function abstractFromInverted(index: unknown): string | null {
@@ -139,7 +148,7 @@ export function abstractFromInverted(index: unknown): string | null {
   return clean(words.filter((w) => w !== undefined).join(' '), ABSTRACT_MAX);
 }
 
-const asObj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+export const asObj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 
 export function parseOpenAlex(json: unknown, doi: string): WorkMetadata | null {
   const w = asObj(json);
@@ -216,7 +225,7 @@ export async function fetchWorkMetadata(ref: WorkRef, o: FetchWorkOptions): Prom
   if (doi) {
     tried++;
     try {
-      const text = await get(`https://api.openalex.org/works/doi:${encodePath(doi)}`, 'application/json', o);
+      const text = await httpGet(`https://api.openalex.org/works/doi:${encodePath(doi)}`, 'application/json', o);
       if (text !== null) {
         let json: unknown = null;
         try {
@@ -236,7 +245,7 @@ export async function fetchWorkMetadata(ref: WorkRef, o: FetchWorkOptions): Prom
   if (arxiv && /^[a-z0-9.\-/]{4,60}$/i.test(arxiv)) {
     tried++;
     try {
-      const text = await get(`https://export.arxiv.org/api/query?id_list=${encodeURIComponent(arxiv.replace(/v\d+$/i, ''))}`, 'application/atom+xml', o);
+      const text = await httpGet(`https://export.arxiv.org/api/query?id_list=${encodeURIComponent(arxiv.replace(/v\d+$/i, ''))}`, 'application/atom+xml', o);
       const metadata = text === null ? null : parseArxivAtom(text);
       if (metadata) return { source: 'arxiv', metadata };
       // Not found there: an earlier OpenAlex ERROR stays the outcome (retryable), not a sticky not-found.

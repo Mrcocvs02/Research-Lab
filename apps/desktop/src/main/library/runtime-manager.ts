@@ -163,6 +163,11 @@ export class RuntimeManager {
     return { libraryId: null, state: 'idle', seen: 0, processed: 0, indexed: 0 };
   }
 
+  /** Whether the worker thread of the active library is alive right now. */
+  workerAlive(): boolean {
+    return this.rt?.workerAlive() ?? false;
+  }
+
   async closeAll(): Promise<void> {
     await this.chain;
     const rt = this.rt;

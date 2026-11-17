@@ -216,6 +216,7 @@ export function createSupervisedWorker(options: SupervisedWorkerOptions): Librar
     extract: (args, hooks) => run('extract', hooks, (w, h) => w.client.extract(args, h)),
     index: (args) => run('index', undefined, (w) => w.client.index(args)),
     remove: (ids) => run('remove', undefined, (w) => w.client.remove(ids)),
+    alive: () => raw !== null,
     async dispose() {
       disposed = true;
       clearTimeout(idleTimer);

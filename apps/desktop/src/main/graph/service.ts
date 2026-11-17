@@ -69,6 +69,18 @@ export function engineOf(s: MainServices): GraphEngine {
   return e;
 }
 
+/** Whether a graph build is running for this library (the maintenance clean waits). */
+export const graphBuilding = (rt: LibraryRuntime): boolean => stateOf(rt).job !== null;
+
+/** Drops the in-memory model and placements of this library (its files were cleaned). */
+export function forgetGraphModel(rt: LibraryRuntime): void {
+  const st = stateOf(rt);
+  clearTimeout(st.loaded?.timer);
+  st.loaded = null;
+  st.meta = null;
+  st.placed.clear();
+}
+
 /** Stops builds and the worker thread (app quit). */
 export async function closeGraph(s: MainServices): Promise<void> {
   const e = engines.get(s);

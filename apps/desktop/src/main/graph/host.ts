@@ -25,6 +25,8 @@ export interface GraphHostOptions {
 /** Engine handed to the handlers: also able to stop everything at quit. */
 export interface GraphHost extends GraphEngine {
   terminate(): Promise<void>;
+  /** Whether the worker thread is alive right now (it closes after `idleCloseMs` without a call). */
+  alive(): boolean;
 }
 
 type Live = RawGraphWorker & { gone: boolean };
@@ -138,6 +140,7 @@ export function createGraphHost(options: GraphHostOptions): GraphHost {
       similarTail = turn.then(noop, noop);
       return turn;
     },
+    alive: () => raw !== null && !raw.gone,
     async dispose() {
       disposed = true;
       clearTimeout(idle);

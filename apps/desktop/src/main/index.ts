@@ -29,7 +29,8 @@ import { fixtureFetch } from './net-fixtures.js';
 import { createBackupPolicy } from './library/backup-policy.js';
 import { RuntimeManager } from './library/runtime-manager.js';
 import { spawnScanWorker, watchdogFromEnv } from './library/worker-host.js';
-import { spawnGraphWorker } from './graph/host.js';
+import { spawnGraphWorker, type GraphHost } from './graph/host.js';
+import { autoBackupOnStart } from './backup/service.js';
 import { closeGraph } from './graph/service.js';
 import { reconcileMcp, stopMcp } from './mcp/service.js';
 import { LibraryService } from './library-service.js';
@@ -45,7 +46,7 @@ import { createMainWindow } from './window.js';
 app.setName(APP_NAME);
 applyResourceSwitches(app.commandLine);
 const runtime = configureRuntime(resolveRuntimeConfig(process.env, app.isPackaged));
-const dirs = resolveAppDirs(process.env, { userData: app.getPath('userData') }, app.isPackaged);
+const dirs = resolveAppDirs(process.env, { userData: app.getPath('userData') }, app.isPackaged, process.argv);
 app.setPath('userData', dirs.userData);
 app.setPath('sessionData', path.join(dirs.localData, 'session'));
 registerPrivilegedSchemes();
@@ -99,6 +100,8 @@ async function main(): Promise<void> {
     spawnWorker: () => spawnScanWorker(path.join(import.meta.dirname, 'scan-worker.js'), { log, watchdog: watchdogFromEnv(process.env, app.isPackaged) }),
     watch: (o) => createWatcher({ rootPath: o.rootPath, dataDir: o.dataDir, config: o.config, onBatch: o.onBatch, onTaxonomyChange: o.onTaxonomyChange, onError: o.onError }),
   });
+  let graphHost: GraphHost | null = null;
+  let startupMs: number | null = null;
   const services: MainServices = {
     log,
     localDataDir: dirs.localData,
@@ -160,7 +163,10 @@ async function main(): Promise<void> {
     fetch: runtime.netFixturesFile ? fixtureFetch(runtime.netFixturesFile) : (input, init) => net.fetch(input as string, init as never) as Promise<Response>,
     metadataFile: runtime.metadataFile,
     // The graph worker thread (build, similarity on the fly): started by the first call, closed when idle.
-    graphEngine: () => spawnGraphWorker(path.join(import.meta.dirname, 'graph-worker.js'), { log }),
+    graphEngine: () => (graphHost ??= spawnGraphWorker(path.join(import.meta.dirname, 'graph-worker.js'), { log })),
+    // Maintenance report (D-258): time to the first window content, and the worker threads alive right now.
+    startupMs: () => startupMs,
+    workers: () => (runtimeManager.workerAlive() ? 1 : 0) + (graphHost?.alive() ? 1 : 0),
   };
 
   // The reader loads PDFs through rl-doc://; every request looks the document up in the active library again.
@@ -191,10 +197,16 @@ async function main(): Promise<void> {
   const win = createMainWindow();
   // The renderer also pulls `app:notices` on start; the event covers a window that is already listening.
   win.webContents.once('did-finish-load', () => {
+    startupMs = Math.round(performance.now());
     for (const notice of settings.notices()) emit('app:notice', notice);
   });
   // Open the active library: index, worker thread and the first incremental scan, off the main thread.
-  void runtimeManager.sync({ autoScan: true }).then(() => reconcileMcp(services));
+  // The automatic backup is checked once here (D-256), after the library is open; never by a timer.
+  void runtimeManager
+    .sync({ autoScan: true })
+    .then(() => reconcileMcp(services))
+    .then(() => autoBackupOnStart(services))
+    .catch((e: unknown) => log.warn('start-up tasks failed', { error: e }));
   let quitting = false;
   app.on('before-quit', (event) => {
     if (quitting) return;

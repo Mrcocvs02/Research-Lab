@@ -178,6 +178,11 @@ export class LibraryRuntime {
     return this.current;
   }
 
+  /** Whether the worker thread of this library is alive right now (maintenance report). */
+  workerAlive(): boolean {
+    return this.d.worker.alive?.() ?? false;
+  }
+
   /** The scanner and the importer write records behind the organizer's back: its reused document list is stale. */
   private recordsWritten(): void {
     this.org?.invalidate();

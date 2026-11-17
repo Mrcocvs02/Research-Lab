@@ -15,6 +15,9 @@
   "scripts": {
     "dev": "npm run dev -w @rl/desktop",
     "build": "npm run build -w @rl/desktop",
+    "dist:dir": "npm run dist:dir -w @rl/desktop",
+    "dist": "npm run dist -w @rl/desktop",
+    "icon": "node tools/make-icon.mjs",
     "typecheck": "tsc -p tsconfig.json && tsc -p apps/desktop/tsconfig.node.json && tsc -p apps/desktop/tsconfig.web.json && tsc -p e2e/tsconfig.json",
     "test": "node tools/mem-guard.mjs 1.2 \"unit tests\" && node tools/mem-sample.mjs --abort-below=0.7 -- vitest run",
     "test:watch": "vitest",

@@ -5,7 +5,7 @@ import { abortChatTurnsAndWait } from '../../ai/service.js';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { AppError, applyPatch, legacyTaxonomySchema, type ImportJobStatus } from '@rl/core';
+import { AppError, applyPatch, effectiveShortcuts, findShortcutConflicts, legacyTaxonomySchema, type ImportJobStatus } from '@rl/core';
 import { DEFAULT_MAX_READ_BYTES, readTextFileLimited } from '@rl/core/node';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
@@ -24,8 +24,18 @@ export const appHandlers = (s: MainServices): DomainHandlers<'app'> => ({
 
 export const settingsHandlers = (s: MainServices): DomainHandlers<'settings'> => ({
   'settings:get': () => s.settings.get(),
-  // Only the fields present in the patch change (see `applyPatch`); the rest keeps its value.
-  'settings:set': (patch) => s.settings.update((cur) => applyPatch(cur, patch)),
+  // Only the fields present in the patch change (see `applyPatch`); the rest keeps its value. The patch schema already
+  // limits it to appearance, shortcuts, guide and the older fields (backup settings only change through `backup:*`) and
+  // writes accelerators in their canonical form; two commands on the same key are refused here, before anything is saved (D-257).
+  'settings:set': (patch) =>
+    s.settings.update((cur) => {
+      const next = applyPatch(cur, patch);
+      if (patch.shortcuts) {
+        const conflicts = findShortcutConflicts(effectiveShortcuts(next.shortcuts));
+        if (conflicts.length > 0) throw new AppError('INVALID_REQUEST', 'Two commands share a shortcut', { reason: 'shortcut-conflict', conflicts: conflicts.slice(0, 20) });
+      }
+      return next;
+    }),
 });
 
 export const libraryHandlers = (s: MainServices): Omit<DomainHandlers<'library'>, 'library:tree'> => ({

@@ -130,7 +130,8 @@ export const backupJobStatusSchema = z.object({
   done: z.number().int().nonnegative(),
   total: z.number().int().nonnegative(),
   result: backupResultSchema.nullable(),
-  error: z.object({ code: z.string(), message: z.string() }).nullable(),
+  /** `reason` (optional, additive): the machine-readable cause (`integrity`, `not-empty`, `already-registered`, `newer-format`, `inside-library`, `too-large`, ...); the same token also opens `message` as `<reason>: ...`. */
+  error: z.object({ code: z.string(), message: z.string(), reason: z.string().max(60).optional() }).nullable(),
 });
 export type BackupJobStatus = z.infer<typeof backupJobStatusSchema>;
 

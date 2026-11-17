@@ -104,6 +104,8 @@ export interface LibraryWorker {
   dispose(): Promise<void>;
   /** Kills the worker thread at once (supervised workers); pending calls fail. Absent in the in-process service. */
   terminate?(): Promise<void>;
+  /** Whether the worker thread is alive right now (supervised workers close after an idle time). Absent in the in-process service. */
+  alive?(): boolean;
 }
 
 type Op = 'openIndex' | 'resetIndex' | 'scan' | 'extract' | 'index' | 'remove' | 'dispose';

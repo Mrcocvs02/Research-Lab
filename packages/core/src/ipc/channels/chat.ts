@@ -60,8 +60,10 @@ export const chatConversationSummarySchema = z.object({
 export const chatChannels = defineChannels('chat', {
   /**
    * Starts a turn: answers at once with the ids, then streams `chat:event`s. `confirmed` is required (CONFLICT with
-   * `details.reason` 'needs-confirmation' otherwise) when the library asks for confirmation and document content goes
-   * with the turn (`contextDocIds`). Refused with AI_BUDGET_EXCEEDED over the monthly cap, and with AI_PROVIDER_ERROR
+   * `details.reason` 'needs-confirmation' otherwise) when the library asks for confirmation (`ai.confirmBeforeSend`)
+   * and either document content goes with the turn (`contextDocIds`) or the conversation was never confirmed and the
+   * agent may read the enabled folders with its tools (D-227: one confirmation per conversation, whose preview lists
+   * the model and the folders the agent may read; a search conversation is confirmed by its own dialog). Refused with AI_BUDGET_EXCEEDED over the monthly cap, and with AI_PROVIDER_ERROR
    * (`details.reason` 'no-access' or 'offline') when Claude cannot be reached.
    */
   send: {

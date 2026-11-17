@@ -41,7 +41,8 @@
       "warning": "Spenta per impostazione predefinita. Quando è accesa, Claude Code può solo PROPORRE campi AI (come un riassunto o dei tag): sono marcati come output AI e vanno alla tua revisione prima di essere accettati. Non può mai modificare le tue note né i tuoi campi.",
       "confirmTitle": "Consentire le proposte di Claude Code?",
       "confirmBody": "Claude Code potrà aggiungere campi AI proposti ai documenti delle cartelle che vede. Ogni proposta aspetta la tua revisione. Puoi spegnerlo in qualsiasi momento.",
-      "confirmYes": "Consenti le proposte"
+      "confirmYes": "Consenti le proposte",
+      "reconnect": "Dopo aver acceso o spento la scrittura, ricollega Claude Code per vedere il cambiamento nell'elenco dei suoi strumenti."
     },
     "port": {
       "title": "Porta",
@@ -50,15 +51,17 @@
       "auto": "Automatica",
       "invalid": "Inserisci un numero intero tra {{min}} e {{max}}, oppure lascia vuoto.",
       "apply": "Applica la porta",
-      "useAuto": "Usa una porta automatica"
+      "useAuto": "Usa una porta automatica",
+      "squat": "La porta resta memorizzata anche ad app chiusa: un altro programma di questo computer potrebbe ascoltarla e ricevere il token che Claude Code invia. Nel dubbio, cambia il token."
     },
     "copy": {
       "title": "Collega Claude Code",
-      "hint": "Copia la configurazione e incollala in un terminale (comando) o nel .mcp.json del tuo progetto. Negli appunti va il vero token; questa finestra mostra solo un'anteprima mascherata. Svuota gli appunti dopo aver incollato.",
+      "hint": "Copia la configurazione e incollala in un terminale (comando) o in un file .mcp.json. Negli appunti va il vero token, che dopo 60 secondi viene tolto se è ancora lì; questa finestra mostra solo un'anteprima mascherata.",
       "cli": "Copia il comando",
       "json": "Copia la voce .mcp.json",
       "notRunning": "Il server deve essere in esecuzione per copiare la sua configurazione.",
-      "done": "Copiato negli appunti ({{format}}). Qui il token è nascosto:"
+      "done": "Copiato negli appunti ({{format}}). Qui il token è nascosto:",
+      "jsonWarning": "La voce .mcp.json contiene il token, un segreto: non metterla mai in un file di un repository (il .mcp.json di un progetto di solito viene committato). Il comando lo registra solo per te (ambito locale)."
     },
     "rotate": {
       "title": "Token",

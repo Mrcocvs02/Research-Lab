@@ -19,7 +19,8 @@ function problemKey(code: string): string {
   return code === 'PORT_IN_USE' || code === 'SECRET_UNAVAILABLE' ? code : 'OTHER';
 }
 
-function CallLog({ calls }: { calls: number }) {
+/** `stamp` changes with every counted call, also once the log is full (the count then stays at its cap). */
+function CallLog({ stamp }: { stamp: string }) {
   const { t, i18n } = useTranslation();
   const [items, setItems] = useState<LogPage['items']>([]);
   const [total, setTotal] = useState(0);
@@ -40,7 +41,7 @@ function CallLog({ calls }: { calls: number }) {
   // The first page again whenever the server counted calls (the status event comes at most every 2 s).
   useEffect(() => {
     void load(0);
-  }, [load, calls]);
+  }, [load, stamp]);
 
   return (
     <div className="group" data-testid="mcp-log">
@@ -96,7 +97,8 @@ export function McpSection() {
   const { t, i18n } = useTranslation();
   const app = useApp();
   const libraryId = app.activeLibraryId;
-  const aiFolders = app.config?.aiEnabledFolders ?? [];
+  const [fresh, setFresh] = useState<string[] | null>(null);
+  const aiFolders = fresh ?? app.config?.aiEnabledFolders ?? [];
   const [status, setStatus] = useState<McpStatus | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
@@ -113,13 +115,21 @@ export function McpSection() {
     setAskWrite(false);
     setAskRotate(false);
     setRotated(false);
+    setFresh(null);
     if (!libraryId) return;
     let live = true;
+    // The AI folders are read here too: they can change elsewhere while this page is open.
+    const folders = () => void rl.invoke('library:getConfig', {}).then((c) => live && setFresh(c.aiEnabledFolders), () => {});
+    folders();
     rl.invoke('mcp:status', {}).then(
       (s) => live && setStatus(s),
       (e: unknown) => live && setError(e),
     );
-    const off = rl.on('mcp:changed', (s) => live && setStatus(s));
+    const off = rl.on('mcp:changed', (s) => {
+      if (!live) return;
+      setStatus(s);
+      folders();
+    });
     return () => {
       live = false;
       off();
@@ -238,6 +248,7 @@ export function McpSection() {
             <p className={status.writeEnabled ? 'callout warn' : 'hint'} data-testid="mcp-write-warning">
               {t('mcp.write.warning')}
             </p>
+            <p className="hint">{t('mcp.write.reconnect')}</p>
             {askWrite && !status.writeEnabled && (
               <div className="callout warn" role="alertdialog" aria-label={t('mcp.write.confirmTitle')} data-testid="mcp-write-confirm">
                 <p>
@@ -281,6 +292,9 @@ export function McpSection() {
                 {portNumber === null ? t('mcp.port.useAuto') : t('mcp.port.apply')}
               </button>
             </div>
+            <p className="hint" data-testid="mcp-port-squat">
+              {t('mcp.port.squat')}
+            </p>
           </div>
 
           <div className="group mcp-copy" data-testid="mcp-copy-group">
@@ -294,6 +308,9 @@ export function McpSection() {
                 {t('mcp.copy.json')}
               </button>
             </div>
+            <p className="callout warn" data-testid="mcp-json-warning">
+              {t('mcp.copy.jsonWarning')}
+            </p>
             {!status.running && <p className="hint">{t('mcp.copy.notRunning')}</p>}
             {copyError && <ErrorNote testId="mcp-copy-error">{copyError}</ErrorNote>}
             {copied && (
@@ -350,7 +367,7 @@ export function McpSection() {
         </>
       )}
       {error ? <ErrorNote testId="mcp-error">{errorMessage(error, t)}</ErrorNote> : null}
-      {status && <CallLog calls={status.calls} />}
+      {status && <CallLog stamp={`${status.calls}|${status.lastCallAt ?? ''}`} />}
     </section>
   );
 }

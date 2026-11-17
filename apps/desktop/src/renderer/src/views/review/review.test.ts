@@ -172,3 +172,25 @@ describe('review of AI proposals', () => {
     expect(callsTo('review:list').at(-1)).toMatchObject({ fields: ['keywords'], offset: 0 });
   });
 });
+
+describe('AI fields in the document panel', () => {
+  it('shows status and new tags, and accepts or rejects a proposed field with the document revision', async () => {
+    const { AiArea } = await import('../library/DocPanel');
+    const work = setup([item(D1, 'description', 'x', { revision: 7 }), item(D1, 'newTags', [], { revision: 7 })]);
+    cleanup();
+    const ai = (status: string, value: unknown) => ({ value, meta, review: { status } });
+    const doc: any = {
+      id: D1,
+      revision: 7,
+      ai: { description: ai('proposed', 'A text'), summary: ai('accepted', 'Done'), suggestedNewTags: ai('proposed', [{ label: 'Fresh', parentId: null, aliases: [] }]) },
+    };
+    render(createElement(NotifyProvider, null, createElement(AiArea, { doc })));
+    expect(screen.getByTestId('ai-summary').getAttribute('data-status')).toBe('accepted');
+    expect(within(screen.getByTestId('ai-summary')).queryByTestId('ai-accept')).toBeNull();
+    expect(screen.getByTestId('ai-suggestedNewTags').textContent).toContain('Fresh');
+    fireEvent.click(within(screen.getByTestId('ai-description')).getByTestId('ai-accept'));
+    await waitFor(() => expect(work.state.decisions[0]).toEqual({ docId: D1, field: 'description', decision: 'accept', expectedRevision: 7 }));
+    fireEvent.click(within(screen.getByTestId('ai-suggestedNewTags')).getByTestId('ai-reject'));
+    await waitFor(() => expect(callsTo('review:decide')).toHaveLength(2));
+  });
+});

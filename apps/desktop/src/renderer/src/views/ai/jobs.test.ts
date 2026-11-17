@@ -34,7 +34,7 @@ function setup(o: { ids?: string[]; tweak?(ai: ReturnType<typeof memoryAi>, work
   o.tweak?.(ai, work);
   const { handlers } = memoryBackend({ profiles: [profile] });
   setHandlers({ ...handlers, ...ai.handlers, ...work.handlers, 'documents:get': (p: any) => ({ id: p.docId, title: 'Paper' }) });
-  const kids = [createElement(JobIndicator, { key: 'i' }), createElement(Probe, { key: 'p' })];
+  const kids: any[] = [createElement(JobIndicator, { key: 'i' }), createElement(Probe, { key: 'p' })];
   if (o.dialog !== false) kids.push(createElement(JobDialog, { key: 'd', docIds: o.ids ?? [D1, D2], onClose: () => {} }));
   render(createElement(AppProvider, null, createElement(NotifyProvider, null, createElement(AiUiProvider, null, createElement(JobsProvider, null, ...kids)))));
   return { ai, work };

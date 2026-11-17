@@ -112,7 +112,7 @@ export interface ChangeContext {
 }
 
 /** The user-owned document fields whose before/after are logged when a change context is set (undo restores them). */
-export const LOGGED_DOCUMENT_FIELDS = ['title', 'authors', 'year', 'type', 'ref', 'doi', 'arxivId', 'userDescription', 'study', 'extracted'] as const;
+export const LOGGED_DOCUMENT_FIELDS = ['title', 'authors', 'year', 'type', 'ref', 'doi', 'arxivId', 'userDescription', 'study', 'extracted', 'publication'] as const;
 /** The project fields whose before/after are logged. */
 export const LOGGED_PROJECT_FIELDS = ['kind', 'name', 'description', 'status', 'members', 'notes', 'readingPlan', 'archivedFrom'] as const;
 

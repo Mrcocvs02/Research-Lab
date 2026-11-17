@@ -72,7 +72,7 @@ const sameSet = (a: unknown, b: unknown) => canonical([...(Array.isArray(a) ? a 
  * writes the user-owned fields below (never a path, id, hash, alias path, AI field or legacy leftovers), and the
  * result is validated with the schema of the file before anything is written.
  */
-const DOCUMENT_RESTORABLE = new Set<string>(['title', 'authors', 'year', 'type', 'ref', 'doi', 'arxivId', 'userDescription', 'study', 'extracted', 'tags']);
+const DOCUMENT_RESTORABLE = new Set<string>(['title', 'authors', 'year', 'type', 'ref', 'doi', 'arxivId', 'userDescription', 'study', 'extracted', 'publication', 'tags']);
 /** AI fields a review decision changes (`ai.review` entries hold the whole field before and after, or null when absent). */
 const AI_RESTORABLE = new Set<string>(['summary', 'description', 'keywords', 'synonyms', 'suggestedTags', 'suggestedNewTags', 'relations']);
 const PROJECT_RESTORABLE = new Set<string>(['kind', 'name', 'description', 'status', 'members', 'notes', 'readingPlan', 'archivedFrom']);

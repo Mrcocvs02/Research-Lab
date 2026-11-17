@@ -137,6 +137,13 @@ function Root() {
           setSection(s);
         }}
         onNewLibrary={() => setWizardOpen(true)}
+        banner={
+          showWelcome && !wizardOpen ? (
+            <Lazy>
+              <WelcomeCard />
+            </Lazy>
+          ) : null
+        }
       >
         <Lazy>
         {section === 'settings' ? (
@@ -164,11 +171,6 @@ function Root() {
           </Lazy>
         )}
       </Shell>
-      {showWelcome && (
-        <Lazy>
-          <WelcomeCard />
-        </Lazy>
-      )}
       {showWizard && (
         <Lazy>
           <Wizard key={wizardOpen ? 'new' : 'first'} onFinished={() => void finished()} onCancel={hasLibraries ? () => setWizardOpen(false) : undefined} />

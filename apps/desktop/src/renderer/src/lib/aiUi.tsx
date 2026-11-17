@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { ReasoningLevel } from '@rl/core';
 import { useLocalFlag } from './useLocalFlag';
 
 /**
@@ -15,10 +14,12 @@ export interface ReaderContext {
   page: number;
 }
 /** An advanced search the dialog asks the chat panel to run (a new conversation, streamed in the panel). */
+/** Same values as `ReasoningLevel` of the contracts (not imported: this file is part of the first screen). */
+type Reasoning = 'low' | 'medium' | 'high';
 export interface SearchRequest {
   text: string;
   model: string;
-  reasoning: ReasoningLevel;
+  reasoning: Reasoning;
   nonce: number;
 }
 export interface Navigation {

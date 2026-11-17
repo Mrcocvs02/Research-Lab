@@ -76,10 +76,11 @@ const biblioRef = (b: Obj): string | undefined => {
 };
 
 export function createOpenAlex(net: Net, now: () => Date): CitationSourceX {
-  const memo = new Map<string, Obj>();
+  // The work just resolved is reused by the calls that follow it (references, cited by); it is not kept for long.
+  const memo = new Map<string, { w: Obj; at: number }>();
   const remember = (key: string, w: Obj): Obj => {
     if (memo.size >= 8) memo.delete(memo.keys().next().value as string);
-    memo.set(key, w);
+    memo.set(key, { w, at: now().getTime() });
     return w;
   };
   const one = async (path: string, signal?: AbortSignal): Promise<Obj | null> => {
@@ -92,7 +93,7 @@ export function createOpenAlex(net: Net, now: () => Date): CitationSourceX {
     const ax = refArxiv(ref);
     const key = `${ref.externalId ?? ""}|${ref.doi ?? ""}|${ax ?? ""}|${ref.title ?? ""}|${ref.year ?? ""}|${ref.authors?.[0] ?? ""}`;
     const hit = memo.get(key);
-    if (hit) return hit;
+    if (hit && now().getTime() - hit.at < 30_000) return hit.w;
     let w: Obj | null = null;
     if (ref.externalId && /^W\d+$/.test(ref.externalId)) w = await one(ref.externalId, signal);
     if (!w && ref.doi) w = await byDoi(normaliseDoi(ref.doi), signal);

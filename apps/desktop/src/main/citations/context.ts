@@ -12,6 +12,9 @@ interface Net {
 }
 const nets = new WeakMap<MainServices, Net>();
 
+/** Tests replace the waiting of the throttle and of the retries (it is real time otherwise). */
+export const netTuning: { sleep?: (ms: number, signal?: AbortSignal) => Promise<void> } = {};
+
 /**
  * The online sources, ready to use: refuses with NETWORK_ERROR (offline) when the machine has no connection, and reads
  * the email setting now (the profile's email goes out only while `network.openAlexEmail` is on). Returns the profile too.
@@ -21,7 +24,7 @@ export async function online(s: MainServices): Promise<Net & { profile: UserProf
   let n = nets.get(s);
   if (!n) {
     const email = { value: null as string | null };
-    const net = createNet({ fetch: s.fetch ?? fetch, email: () => email.value });
+    const net = createNet({ fetch: s.fetch ?? fetch, email: () => email.value, ...(netTuning.sleep ? { sleep: netTuning.sleep } : {}) });
     const sources = createCitationSources({ fetch: s.fetch ?? fetch, net });
     n = { sources, service: createCitationService(sources), watch: createWatchFetcher(net), email };
     nets.set(s, n);

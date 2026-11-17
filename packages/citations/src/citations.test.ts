@@ -43,6 +43,16 @@ describe('OpenAlex source', () => {
       return undefined;
     },
   ];
+  it('keeps the first page of cited-by when OpenAlex asks for an API key to page further (401)', async () => {
+    const { f } = fake(
+      routes[0]!,
+      (u: URL) => ((u.searchParams.get('filter') ?? '') === 'cites:W1' && u.searchParams.get('cursor') !== '*' ? new Response(JSON.stringify({ error: 'API key required for cursor paging' }), { status: 401 }) : undefined),
+      routes[1]!,
+    );
+    const src = createOpenAlex(createNet({ fetch: f, ...noSleep }), () => new Date('2024-01-01T00:00:00Z'));
+    expect((await src.fetchCitedBy({ doi: '10.1001/W1' })).map((c) => c.externalId)).toEqual(['W10', 'W11']);
+  });
+
   it('resolves by DOI, keeps the order of the references and counts citations; no email unless given', async () => {
     const { f, urls } = fake(...routes);
     const src = createOpenAlex(createNet({ fetch: f, ...noSleep }), () => new Date('2024-01-01T00:00:00Z'));

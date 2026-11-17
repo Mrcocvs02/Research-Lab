@@ -1,4 +1,4 @@
-import { ARXIV_SHAPE, CITATION_FILE_LIMITS, isValidDoi, type CitationLink, type CitationSource, type WorkMetadata as CoreMetadata, type WorkRef as CoreRef } from '@rl/core';
+import { AppError, ARXIV_SHAPE, CITATION_FILE_LIMITS, isValidDoi, type CitationLink, type CitationSource, type WorkMetadata as CoreMetadata, type WorkRef as CoreRef } from '@rl/core';
 import { asObj, clean, clip, encodePath, normaliseDoi, parseArxivAtom, pathDoi } from './metadata.js';
 import { arxivBase, arxivFromDoi, lastName, sameWork, titleKey } from './match.js';
 import type { Net } from './net.js';
@@ -178,7 +178,15 @@ export function createOpenAlex(net: Net, now: () => Date): CitationSourceX {
       let cursor: string | null = '*';
       // A source that never ends its pages (a repeated cursor, endless empty-looking pages) cannot keep this loop alive.
       for (let page = 0; cursor && out.length < L.citedBy && page < Math.ceil(L.citedBy / OA_PAGE) + 2; page++) {
-        const res = asObj(await net.json(`${OA}/works?filter=${q(`cites:${id}`)}&sort=publication_date:desc&per-page=${OA_PAGE}&cursor=${q(cursor)}&select=${LINK_FIELDS}`, signal, LIST_BYTES));
+        let res: Obj;
+        try {
+          res = asObj(await net.json(`${OA}/works?filter=${q(`cites:${id}`)}&sort=publication_date:desc&per-page=${OA_PAGE}&cursor=${q(cursor)}&select=${LINK_FIELDS}`, signal, LIST_BYTES));
+        } catch (e) {
+          // OpenAlex asks for an API key to page past the first page (401): keep the most recent works already read
+          // (the total stays in `cited_by_count`). Any other failure, or a failure on the first page, is an error.
+          if (page > 0 && e instanceof AppError && (e.details as { status?: number } | undefined)?.status === 401) break;
+          throw e;
+        }
         const results = arr(res['results']);
         for (const r of results) out.push(openAlexLink(asObj(r), at));
         const next = asObj(res['meta'])['next_cursor'];

@@ -53,6 +53,47 @@ function toCandidate(base: LibraryConfig, d: Draft): unknown {
   };
 }
 
+/** The Claude Code executable the provider runs: where it was found, "Choose…" (dialog of the main process) and "Automatic". */
+function ExecutableRow({ info, onChanged }: { info: NonNullable<AiStatus['claudeCode']>; onChanged(): void }) {
+  const { t } = useTranslation();
+  const [error, setError] = useState<unknown>(null);
+  const run = async (fn: () => Promise<unknown>) => {
+    setError(null);
+    try {
+      await fn();
+      onChanged();
+    } catch (e) {
+      setError(e);
+    }
+  };
+  return (
+    <>
+      <dt>{t('settings.ai.exe.label')}</dt>
+      <dd data-testid="ai-exe" data-source={info.source}>
+        {info.path === null ? (
+          <span data-testid="ai-exe-path">{t('settings.ai.exe.notFound')}</span>
+        ) : (
+          <>
+            <code data-testid="ai-exe-path">{info.path}</code>{' '}
+            <span className="hint" data-testid="ai-exe-source">
+              ({t(`settings.ai.exe.source_${info.source}`)})
+            </span>
+          </>
+        )}
+        <span className="actions start">
+          <button type="button" onClick={() => void run(() => rl.invoke('ai:chooseExecutable', {}))} data-testid="ai-exe-choose">
+            {t('settings.ai.exe.choose')}
+          </button>
+          <button type="button" disabled={info.source !== 'settings'} onClick={() => void run(() => rl.invoke('ai:clearExecutable', {}))} data-testid="ai-exe-auto">
+            {t('settings.ai.exe.auto')}
+          </button>
+        </span>
+        {error ? <ErrorNote testId="ai-exe-error">{errorMessage(error, t)}</ErrorNote> : null}
+      </dd>
+    </>
+  );
+}
+
 function StatusBlock({ onChecked }: { onChecked(): void }) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<AiStatus | null>(null);
@@ -81,6 +122,7 @@ function StatusBlock({ onChecked }: { onChecked(): void }) {
           <dd data-testid="ai-provider">{t(`settings.ai.providers.${status.provider}`)}</dd>
           <dt>{t('settings.ai.access')}</dt>
           <dd data-testid="ai-access">{t(`settings.ai.auth.${status.auth}`)}</dd>
+          {status.claudeCode && <ExecutableRow info={status.claudeCode} onChanged={() => void check()} />}
           <dd>
             <span className={status.available ? 'badge ok' : 'badge'} data-testid="ai-available">
               {status.available ? t('settings.ai.available') : `${t('settings.ai.notAvailable')}${status.reason ? `: ${t(`settings.ai.reason.${status.reason}`)}` : ''}`}
@@ -219,6 +261,7 @@ export function AiSection() {
     );
   }
 
+  const allLibrary = draft.aiFolders.includes('');
   const err = (path: string) => (check.errors[path] || serverIssues[path] ? t(validationKey(path)) : undefined);
   const edit = (patch: Partial<Draft>) => {
     setDraft({ ...draft, ...patch });
@@ -253,7 +296,18 @@ export function AiSection() {
         <p className={draft.aiFolders.length === 0 ? 'callout' : 'hint'} role="status" data-testid="ai-folders-summary">
           {draft.aiFolders.length === 0 ? t('settings.ai.nothingSent') : t('settings.ai.foldersEnabled', { count: draft.aiFolders.length })}
         </p>
-        <FolderTree load={loadFolders} value={draft.aiFolders} onChange={(v) => edit({ aiFolders: v })} ariaLabel={t('settings.library.aiFolders')} testId="config-ai-tree" />
+        <div className="ai-roots" data-testid="ai-roots">
+          <CheckField label={t('settings.ai.rootAll')} hint={t('settings.ai.rootAllHint')} checked={allLibrary} onChange={(e) => edit({ aiFolders: e.target.checked ? [''] : [] })} data-testid="ai-root-all" />
+          <CheckField
+            label={t('settings.ai.rootFiles')}
+            hint={t('settings.ai.rootFilesHint')}
+            checked={allLibrary || draft.aiFolders.includes('.')}
+            disabled={allLibrary}
+            onChange={(e) => edit({ aiFolders: e.target.checked ? [...draft.aiFolders, '.'].sort() : draft.aiFolders.filter((f) => f !== '.') })}
+            data-testid="ai-root-files"
+          />
+        </div>
+        <FolderTree load={loadFolders} value={draft.aiFolders} onChange={(v) => edit({ aiFolders: v })} ariaLabel={t('settings.library.aiFolders')} testId="config-ai-tree" allIncluded={allLibrary} />
         <CheckField label={t('settings.library.confirmBeforeSend')} checked={draft.confirmBeforeSend} onChange={(e) => edit({ confirmBeforeSend: e.target.checked })} />
       </div>
 

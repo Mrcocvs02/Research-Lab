@@ -23,6 +23,7 @@ import { TaxonomyProvider } from './useTaxonomy';
 const DocumentCard = lazyRetry(() => import('./DocPanel').then((m) => ({ default: m.DocumentCard })));
 const BulkTagEditor = lazyRetry(() => import('./DocPanel').then((m) => ({ default: m.BulkTagEditor })));
 const TaxonomyManager = lazyRetry(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })));
+const JobDialog = lazyRetry(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })));
 const AddToProject = lazyRetry(() => import('./AddToProject').then((m) => ({ default: m.AddToProject })));
 
 type PaneTab = 'folders' | 'tags' | 'filters';
@@ -58,6 +59,7 @@ function LibraryInner() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [mode, setMode] = useState<'browse' | 'taxonomy'>('browse');
   const [addOpen, setAddOpen] = useState(false);
+  const [jobOpen, setJobOpen] = useState(false);
   const set = (patch: Partial<BrowseState>) => setBrowse((b) => ({ ...b, ...patch }));
 
   // Scan on opening the view when nothing ran in this session (a new library, for instance).
@@ -255,6 +257,9 @@ function LibraryInner() {
                   <button type="button" onClick={() => setAddOpen(true)} data-testid="add-to-project-button">
                     {t('projects.addToProject')}
                   </button>
+                  <button type="button" onClick={() => setJobOpen(true)} data-testid="bulk-ai-propose">
+                    {t('jobs.propose')}
+                  </button>
                   <button type="button" className="link" onClick={() => setSelection(emptySelection())} data-testid="selection-clear">
                     {t('docs.clearSelection')}
                   </button>
@@ -277,6 +282,11 @@ function LibraryInner() {
             </aside>
           )}
         </div>
+      )}
+      {jobOpen && (
+        <Lazy>
+          <JobDialog docIds={selectedIds} onClose={() => setJobOpen(false)} />
+        </Lazy>
       )}
       {addOpen && (
         <Lazy>

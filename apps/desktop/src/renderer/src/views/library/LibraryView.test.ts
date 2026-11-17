@@ -784,3 +784,20 @@ describe('LibraryView: bulk actions and their limits (D-178)', () => {
     await waitFor(() => expect(toastTexts().some((x) => x.includes('A project can hold at most 20000 documents; this one would have 20003.'))).toBe(true));
   });
 });
+
+describe('LibraryView: propose with AI', () => {
+  it('opens the bulk job dialog for the selection and estimates it', async () => {
+    const docs = makeDocs(4);
+    setup({ docs }, {
+      'library:getConfig': () => ({ ai: { models: [{ id: 'm1', label: 'M1' }], defaultModel: 'm1', defaultReasoning: 'low' } }),
+      'jobs:estimate': () => ({ preview: { model: 'm1', allowed: [docs[0]!.docId, docs[2]!.docId], refused: [], folders: [''], approxInputTokens: 2000, estimatedUsd: 0.01, needsConfirmation: false, overCap: false }, skipped: 0, toSend: 2 }),
+    });
+    await ready();
+    fireEvent.click(rowOf('Paper 0000'));
+    fireEvent.click(rowOf('Paper 0002'), { ctrlKey: true });
+    fireEvent.click(screen.getByTestId('bulk-ai-propose'));
+    expect(await screen.findByTestId('job-dialog')).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId('job-to-send').textContent).toBe('2 documents will be sent'));
+    expect(callsTo('jobs:estimate')[0].docIds).toHaveLength(2);
+  });
+});

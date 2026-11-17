@@ -14,7 +14,7 @@ export interface ReaderContext {
   page: number;
 }
 export interface Navigation {
-  to: 'settings' | 'project';
+  to: 'settings' | 'project' | 'inbox' | 'review';
   projectId?: string;
   nonce: number;
 }
@@ -36,6 +36,9 @@ interface AiUiValue {
   navigation: Navigation | null;
   openProject(id: string): void;
   openSettings(): void;
+  /** The Inbox section, on the arrivals tab or on the AI proposals (review). */
+  openInbox(): void;
+  openReview(): void;
 }
 
 const NONE: AiUiValue = {
@@ -52,6 +55,8 @@ const NONE: AiUiValue = {
   navigation: null,
   openProject() {},
   openSettings() {},
+  openInbox() {},
+  openReview() {},
 };
 const Ctx = createContext<AiUiValue>(NONE);
 export const useAiUi = (): AiUiValue => useContext(Ctx);
@@ -72,6 +77,9 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   const openProject = useCallback((id: string) => setNavigation((cur) => ({ to: 'project', projectId: id, nonce: (cur?.nonce ?? 0) + 1 })), []);
   const openSettings = useCallback(() => setNavigation((cur) => ({ to: 'settings', nonce: (cur?.nonce ?? 0) + 1 })), []);
 
+  const openInbox = useCallback(() => setNavigation((cur) => ({ to: 'inbox', nonce: (cur?.nonce ?? 0) + 1 })), []);
+  const openReview = useCallback(() => setNavigation((cur) => ({ to: 'review', nonce: (cur?.nonce ?? 0) + 1 })), []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
@@ -89,8 +97,8 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   }, [chatOpen, setChatOpen]);
 
   const value = useMemo(
-    () => ({ chatOpen, setChatOpen, paletteOpen, setPaletteOpen, selection, publishSelection, reader, publishReader, prefill, fillPrompt, navigation, openProject, openSettings }),
-    [chatOpen, setChatOpen, paletteOpen, selection, publishSelection, reader, publishReader, prefill, fillPrompt, navigation, openProject, openSettings],
+    () => ({ chatOpen, setChatOpen, paletteOpen, setPaletteOpen, selection, publishSelection, reader, publishReader, prefill, fillPrompt, navigation, openProject, openSettings, openInbox, openReview }),
+    [chatOpen, setChatOpen, paletteOpen, selection, publishSelection, reader, publishReader, prefill, fillPrompt, navigation, openProject, openSettings, openInbox, openReview],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

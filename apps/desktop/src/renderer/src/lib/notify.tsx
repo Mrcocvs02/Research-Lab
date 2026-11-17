@@ -12,7 +12,7 @@ export interface Toast {
 }
 
 interface NotifyValue {
-  info(text: string): void;
+  info(text: string, action?: { label: string; run(): void }): void;
   /** An error message that is not a thrown value (a refused action). */
   fail(text: string): void;
   /** Shows a localised message for any thrown value; a CONFLICT also offers to reload the data. */
@@ -44,7 +44,7 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<NotifyValue>(
     () => ({
-      info: (text) => push({ kind: 'info', text }),
+      info: (text, action) => push(action ? { kind: 'info', text, action } : { kind: 'info', text }),
       fail: (text) => push({ kind: 'error', text }),
       reportError: (error) => {
         const conflict = RlError.from(error).code === 'CONFLICT';

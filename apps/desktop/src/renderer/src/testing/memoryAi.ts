@@ -74,6 +74,9 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
     earlyEvents: false,
     cancelEmits: true,
     secrets: new Set<string>(),
+    /** What the Claude Code executable status reports (undefined: the field is absent) and what the file dialog would return. */
+    claudeCode: { path: 'bin/claude', source: 'path' } as { path: string | null; source: 'settings' | 'path' | 'local-bin' | 'sdk' | 'none' } | undefined,
+    dialogPath: 'bin/chosen-claude' as string | null,
     counter: 1,
   };
 
@@ -138,7 +141,16 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
       enabledFolders: state.config.aiEnabledFolders,
       monthUsd: state.monthUsd,
       capUsd: state.config.ai.usageCap.monthlyUsd,
+      ...(state.claudeCode ? { claudeCode: state.claudeCode } : {}),
     }),
+    'ai:chooseExecutable': () => {
+      if (state.dialogPath !== null) state.claudeCode = { path: state.dialogPath, source: 'settings' };
+      return { path: state.dialogPath };
+    },
+    'ai:clearExecutable': () => {
+      state.claudeCode = { path: 'bin/claude', source: 'path' };
+      return { ok: true };
+    },
     'ai:preview': (p) => {
       state.previews.push(p);
       return preview(p);

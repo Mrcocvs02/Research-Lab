@@ -8,6 +8,8 @@ import { installWindowGuard } from './lib/dirtyEditors';
 import { AiUiProvider, useAiUi } from './lib/aiUi';
 import { LibraryEventsProvider } from './lib/events';
 import { HistoryProvider } from './lib/history';
+import { InboxProvider } from './lib/inbox';
+import { JobsProvider } from './lib/jobs';
 import { NotifyProvider } from './lib/notify';
 import { ReaderProvider, useReader } from './lib/reader';
 import { LibraryView } from './views/library/LibraryView';
@@ -19,6 +21,7 @@ const Settings = lazyRetry(() => import('./settings/Settings').then((m) => ({ de
 const ProjectsView = lazyRetry(() => import('./views/projects/ProjectsView').then((m) => ({ default: m.ProjectsView })));
 // The reader (and pdf.js with it) loads the first time a document is opened in it.
 const ReaderView = lazyRetry(() => import('./views/reader/ReaderView').then((m) => ({ default: m.ReaderView })));
+const InboxView = lazyRetry(() => import('./views/inbox/InboxView').then((m) => ({ default: m.InboxView })));
 const Wizard = lazyRetry(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })));
 
 export function App() {
@@ -30,7 +33,11 @@ export function App() {
             <HistoryProvider>
               <ReaderProvider>
                 <AiUiProvider>
-                  <Root />
+                  <JobsProvider>
+                    <InboxProvider>
+                      <Root />
+                    </InboxProvider>
+                  </JobsProvider>
                 </AiUiProvider>
               </ReaderProvider>
             </HistoryProvider>
@@ -48,6 +55,7 @@ function Root() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const reader = useReader();
   const { navigation } = useAiUi();
+  const [inboxTab, setInboxTab] = useState<'arrivals' | 'proposals'>('arrivals');
   // A document id belongs to one library: the reader does not outlive a switch. The unsaved notes were already saved
   // before the switch (`setActiveLibrary`, the library list, the wizard), so by now there is nothing left to wait for.
   const libraryId = app.activeLibraryId;
@@ -58,7 +66,8 @@ function Root() {
   useEffect(() => {
     if (!navigation) return;
     closeReader();
-    setSection(navigation.to === 'settings' ? 'settings' : 'projects');
+    if (navigation.to === 'inbox' || navigation.to === 'review') setInboxTab(navigation.to === 'review' ? 'proposals' : 'arrivals');
+    setSection(navigation.to === 'settings' ? 'settings' : navigation.to === 'project' ? 'projects' : 'inbox');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navNonce]);
   const readerNonce = reader.target?.nonce;
@@ -119,6 +128,8 @@ function Root() {
           </div>
         ) : section === 'projects' && app.activeProfile && !showWizard ? (
           <ProjectsView key={app.activeProfile.id} />
+        ) : section === 'inbox' && app.activeProfile && !showWizard ? (
+          <InboxView key={app.activeProfile.id} tab={inboxTab} onTab={setInboxTab} />
         ) : (
           <Placeholder section={section} />
         )}

@@ -6,23 +6,23 @@ import { formatTokens, formatUsd } from './format';
 import type { AiPreview } from './useChat';
 import { useDocTitle } from './useLabels';
 
-function DocLine({ docId, reason }: { docId: string; reason?: AiPreview['refused'][number]['reason'] }) {
+function DocLine({ docId, reason, label }: { docId: string; reason?: AiPreview['refused'][number]['reason']; label?: string | undefined }) {
   const { t } = useTranslation();
   const title = useDocTitle(docId);
   return (
     <li data-testid={reason ? 'preview-refused' : 'preview-allowed'} data-doc-id={docId}>
-      {safeText(title ?? docId.slice(0, 8))}
+      {safeText(label ?? title ?? docId.slice(0, 8))}
       {reason && <span className="hint"> — {t(`chat.preview.reason_${reason}`)}</span>}
     </li>
   );
 }
 
 /** What is about to be sent to which model, shown before the send and confirmed by the user (docs/RULES.md, rule 4). */
-export function PreviewDialog({ preview, models, onConfirm, onCancel, busy }: { preview: AiPreview; models: ModelConfig[]; onConfirm(): void; onCancel(): void; busy: boolean }) {
+export function PreviewDialog({ preview, models, onConfirm, onCancel, busy, labels, title, confirmLabel }: { preview: AiPreview; models: ModelConfig[]; onConfirm(): void; onCancel(): void; busy: boolean; labels?: Record<string, string>; title?: string; confirmLabel?: string }) {
   const { t } = useTranslation();
   const model = models.find((m) => m.id === preview.model)?.label ?? preview.model;
   return (
-    <Dialog title={t('chat.preview.title')} onClose={onCancel} testId="send-preview">
+    <Dialog title={title ?? t('chat.preview.title')} onClose={onCancel} testId="send-preview">
       <div className="dialog-body">
         <p>{t('chat.preview.intro', { model })}</p>
         <h3>{t('chat.preview.allowed', { count: preview.allowed.length })}</h3>
@@ -31,7 +31,7 @@ export function PreviewDialog({ preview, models, onConfirm, onCancel, busy }: { 
         ) : (
           <ul className="preview-docs">
             {preview.allowed.map((id) => (
-              <DocLine key={id} docId={id} />
+              <DocLine key={id} docId={id} label={labels?.[id]} />
             ))}
           </ul>
         )}
@@ -40,7 +40,7 @@ export function PreviewDialog({ preview, models, onConfirm, onCancel, busy }: { 
             <h3>{t('chat.preview.refused', { count: preview.refused.length })}</h3>
             <ul className="preview-docs" data-testid="preview-refused-list">
               {preview.refused.map((r) => (
-                <DocLine key={r.docId} docId={r.docId} reason={r.reason} />
+                <DocLine key={r.docId} docId={r.docId} reason={r.reason} label={labels?.[r.docId]} />
               ))}
             </ul>
           </>
@@ -61,7 +61,7 @@ export function PreviewDialog({ preview, models, onConfirm, onCancel, busy }: { 
           {t('common.cancel')}
         </button>
         <button type="button" className="primary" onClick={onConfirm} disabled={busy} data-testid="preview-confirm">
-          {t('chat.preview.send')}
+          {confirmLabel ?? t('chat.preview.send')}
         </button>
       </div>
     </Dialog>

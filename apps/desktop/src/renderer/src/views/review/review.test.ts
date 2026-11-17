@@ -25,7 +25,7 @@ const D1 = '1111111111111111';
 const D2 = '2222222222222222';
 const meta = { model: 'claude-haiku-5-5', provider: 'claude-agent-sdk', date: '2026-11-16T10:00:00.000Z', source: 'job' };
 const item = (docId: string, field: string, value: unknown, over: Record<string, unknown> = {}) => ({ docId, title: docId === D1 ? 'Paper One' : 'Paper Two', path: docId === D1 ? 'alpha/one.pdf' : 'beta/two.pdf', revision: 3, status: 'proposed', meta, field, value, ...over });
-const node = (id: string, label: string) => ({ id, label, parents: [], aliases: [], status: 'active', color: undefined });
+const node = (id: string, label: string) => ({ id, label, parents: [], aliases: [], implies: [], status: 'active', color: undefined, counts: { direct: 0, total: 0 } });
 
 function setup(items: any[], tweak: (w: ReturnType<typeof memoryWork>) => void = () => {}) {
   const ai = memoryAi({ docs: [] });

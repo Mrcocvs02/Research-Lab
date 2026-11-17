@@ -93,8 +93,10 @@ function Arrivals() {
   const [items, setItems] = useState<InboxItem[] | null>(null);
   const [error, setError] = useState<unknown>(null);
   const models = config?.ai.models ?? [];
-  const [model, setModel] = useState(config?.ai.defaultModel ?? models[0]?.id ?? '');
-  const [reasoning, setReasoning] = useState<ReasoningLevel>(config?.ai.defaultReasoning ?? 'low');
+  const [modelChoice, setModel] = useState<string | null>(null);
+  const [reasoningChoice, setReasoning] = useState<ReasoningLevel | null>(null);
+  const model = modelChoice ?? config?.ai.defaultModel ?? models[0]?.id ?? '';
+  const reasoning = reasoningChoice ?? config?.ai.defaultReasoning ?? 'low';
 
   const load = useCallback(async () => {
     try {

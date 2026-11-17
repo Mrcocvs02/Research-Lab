@@ -176,6 +176,27 @@ describe('library store', () => {
     expect((await store.readConfig()).name).toBe('Mine');
   });
 
+  it('sets a damaged citation file or watch.json aside as .corrupt, once, and then reads as empty', async () => {
+    const id = hex(7);
+    const citationFile = path.join(store.dataDir, 'citations', `${id}.json`);
+    await mkdir(path.dirname(citationFile), { recursive: true });
+    await writeFile(citationFile, '{ nope');
+    await expect(store.citations.get(id)).rejects.toMatchObject({ code: 'SCHEMA_INVALID' });
+    expect(await store.quarantineCitations(id)).toBe(true);
+    expect(await readFile(`${citationFile}.corrupt`, 'utf8')).toBe('{ nope');
+    expect(await store.citations.get(id)).toBeNull();
+    expect(await store.citations.listIds()).toEqual([]);
+    expect(await store.quarantineCitations(id)).toBe(false);
+    await expect(store.quarantineCitations('../x' as never)).rejects.toBeDefined();
+    const watchFile = path.join(store.dataDir, 'watch.json');
+    await writeFile(watchFile, 'garbage');
+    await expect(store.readWatch()).rejects.toMatchObject({ code: 'SCHEMA_INVALID' });
+    expect(await store.resetWatch()).toBe(true);
+    expect((await store.readWatch()).sources).toEqual([]);
+    expect(await readFile(`${watchFile}.corrupt`, 'utf8')).toBe('garbage');
+    expect(await store.resetWatch()).toBe(false);
+  });
+
   it('logs tag changes with before and after, and taxonomy changes as item diffs', async () => {
     const s = store.withActor('user');
     await s.documents.put(doc(1, { tags: ['a'] }));

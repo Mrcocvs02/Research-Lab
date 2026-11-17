@@ -53,6 +53,9 @@ export function CitationsPanel({ docId }: { docId: string }) {
   const current = useRef(docId);
   current.current = docId;
 
+  // Another document has its own refresh state (a refresh of the previous one may still be running).
+  useEffect(() => setBusy(false), [docId]);
+
   useEffect(() => {
     let live = true;
     setView(null);
@@ -76,7 +79,7 @@ export function CitationsPanel({ docId }: { docId: string }) {
     } catch (e) {
       if (current.current === asked) setError(e);
     } finally {
-      setBusy(false);
+      if (current.current === asked) setBusy(false);
     }
   }, [docId]);
 
@@ -114,8 +117,8 @@ export function CitationsPanel({ docId }: { docId: string }) {
       )}
       {view?.fetched && (
         <>
-          <Links links={view.references} testId="citation-ref" title={t('citations.references', { count: view.references.length })} empty={t('citations.emptyRefs')} />
-          <Links links={view.citedBy} testId="citation-citedby" title={t('citations.citedBy', { count: view.citedBy.length })} empty={t('citations.emptyCitedBy')} />
+          <Links key={`ref-${docId}`} links={view.references} testId="citation-ref" title={t('citations.references', { count: view.references.length })} empty={t('citations.emptyRefs')} />
+          <Links key={`by-${docId}`} links={view.citedBy} testId="citation-citedby" title={t('citations.citedBy', { count: view.citedBy.length })} empty={t('citations.emptyCitedBy')} />
         </>
       )}
     </div>

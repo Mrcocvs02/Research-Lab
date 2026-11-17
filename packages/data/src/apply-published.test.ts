@@ -36,4 +36,18 @@ describe('applyPublished', () => {
     expect(back).toMatchObject({ doi: null, year: 2024, publication: { status: 'preprint' }, arxivId: '2401.01234' });
     expect(back.ref.venue).toBeUndefined();
   });
+
+  it('keeps the arXiv identity when the DOI that goes was the arXiv one, and moves the generation of what is derived from documents', async () => {
+    await store.documents.put({ ...doc(), id: hex(2), path: 'docs/b.pdf', doi: '10.48550/arXiv.2402.00009v2', arxivId: null });
+    const g = org.generation;
+    const before = (await store.documents.get(hex(2)))!;
+    const r = await org.applyPublished(hex(2), { ...found, doi: '10.1234/pub2' }, before.revision);
+    expect(r.record).toMatchObject({ doi: '10.1234/pub2', arxivId: '2402.00009' });
+    expect(org.generation).toBeGreaterThan(g);
+    const g2 = org.generation;
+    org.invalidate();
+    expect(org.generation).toBe(g2 + 1);
+    await org.undo(r.changeId);
+    expect(await store.documents.get(hex(2))).toMatchObject({ doi: '10.48550/arXiv.2402.00009v2' });
+  });
 });

@@ -587,7 +587,7 @@ describe('inbox security and robustness (review fixes)', () => {
     const call = harness();
     ok(await call('inbox:add', { paths: [await pdf('a.pdf')] }));
     await whenInboxIdle();
-    await store.documents.put(doc(9, 'misc/new.pdf', { doi: '10.1/zzz', inbox: { since: NOW, reason: 'new' } }));
+    await store.documents.put(doc(9, 'misc/new.pdf', { doi: '10.1001/zzz', inbox: { since: NOW, reason: 'new' } }));
     fetched.length = 0;
     const reads = { list: 0, get: 0 };
     const ol = store.documents.list.bind(store.documents);
@@ -606,7 +606,7 @@ describe('inbox security and robustness (review fixes)', () => {
   });
 
   it('a lookup that fails leaves a negative entry: listing again does not schedule it again', async () => {
-    await store.documents.put(doc(9, 'misc/new.pdf', { doi: '10.1/zzz', inbox: { since: NOW, reason: 'new' } }));
+    await store.documents.put(doc(9, 'misc/new.pdf', { doi: '10.1001/zzz', inbox: { since: NOW, reason: 'new' } }));
     const call = harness();
     online = true;
     failFetch = true;

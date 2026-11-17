@@ -5,7 +5,7 @@ import { trackAbort } from '../ai/abort-registry.js';
 import type { MainServices } from '../ipc/handlers/services.js';
 import type { DomainHandlers } from '../ipc/types.js';
 import type { LibraryRuntime } from '../library/library-runtime.js';
-import { online, ownedIndex } from './context.js';
+import { bumpCitations, online, ownedIndex } from './context.js';
 
 type What = Array<'references' | 'citedBy'>;
 export type CitationView = Awaited<ReturnType<DomainHandlers<'citations'>['citations:get']>>;
@@ -49,14 +49,50 @@ export async function citationView(rt: LibraryRuntime, docId: DocumentId): Promi
   };
 }
 
+/** The stored file for `previous`; a damaged one is set aside (`.corrupt`) and ignored, since the refresh writes a new one. */
+async function readPrevious(rt: LibraryRuntime, docId: DocumentId): Promise<CitationFile | null> {
+  try {
+    return await rt.store.citations.get(docId);
+  } catch (e) {
+    if (e instanceof AppError && e.code === 'SCHEMA_INVALID') {
+      await rt.store.quarantineCitations(docId);
+      return null;
+    }
+    throw e;
+  }
+}
+
+/**
+ * What a refresh of `what` writes into the file as it is NOW: the fetched half comes from `file`, the other half stays
+ * as it is stored (a concurrent refresh of that half is not undone by this one).
+ */
+function mergeFile(cur: CitationFile | null, file: CitationFile, what: What): CitationFile {
+  if (!cur) return file;
+  const r = what.includes('references');
+  const c = what.includes('citedBy');
+  const out: CitationFile = { ...file, references: r ? file.references : cur.references, citedBy: c ? file.citedBy : cur.citedBy };
+  const set = <K extends 'externalId' | 'citedByCount' | 'referencesCheckedAt' | 'citedByCheckedAt'>(k: K, v: CitationFile[K]) => {
+    if (v === undefined) delete out[k];
+    else out[k] = v;
+  };
+  set('externalId', file.externalId ?? cur.externalId);
+  set('citedByCount', c ? file.citedByCount : cur.citedByCount);
+  set('referencesCheckedAt', r ? file.referencesCheckedAt : cur.referencesCheckedAt);
+  set('citedByCheckedAt', c ? file.citedByCheckedAt : cur.citedByCheckedAt);
+  return out;
+}
+
 /** Fetches one document's citations and stores the file (atomic, through the store). */
 async function refreshFile(s: MainServices, rt: LibraryRuntime, docId: DocumentId, what: What, signal: AbortSignal, index?: Awaited<ReturnType<typeof ownedIndex>>): Promise<CitationFile> {
   const doc = await rt.getDocument(docId);
   if (!hasLookupKey(doc)) throw new AppError('INVALID_REQUEST', 'This document has no DOI, arXiv id or title to look up');
   const { service } = await online(s);
-  const previous = await rt.store.citations.get(docId);
+  const previous = await readPrevious(rt, docId);
   const file = await service.refresh(doc, index ?? (await ownedIndex(rt, true)), signal, { what, previous });
-  return rt.store.citations.put(file);
+  // Merged inside the store's per-file queue: the half this refresh did not fetch is re-read, not taken from `previous`.
+  const stored = await rt.store.citations.update(docId, (cur) => mergeFile(cur, file, what));
+  bumpCitations(rt);
+  return stored;
 }
 
 export async function refreshCitations(s: MainServices, docId: DocumentId, what: What): Promise<CitationView> {
@@ -76,10 +112,15 @@ interface Job {
   status: CitationJobStatus;
   libraryId: string;
   docIds: DocumentId[];
+  /** Documents checked within this many days are left out (0: none). */
+  skipDays: number;
   controller: AbortController;
   release(): void;
 }
 const JOBS_KEPT = 20;
+/** Jobs running or waiting at once (each holds its document ids in memory and the sources' rate limits are shared). */
+const JOBS_ACTIVE_MAX = 5;
+const DAY_MS = 86_400_000;
 const PROGRESS_MS = 250;
 const jobs: Job[] = [];
 let seq = 0;
@@ -87,11 +128,12 @@ let running = false;
 
 const active = (j: Job) => j.status.state === 'queued' || j.status.state === 'running';
 
-export async function startRefreshMany(s: MainServices, docIds: DocumentId[]): Promise<{ jobId: string }> {
+export async function startRefreshMany(s: MainServices, docIds: DocumentId[], skipDays = 7): Promise<{ jobId: string }> {
   const rt = await s.runtime.require();
+  if (jobs.filter(active).length >= JOBS_ACTIVE_MAX) throw new AppError('INVALID_REQUEST', 'Too many citation refreshes are waiting: wait for one to finish or cancel one', { reason: 'too-many-jobs', limit: JOBS_ACTIVE_MAX });
   const ids = [...new Set(docIds)];
   const t = trackAbort();
-  const job: Job = { status: { jobId: `cit-${++seq}`, state: 'queued', total: ids.length, done: 0, failed: 0, skipped: 0 }, libraryId: rt.libraryId, docIds: ids, controller: t.controller, release: t.release };
+  const job: Job = { status: { jobId: `cit-${++seq}`, state: 'queued', total: ids.length, done: 0, failed: 0, skipped: 0, notFound: 0 }, libraryId: rt.libraryId, docIds: ids, skipDays, controller: t.controller, release: t.release };
   jobs.unshift(job);
   for (let i = jobs.length - 1; i >= 0 && jobs.length > JOBS_KEPT; i--) if (!active(jobs[i]!)) jobs.splice(i, 1);
   void pump(s);
@@ -135,6 +177,11 @@ async function run(s: MainServices, j: Job): Promise<void> {
   s.emit('citations:progress', { ...st });
   let lastEmit = Date.now();
   let streak = 0;
+  const tick = () => {
+    if (Date.now() - lastEmit < PROGRESS_MS) return;
+    lastEmit = Date.now();
+    s.emit('citations:progress', { ...st });
+  };
   try {
     const rt = await s.runtime.require();
     if (rt.libraryId !== j.libraryId || j.controller.signal.aborted) return finish(s, j, 'cancelled');
@@ -146,6 +193,7 @@ async function run(s: MainServices, j: Job): Promise<void> {
       try {
         const doc = await rt.getDocument(docId);
         if (!hasLookupKey(doc)) st.skipped++;
+        else if (j.skipDays > 0 && (await checkedRecently(rt, docId, j.skipDays))) st.skipped++;
         else {
           await refreshFile(s, rt, docId, ['references', 'citedBy'], j.controller.signal, index);
           st.done++;
@@ -154,18 +202,19 @@ async function run(s: MainServices, j: Job): Promise<void> {
       } catch (e) {
         if (e instanceof AppError && e.code === 'CANCELLED') return finish(s, j, 'cancelled');
         if (e instanceof AppError && (e.code === 'NOT_FOUND' || e.code === 'INVALID_REQUEST')) {
-          st.skipped++;
+          // No source knows the work (or the document cannot be looked up): the sources answered, so this is not a failure.
+          if (e.code === 'NOT_FOUND') st.notFound++;
+          else st.skipped++;
+          streak = 0;
+          tick();
           continue;
         }
         st.failed++;
         const offline = e instanceof AppError && e.code === 'NETWORK_ERROR' && e.details?.['reason'] === 'offline';
-        // Offline, or three failures in a row: the rest would fail too, and each try costs the sources a request.
+        // Unreachable, or three failures in a row (a timeout counts like any other): the rest would fail too, and each try costs the sources a request.
         if (offline || ++streak >= 3) throw e;
       }
-      if (Date.now() - lastEmit >= PROGRESS_MS) {
-        lastEmit = Date.now();
-        s.emit('citations:progress', { ...st });
-      }
+      tick();
     }
     finish(s, j, 'done');
   } catch (e) {
@@ -173,6 +222,13 @@ async function run(s: MainServices, j: Job): Promise<void> {
     s.log.warn('citation refresh stopped', { error: e });
     finish(s, j, 'failed', e instanceof AppError ? { code: e.code, message: e.message } : { code: 'INTERNAL', message: 'The refresh stopped' });
   }
+}
+
+/** Both halves refreshed within `days` days. */
+async function checkedRecently(rt: LibraryRuntime, docId: DocumentId, days: number): Promise<boolean> {
+  const f = await rt.store.citations.get(docId).catch(() => null);
+  const at = f?.referencesCheckedAt && f.citedByCheckedAt ? Math.min(Date.parse(f.referencesCheckedAt), Date.parse(f.citedByCheckedAt)) : NaN;
+  return Number.isFinite(at) && Date.now() - at < days * DAY_MS;
 }
 
 /** Resolves when no citation job is running or queued (tests). */

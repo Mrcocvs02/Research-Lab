@@ -269,7 +269,7 @@ function LibraryInner() {
                   <button type="button" onClick={() => setJobOpen(true)} data-testid="bulk-ai-propose">
                     {t('jobs.propose')}
                   </button>
-                  <button type="button" onClick={() => void citationJob.start(selectedIds)} title={t('citations.bulkHint')} data-testid="bulk-citations">
+                  <button type="button" onClick={() => void citationJob.start(selectedIds)} disabled={citationJob.busy} title={citationJob.busy ? t('citations.alreadyRunning') : t('citations.bulkHint')} data-testid="bulk-citations">
                     {t('citations.bulk')}
                   </button>
                   <button type="button" className="link" onClick={() => setSelection(emptySelection())} data-testid="selection-clear">

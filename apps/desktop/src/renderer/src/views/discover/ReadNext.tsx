@@ -15,6 +15,9 @@ type Item = Result['items'][number];
 type Project = ResponseOf<Channels, 'projects:list'>['items'][number];
 type Scope = 'all' | 'project' | 'folder';
 
+/** The number field changes the list only after this pause (each change recomputes it in the main process). */
+const MIN_DEBOUNCE_MS = 350;
+
 /** Fewer documents than this have stored citations: the list is thin, so say so and how to improve it. */
 const FEW = 5;
 
@@ -42,7 +45,12 @@ export function ReadNext({ reloadKey }: { reloadKey: number }) {
   const [scope, setScope] = useState<Scope>('all');
   const [projectId, setProjectId] = useState('');
   const [folder, setFolder] = useState('');
+  const [minInput, setMinInput] = useState(2);
   const [minCiting, setMinCiting] = useState(2);
+  useEffect(() => {
+    const id = setTimeout(() => setMinCiting(minInput), MIN_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [minInput]);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<unknown>(null);
   const projects = useProjects(scope === 'project');
@@ -126,7 +134,7 @@ export function ReadNext({ reloadKey }: { reloadKey: number }) {
         )}
         <div className="field">
           <label htmlFor={minId}>{t('discover.readnext.minCiting')}</label>
-          <input id={minId} type="number" min={1} max={50} value={minCiting} onChange={(e) => setMinCiting(Math.min(50, Math.max(1, Number.parseInt(e.target.value, 10) || 1)))} data-testid="readnext-min" />
+          <input id={minId} type="number" min={1} max={50} value={minInput} onChange={(e) => setMinInput(Math.min(50, Math.max(1, Number.parseInt(e.target.value, 10) || 1)))} data-testid="readnext-min" />
         </div>
       </div>
       {error !== null && <ErrorNote testId="readnext-error">{errorMessage(error, t)}</ErrorNote>}

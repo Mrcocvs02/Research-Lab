@@ -4,6 +4,8 @@
  * Electron's `net.fetch` in the app, a fake in tests. No dependency: the Atom feed of arXiv is read with a few
  * bounded regular expressions, over a response that is size-capped first.
  */
+import { ARXIV_SHAPE, isValidDoi, UNSAFE_TEXT } from '@rl/core';
+
 export interface WorkRef {
   doi?: string | null | undefined;
   /** With or without version (`2401.01234`, `2401.01234v2`, `hep-th/9901001`). */
@@ -35,10 +37,10 @@ export interface FetchWorkOptions {
 }
 
 export class WorkLookupError extends Error {
-  /** `http` / `rate-limited` carry the status; `network` is a failed or timed-out request; `refused` is a safety refusal. */
+  /** `http` / `rate-limited` carry the status; `network` is a request that failed (host unreachable); `timeout` one that got no answer in time; `refused` is a safety refusal. */
   constructor(
     message: string,
-    readonly reason: 'network' | 'http' | 'rate-limited' | 'refused' | 'cancelled' = 'refused',
+    readonly reason: 'network' | 'timeout' | 'http' | 'rate-limited' | 'refused' | 'cancelled' = 'refused',
     readonly status = 0,
     readonly retryAfterMs = 0,
   ) {
@@ -53,10 +55,23 @@ const ABSTRACT_MAX = 20_000;
 const ENTRY_MAX = 200_000;
 const USER_AGENT = 'ResearchLab';
 
+/** `https://` URL of an allowed host, no credentials: checked before anything is sent. */
+function checkTarget(url: string): void {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    throw new WorkLookupError('invalid address');
+  }
+  if (u.protocol !== 'https:') throw new WorkLookupError('only https is used');
+  if (u.username || u.password || !ALLOWED_HOSTS.has(u.host)) throw new WorkLookupError('address not allowed');
+}
+
 export const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) : s);
 export const clean = (s: unknown, n: number): string | null => {
   if (typeof s !== 'string') return null;
-  const t = s.replace(/\s+/g, ' ').trim();
+  // Whitespace becomes one space; control and bidi characters go (what is stored and synced is clean, not only what is shown).
+  const t = s.replace(/\s+/g, ' ').replace(UNSAFE_TEXT, '').trim();
   return t ? clip(t, n) : null;
 };
 
@@ -89,9 +104,13 @@ const ALLOWED_HOSTS = new Set(['api.openalex.org', 'export.arxiv.org', 'api.sema
 
 /** GET of an https URL with a timeout, a size cap and no cookies. Null on 404; throws `WorkLookupError` on anything else. Redirects are refused. */
 export async function httpGet(url: string, accept: string, o: FetchWorkOptions): Promise<string | null> {
-  if (!url.startsWith('https://')) throw new WorkLookupError('only https is used');
+  checkTarget(url);
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), o.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    ctl.abort();
+  }, o.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const onAbort = () => ctl.abort();
   o.signal?.addEventListener('abort', onAbort, { once: true });
   try {
@@ -116,20 +135,35 @@ export async function httpGet(url: string, accept: string, o: FetchWorkOptions):
     return await readCapped(res, o.maxBytes ?? DEFAULT_MAX_BYTES);
   } catch (e) {
     if (e instanceof WorkLookupError) throw e;
-    throw new WorkLookupError(ctl.signal.aborted ? 'timeout or cancelled' : 'network error', o.signal?.aborted ? 'cancelled' : 'network');
+    if (o.signal?.aborted) throw new WorkLookupError('cancelled', 'cancelled');
+    throw timedOut ? new WorkLookupError('timeout', 'timeout') : new WorkLookupError('network error', 'network');
   } finally {
     clearTimeout(timer);
     o.signal?.removeEventListener('abort', onAbort);
   }
 }
 
+/** Lower case, without a `doi:` or doi.org prefix and without the punctuation a sentence leaves after a DOI. */
 export const normaliseDoi = (doi: string): string =>
   doi
     .trim()
     .replace(/^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:\s*)/i, '')
+    .replace(/[.,;:]+$/, '')
     .toLowerCase();
 
-export const encodePath = (s: string) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F');
+/** Every `/`-separated segment encoded on its own, so nothing in an identifier can end a path, a query or a fragment. */
+export const encodePath = (s: string) => s.split('/').map(encodeURIComponent).join('/');
+
+/**
+ * A DOI that may go into a URL path: lower case, no `doi:`/URL prefix, no control or bidi character, no `.` or `..`
+ * segment (which `new URL` would resolve into another path of the same host). Null otherwise.
+ */
+export function pathDoi(doi: string | null | undefined): string | null {
+  if (!doi) return null;
+  const d = normaliseDoi(doi);
+  if (!isValidDoi(d)) return null;
+  return d;
+}
 
 /** Abstract of OpenAlex's `abstract_inverted_index` ({ word: [positions] }) back to text. */
 export function abstractFromInverted(index: unknown): string | null {
@@ -163,7 +197,7 @@ export function parseOpenAlex(json: unknown, doi: string): WorkMetadata | null {
   const venue = clean(asObj(asObj(w['primary_location'])['source'])['display_name'] ?? asObj(w['host_venue'])['display_name'], 500);
   const type = typeof w['type'] === 'string' ? w['type'] : '';
   const publication = w['is_retracted'] === true ? 'withdrawn' : type === 'preprint' ? 'preprint' : 'published';
-  const rawDoi = typeof w['doi'] === 'string' ? normaliseDoi(w['doi']) : doi;
+  const rawDoi = typeof w['doi'] === 'string' && isValidDoi(normaliseDoi(w['doi'])) ? normaliseDoi(w['doi']) : doi;
   return { title, authors, year, venue, doi: clip(rawDoi || doi, 300), arxivId: null, abstract: abstractFromInverted(w['abstract_inverted_index']), publication };
 }
 
@@ -207,7 +241,7 @@ export function parseArxivAtom(xml: string): WorkMetadata | null {
     authors,
     year: Number.isInteger(y) && y >= 1000 ? y : null,
     venue: journal,
-    doi: doi ? normaliseDoi(doi) : null,
+    doi: doi && isValidDoi(normaliseDoi(doi)) ? normaliseDoi(doi) : null,
     arxivId: clip(idMatch[1]!, 300),
     abstract: clean(tag(entry, 'summary'), ABSTRACT_MAX),
     publication: doi || journal ? 'published' : 'preprint',
@@ -221,7 +255,7 @@ export function parseArxivAtom(xml: string): WorkMetadata | null {
 export async function fetchWorkMetadata(ref: WorkRef, o: FetchWorkOptions): Promise<WorkLookup | null> {
   let failed: WorkLookupError | null = null;
   let tried = 0;
-  const doi = ref.doi ? normaliseDoi(ref.doi) : '';
+  const doi = pathDoi(ref.doi) ?? '';
   if (doi) {
     tried++;
     try {
@@ -242,7 +276,7 @@ export async function fetchWorkMetadata(ref: WorkRef, o: FetchWorkOptions): Prom
     }
   }
   const arxiv = ref.arxivId?.trim().replace(/^arxiv:\s*/i, '');
-  if (arxiv && /^[a-z0-9.\-/]{4,60}$/i.test(arxiv)) {
+  if (arxiv && ARXIV_SHAPE.test(arxiv)) {
     tried++;
     try {
       const text = await httpGet(`https://export.arxiv.org/api/query?id_list=${encodeURIComponent(arxiv.replace(/v\d+$/i, ''))}`, 'application/atom+xml', o);

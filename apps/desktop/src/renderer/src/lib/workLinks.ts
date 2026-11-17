@@ -8,31 +8,29 @@ export interface WorkIds {
 }
 
 export type WorkLinkKind = 'doi' | 'arxiv' | 'openalex';
+/** A work's identifier, never a URL: the main process checks its shape and builds the address (`citations:openExternal`). */
 export interface WorkLink {
   kind: WorkLinkKind;
-  url: string;
+  id: string;
 }
 
-const enc = (s: string) => s.split('/').map(encodeURIComponent).join('/');
-
 /**
- * The page of a work on a host the app may open (doi.org, arxiv.org, openalex.org), built from its identifiers. The
- * identifier is always percent-encoded after the fixed host, so a hostile value cannot change where the link goes.
- * DOI first, then arXiv, then an OpenAlex id (`W123`); null when nothing usable.
+ * The best identifier of a work to open it by: DOI first, then arXiv, then an OpenAlex id (`W123`); null when nothing
+ * usable. Prefixes (`doi:`, a doi.org address, `arXiv:`) are dropped; the shape is checked by the main process.
  */
 export function workLink(ids: WorkIds): WorkLink | null {
   const doi = ids.doi?.trim().replace(/^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:)/i, '');
-  if (doi) return { kind: 'doi', url: `https://doi.org/${enc(doi)}` };
+  if (doi && doi.length <= 300) return { kind: 'doi', id: doi };
   const arxiv = ids.arxivId?.trim().replace(/^arxiv:/i, '');
-  if (arxiv) return { kind: 'arxiv', url: `https://arxiv.org/abs/${enc(arxiv)}` };
+  if (arxiv && arxiv.length <= 300) return { kind: 'arxiv', id: arxiv };
   const ext = ids.externalId?.trim();
-  if (ext && /^W\d+$/.test(ext)) return { kind: 'openalex', url: `https://openalex.org/${ext}` };
+  if (ext && /^W\d+$/.test(ext)) return { kind: 'openalex', id: ext };
   return null;
 }
 
-/** Opens a link in the system browser through the main process (which checks the scheme again). */
-export function openExternal(url: string): Promise<unknown> {
-  return rl.invoke('reader:openLink', { url });
+/** Opens a work's page in the system browser: the main process validates the identifier, builds the URL on doi.org, arxiv.org or openalex.org, and opens it. */
+export function openWork(link: WorkLink): Promise<unknown> {
+  return rl.invoke('citations:openExternal', { kind: link.kind, id: link.id });
 }
 
 /** "A. One, B. Two, C. Three" (at most three names); `more` formats the "et al." suffix. */

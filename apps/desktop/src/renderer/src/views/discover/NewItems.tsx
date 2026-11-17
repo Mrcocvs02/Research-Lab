@@ -9,6 +9,7 @@ import { WorkRow } from '../citations/WorkRow';
 import { safeText } from '../library/safeText';
 import type { WatchSource } from './DiscoverView';
 import { sourceName } from './sourceName';
+import { useWatchOp } from './watchOps';
 
 type Items = ResponseOf<Channels, 'watch:items'>;
 type Item = Items['items'][number];
@@ -24,8 +25,8 @@ export function NewItems({ sources, nonce, onChanged }: { sources: WatchSource[]
   const [items, setItems] = useState<Item[] | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<unknown>(null);
-  const [checking, setChecking] = useState(false);
-  const [result, setResult] = useState<CheckResult | null>(null);
+  const op = useWatchOp<CheckResult>('check');
+  const { running: checking, result } = op;
   const filterId = useId();
 
   useEffect(() => {
@@ -54,17 +55,9 @@ export function NewItems({ sources, nonce, onChanged }: { sources: WatchSource[]
     }
   }, [filter, items?.length, reportError]);
 
-  const check = async () => {
-    setChecking(true);
+  const check = () => {
     setError(null);
-    try {
-      setResult(await rl.invoke('watch:check', {}));
-      onChanged();
-    } catch (e) {
-      setError(e);
-    } finally {
-      setChecking(false);
-    }
+    void op.run(() => rl.invoke('watch:check', {}), onChanged);
   };
 
   const dismiss = async (item: Item) => {
@@ -99,10 +92,18 @@ export function NewItems({ sources, nonce, onChanged }: { sources: WatchSource[]
             ))}
           </select>
         </div>
-        <button type="button" className="primary" onClick={() => void check()} disabled={checking || (sources !== null && sources.length === 0)} data-testid="watch-check">
+        <button type="button" className="primary" onClick={check} disabled={checking || (sources !== null && sources.length === 0)} data-testid="watch-check">
           {checking ? t('discover.watch.checking') : t('discover.watch.checkNow')}
         </button>
       </div>
+      {checking && (
+        <p role="status" data-testid="watch-progress">
+          {op.progress ? t('discover.watch.progress', { done: op.progress.done, total: op.progress.total }) : t('discover.watch.checking')}{' '}
+          <button type="button" className="link" onClick={() => void op.cancel()} disabled={op.cancelling} data-testid="watch-cancel">
+            {t('discover.cancel')}
+          </button>
+        </p>
+      )}
       {sources !== null && sources.length === 0 && <p className="hint">{t('discover.watch.noSources')}</p>}
       {result && (
         <div role="status" data-testid="watch-result">
@@ -118,7 +119,7 @@ export function NewItems({ sources, nonce, onChanged }: { sources: WatchSource[]
           )}
         </div>
       )}
-      {error !== null && <ErrorNote testId="watch-error">{errorMessage(error, t)}</ErrorNote>}
+      {(error ?? (checking ? null : op.error)) !== null && <ErrorNote testId="watch-error">{errorMessage(error ?? op.error, t)}</ErrorNote>}
       {items === null && error === null && <p className="hint">{t('discover.watch.loading')}</p>}
       {items && items.length === 0 && (
         <p className="empty" data-testid="watch-empty">

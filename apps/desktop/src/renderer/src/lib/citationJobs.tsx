@@ -10,6 +10,8 @@ export type CitationJob = EventPayload<Events, 'citations:progress'>;
 interface Value {
   /** The citation refresh of this session (the newest), or null. */
   job: CitationJob | null;
+  /** A refresh is running or queued: a new one is refused until it ends (the older one could not be followed or cancelled). */
+  busy: boolean;
   /** Moves when a refresh ends (the stored citations changed). */
   version: number;
   /** Starts a background refresh of these documents (the network is used from here on, never before). */
@@ -17,7 +19,7 @@ interface Value {
   cancel(): Promise<void>;
   dismiss(): void;
 }
-const NONE: Value = { job: null, version: 0, start: async () => false, cancel: async () => {}, dismiss() {} };
+const NONE: Value = { job: null, busy: false, version: 0, start: async () => false, cancel: async () => {}, dismiss() {} };
 const Ctx = createContext<Value>(NONE);
 export const useCitationJob = () => useContext(Ctx);
 
@@ -39,6 +41,10 @@ export function CitationJobsProvider({ children }: { children: ReactNode }) {
   const jobId = useRef<string | null>(null);
   // Events of jobs we do not follow (yet): `refreshMany` may answer after its first event.
   const seen = useRef(new Map<string, CitationJob>());
+  // Set while the request that starts a job is in flight, and while the job lives.
+  const starting = useRef(false);
+  const liveJob = useRef(false);
+  liveJob.current = job !== null && live(job);
 
   useEffect(() => {
     setJob(null);
@@ -61,10 +67,15 @@ export function CitationJobsProvider({ children }: { children: ReactNode }) {
 
   const start = useCallback(
     async (docIds: readonly string[]) => {
+      if (starting.current || liveJob.current) {
+        info(t('citations.alreadyRunning'));
+        return false;
+      }
       if (docIds.length > REFRESH_MANY_MAX) {
         fail(t('citations.tooMany', { limit: REFRESH_MANY_MAX, n: docIds.length }));
         return false;
       }
+      starting.current = true;
       try {
         const r = await rl.invoke('citations:refreshMany', { docIds: [...docIds] });
         jobId.current = r.jobId;
@@ -75,6 +86,8 @@ export function CitationJobsProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         reportError(e);
         return false;
+      } finally {
+        starting.current = false;
       }
     },
     [fail, info, reportError, t],
@@ -89,7 +102,8 @@ export function CitationJobsProvider({ children }: { children: ReactNode }) {
   }, [reportError]);
   const dismiss = useCallback(() => setDismissed(jobId.current), []);
   const shown = job && job.jobId !== dismissed ? job : null;
-  const value = useMemo(() => ({ job: shown, version, start, cancel, dismiss }), [shown, version, start, cancel, dismiss]);
+  const busy = job !== null && live(job);
+  const value = useMemo(() => ({ job: shown, busy, version, start, cancel, dismiss }), [shown, busy, version, start, cancel, dismiss]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
@@ -101,7 +115,7 @@ export function CitationIndicator() {
   const running = live(job);
   const text = running
     ? t('citations.job.running', { done: job.done, total: job.total })
-    : t(`citations.job.ended_${job.state}`, { done: job.done, total: job.total, failed: job.failed, skipped: job.skipped });
+    : t(`citations.job.ended_${job.state}`, { done: job.done, total: job.total, failed: job.failed, skipped: job.skipped, notFound: job.notFound });
   return (
     <span className="job-indicator" data-testid="citations-indicator" data-state={job.state} role="status" aria-label={t('citations.job.label')}>
       <span data-testid="citations-text">{text}</span>

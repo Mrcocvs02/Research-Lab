@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { createElement, type ReactNode } from 'react';
+import { createElement, useState, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError, CITATION_LIMITS, type LibraryProfile } from '@rl/core';
 import i18n from '../../i18n';
@@ -50,14 +50,14 @@ beforeEach(async () => {
 afterEach(() => cleanup());
 
 describe('workLink', () => {
-  it('builds links only on the allowed hosts and encodes what it is given', () => {
-    expect(workLink({ doi: '10.1000/abc' })).toEqual({ kind: 'doi', url: 'https://doi.org/10.1000/abc' });
-    expect(workLink({ doi: 'https://doi.org/10.1000/abc' })?.url).toBe('https://doi.org/10.1000/abc');
-    expect(workLink({ doi: '10.1/a b<c>?x#y' })?.url).toBe('https://doi.org/10.1/a%20b%3Cc%3E%3Fx%23y');
-    expect(workLink({ doi: '@evil.example/x' })?.url.startsWith('https://doi.org/')).toBe(true);
-    expect(workLink({ arxivId: 'arXiv:2101.00001' })).toEqual({ kind: 'arxiv', url: 'https://arxiv.org/abs/2101.00001' });
-    expect(workLink({ externalId: 'W123' })).toEqual({ kind: 'openalex', url: 'https://openalex.org/W123' });
+  it('gives an identifier, never a URL (the main process builds the address)', () => {
+    expect(workLink({ doi: '10.1000/abc' })).toEqual({ kind: 'doi', id: '10.1000/abc' });
+    expect(workLink({ doi: 'https://doi.org/10.1000/abc' })).toEqual({ kind: 'doi', id: '10.1000/abc' });
+    expect(workLink({ doi: '10.1000/abc', arxivId: '2101.00001' })?.kind).toBe('doi');
+    expect(workLink({ arxivId: 'arXiv:2101.00001' })).toEqual({ kind: 'arxiv', id: '2101.00001' });
+    expect(workLink({ externalId: 'W123' })).toEqual({ kind: 'openalex', id: 'W123' });
     expect(workLink({ externalId: 'https://evil.example/W1' })).toBeNull();
+    expect(workLink({ doi: `10.1000/${'x'.repeat(400)}` })).toBeNull();
     expect(workLink({})).toBeNull();
   });
 
@@ -111,7 +111,7 @@ describe('CitationsPanel', () => {
     // missing works link to DOI or arXiv, through the main process opener only
     fireEvent.click(within(refs[1]!).getByTestId('citation-ref-external'));
     fireEvent.click(within(refs[2]!).getByTestId('citation-ref-external'));
-    await waitFor(() => expect(callsTo('reader:openLink')).toEqual([{ url: 'https://doi.org/10.1000/missing' }, { url: 'https://arxiv.org/abs/2101.00001' }]));
+    await waitFor(() => expect(callsTo('citations:openExternal')).toEqual([{ kind: 'doi', id: '10.1000/missing' }, { kind: 'arxiv', id: '2101.00001' }]));
   });
 
   it('renders remote metadata as text only', async () => {
@@ -186,7 +186,7 @@ describe('bulk citation refresh', () => {
     expect(screen.getByTestId('citations-text').textContent).toBe('Citations stopped: 1/3 done');
     expect(screen.getByTestId('cit-version').textContent).toBe('1');
     act(() => c.progress({ state: 'done', total: 3, done: 3, skipped: 1, failed: 1 }));
-    expect(screen.getByTestId('citations-text').textContent).toBe('Citations updated: 3/3 (1 skipped, 1 failed)');
+    expect(screen.getByTestId('citations-text').textContent).toBe('Citations updated: 3/3 (1 skipped, 0 not found, 1 failed)');
     fireEvent.click(screen.getByTestId('citations-dismiss'));
     expect(screen.queryByTestId('citations-indicator')).toBeNull();
   });
@@ -204,6 +204,22 @@ describe('bulk citation refresh', () => {
     expect(c2.state.manyStarted).toEqual([]);
   });
 
+  it('refuses a second job while one is running and disables the button of the selection', async () => {
+    const lib = memoryLibrary({ docs: makeDocs(4) });
+    const c = await mount(createElement('div', null, createElement(LibraryView), createElement(Starter, { ids: ['d1'] })), lib.handlers);
+    await screen.findAllByTestId('search-result');
+    fireEvent.click(screen.getAllByTestId('search-result')[0]!);
+    fireEvent.click(await screen.findByTestId('bulk-citations'));
+    await waitFor(() => expect(c.state.manyStarted).toHaveLength(1));
+    act(() => c.progress({ state: 'running', total: 1, done: 0 }));
+    await waitFor(() => expect(screen.getByTestId('bulk-citations')).toHaveProperty('disabled', true));
+    fireEvent.click(screen.getByTestId('go'));
+    await waitFor(() => expect(screen.getByTestId('toasts').textContent).toContain('already running'));
+    expect(c.state.manyStarted).toHaveLength(1);
+    act(() => c.progress({ state: 'done', total: 1, done: 1 }));
+    await waitFor(() => expect(screen.getByTestId('bulk-citations')).toHaveProperty('disabled', false));
+  });
+
   it('is offered from the library selection and starts the job for the selected documents', async () => {
     const lib = memoryLibrary({ docs: makeDocs(4) });
     const c = await mount(createElement(LibraryView), lib.handlers);
@@ -215,6 +231,39 @@ describe('bulk citation refresh', () => {
     await waitFor(() => expect(c.state.manyStarted).toHaveLength(1));
     expect(c.state.manyStarted[0]).toHaveLength(2);
     expect(callsTo('citations:refresh')).toEqual([]);
+  });
+});
+
+describe('CitationsPanel across documents', () => {
+  it('does not carry the refreshing state or the page size over to another document', async () => {
+    let finish!: () => void;
+    const slow = new Promise<void>((r) => (finish = r));
+    const many = Array.from({ length: 60 }, (_, i) => fakeLink({ title: `Ref ${i}` }));
+    const c = memoryCitations();
+    c.state.stored.set('d1', fakeView('d1', { references: many }));
+    c.state.stored.set('d2', fakeView('d2', { references: many }));
+    function Switch() {
+      const [id, setId] = useState('d1');
+      return createElement('div', null, createElement('button', { type: 'button', 'data-testid': 'switch', onClick: () => setId('d2') }), createElement(CitationsPanel, { docId: id }));
+    }
+    const refresh = async (p: any) => {
+      if (p.docId === 'd1') await slow;
+      return fakeView(p.docId);
+    };
+    await mount(createElement(Switch), { 'citations:refresh': refresh }, c);
+    await screen.findAllByTestId('citation-ref');
+    fireEvent.click(screen.getByTestId('citation-ref-more'));
+    expect(screen.getAllByTestId('citation-ref')).toHaveLength(60);
+    fireEvent.click(screen.getByTestId('citations-refresh'));
+    await waitFor(() => expect(screen.getByTestId('citations-refresh')).toHaveProperty('disabled', true));
+    fireEvent.click(screen.getByTestId('switch'));
+    await waitFor(() => expect(screen.getByTestId('citations-refresh')).toHaveProperty('disabled', false));
+    await waitFor(() => expect(screen.getAllByTestId('citation-ref')).toHaveLength(50));
+    await act(async () => {
+      finish();
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(screen.getByTestId('citations-refresh')).toHaveProperty('disabled', false);
   });
 });
 

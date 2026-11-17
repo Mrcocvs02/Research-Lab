@@ -7,8 +7,9 @@ import { useLibraryEvents } from '../../lib/events';
 import { useHistory } from '../../lib/history';
 import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
-import { openExternal, workLink } from '../../lib/workLinks';
+import { openWork, workLink } from '../../lib/workLinks';
 import { safeText } from '../library/safeText';
+import { useWatchOp } from './watchOps';
 
 type Check = ResponseOf<Channels, 'watch:checkPublished'>;
 type Proposal = Check['proposals'][number];
@@ -23,26 +24,13 @@ export function Published() {
   const { invalidate } = useLibraryEvents();
   const history = useHistory();
   const [ownOnly, setOwnOnly] = useState(false);
-  const [result, setResult] = useState<Check | null>(null);
-  const [proposals, setProposals] = useState<Proposal[]>([]);
-  const [checking, setChecking] = useState(false);
+  const op = useWatchOp<Check>('checkPublished');
+  const { running: checking, result, error } = op;
+  const proposals = result?.proposals ?? [];
   const [applying, setApplying] = useState<string | null>(null);
-  const [error, setError] = useState<unknown>(null);
   const ownId = useId();
 
-  const check = async () => {
-    setChecking(true);
-    setError(null);
-    try {
-      const r = await rl.invoke('watch:checkPublished', { ownOnly });
-      setResult(r);
-      setProposals(r.proposals);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setChecking(false);
-    }
-  };
+  const check = () => void op.run(() => rl.invoke('watch:checkPublished', { ownOnly }));
 
   const confirm = async (p: Proposal) => {
     setApplying(p.docId);
@@ -56,7 +44,7 @@ export function Published() {
         source: p.found.source,
         expectedRevision: p.revision,
       });
-      setProposals((cur) => cur.filter((x) => x.docId !== p.docId));
+      op.patch((r) => ({ ...r, proposals: r.proposals.filter((x) => x.docId !== p.docId) }));
       invalidate('documents');
       info(t('discover.published.applied', { title: safeText(p.title?.trim() || t('citations.untitled')) }), { label: t('discover.published.undo'), run: () => void history.undo(r.changeId) });
     } catch (e) {
@@ -78,12 +66,20 @@ export function Published() {
             {t('discover.published.ownOnlyHint')}
           </p>
         </div>
-        <button type="button" className="primary" onClick={() => void check()} disabled={checking} data-testid="published-check">
+        <button type="button" className="primary" onClick={check} disabled={checking} data-testid="published-check">
           {checking ? t('discover.published.checking') : t('discover.published.check')}
         </button>
       </div>
-      {error !== null && <ErrorNote testId="published-error">{errorMessage(error, t)}</ErrorNote>}
-      {result === null && error === null && <p className="hint">{t('discover.published.notChecked')}</p>}
+      {checking && (
+        <p role="status" data-testid="published-progress">
+          {op.progress ? t('discover.published.progress', { done: op.progress.done, total: op.progress.total }) : t('discover.published.checking')}{' '}
+          <button type="button" className="link" onClick={() => void op.cancel()} disabled={op.cancelling} data-testid="published-cancel">
+            {t('discover.cancel')}
+          </button>
+        </p>
+      )}
+      {error !== null && !checking && <ErrorNote testId="published-error">{errorMessage(error, t)}</ErrorNote>}
+      {result === null && error === null && !checking && <p className="hint">{t('discover.published.notChecked')}</p>}
       {result && (
         <p role="status" data-testid="published-summary">
           {t('discover.published.checked', { checked: result.checked, count: result.proposals.length, failed: result.failed })}
@@ -122,12 +118,17 @@ export function Published() {
                 <dd />
                 <dd>{p.found.source}</dd>
               </dl>
+              {p.ownedBy && (
+                <p className="hint" data-testid="published-owned">
+                  {t('discover.published.alreadyOwned')}
+                </p>
+              )}
               <div className="work-actions">
-                <button type="button" className="primary" onClick={() => void confirm(p)} disabled={applying !== null} aria-label={`${t('discover.published.confirm')}: ${title}`} data-testid="published-confirm">
+                <button type="button" className="primary" onClick={() => void confirm(p)} disabled={applying !== null || Boolean(p.ownedBy)} aria-label={`${t('discover.published.confirm')}: ${title}`} data-testid="published-confirm">
                   {applying === p.docId ? t('discover.published.confirming') : t('discover.published.confirm')}
                 </button>
                 {link && (
-                  <button type="button" className="link" onClick={() => void openExternal(link.url).catch(reportError)} aria-label={t('citations.openExternal', { target: t('citations.openDoi'), title })} data-testid="published-open">
+                  <button type="button" className="link" onClick={() => void openWork(link).catch(reportError)} aria-label={t('citations.openExternal', { target: t('citations.openDoi'), title })} data-testid="published-open">
                     {t('citations.openDoi')}
                   </button>
                 )}

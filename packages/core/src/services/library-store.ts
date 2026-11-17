@@ -96,6 +96,10 @@ export interface LibraryStore {
   updateTaxonomy(fn: (current: TaxonomyFile) => TaxonomyFile | Promise<TaxonomyFile>): Promise<void>;
   readWatch(): Promise<WatchFile>;
   writeWatch(watch: WatchFile): Promise<void>;
+  /** Sets a damaged citation file of a document aside as `<name>.json.corrupt` (an earlier copy is replaced); false when there is none. */
+  quarantineCitations(docId: DocumentId): Promise<boolean>;
+  /** Sets a damaged `watch.json` aside as `watch.json.corrupt`; false when there is none. The next read starts empty. */
+  resetWatch(): Promise<boolean>;
 
   /** Appends to this device's log file for the current month. */
   appendLog(entry: LogEntry): Promise<void>;

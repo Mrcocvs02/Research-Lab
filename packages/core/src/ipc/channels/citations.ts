@@ -32,8 +32,10 @@ export const citationJobStatusSchema = z.object({
   total: z.number().int().nonnegative(),
   done: z.number().int().nonnegative(),
   failed: z.number().int().nonnegative(),
-  /** Documents with no DOI, arXiv id or title good enough to look up. */
+  /** Documents left out: no DOI, arXiv id or title good enough to look up, or checked within `skipCheckedDays`. */
   skipped: z.number().int().nonnegative(),
+  /** Documents no online source knows (they are not failures). */
+  notFound: z.number().int().nonnegative().default(0),
   error: z.object({ code: z.string(), message: z.string() }).optional(),
 });
 
@@ -55,10 +57,24 @@ export const citationsChannels = defineChannels('citations', {
   },
   /** Refreshes many documents in the background, one source call at a time within the sources' rate limits. */
   refreshMany: {
-    request: z.object({ docIds: z.array(documentIdSchema).min(1).max(CITATION_LIMITS.refreshMany) }),
+    request: z.object({
+      docIds: z.array(documentIdSchema).min(1).max(CITATION_LIMITS.refreshMany),
+      /** Documents whose citations were refreshed within this many days are skipped (0: refresh everything). Default 7. */
+      skipCheckedDays: z.number().int().min(0).max(365).default(7),
+    }),
     response: z.object({ jobId: z.string() }),
   },
   cancel: { request: z.object({ jobId: z.string().max(100) }), response: z.object({ cancelled: z.boolean() }) },
+  /**
+   * Opens the page of a work in the system browser. The renderer sends the identifier, never a URL: main checks its
+   * shape (DOI `10.NNNN/…` without control or bidi characters, arXiv new or old id, OpenAlex `W123`), builds the URL on
+   * doi.org, arxiv.org or openalex.org with every path segment encoded, checks it against the allowed external hosts,
+   * and opens it. INVALID_REQUEST for an identifier of the wrong shape; PERMISSION_DENIED if the host were refused.
+   */
+  openExternal: {
+    request: z.object({ kind: z.enum(['doi', 'arxiv', 'openalex']), id: z.string().min(1).max(300) }),
+    response: z.object({ ok: z.literal(true) }),
+  },
 });
 
 export const citationsEvents = defineEvents('citations', {

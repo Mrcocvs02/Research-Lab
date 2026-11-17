@@ -37,6 +37,8 @@ export interface ToolNote {
 export interface LibraryToolsHost {
   /** `aiEnabledFolders` of the active library, read at each call (the user may change it during a chat). */
   enabledFolders(): Promise<readonly string[]>;
+  /** `excludedFolders` of the library: documents in them are never visible to the tools, even inside an enabled folder. */
+  excludedFolders?(): Promise<readonly string[]>;
   search(query: { text: string; limit: number }): Promise<SearchResultPage>;
   /** The record, or null when unknown. */
   getDocument(docId: string): Promise<DocumentRecord | null>;
@@ -56,6 +58,8 @@ export interface LibraryToolsOptions {
   provider: AiProviderId;
   /** What the turn is for; becomes the `source` of written fields and part of the log purpose. Default `chat`. */
   purpose?: string;
+  /** Answer a document that is not visible (unknown, folder not enabled, excluded) as NOT_FOUND, like an unknown id: no existence oracle (MCP). */
+  hideRefusal?: boolean;
 }
 
 /** Folder of a library path ('' for the root). */
@@ -79,6 +83,22 @@ export function inEnabledFolder(relPath: string, enabled: readonly string[]): bo
     return rel === e || rel.startsWith(`${e}/`);
   });
 }
+
+/**
+ * True when the path is inside an excluded folder (sub-folders included). Case is folded, as the scanner does on Windows and
+ * macOS: a difference in case fails closed. An empty exclusion matches nothing, like the scanner.
+ */
+export function inExcludedFolder(relPath: string, excluded: readonly string[] = []): boolean {
+  const rel = canonFolder(relPath).toLowerCase();
+  return excluded.some((f) => {
+    const e = canonFolder(f).toLowerCase();
+    return e !== '' && (rel === e || rel.startsWith(`${e}/`));
+  });
+}
+
+/** What the AI may see: in an enabled folder and not in an excluded one. */
+export const aiVisible = (relPath: string, cfg: { aiEnabledFolders: readonly string[]; excludedFolders?: readonly string[] }): boolean =>
+  inEnabledFolder(relPath, cfg.aiEnabledFolders) && !inExcludedFolder(relPath, cfg.excludedFolders);
 
 /**
  * `./x`, `x//`, `x/.` and `x` are one folder, and a composed and a decomposed accent are one name. Case is NOT folded: a
@@ -111,12 +131,15 @@ export function createLibraryTools(options: LibraryToolsOptions): ToolSpec[] {
 
   const refuse = (docIds: string[]) =>
     new AppError('FOLDER_NOT_AI_ENABLED', 'The folder of this document is not enabled for AI: its content is not sent', { docIds });
+  /** A document the caller may not see: the specific refusal in the app, the answer for an unknown id over MCP. */
+  const refuseDoc = (docId: string) => (options.hideRefusal ? new AppError('NOT_FOUND', 'Unknown document') : refuse([docId]));
+  const excludedOf = async () => (host.excludedFolders ? await host.excludedFolders() : []);
 
   /** The gate every read of document content goes through. Throws without reading anything else. */
   async function gate(docId: string): Promise<{ doc: DocumentRecord; folder: string }> {
     const doc = await host.getDocument(docId);
     if (!doc) throw new AppError('NOT_FOUND', 'Unknown document');
-    if (!inEnabledFolder(doc.path, await host.enabledFolders())) throw refuse([docId]);
+    if (!inEnabledFolder(doc.path, await host.enabledFolders()) || inExcludedFolder(doc.path, await excludedOf())) throw refuseDoc(docId);
     return { doc, folder: folderOf(doc.path) };
   }
 
@@ -148,7 +171,8 @@ export function createLibraryTools(options: LibraryToolsOptions): ToolSpec[] {
       const limit = input.limit ?? 8;
       // Ask for more than needed: hits outside the enabled folders are dropped afterwards (never sent).
       const fetchLimit = Math.min(TOOL_LIMITS.searchHits * 3, limit * 3);
-      const keep = (hits: SearchResultPage['hits']) => hits.filter((h) => inEnabledFolder(h.path, enabled));
+      const excluded = await excludedOf();
+      const keep = (hits: SearchResultPage['hits']) => hits.filter((h) => inEnabledFolder(h.path, enabled) && !inExcludedFolder(h.path, excluded));
       let allowed = keep((await host.search({ text: input.query, limit: fetchLimit })).hits).slice(0, limit);
       let matched: 'all' | 'any' = 'all';
       // A natural multi-word query is an AND of all its terms and often finds nothing: with few hits, retry with OR and append.

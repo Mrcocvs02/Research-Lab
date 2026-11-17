@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { createLibraryTools, folderOf, inEnabledFolder, type LibraryToolsHost } from '@rl/ai';
+import { aiVisible, createLibraryTools, folderOf, type LibraryToolsHost } from '@rl/ai';
 import { AppError, MCP_TOOL_NAMES, type DocumentId, type DocumentRecord, type ToolSpec } from '@rl/core';
 import { toMcpTool, type McpTool } from '@rl/mcp';
 import { createToolsHost } from '../ai/tools-host.js';
@@ -28,17 +28,24 @@ interface Result {
  * enabled too.
  */
 function extraTools(s: MainServices, rt: LibraryRuntime, host: LibraryToolsHost): ToolSpec[] {
-  const refuse = (docIds: string[]) => new AppError('FOLDER_NOT_AI_ENABLED', 'The folder of this document is not enabled for AI: its content is not sent', { docIds });
+  /** The folder rule read now: enabled for the AI and not excluded. */
+  const rule = async () => ({ aiEnabledFolders: await host.enabledFolders(), excludedFolders: (await host.excludedFolders?.()) ?? [] });
+  /** An unknown document and one that is not visible get the same answer (ids are content hashes: no existence oracle). */
   const gate = async (docId: string): Promise<DocumentRecord> => {
     const doc = await host.getDocument(docId);
-    if (!doc) throw new AppError('NOT_FOUND', 'Unknown document');
-    if (!inEnabledFolder(doc.path, await host.enabledFolders())) throw refuse([docId]);
+    if (!doc || !aiVisible(doc.path, await rule())) throw new AppError('NOT_FOUND', 'Unknown document');
     return doc;
   };
   /** Ids of the documents Claude Code may see, read now. */
   const visibleIds = async (): Promise<Set<string>> => {
-    const enabled = await host.enabledFolders();
-    return new Set((await rt.store.documents.list()).filter((d) => inEnabledFolder(d.path, enabled)).map((d) => d.id));
+    const cfg = await rule();
+    return new Set((await rt.store.documents.list()).filter((d) => aiVisible(d.path, cfg)).map((d) => d.id));
+  };
+  /** A project exists for Claude Code only when one of its members is visible (its name and text are the user's own). */
+  const visibleProject = async (projectId: string) => {
+    const p = await rt.store.projects.get(projectId);
+    const visible = await visibleIds();
+    return p && p.members.some((m) => visible.has(m.docId)) ? { p, visible } : null;
   };
   const logRead = (tool: string, docs: DocumentRecord[]) =>
     docs.length === 0
@@ -76,13 +83,13 @@ function extraTools(s: MainServices, rt: LibraryRuntime, host: LibraryToolsHost)
     async run(raw): Promise<Result> {
       const { docId, limit = 8 } = similarInput.parse(raw);
       const doc = await gate(docId);
-      const enabled = await host.enabledFolders();
+      const cfg = await rule();
       const items: Array<Record<string, unknown>> = [];
       const shown: DocumentRecord[] = [];
       // Hits outside the enabled folders are dropped afterwards: ask for more than needed.
       for (const it of await similar(s, docId, Math.min(40, limit * 3))) {
         const other = await host.getDocument(it.docId);
-        if (!other || !inEnabledFolder(other.path, enabled)) continue;
+        if (!other || !aiVisible(other.path, cfg)) continue;
         shown.push(other);
         items.push({ ...brief(other), score: Math.round(it.score * 1000) / 1000, reasons: it.reasons, sharedTerms: it.shared.terms.slice(0, 8), sharedCitations: it.shared.citations });
         if (items.length === limit) break;
@@ -135,14 +142,15 @@ function extraTools(s: MainServices, rt: LibraryRuntime, host: LibraryToolsHost)
 
   const listProjects: ToolSpec = {
     name: 'list_projects',
-    description: 'Projects and collections of the library with the number of their documents that are in AI-enabled folders. Read only.',
+    description: 'Projects and collections that have at least one document in an AI-enabled folder: name, kind, status and the number of those documents. Read only.',
     input: z.object({}),
     writes: false,
     async run(): Promise<Result> {
       const visible = await visibleIds();
       const items = (await rt.store.projects.list())
         .filter((p) => p.status !== 'archived')
-        .map((p) => ({ id: p.id, name: p.name, kind: p.kind ?? 'project', status: p.status, description: clip(p.description, 300), documents: p.members.filter((m) => visible.has(m.docId)).length }));
+        .map((p) => ({ id: p.id, name: p.name, kind: p.kind ?? 'project', status: p.status, documents: p.members.filter((m) => visible.has(m.docId)).length }))
+        .filter((p) => p.documents > 0);
       return { summary: `Listed ${items.length} project(s)`, docIds: [], data: { items } };
     },
   };
@@ -150,28 +158,27 @@ function extraTools(s: MainServices, rt: LibraryRuntime, host: LibraryToolsHost)
   const projectInput = z.object({ projectId: z.string().min(1).max(100) });
   const getProject: ToolSpec = {
     name: 'get_project',
-    description: "A project: description, its documents (only those in AI-enabled folders) and its reading plan. The user's project notes are not included.",
+    description: "A project with at least one document in an AI-enabled folder: name, status, those documents and the reading plan among them. The project's description and notes are not included.",
     input: projectInput,
     writes: false,
     async run(raw): Promise<Result> {
       const { projectId } = projectInput.parse(raw);
-      const p = await rt.store.projects.get(projectId);
-      if (!p) throw new AppError('NOT_FOUND', 'Unknown project');
-      const enabled = await host.enabledFolders();
+      const found = await visibleProject(projectId);
+      if (!found) throw new AppError('NOT_FOUND', 'Unknown project');
+      const { p, visible } = found;
       const docs = new Map<string, DocumentRecord>();
       for (const id of new Set([...p.members.map((m) => m.docId as string), ...p.readingPlan.map((r) => r.docId as string)])) {
-        const d = await host.getDocument(id);
-        if (d && inEnabledFolder(d.path, enabled)) docs.set(id, d);
+        const d = visible.has(id) ? await host.getDocument(id) : null;
+        if (d) docs.set(id, d);
       }
       const data = {
         id: p.id,
         name: p.name,
         kind: p.kind ?? 'project',
         status: p.status,
-        description: p.description,
         documents: p.members.flatMap((m) => {
           const d = docs.get(m.docId);
-          return d ? [{ ...brief(d), remark: m.note ?? null }] : [];
+          return d ? [brief(d)] : [];
         }),
         readingPlan: p.readingPlan
           .filter((r) => docs.has(r.docId))
@@ -194,7 +201,7 @@ function extraTools(s: MainServices, rt: LibraryRuntime, host: LibraryToolsHost)
       const { limit = 15, minCiting = 2, projectId } = readNextInput.parse(raw);
       let scopeIds = await visibleIds();
       if (projectId) {
-        const p = await rt.store.projects.get(projectId);
+        const p = (await visibleProject(projectId))?.p;
         if (!p) throw new AppError('NOT_FOUND', 'Unknown project');
         const members = new Set(p.members.map((m) => m.docId as string));
         scopeIds = new Set([...scopeIds].filter((id) => members.has(id)));
@@ -215,7 +222,7 @@ const dead = <T>(): T => new Proxy({}, { get: () => unavailable }) as unknown as
 
 /** Specs only for name, text and schema: built once with a host that is never called. */
 const specs: ToolSpec[] = [
-  ...createLibraryTools({ host: dead<LibraryToolsHost>(), model: MCP_MODEL, provider: 'claude-agent-sdk', purpose: MCP_PURPOSE }),
+  ...createLibraryTools({ host: dead<LibraryToolsHost>(), model: MCP_MODEL, provider: 'claude-agent-sdk', purpose: MCP_PURPOSE, hideRefusal: true }),
   ...extraTools(dead<MainServices>(), dead<LibraryRuntime>(), dead<LibraryToolsHost>()),
 ];
 
@@ -246,7 +253,7 @@ export function createMcpTools(d: McpToolsDeps): McpTool[] {
           // `require(libraryId)` fails with LIBRARY_NOT_ACTIVE when the user has switched library since the server started.
           const rt = await d.s.runtime.require(d.libraryId);
           const host = createToolsHost({ s: d.s, rt, provider: 'claude-agent-sdk', model: MCP_MODEL, confirmed: true });
-          const real = [...createLibraryTools({ host, model: MCP_MODEL, provider: 'claude-agent-sdk', purpose: MCP_PURPOSE }), ...extraTools(d.s, rt, host)].find((t) => t.name === name);
+          const real = [...createLibraryTools({ host, model: MCP_MODEL, provider: 'claude-agent-sdk', purpose: MCP_PURPOSE, hideRefusal: true }), ...extraTools(d.s, rt, host)].find((t) => t.name === name);
           if (!real) throw new AppError('INTERNAL', 'Unknown tool');
           return real.run(input, ctx);
         },

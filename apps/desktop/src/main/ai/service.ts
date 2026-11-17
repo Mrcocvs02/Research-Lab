@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { approxTokens, buildSystemPrompt, createLibraryTools, estimateCostFromModels, folderOf, inEnabledFolder, isToolResult, usdFor, type AiProviderEx, type TokenUsageWithCost } from '@rl/ai';
+import { approxTokens, buildSystemPrompt, createLibraryTools, estimateCostFromModels, folderOf, aiVisible, isToolResult, usdFor, type AiProviderEx, type TokenUsageWithCost } from '@rl/ai';
 import {
   AppError,
   documentIdSchema,
@@ -97,7 +97,7 @@ export async function classifyDocs(rt: LibraryRuntime, cfg: LibraryConfig, docId
   for (const id of new Set(docIds)) {
     const rec = documentIdSchema.safeParse(id).success ? await rt.store.documents.get(id as DocumentId).catch(() => null) : null;
     if (!rec) out.refused.push({ docId: id, reason: 'unknown' });
-    else if (!inEnabledFolder(rec.path, cfg.aiEnabledFolders)) out.refused.push({ docId: id, reason: 'folder-not-enabled' });
+    else if (!aiVisible(rec.path, cfg)) out.refused.push({ docId: id, reason: 'folder-not-enabled' });
     else if (rec.missing) out.refused.push({ docId: id, reason: 'missing' });
     else out.allowed.push(rec);
   }
@@ -272,7 +272,7 @@ export async function allowedHistory(rt: LibraryRuntime, cfg: LibraryConfig, tur
     let ok = verdict.get(id);
     if (ok === undefined) {
       const rec = documentIdSchema.safeParse(id).success ? await rt.store.documents.get(id as DocumentId).catch(() => null) : null;
-      ok = rec !== null && inEnabledFolder(rec.path, cfg.aiEnabledFolders);
+      ok = rec !== null && aiVisible(rec.path, cfg);
       verdict.set(id, ok);
     }
     return ok;

@@ -28,6 +28,7 @@ export function createToolsHost(c: ToolsHostContext): LibraryToolsHost {
 
   return {
     enabledFolders: async () => (await rt.store.readConfig()).aiEnabledFolders,
+    excludedFolders: async () => (await rt.store.readConfig()).excludedFolders,
     search: (q) => rt.search({ text: q.text, limit: q.limit }),
     async getDocument(id) {
       if (!documentIdSchema.safeParse(id).success) return null;

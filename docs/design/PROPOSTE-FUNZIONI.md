@@ -182,7 +182,7 @@ Legenda: sforzo S/M/L; peso = impatto su dipendenze, budget (main 932/950 KiB, q
 
 ## Note per la decisione
 
-- Il main è a 932/950 KiB: le funzioni 13, 7 e 6 toccano il main (serializzazione e parser); le altre sono viste del renderer caricate su richiesta.
+- Il main è a circa 1009/1010 KiB (tetto proposto dal design: 1080): le funzioni 13, 7 e 6 toccano il main (serializzazione e parser); le altre sono viste del renderer caricate su richiesta.
 - Nessuna proposta introduce account cloud o telemetria. Quelle con rete (10, 11, 16, 17, 23) usano fonti già consentite o richiedono consenso e anteprima come da regola 4.
 - Si consiglia di avviarle dopo le onde H0 e R0 e dopo la scrittura nei PDF, per non aggravare il rischio sui file originali.
 

@@ -1,0 +1,187 @@
+{
+  "backup": {
+    "title": "Backup and restore",
+    "intro": "A backup is one file with your library data folder (notes, highlights, citations, projects, taxonomy), and optionally your chat history and reading state. Your original documents are not included: they stay where they are. API keys and tokens are never saved.",
+    "internalNote": "This is your own copy, in a folder you choose, that you can move, verify and restore. It is separate from the automatic safety copy the app keeps for itself to undo its own mistakes.",
+    "destination": {
+      "label": "Destination folder",
+      "choose": "Choose folder…",
+      "change": "Change folder…",
+      "clear": "Forget folder",
+      "none": "No folder chosen yet.",
+      "hint": "Choose a folder outside your library folders, for example on another disk or a synced folder."
+    },
+    "schedule": {
+      "title": "Automatic backup",
+      "label": "How often",
+      "hint": "Checked once when the app starts; nothing runs in the background.",
+      "off": "Off",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "keep": "Automatic backups to keep",
+      "keepHint": "Older automatic backups are removed; backups you make by hand are never removed."
+    },
+    "autoError": "The last automatic backup did not run: {{reason}}",
+    "autoErrorOther": "error {{code}}",
+    "now": {
+      "title": "Back up now",
+      "button": "Back up now",
+      "needsDestination": "Choose a destination folder first.",
+      "needsLibrary": "No library is active."
+    },
+    "last": "Last backup of this library: {{when}}",
+    "lastNone": "No backup of this library found in the destination yet.",
+    "stale": "The last backup is {{days}} days old (more than {{limit}}). Consider making a new one.",
+    "includeLocal": {
+      "label": "Include chat history, usage counters and reading state",
+      "hint": "Data that cannot be rebuilt. Search index, caches and thumbnails are never saved: they are rebuilt after a restore."
+    },
+    "preview": "About {{files}} files, {{size}} to save.",
+    "previewFree": "Free space in the destination: {{free}}.",
+    "phase": {
+      "collect": "Collecting files…",
+      "write": "Writing the backup…",
+      "verify": "Checking the backup…",
+      "extract": "Extracting files…",
+      "finish": "Finishing…",
+      "done": "Done"
+    },
+    "progress": "Backup progress",
+    "cancel": "Cancel",
+    "reveal": "Show in folder",
+    "verify": "Verify",
+    "remove": "Remove",
+    "removeTitle": "Remove backup",
+    "removeBody": "The file \"{{name}}\" will be deleted from the destination folder. This cannot be undone.",
+    "removeConfirm": "Delete the file",
+    "result": {
+      "created": "Backup written: {{files}} files, {{size}}.",
+      "cancelled": "Cancelled. No partial file was left.",
+      "failed": "The operation failed: {{message}}",
+      "verifyOk": "\"{{name}}\" is intact: {{files}} files checked.",
+      "verifyBad": "\"{{name}}\" has problems and should not be used for a restore.",
+      "problems": "{{count}} files with problems",
+      "reason": {
+        "missing": "is missing",
+        "size": "has the wrong size",
+        "hash": "does not match its checksum",
+        "unreadable": "cannot be read",
+        "unexpected": "is not listed in the backup"
+      }
+    },
+    "list": {
+      "title": "Backups",
+      "empty": "No backups in the destination folder yet.",
+      "noDestination": "Choose a destination folder to see your backups here, or open a backup file.",
+      "openFile": "Open a backup file…",
+      "fileDialogTitle": "Choose a backup file",
+      "docs_one": "{{count}} document",
+      "docs_other": "{{count}} documents",
+      "origin": {
+        "manual": "manual",
+        "auto": "automatic"
+      },
+      "local": "with local data",
+      "settings": "with settings",
+      "newer": "newer format"
+    },
+    "errors": {
+      "no-destination": "No destination folder is chosen.",
+      "inside-library": "The destination is inside a library folder. Choose a folder outside your libraries.",
+      "too-large": "The library has too many files for one backup.",
+      "not-enough-space": "Not enough free space in the destination: {{needed}} needed, {{free}} free.",
+      "not-empty": "The data folder of that library already exists in the chosen folder and is not empty. Nothing was changed. Choose another folder.",
+      "already-registered": "A library already uses this folder. Choose a different folder to restore into.",
+      "integrity": "The backup file is damaged or incomplete, so nothing was restored. Use Verify to see which files are affected, or try another backup.",
+      "newer-format": "This backup was made by a newer version of the app and cannot be read by this one.",
+      "not-a-backup": "This file is not a Research Lab backup.",
+      "file-not-approved": "Pick the file again with the file chooser.",
+      "busy": "The app is busy with a scan, a network build or another backup. Try again in a moment.",
+      "unknown": "The operation failed."
+    },
+    "restore": {
+      "button": "Restore…",
+      "title": "Restore a backup",
+      "intro": "The backup becomes a new library. Nothing that exists now is overwritten, and your documents are not copied or changed.",
+      "library": "Library",
+      "made": "Made on",
+      "holds": "Contents",
+      "holdsValue": "{{documents}} documents, {{files}} files, {{size}}",
+      "root": "Folder of the documents",
+      "rootHint": "Choose the folder where the documents of this library are on this computer. The data folder is created inside it.",
+      "chooseRoot": "Choose folder…",
+      "changeRoot": "Change folder…",
+      "chooseRootTitle": "Choose the folder of the documents",
+      "name": "Name of the library",
+      "nameHint": "Leave empty to keep the name from the backup.",
+      "local": "Restore chat history, usage counters and reading state",
+      "localHint": "Also saved in this backup.",
+      "localMissing": "Not saved in this backup.",
+      "settings": "Also restore the saved settings",
+      "settingsHint": "Replaces language, profile, appearance, shortcuts and guide state with those of the backup.",
+      "settingsMissing": "The settings were not saved in this backup.",
+      "noOverwrite": "To go back to an older state, restore into a different folder and then remove the library you no longer want from the list.",
+      "start": "Restore",
+      "failed": "Nothing was restored: {{message}}",
+      "cancelled": "Cancelled. No library and no data folder were left behind.",
+      "again": "Try again",
+      "done": "The library was restored. Its search index is being rebuilt.",
+      "settingsApplied": "The saved settings were applied.",
+      "settingsKept": "Your current settings were kept.",
+      "secretsTitle": "Enter these again in the settings (secrets are never stored in a backup):",
+      "secretsHint": "Open the settings: the AI and MCP sections.",
+      "secretsNone": "No secrets need to be entered again.",
+      "rebuilding": "The first search may take a little longer while the index is rebuilt.",
+      "secrets": {
+        "anthropic-api-key": "Anthropic API key",
+        "openalex-api-key": "OpenAlex API key",
+        "mcp-token": "MCP server token"
+      }
+    }
+  },
+  "maintenance": {
+    "title": "Maintenance and performance",
+    "intro": "Sizes of what the app keeps for the active library, and tools to free space. Nothing here touches your documents or your notes.",
+    "sizes": "Sizes and state",
+    "loading": "Reading sizes…",
+    "needsLibrary": "No library is active.",
+    "refresh": "Refresh",
+    "rows": {
+      "documents": "Documents",
+      "data": "Library data folder",
+      "index": "Search index",
+      "cache": "Caches",
+      "thumbs": "Thumbnails",
+      "graph": "Network model",
+      "chats": "Chat history",
+      "logs": "Logs",
+      "memory": "App memory",
+      "startup": "Start-up time",
+      "workers": "Background workers now"
+    },
+    "memoryValue": "{{rss}} MB in use, {{heap}} MB of script data",
+    "startupValue": "{{ms}} ms",
+    "clean": {
+      "title": "Free space",
+      "hint": "Deletes only data the app can rebuild by itself (it is recomputed when needed). The library data folder, the search index, chats and settings are never touched.",
+      "button": "Clean selected"
+    },
+    "targets": {
+      "cache": "Caches",
+      "thumbs": "Thumbnails",
+      "graph": "Network model",
+      "logs": "Logs"
+    },
+    "cleaned": "Done: {{size}} freed.",
+    "busy": "The app is busy with a scan, a network build or a backup. Try again when it has finished.",
+    "support": {
+      "title": "Support",
+      "hint": "The diagnostics text lists versions, language, counts and sizes. It never contains file names, document titles, paths, keys or tokens.",
+      "openLogs": "Open the log folder",
+      "copy": "Copy diagnostics",
+      "shown": "Diagnostics text"
+    },
+    "copied": "Diagnostics copied to the clipboard."
+  }
+}

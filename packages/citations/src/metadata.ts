@@ -143,10 +143,12 @@ export async function httpGet(url: string, accept: string, o: FetchWorkOptions):
   }
 }
 
+/** Lower case, without a `doi:` or doi.org prefix and without the punctuation a sentence leaves after a DOI. */
 export const normaliseDoi = (doi: string): string =>
   doi
     .trim()
     .replace(/^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:\s*)/i, '')
+    .replace(/[.,;:]+$/, '')
     .toLowerCase();
 
 /** Every `/`-separated segment encoded on its own, so nothing in an identifier can end a path, a query or a fragment. */

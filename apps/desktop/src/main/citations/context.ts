@@ -13,7 +13,7 @@ interface Net {
 const nets = new WeakMap<MainServices, Net>();
 
 /** Tests replace the waiting of the throttle and of the retries (it is real time otherwise). */
-export const netTuning: { sleep?: (ms: number, signal?: AbortSignal) => Promise<void> } = {};
+export const netTuning: { sleep?: (ms: number, signal?: AbortSignal) => Promise<void>; timeoutMs?: number } = {};
 
 /**
  * The online sources, ready to use: refuses with NETWORK_ERROR (offline) when the machine has no connection, and reads
@@ -24,7 +24,7 @@ export async function online(s: MainServices): Promise<Net & { profile: UserProf
   let n = nets.get(s);
   if (!n) {
     const email = { value: null as string | null };
-    const net = createNet({ fetch: s.fetch ?? fetch, email: () => email.value, ...(netTuning.sleep ? { sleep: netTuning.sleep } : {}) });
+    const net = createNet({ fetch: s.fetch ?? fetch, email: () => email.value, ...(netTuning.sleep ? { sleep: netTuning.sleep } : {}), ...(netTuning.timeoutMs ? { timeoutMs: netTuning.timeoutMs } : {}) });
     const sources = createCitationSources({ fetch: s.fetch ?? fetch, net });
     n = { sources, service: createCitationService(sources), watch: createWatchFetcher(net), email };
     nets.set(s, n);

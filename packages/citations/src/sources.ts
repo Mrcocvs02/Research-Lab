@@ -115,7 +115,8 @@ export function createOpenAlex(net: Net, now: () => Date): CitationSourceX {
     if (hit) return hit;
     let w: Obj | null = null;
     if (ref.externalId && /^W\d+$/.test(ref.externalId)) w = await one(ref.externalId, signal);
-    if (!w && ref.doi) w = await byDoi(ref.doi, signal);
+    // The DOI arXiv gives a paper is looked up without its version suffix.
+    if (!w && ref.doi) w = await byDoi(arxivFromDoi(ref.doi) ? `10.48550/arxiv.${arxivFromDoi(ref.doi)}` : ref.doi, signal);
     if (!w && validArxiv(ax) && !ref.doi?.toLowerCase().includes('10.48550/')) w = await byDoi(`10.48550/arXiv.${ax}`, signal);
     if (!w && ref.title && titleKey(ref.title).length >= 12) {
       const y = ref.year;

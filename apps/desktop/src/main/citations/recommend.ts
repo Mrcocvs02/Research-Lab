@@ -19,7 +19,7 @@ interface Entry {
 
 /** Everything `readNext` needs of the stored files, computed once and reused until a citation file or a document changes. */
 interface Aggregate {
-  /** `${citation writes}|${documents key}|${number of files}`. */
+  /** `${citation writes}|${documents key}|${citation files}|${documents}`. */
   key: string;
   at: number;
   entries: Entry[];
@@ -41,7 +41,7 @@ async function aggregate(rt: LibraryRuntime): Promise<Aggregate> {
   const store = rt.store;
   const existing = new Set(await store.documents.listIds());
   const ids = await store.citations.listIds();
-  const key = `${citationsVersion(rt)}|${documentsKey(rt)}|${ids.length}`;
+  const key = `${citationsVersion(rt)}|${documentsKey(rt)}|${ids.length}|${existing.size}`;
   const hit = aggregates.get(rt);
   if (hit && hit.key === key && Date.now() - hit.at < AGGREGATE_TTL_MS) return hit;
   const ix = await ownedIndex(rt);

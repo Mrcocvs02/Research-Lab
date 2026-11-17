@@ -7,6 +7,7 @@ import { errorMessage } from './lib/errors';
 import { installWindowGuard } from './lib/dirtyEditors';
 import { AiUiProvider, useAiUi } from './lib/aiUi';
 import { LibraryEventsProvider } from './lib/events';
+import { KeymapProvider } from './lib/keymap';
 import { CitationJobsProvider } from './lib/citationJobs';
 import { HistoryProvider } from './lib/history';
 import { InboxProvider } from './lib/inbox';
@@ -32,6 +33,7 @@ export function App() {
   return (
     <ErrorBoundary>
       <AppProvider>
+        <KeymapProvider>
         <LibraryEventsProvider>
           <NotifyProvider>
             <HistoryProvider>
@@ -51,6 +53,7 @@ export function App() {
             </HistoryProvider>
           </NotifyProvider>
         </LibraryEventsProvider>
+        </KeymapProvider>
       </AppProvider>
     </ErrorBoundary>
   );
@@ -74,8 +77,14 @@ function Root() {
   useEffect(() => {
     if (!navigation) return;
     closeReader();
+    if (navigation.to === 'newLibrary') {
+      setWizardOpen(true);
+      return;
+    }
     if (navigation.to === 'inbox' || navigation.to === 'review') setInboxTab(navigation.to === 'review' ? 'proposals' : 'arrivals');
-    setSection(navigation.to === 'settings' ? 'settings' : navigation.to === 'project' ? 'projects' : 'inbox');
+    setSection(navigation.to === 'settings' ? 'settings' : navigation.to === 'project' || navigation.to === 'projects' ? 'projects' : navigation.to === 'library' ? 'library' : navigation.to === 'network' ? 'network' : 'inbox');
+    // The focus target exists once the view is drawn.
+    if (navigation.focus === 'search') setTimeout(() => document.querySelector<HTMLInputElement>('[data-testid="search-input"]')?.focus(), 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navNonce]);
   const readerNonce = reader.target?.nonce;

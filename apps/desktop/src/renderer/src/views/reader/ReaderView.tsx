@@ -4,6 +4,7 @@ import { STUDY_LIMITS, type Annotation, type StudyState } from '@rl/core';
 import { ErrorNote } from '../../components/ui';
 import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
+import { useShortcutMatcher } from '../../lib/keymap';
 import { useNotify } from '../../lib/notify';
 import type { ReaderPanel, ReaderTarget } from '../../lib/reader';
 import { rl } from '../../lib/rl';
@@ -284,6 +285,7 @@ export function ReaderView({ target, onClose }: Props) {
     if (hit) setPending(null);
   };
 
+  const matches = useShortcutMatcher();
   const openFind = () => {
     setFindOpen(true);
     setTimeout(() => findInputRef.current?.select(), 0);
@@ -298,10 +300,12 @@ export function ReaderView({ target, onClose }: Props) {
   const onKeyDown = (e: ReactKeyboardEvent) => {
     const mod = e.ctrlKey || e.metaKey;
     const inField = isEditable(e.target);
+    // The reader shortcuts are the user's (keymap): find, and highlight or underline the current match.
+    if (matches(e, 'reader.find')) return (e.preventDefault(), openFind());
+    if (findOpen && matches(e, 'reader.highlight')) return (e.preventDefault(), annotateMatch('highlight'));
+    if (findOpen && matches(e, 'reader.underline')) return (e.preventDefault(), annotateMatch('underline'));
     if (mod && !e.altKey) {
       const key = e.key.toLowerCase();
-      if (e.shiftKey && findOpen && (key === 'h' || key === 'u')) return (e.preventDefault(), annotateMatch(key === 'h' ? 'highlight' : 'underline'));
-      if (key === 'f') return (e.preventDefault(), openFind());
       if (key === 'g') return (e.preventDefault(), pageInputRef.current?.select());
       if (key === '=' || key === '+') return (e.preventDefault(), viewerRef.current?.zoomBy(1));
       if (key === '-') return (e.preventDefault(), viewerRef.current?.zoomBy(-1));

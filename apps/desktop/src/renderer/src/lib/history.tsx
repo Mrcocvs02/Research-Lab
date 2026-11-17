@@ -5,6 +5,7 @@ import { Lazy, lazyView } from '../components/Lazy';
 import { RlError } from './rl-error';
 import { useApp } from '../state/app-context';
 import { useLibraryEvents } from './events';
+import { isTextTarget, useEffectiveShortcuts, useShortcut } from './keymap';
 import { useNotify } from './notify';
 import { rl } from './rl';
 
@@ -23,28 +24,6 @@ interface HistoryValue {
 const EMPTY: HistoryValue = { items: [], canUndo: false, canRedo: false, busy: false, undo: async () => {}, redo: async () => {}, refresh: async () => {} };
 const Ctx = createContext<HistoryValue>(EMPTY);
 export const useHistory = () => useContext(Ctx);
-
-/** Text fields keep their own native undo: the global shortcuts leave them alone. */
-export function isTextTarget(target: EventTarget | null): boolean {
-  const el = target as HTMLElement | null;
-  if (!el || !el.tagName) return false;
-  if (el.isContentEditable) return true;
-  if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
-  if (el.tagName === 'INPUT') {
-    const type = (el as HTMLInputElement).type;
-    return !['checkbox', 'radio', 'button', 'submit', 'range', 'color'].includes(type);
-  }
-  return false;
-}
-
-/** Which key press means undo or redo (Ctrl or Cmd +Z, +Y, +Shift+Z). */
-export function historyShortcut(e: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>): 'undo' | 'redo' | null {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey) return null;
-  const k = e.key.toLowerCase();
-  if (k === 'z') return e.shiftKey ? 'redo' : 'undo';
-  if (k === 'y' && !e.shiftKey) return 'redo';
-  return null;
-}
 
 export function HistoryProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
@@ -104,17 +83,22 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
   const undo = useCallback((id?: string) => run('undo', id), [run]);
   const redo = useCallback((id?: string) => run('redo', id), [run]);
 
+  // Text fields keep their own native undo: the shortcuts leave them alone.
+  useShortcut('history.undo', () => void undo(), { skipInText: true, enabled: activeLibraryId !== null });
+  useShortcut('history.redo', () => void redo(), { skipInText: true, enabled: activeLibraryId !== null });
+  // Ctrl+Shift+Z has always meant redo next to Ctrl+Z: it stays while undo keeps its default key.
+  const undoKey = useEffectiveShortcuts()['history.undo'];
   useEffect(() => {
-    if (!activeLibraryId) return;
+    if (!activeLibraryId || undoKey !== 'Ctrl+Z') return;
     const onKey = (e: KeyboardEvent) => {
-      const action = historyShortcut(e);
-      if (!action || isTextTarget(e.target)) return;
-      e.preventDefault();
-      void (action === 'undo' ? undo() : redo());
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z' && !e.defaultPrevented && !isTextTarget(e.target)) {
+        e.preventDefault();
+        void redo();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeLibraryId, undo, redo]);
+  }, [activeLibraryId, undoKey, redo]);
 
   const value = useMemo<HistoryValue>(() => {
     const mine = items.filter((i) => i.mine);

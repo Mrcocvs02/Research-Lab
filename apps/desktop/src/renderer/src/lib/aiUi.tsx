@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useShortcut } from './keymap';
 import { useLocalFlag } from './useLocalFlag';
 
 /**
@@ -7,7 +8,9 @@ import { useLocalFlag } from './useLocalFlag';
  * context, a prompt the palette filled, and requests to move to Settings or a project. The chat itself (and everything
  * AI) loads only when the panel is first opened.
  *
- * Keys: Ctrl+J shows or hides the chat panel, Ctrl+K opens the command palette (Cmd on macOS).
+ * Keys (the user's accelerators from the keymap, `lib/keymap.tsx`): Ctrl+J shows or hides the chat panel, Ctrl+K opens
+ * the command palette, Alt+1..5 and Ctrl+, move between the views, Ctrl+L focuses the search, F1 opens the guide and
+ * Ctrl+/ the list of shortcuts (Cmd on macOS).
  */
 export interface ReaderContext {
   docId: string;
@@ -23,10 +26,16 @@ export interface SearchRequest {
   nonce: number;
 }
 export interface Navigation {
-  to: 'settings' | 'project' | 'inbox' | 'review';
+  to: 'settings' | 'project' | 'inbox' | 'review' | 'library' | 'projects' | 'network' | 'newLibrary';
   projectId?: string;
+  /** Where to put the focus once the view is shown (`search`: the library search box; `backup`: the backup section of the settings). */
+  focus?: 'search' | 'backup';
+  /** Something to start once the view is shown (`backupNow`: the backup section starts a backup, once per nonce). */
+  run?: 'backupNow';
   nonce: number;
 }
+/** What the in-app guide dialog shows: the usage guide or only the list of shortcuts. */
+export type GuideKind = 'guide' | 'shortcuts';
 
 /** What the second-brain export dialog starts from (any mix; the dialog lets the user change it). */
 export interface ExportInit {
@@ -67,6 +76,12 @@ interface AiUiValue {
   /** The Inbox section, on the arrivals tab or on the AI proposals (review). */
   openInbox(): void;
   openReview(): void;
+  /** Any view, optionally with a focus target or an action to start (palette, shortcuts). */
+  goTo(to: Navigation['to'], extra?: Pick<Navigation, 'focus' | 'run'>): void;
+  /** The in-app guide (F1) or the list of shortcuts (Ctrl+/), a lazy dialog in the Shell; null when closed. */
+  guide: GuideKind | null;
+  openGuide(kind?: GuideKind): void;
+  closeGuide(): void;
   /** The second-brain export dialog (lazy, in the Shell): `exportInit` is what it starts from, null when closed. */
   exportInit: ExportInit | null;
   openExport(init?: ExportInit): void;
@@ -94,6 +109,10 @@ const NONE: AiUiValue = {
   openSettings() {},
   openInbox() {},
   openReview() {},
+  goTo() {},
+  guide: null,
+  openGuide() {},
+  closeGuide() {},
   exportInit: null,
   openExport() {},
   closeExport() {},
@@ -112,6 +131,9 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   const [prefill, setPrefill] = useState<AiUiValue['prefill']>(null);
   const [searchRequest, setSearchRequest] = useState<SearchRequest | null>(null);
   const [navigation, setNavigation] = useState<Navigation | null>(null);
+  const [guide, setGuide] = useState<GuideKind | null>(null);
+  const openGuide = useCallback((kind: GuideKind = 'guide') => setGuide(kind), []);
+  const closeGuide = useCallback(() => setGuide(null), []);
   const [exportInit, setExportInit] = useState<ExportInit | null>(null);
   const openExport = useCallback((init: ExportInit = {}) => setExportInit(init), []);
   const closeExport = useCallback(() => setExportInit(null), []);
@@ -133,25 +155,23 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   const openInbox = useCallback(() => setNavigation((cur) => ({ to: 'inbox', nonce: (cur?.nonce ?? 0) + 1 })), []);
   const openReview = useCallback(() => setNavigation((cur) => ({ to: 'review', nonce: (cur?.nonce ?? 0) + 1 })), []);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
-      const k = e.key.toLowerCase();
-      if (k === 'j') {
-        e.preventDefault();
-        setChatOpen(!chatOpen);
-      } else if (k === 'k') {
-        e.preventDefault();
-        setPaletteOpen(true);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [chatOpen, setChatOpen]);
+  const goTo = useCallback<AiUiValue['goTo']>((to, extra = {}) => setNavigation((cur) => ({ to, ...extra, nonce: (cur?.nonce ?? 0) + 1 })), []);
+
+  useShortcut('chat.toggle', () => setChatOpen(!chatOpen));
+  useShortcut('palette.open', () => setPaletteOpen(true));
+  useShortcut('search.focus', () => goTo('library', { focus: 'search' }));
+  useShortcut('nav.library', () => goTo('library'));
+  useShortcut('nav.projects', () => goTo('projects'));
+  useShortcut('nav.network', () => goTo('network'));
+  useShortcut('nav.inbox', () => goTo('inbox'));
+  useShortcut('nav.review', () => goTo('review'));
+  useShortcut('nav.settings', () => goTo('settings'));
+  useShortcut('guide.open', () => openGuide('guide'), { inModal: true });
+  useShortcut('shortcuts.show', () => openGuide('shortcuts'), { inModal: true });
 
   const value = useMemo(
-    () => ({ chatOpen, setChatOpen, paletteOpen, setPaletteOpen, selection, publishSelection, chatBusy, setChatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview, exportInit, openExport, closeExport }),
-    [chatOpen, setChatOpen, paletteOpen, selection, publishSelection, chatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview, exportInit, openExport, closeExport],
+    () => ({ chatOpen, setChatOpen, paletteOpen, setPaletteOpen, selection, publishSelection, chatBusy, setChatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview, goTo, guide, openGuide, closeGuide, exportInit, openExport, closeExport }),
+    [chatOpen, setChatOpen, paletteOpen, selection, publishSelection, chatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview, goTo, guide, openGuide, closeGuide, exportInit, openExport, closeExport],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

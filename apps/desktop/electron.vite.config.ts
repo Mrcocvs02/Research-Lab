@@ -61,6 +61,8 @@ export default defineConfig({
         input: {
           index: resolve(import.meta.dirname, 'src/main/index.ts'),
           'scan-worker': resolve(import.meta.dirname, 'src/main/scan-worker.ts'),
+          // `graph-worker` builds the graph model (phase 6) on demand and closes when idle.
+          'graph-worker': resolve(import.meta.dirname, 'src/main/graph-worker.ts'),
         },
         // Unminified, but without the JSDoc of the sources (it is documentation, not code): names, structure and stack
         // traces stay readable. Legal comments stay; the sources keep all their comments (D-233).

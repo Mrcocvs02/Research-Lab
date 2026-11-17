@@ -109,6 +109,8 @@ export interface PreviewInput {
   model: string;
   docIds: readonly string[];
   promptChars: number;
+  /** Characters each allowed document adds to the send (default: a context document, metadata plus pages); 0 when only titles go. */
+  perDocChars?: number;
   /** Chat only: the conversation this send belongs to was already confirmed (D-227), so the agent's own reads need no new preview. */
   conversationConfirmed?: boolean;
 }
@@ -116,7 +118,7 @@ export interface PreviewInput {
 /** What a send would include and cost, with the confirmation and cap rules of the library. Spends and sends nothing. */
 export async function computePreview(s: MainServices, ctx: AiCtx, input: PreviewInput): Promise<{ preview: AiPreview; monthUsd: number; docs: DocClassification }> {
   const docs = await classifyDocs(ctx.rt, ctx.cfg, input.docIds);
-  const chars = input.promptChars + docs.allowed.length * CONTEXT_DOC_CHARS;
+  const chars = input.promptChars + docs.allowed.length * (input.perDocChars ?? CONTEXT_DOC_CHARS);
   const est = estimateCostFromModels(ctx.cfg.ai.models, { model: input.model, promptChars: chars });
   const monthUsd = (await monthUsage(ctx.rt, monthOf(new Date()))).usd;
   const cap = ctx.cfg.ai.usageCap;

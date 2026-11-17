@@ -1,6 +1,7 @@
 import type { LegacyImporter, LibraryConfig, Logger, SecretStore } from '@rl/core';
 import type { AiProviderFactory } from '../../ai/provider-factory.js';
 import type { ApprovedPaths } from '../../approved-paths.js';
+import type { GraphEngine } from '../../graph/engine.js';
 import type { RuntimeManager } from '../../library/runtime-manager.js';
 import type { LibraryService } from '../../library-service.js';
 import type { SettingsStore } from '../../settings-store.js';
@@ -55,6 +56,8 @@ export interface MainServices {
   isOnline?: () => boolean;
   /** HTTPS fetch of the metadata lookup (Electron `net.fetch`); absent in tests that do not use it. */
   fetch?: typeof fetch;
+  /** The graph worker (build, similarity on the fly), started on demand; absent: the work runs in-process (tests). */
+  graphEngine?: () => GraphEngine;
   /** Test hook (RL_E2E=1, development run only): JSON file that replaces the online metadata lookup. */
   metadataFile?: string | null;
 }

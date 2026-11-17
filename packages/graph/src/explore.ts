@@ -215,7 +215,7 @@ function authorDim(docs: readonly ExploreDoc[]): Dim {
   };
   const makeGroup = (id: string): ExploreNode => {
     const m = groupMembers.get(id) as string[];
-    return { id, label: id === 'group:other' ? 'Other authors' : `${display(m[0] as string)} +${m.length - 1}`, kind: 'author-group', count: groupDocs(id).size, hasChildren: true };
+    return { id, label: id === 'group:other' ? 'Other authors' : `${display(m[0] as string).slice(0, 280)} +${m.length - 1}`, kind: 'author-group', count: groupDocs(id).size, hasChildren: true };
   };
   const makeAuthor = (key: string): ExploreNode => ({ id: `author:${key}`, label: display(key), kind: 'author', count: countOf(key), hasChildren: false });
   const keyOf = (id: string) => (id.startsWith('author:') && byAuthor.has(id.slice(7)) ? id.slice(7) : undefined);
@@ -251,7 +251,7 @@ function venueDim(docs: readonly ExploreDoc[], tax: ExploreTaxonomy): Dim {
     let key: string | undefined;
     let label: string | undefined;
     if (d.venueId && venueNames.has(d.venueId)) [key, label] = [`venue:${d.venueId}`, venueNames.get(d.venueId)];
-    else if (d.venue && fold(d.venue) !== '') [key, label] = [`venue:${fold(d.venue)}`, d.venue.trim()];
+    else if (d.venue && fold(d.venue) !== '') [key, label] = [`venue:${fold(d.venue).slice(0, 400)}`, d.venue.trim().slice(0, 290)];
     if (key === undefined || label === undefined) return;
     (byVenue.get(key) ?? byVenue.set(key, new Set()).get(key))!.add(i);
     const nm = names.get(key) ?? names.set(key, new Map()).get(key)!;
@@ -310,7 +310,7 @@ function venueDim(docs: readonly ExploreDoc[], tax: ExploreTaxonomy): Dim {
     const tags = new Map<string, number>();
     for (const m of areaMembers.get(id) as string[]) for (const [t, c] of tagCount.get(m) as Map<string, number>) tags.set(t, (tags.get(t) ?? 0) + c);
     const top = [...tags.entries()].filter(([t]) => tagLabels.has(t)).sort((p, q) => q[1] - p[1] || (p[0] < q[0] ? -1 : 1)).slice(0, 2);
-    return top.length > 0 ? top.map(([t]) => tagLabels.get(t)).join(' / ') : display((areaMembers.get(id) as string[])[0] as string);
+    return top.length > 0 ? top.map(([t]) => tagLabels.get(t)).join(' / ').slice(0, 290) : display((areaMembers.get(id) as string[])[0] as string);
   };
   const makeArea = (id: string): ExploreNode => ({ id, label: areaLabel(id), kind: 'venue-area', count: areaDocs(id).size, hasChildren: true });
   const makeVenue = (k: string): ExploreNode => ({ id: k, label: display(k), kind: 'venue', count: countOf(k), hasChildren: false });

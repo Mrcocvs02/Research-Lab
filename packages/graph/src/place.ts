@@ -18,11 +18,11 @@ const JITTER = 0.02;
 
 /**
  * Places a document that is not in the model (new or changed since the build) from its nearest neighbours in the
- * model, without touching anything else: position = mean of the neighbours' positions weighted by closeness squared,
+ * model (never from its own old entry, `exclude`), without touching anything else: position = mean of the neighbours' positions weighted by closeness squared,
  * plus a small jitter that depends only on the document id (so it never lands exactly on a neighbour and is the same
  * every time); its clusters are those most of its neighbours are in.
  */
-export function createPlacer(model: GraphModel): { place(id: string, counts: TermCounts): Placement; vector(counts: TermCounts): SparseVec } {
+export function createPlacer(model: GraphModel): { place(id: string, counts: TermCounts, exclude?: number): Placement; vector(counts: TermCounts): SparseVec } {
   const vocab = modelVocabulary(model);
   const vectors: SparseVec[] = model.vi.map((_, i) => ({ i: Int32Array.from(model.vi[i] as number[]), w: Float32Array.from(model.vw[i] as number[]) }));
   const post = buildPostings(vectors, vocab.terms.length);
@@ -30,9 +30,9 @@ export function createPlacer(model: GraphModel): { place(id: string, counts: Ter
   const clusterOf = (j: number) => model.cl[j] as number[];
   return {
     vector: (counts) => vectorize(counts, vocab),
-    place(id, counts) {
+    place(id, counts, exclude = -1) {
       const v = vectorize(counts, vocab);
-      const near = nearest(post, v, -1, PLACE_K, 0.05, scratch);
+      const near = nearest(post, v, exclude, PLACE_K, 0.05, scratch);
       const h = hash32(id);
       const angle = ((h & 0xffff) / 0xffff) * 2 * Math.PI;
       const radius = JITTER * (0.5 + ((h >>> 16) / 0xffff) * 0.5);

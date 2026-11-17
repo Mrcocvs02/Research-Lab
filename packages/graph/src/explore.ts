@@ -44,6 +44,8 @@ export interface ExploreIndex {
 
 export const MAX_EXPLORE_NODES = 500;
 const MAX_AUTHORS_FOR_PAIRS = 30;
+/** Distinct co-author pairs kept for grouping (memory and time of the main process on a huge or crafted library); past it known pairs still count up. */
+const MAX_AUTHOR_EDGES = 300_000;
 
 /** Everything one dimension offers; documents are indexes into the document list. */
 interface Dim {
@@ -197,22 +199,24 @@ function authorDim(docs: readonly ExploreDoc[]): Dim {
   });
   const keys = [...byAuthor.keys()].sort();
   const at = new Map(keys.map((k, i) => [k, i]));
-  const edges: Edge[] = [];
+  // Repeated co-authorship weighs more: parallel edges are summed as they are met.
+  const weight = new Map<number, Edge>();
   docs.forEach((d) => {
     const ks = [...new Set(d.authors.map(authorKey).filter((k) => k !== ''))];
     if (ks.length > MAX_AUTHORS_FOR_PAIRS) return;
-    for (let p = 0; p < ks.length; p++) for (let q = p + 1; q < ks.length; q++) edges.push({ a: at.get(ks[p] as string) as number, b: at.get(ks[q] as string) as number, w: 1 });
+    for (let p = 0; p < ks.length; p++) {
+      for (let q = p + 1; q < ks.length; q++) {
+        const x = at.get(ks[p] as string) as number;
+        const y = at.get(ks[q] as string) as number;
+        const a = Math.min(x, y);
+        const b = Math.max(x, y);
+        const key = a * 4_294_967_296 + b;
+        const cur = weight.get(key);
+        if (cur) cur.w += 1;
+        else if (weight.size < MAX_AUTHOR_EDGES) weight.set(key, { a, b, w: 1 });
+      }
+    }
   });
-  // Repeated co-authorship weighs more: sum the parallel edges.
-  const weight = new Map<number, Edge>();
-  for (const e of edges) {
-    const a = Math.min(e.a, e.b);
-    const b = Math.max(e.a, e.b);
-    const key = a * 4_294_967_296 + b;
-    const cur = weight.get(key);
-    if (cur) cur.w += 1;
-    else weight.set(key, { a, b, w: 1 });
-  }
   const countOf = (k: string) => (byAuthor.get(k) as Set<number>).size;
   const { members: groupMembers, of: groupOf } = groupKeys(keys, [...weight.values()], countOf, (top) => `group:${top}`, 'group:other');
   const display = (k: string) => mostCommon(names.get(k) as Map<string, number>);

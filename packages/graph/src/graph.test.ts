@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { analyze, buildModel, citationKey, citationSignals, countTerms, createPlacer, decodeModel, neighborsOf, reasonsOf, similarTo, surprisingPairs, tokenize } from './index.js';
-import { buildVectors } from './tfidf.js';
+import { MAX_CITATION_KEYS, MAX_COUNTS_PER_DOC, TermDictionary, analyze, buildModel, citationKey, citationSignals, countTerms, createPlacer, decodeModel, neighborsOf, packCounts, reasonsOf, similarTo, surprisingPairs, tokenize } from './index.js';
+import { buildVectors, maxDocFrequency } from './tfidf.js';
 import { syntheticDocs, topicWord } from './synthetic.js';
 import type { GraphDoc } from './types.js';
 
@@ -237,5 +237,84 @@ describe('budget', () => {
     expect(JSON.stringify(m).length).toBeLessThan(3 * 1024 * 1024);
     expect(Math.max(...m.vi.map((v) => v.length))).toBeLessThanOrEqual(64);
     expect(m.vocab.length).toBeLessThanOrEqual(30_000);
+  });
+});
+
+describe('large and hostile input', () => {
+  it('packed counts (what a loader keeps instead of the text) give the same neighbours as the text', async () => {
+    const docs = syntheticDocs(60, { topics: 5, seed: 3 });
+    const dict = new TermDictionary();
+    const packed = docs.map((d) => ({ ...d, packed: packCounts(countTerms(d), dict, MAX_COUNTS_PER_DOC), dict, title: '', abstract: '', keywords: [] as string[], text: '' }));
+    const a = await analyze(docs);
+    const b = await analyze(packed);
+    expect(b.vocab.terms).toEqual(a.vocab.terms);
+    for (const i of [0, 7, 31]) expect(b.neighborsOf(i, 10).map((n) => [n.j, n.score])).toEqual(a.neighborsOf(i, 10).map((n) => [n.j, n.score]));
+  });
+
+  it('keeps the strongest words of a document when it has more than the cap, and the same ones whatever the order', () => {
+    const counts = new Map<string, number>();
+    for (let i = 0; i < 400; i++) counts.set(`word${String(i).padStart(3, '0')}`, 1 + (i % 7));
+    const dict = new TermDictionary();
+    const p = packCounts(counts, dict, 100);
+    expect(p.t.length).toBe(100);
+    expect(Math.min(...p.c)).toBeGreaterThanOrEqual(5);
+    const dict2 = new TermDictionary();
+    const q = packCounts(new Map([...counts].reverse()), dict2, 100);
+    expect(new Set(Array.from(q.t, (t) => dict2.terms[t]))).toEqual(new Set(Array.from(p.t, (t) => dict.terms[t])));
+  });
+
+  it('lowers the share of documents a word may appear in for big corpora', () => {
+    expect(maxDocFrequency(10)).toBe(10);
+    expect(maxDocFrequency(1000)).toBe(400);
+    expect(maxDocFrequency(5000)).toBe(2000);
+    expect(maxDocFrequency(50_000)).toBe(2500);
+  });
+
+  it('caps the citation keys of a document and says it did', () => {
+    const link = (extra: object) => ({ authors: [], matchedDocId: null, source: 'manual' as const, checkedAt: '2026-01-01T00:00:00.000Z', ...extra });
+    const many = Array.from({ length: MAX_CITATION_KEYS + 50 }, (_, i) => ({ doi: `10.1/${String(i).padStart(4, '0')}` }));
+    const sig = citationSignals({ references: many.map((l) => link(l)), citedBy: [] } as never);
+    expect(sig.refs).toHaveLength(MAX_CITATION_KEYS);
+    expect(sig.trimmed).toBe(true);
+    expect(sig.refs).toEqual([...sig.refs].sort());
+    expect(citationSignals({ references: many.slice(0, 5).map((l) => link(l)), citedBy: [] } as never).trimmed).toBe(false);
+  });
+
+  it('does not let shared citation keys make a document a candidate of everything', async () => {
+    const docs = syntheticDocs(400, { topics: 2, seed: 4 });
+    // Every document cites the same 200 works: each key is shared by 400 documents (over the key cap), so none make candidates.
+    const refs = Array.from({ length: 200 }, (_, i) => `r:doi:10.9/${i}`);
+    for (const d of docs) d.refs = refs;
+    const a = await analyze(docs);
+    for (const n of a.neighborsOf(0, 20)) expect(n.citShared).toBe(200);
+    expect(a.neighborsOf(0, 20).length).toBeLessThanOrEqual(20);
+  });
+
+  it('rejects a model with unsafe or inconsistent clusters, vectors or scores', async () => {
+    const m = await build(syntheticDocs(40, { topics: 4 }));
+    const copy = () => JSON.parse(JSON.stringify(m)) as typeof m;
+    expect(decodeModel(copy())).not.toBeNull();
+    const proto = copy();
+    proto.clusters[0]!.id = '__proto__';
+    expect(decodeModel(proto)).toBeNull();
+    const dup = copy();
+    dup.clusters[1]!.id = dup.clusters[0]!.id;
+    expect(decodeModel(dup)).toBeNull();
+    const cycle = copy();
+    cycle.clusters[0]!.parent = 0;
+    expect(decodeModel(cycle)).toBeNull();
+    const unsorted = copy();
+    unsorted.vi[0] = [...unsorted.vi[0]!].reverse();
+    expect(decodeModel(unsorted)).toBeNull();
+    const negative = copy();
+    negative.vw[0]![0] = -0.5;
+    expect(decodeModel(negative)).toBeNull();
+    const score = copy();
+    const withNb = score.nb.findIndex((l) => l.length > 0);
+    score.nb[withNb]![1] = 99_999;
+    expect(decodeModel(score)).toBeNull();
+    const terms = copy();
+    (terms.clusters[0]!.terms as unknown[]).push(42);
+    expect(decodeModel(terms)).toBeNull();
   });
 });

@@ -206,6 +206,17 @@ describe('export:run', () => {
     expect((await exportNow(call, s, target(), true)).state).toBe('done');
   });
 
+  it('documents in excluded folders never enter an export: not by id, not by folder', async () => {
+    await store.writeConfig(config({ excludedFolders: ['private'] }));
+    const call = harness();
+    expect(fail(await call('export:preview', { selection: sel({ docIds: [hex(0), hex(7)] }) })).code).toBe('NOT_FOUND');
+    const run = await exportNow(call, sel({ docIds: [], folders: ['open', 'private'] }));
+    expect(run.state).toBe('done');
+    const files = (await readdir(path.join(dest, 'brain'), { recursive: true })).join(' ');
+    expect(files).not.toContain('p7');
+    expect(await read('brain', 'INDEX.md')).not.toContain(TITLES[7 % COUNT]!);
+  });
+
   it('refuses a folder that is not empty or that belongs to another library, and writes nothing there', async () => {
     const call = harness();
     await mkdir(path.join(dest, 'full'));

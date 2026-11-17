@@ -64,9 +64,13 @@ export const folderOf = (relPath: string): string => {
   return i < 0 ? '' : relPath.slice(0, i);
 };
 
-/** A document is in an enabled folder when its path is inside it (sub-folders included); '' enables the whole library. */
+/**
+ * A document is in an enabled folder when its path is inside it (sub-folders included); '' enables the whole library and
+ * '.' only the files directly in the library root.
+ */
 export function inEnabledFolder(relPath: string, enabled: readonly string[]): boolean {
   return enabled.some((f) => {
+    if (f === '.') return !relPath.includes('/');
     const e = f.replace(/\/+$/, '');
     return e === '' || relPath === e || relPath.startsWith(`${e}/`);
   });

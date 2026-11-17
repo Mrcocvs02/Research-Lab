@@ -3,6 +3,7 @@ export * from './types.js';
 export * from './pricing.js';
 export * from './guide.js';
 export * from './tools.js';
+export * from './suggest.js';
 export { createMockAiProvider, parseToolDirectives, type MockScript } from './mock.js';
 export {
   BUILTIN_TOOLS_DISALLOWED,
@@ -11,6 +12,8 @@ export {
   bundledExecutable,
   createClaudeProvider,
   detectAccess,
+  findClaudeExecutable,
+  type ExecutableSource,
   effortFor,
   mcpToolName,
   renderPrompt,

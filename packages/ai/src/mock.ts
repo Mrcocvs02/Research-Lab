@@ -1,5 +1,6 @@
 import { AppError, DEFAULT_MODELS, type ChatEvent, type ChatRequest, type CostEstimate, type ModelConfig, type StructuredRequest, type StructuredResult } from '@rl/core';
 import { approxTokens, estimateCostFromModels } from './pricing.js';
+import { parseTaxonomyBlock } from './suggest.js';
 import { isToolResult } from './tools.js';
 import type { AiAccess, AiProviderEx, TokenUsageWithCost } from './types.js';
 
@@ -65,6 +66,28 @@ export function parseToolDirectives(text: string): Array<{ name: string; input: 
     } catch {
       /* not JSON: ignored */
     }
+  }
+  return out;
+}
+
+/**
+ * Default structured answer of the mock, built from the keys of the schema (`@rl/ai` suggest schema): tags are existing
+ * taxonomy ids whose label words appear in the document data of the prompt (else the first node); fixed short texts for
+ * the other fields. Deterministic, so that the e2e can predict it.
+ */
+export function mockStructured(request: { schema: unknown; prompt: string }): unknown {
+  const keys = Object.keys((request.schema as { shape?: Record<string, unknown> }).shape ?? {});
+  const data = (/<<<DATA[\s\S]*?DATA>>>/.exec(request.prompt)?.[0] ?? '').toLowerCase();
+  const nodes = parseTaxonomyBlock(request.prompt);
+  const hits = nodes.filter((n) => n.label.toLowerCase().split(/[^\p{L}\p{N}]+/u).some((w) => w.length >= 3 && data.includes(w))).slice(0, 3);
+  const out: Record<string, unknown> = {};
+  for (const k of keys) {
+    if (k === 'tagIds') out[k] = (hits.length > 0 ? hits : nodes.slice(0, 1)).map((n) => n.id);
+    else if (k === 'newTags') out[k] = [];
+    else if (k === 'description') out[k] = 'Mock description of the document.';
+    else if (k === 'summary') out[k] = 'Mock summary.';
+    else if (k === 'keywords') out[k] = ['mock keyword', 'second keyword'];
+    else if (k === 'synonyms') out[k] = ['mock synonym'];
   }
   return out;
 }
@@ -140,7 +163,7 @@ export function createMockAiProvider(script: MockScript = {}): AiProviderEx {
     },
     async completeStructured<T>(request: StructuredRequest<T>): Promise<StructuredResult<T>> {
       if (script.fail) throw new AppError(script.fail.code, script.fail.message);
-      const parsed = request.schema.safeParse(script.structured);
+      const parsed = request.schema.safeParse(script.structured !== undefined ? script.structured : mockStructured(request));
       if (!parsed.success) throw new AppError('AI_PROVIDER_ERROR', 'The mock answer does not match the schema');
       const usage = { inputTokens: approxTokens(request.system.length + request.prompt.length), outputTokens: 50 };
       return { value: parsed.data, usage, meta: { model: request.model, provider: 'mock', date: now(), source: request.source } };

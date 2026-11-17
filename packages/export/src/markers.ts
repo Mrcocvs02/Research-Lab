@@ -16,6 +16,8 @@ export interface Part {
 const begin = (p: Part) => (p.style === 'yaml' ? `# rl:begin ${p.name}` : `<!-- rl:begin ${p.name} -->`);
 const end = (p: Part) => (p.style === 'yaml' ? `# rl:end ${p.name}` : `<!-- rl:end ${p.name} -->`);
 const trimEnd = (s: string) => s.replace(/\n+$/, '');
+/** Line endings an editor or git may have rewritten (CRLF, lone CR), back to `\n`. */
+const lf = (s: string) => s.replace(/\r\n?/g, '\n');
 
 /** The block of a part as written in a file. */
 export const renderPart = (p: Part): string => `${begin(p)}\n${trimEnd(p.body)}\n${end(p)}`;
@@ -36,11 +38,13 @@ function find(text: string, p: Part): Found | null {
   for (;;) {
     let nl = text.indexOf('\n', at);
     if (nl < 0) nl = text.length;
-    const line = text.slice(at, nl).replace(/\r$/, '');
+    // A byte order mark an editor put at the top of the file must not hide the first marker.
+    const raw = text.slice(at, nl).replace(/\r$/, '');
+    const line = at === 0 ? raw.replace(/^\uFEFF/, '') : raw;
     if (innerStart < 0) {
       if (line === b && nl < text.length) innerStart = nl + 1;
     } else if (line === e) {
-      return { innerStart, innerStop: Math.max(innerStart, at - 1) };
+      return { innerStart, innerStop: Math.max(innerStart, at - (text[at - 2] === '\r' ? 2 : 1)) };
     }
     if (nl >= text.length) return null;
     at = nl + 1;
@@ -50,7 +54,7 @@ function find(text: string, p: Part): Found | null {
 /** Current content of a part in `text` (null when its markers are missing). */
 export function readPart(text: string, p: Pick<Part, 'name' | 'style'>): string | null {
   const f = find(text, { ...p, body: '' });
-  return f === null ? null : text.slice(f.innerStart, f.innerStop).replace(/\r\n/g, '\n');
+  return f === null ? null : lf(text.slice(f.innerStart, f.innerStop));
 }
 
 export type MergeStatus = 'new' | 'unchanged' | 'updated' | 'kept-edited';
@@ -88,10 +92,10 @@ export function mergeParts(
         text = `${text.replace(/\n*$/, '\n\n')}${renderPart(p)}\n`;
         hashes[p.name] = partHash(p.body);
         changed = true;
-      }
+      } else hashes[p.name] = known[p.name] as string; // deleted by the user: stays deleted, and stays known
       continue;
     }
-    const current = text.slice(f.innerStart, f.innerStop).replace(/\r\n/g, '\n');
+    const current = lf(text.slice(f.innerStart, f.innerStop));
     const knownHash = known[p.name];
     if (knownHash === undefined || partHash(current) !== knownHash) return { status: 'kept-edited', text: existing, hashes: { ...known } };
     const next = partHash(p.body);

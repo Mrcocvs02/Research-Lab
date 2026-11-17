@@ -7,6 +7,8 @@ export interface ManifestFile {
   whole?: string;
   /** Hash of each generated part as written (files with markers). */
   parts?: Record<string, string>;
+  /** Size in bytes of a copy in `sources/` as the export wrote it (copies are not hashed: they can be large). */
+  size?: number;
 }
 
 export interface ExportManifest {
@@ -31,6 +33,12 @@ const strMap = (v: unknown): Record<string, string> | null => {
   return out;
 };
 
+const CITEKEY = /^[a-z0-9]{1,80}$/;
+const RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/;
+
+/** True for a citekey the export itself could have made: it names a file and sits inside `[[ ]]`, so nothing else goes. */
+export const isValidCitekey = (k: string): boolean => CITEKEY.test(k) && !RESERVED.test(k);
+
 /** The manifest in `text`, or null when it is not one (not JSON, wrong shape, newer format). */
 export function parseManifest(text: string): ExportManifest | null {
   let v: unknown;
@@ -43,12 +51,21 @@ export function parseManifest(text: string): ExportManifest | null {
   const citekeys = strMap(v['citekeys']);
   const titles = strMap(v['titles'] ?? {});
   if (!citekeys || !titles || !isRecord(v['files'])) return null;
+  // A hand-edited manifest is not trusted: an entry whose citekey is not one of ours (separators, reserved names, `]]`,
+  // line breaks) or repeats another is dropped, and the document gets a fresh key.
+  const seen = new Set<string>();
+  for (const [id, k] of Object.entries(citekeys)) {
+    if (!isValidCitekey(k) || seen.has(k)) delete citekeys[id];
+    else seen.add(k);
+  }
+  for (const [id, t] of Object.entries(titles)) titles[id] = t.replace(/\s+/g, ' ').slice(0, 300);
   const files: Record<string, ManifestFile> = {};
   for (const [rel, f] of Object.entries(v['files'])) {
     if (!isRecord(f)) return null;
     const parts = f['parts'] === undefined ? undefined : strMap(f['parts']);
     if (parts === null || (f['whole'] !== undefined && typeof f['whole'] !== 'string')) return null;
-    files[rel] = { ...(typeof f['whole'] === 'string' ? { whole: f['whole'] } : {}), ...(parts ? { parts } : {}) };
+    const size = f['size'];
+    files[rel] = { ...(typeof f['whole'] === 'string' ? { whole: f['whole'] } : {}), ...(parts ? { parts } : {}), ...(typeof size === 'number' && Number.isSafeInteger(size) && size >= 0 ? { size } : {}) };
   }
   return { format: MANIFEST_FORMAT, libraryId: v['libraryId'], exportedAt: v['exportedAt'], citekeys, titles, files };
 }

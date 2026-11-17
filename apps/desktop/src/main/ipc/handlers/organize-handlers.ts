@@ -10,7 +10,7 @@ import type { MainServices } from './services.js';
  * Pushes `library:changed` and refreshes the search index of the documents a change touched. An index failure never
  * fails the change (it is on disk): the next scan finds the stale entries (their stamp holds the record version and a fingerprint of the taxonomy) and refreshes them.
  */
-async function settle(s: MainServices, rt: LibraryRuntime, touched: { reindex: string[] }, events: Array<{ kind: 'documents' | 'taxonomy' | 'projects'; ids?: string[] | undefined }>): Promise<void> {
+export async function settle(s: MainServices, rt: LibraryRuntime, touched: { reindex: string[] }, events: Array<{ kind: 'documents' | 'taxonomy' | 'projects'; ids?: string[] | undefined }>): Promise<void> {
   if (touched.reindex.length > 0) {
     await rt.reindexDocuments(touched.reindex as DocumentId[]).catch((e: unknown) => s.log.warn('index refresh after a change failed', { error: e }));
   }

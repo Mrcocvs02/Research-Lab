@@ -63,6 +63,15 @@ describe('runtime switches are development-only', () => {
     expect(resolveRuntimeConfig({ RL_USER_DATA_DIR: 'relative' }, false).userDataDir).toBeNull();
   });
 
+  it('the network fixtures file is honoured only in a development run with RL_E2E=1', () => {
+    const env = { RL_E2E_NET_FIXTURES: ABS('net.json') };
+    expect(resolveRuntimeConfig(env, false).netFixturesFile).toBeNull();
+    expect(resolveRuntimeConfig({ ...env, RL_E2E: '1' }, false).netFixturesFile).toBe(ABS('net.json'));
+    const packaged = resolveRuntimeConfig({ ...env, RL_E2E: '1' }, true);
+    expect(packaged.netFixturesFile).toBeNull();
+    expect(packaged.warnings.join(' ')).toContain('RL_E2E_NET_FIXTURES');
+  });
+
   it('a dev server URL that is not plain localhost is ignored with a warning, even in development', () => {
     const rt = resolveRuntimeConfig({ ELECTRON_RENDERER_URL: 'https://evil.example/app' }, false);
     expect(rt.rendererDevUrl).toBeNull();

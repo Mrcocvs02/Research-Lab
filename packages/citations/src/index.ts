@@ -1,12 +1,6 @@
-import type { CitationService, CitationSource } from '@rl/core';
-
-/** Owner: citations. OpenAlex (primary), arXiv and Semantic Scholar (fallbacks). */
-export function createCitationSources(): CitationSource[] {
-  throw new Error('not implemented');
-}
-
-export function createCitationService(_sources: CitationSource[]): CitationService {
-  throw new Error('not implemented');
-}
-
 export * from './metadata.js';
+export * from './match.js';
+export { createNet, type Net, type NetOptions } from './net.js';
+export { createArxiv, createOpenAlex, createSemanticScholar, openAlexLink, type CitationSourceX, type LookupResult, type PublishedInfo, type SourceRef } from './sources.js';
+export { createCitationService, createCitationSources, hasLookupKey, refOf, type CitationServiceX, type RefreshOptions } from './service.js';
+export { createWatchFetcher, type WatchHit, type WatchQuery } from './watch.js';

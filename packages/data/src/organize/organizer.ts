@@ -241,6 +241,48 @@ export class Organizer {
   }
 
   /**
+   * A published version of a preprint (monitoring, phase 5): DOI, venue, reference and year become the user's own
+   * fields and `publication` is marked published, as ONE logged change (undoable). A stale `expectedRevision` is a conflict.
+   */
+  applyPublished(
+    docId: string,
+    found: { doi: string; venue: string | null; venueRef: string | null; year: number | null; source: string },
+    expectedRevision: number,
+  ): Promise<{ record: DocumentRecord; changeId: string; checkedAt: string } & Touched> {
+    return this.run(async () => {
+      const store = this.d.store;
+      const cur = await store.documents.get(docId);
+      if (!cur) throw new AppError('NOT_FOUND', 'Unknown document');
+      if (cur.revision !== expectedRevision) throw new RevisionConflictError('document', expectedRevision, cur.revision);
+      const checkedAt = this.ctx.now().toISOString();
+      const changeId = this.ctx.newChangeId();
+      const apply = (c: DocumentRecord): DocumentRecord => {
+        const next: DocumentRecord = { ...c, ref: { ...c.ref }, publication: { status: 'published', source: clip(found.source, 500), checkedAt }, updatedAt: checkedAt };
+        next.doi = cleanDoiInput(found.doi);
+        if (found.year !== null) next.year = found.year;
+        if (found.venue) next.ref.venue = found.venue;
+        if (found.venueRef) next.ref.venueRef = found.venueRef;
+        if (next.extracted) {
+          const extracted = { ...next.extracted };
+          if (canonical(extracted.doi) === canonical(next.doi)) delete extracted.doi;
+          if (canonical(extracted.year) === canonical(next.year)) delete extracted.year;
+          if (Object.keys(extracted).length === 0) delete next.extracted;
+          else next.extracted = extracted;
+        }
+        return next;
+      };
+      const cs = store.withChange({ changeId, summary: 'Published version applied' });
+      const record = await cs.documents.update(docId, (c) => {
+        if (!c) throw new AppError('NOT_FOUND', 'Unknown document');
+        if (c.revision !== expectedRevision) throw new RevisionConflictError('document', expectedRevision, c.revision);
+        return apply(c);
+      });
+      this.ctx.invalidate();
+      return { record, changeId, checkedAt, reindex: [docId] };
+    });
+  }
+
+  /**
    * Keeps the "underlined" flag in step with the annotations of a document (D-184): with origin "annotations" the value
    * is "there is at least one annotation"; a manual true stays; a manual false becomes an annotations true as soon as there is
    * one. Read and written under the queue, no change log entry (annotation edits are not part of undo/redo).

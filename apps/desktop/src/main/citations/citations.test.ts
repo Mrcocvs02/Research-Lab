@@ -402,8 +402,8 @@ describe('net fixtures hook', () => {
     const f = fixtureFetch(file);
     expect((await f('https://api.openalex.org/works/doi:10.1/w1?select=id&mailto=x%40y.z')).status).toBe(200);
     const batch = await f('https://api.openalex.org/works?select=id,doi,title,publication_year,authorships,primary_location&per-page=50&filter=openalex_id%3AW2%7CW7%7CW8');
-    expect((await batch.json()).results).toHaveLength(1);
-    expect((await (await f('https://api.openalex.org/works?filter=cites%3AW1&cursor=*')).json()).results).toEqual([]);
+    expect(((await batch.json()) as { results: unknown[] }).results).toHaveLength(1);
+    expect(((await (await f('https://api.openalex.org/works?filter=cites%3AW1&cursor=*')).json()) as { results: unknown[] }).results).toEqual([]);
     expect(await (await f('https://export.arxiv.org/api/query?id_list=2401.00001')).text()).toBe('<feed/>');
     expect((await f('https://api.semanticscholar.org/graph/v1/paper/DOI:10.1/gone?fields=x')).status).toBe(404);
     expect((await f('https://api.openalex.org/authors?search=x')).status).toBe(404);

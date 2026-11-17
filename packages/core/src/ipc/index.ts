@@ -11,8 +11,6 @@ export interface RlApi {
   on: OnEventFn<Events>;
 }
 
-/** Name of the single Electron IPC channel carrying all invokes. */
-export const IPC_INVOKE_CHANNEL = 'rl:invoke';
-/** Name of the single Electron IPC channel carrying all push events. */
-export const IPC_EVENT_CHANNEL = 'rl:event';
+/** Names of the single Electron IPC channels carrying all invokes and all push events (defined with the name lists). */
+export { IPC_EVENT_CHANNEL, IPC_INVOKE_CHANNEL } from './names.js';
 export * from './client.js';

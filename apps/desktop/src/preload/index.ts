@@ -1,5 +1,11 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import { AppError, channels, events, IPC_EVENT_CHANNEL, IPC_INVOKE_CHANNEL, type IpcEnvelope, type RlBridge } from '@rl/core';
+import type { IpcEnvelope, RlBridge } from '@rl/core';
+// Plain name lists, not the registry: the preload runs in every window at start and must not load zod and every schema.
+import { CHANNEL_NAMES, EVENT_NAMES, IPC_EVENT_CHANNEL, IPC_INVOKE_CHANNEL } from '@rl/core/ipc-names';
+
+const CHANNELS = new Set(CHANNEL_NAMES);
+const EVENTS = new Set(EVENT_NAMES);
+const unknownChannel: IpcEnvelope = { ok: false, error: { code: 'UNKNOWN_CHANNEL', message: 'Unknown channel' } };
 
 /**
  * The only thing the renderer gets: two functions, no Electron objects, no generic ipcRenderer.
@@ -7,13 +13,11 @@ import { AppError, channels, events, IPC_EVENT_CHANNEL, IPC_INVOKE_CHANNEL, type
  */
 const bridge: RlBridge = {
   async invokeRaw(channel, payload): Promise<IpcEnvelope> {
-    if (typeof channel !== 'string' || !Object.hasOwn(channels, channel)) {
-      return { ok: false, error: new AppError('UNKNOWN_CHANNEL', 'Unknown channel').toJSON() };
-    }
+    if (typeof channel !== 'string' || !CHANNELS.has(channel)) return unknownChannel;
     return (await ipcRenderer.invoke(IPC_INVOKE_CHANNEL, channel, payload)) as IpcEnvelope;
   },
   subscribe(event, listener) {
-    if (typeof event !== 'string' || !Object.hasOwn(events, event)) throw new AppError('UNKNOWN_CHANNEL', 'Unknown event');
+    if (typeof event !== 'string' || !EVENTS.has(event)) throw new Error('Unknown event');
     const handler = (_e: unknown, name: string, payload: unknown) => {
       if (name === event) listener(payload);
     };

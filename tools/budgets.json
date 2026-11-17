@@ -14,7 +14,7 @@
     "totalJsKB": 840
   },
   "preload": {
-    "totalKB": 132
+    "totalKB": 8
   },
   "runtime": {
     "idleMemoryMb": 501,

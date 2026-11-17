@@ -39,8 +39,14 @@ export function vectorize(counts: TermCounts, vocab: Vocabulary): SparseVec {
   const entries: Array<[number, number]> = [];
   for (const [term, c] of counts) {
     const i = vocab.index.get(term);
-    if (i !== undefined) entries.push([i, (1 + Math.log(c)) * (vocab.idf[i] as number)]);
+    if (i !== undefined) entries.push([i, c]);
   }
+  return vectorizeIndexed(entries, vocab);
+}
+
+/** Same from (vocabulary index, weighted count) pairs. */
+function vectorizeIndexed(counts: Array<[number, number]>, vocab: Vocabulary): SparseVec {
+  const entries: Array<[number, number]> = counts.map(([i, c]) => [i, (1 + Math.log(c)) * (vocab.idf[i] as number)]);
   if (entries.length > MAX_TERMS_PER_DOC) {
     entries.sort((p, q) => q[1] - p[1] || p[0] - q[0]);
     entries.length = MAX_TERMS_PER_DOC;
@@ -61,24 +67,88 @@ export function vectorize(counts: TermCounts, vocab: Vocabulary): SparseVec {
   return { i: Int32Array.from(i), w: Float32Array.from(w) };
 }
 
+/** Distinct words kept per document while the corpus is read (the strongest by weighted count): bounds memory per document. */
+export const MAX_COUNTS_PER_DOC = 256;
+
+/** Words of a whole corpus, numbered: documents then carry numbers instead of strings. */
+export class TermDictionary {
+  readonly index = new Map<string, number>();
+  readonly terms: string[] = [];
+  id(term: string): number {
+    let i = this.index.get(term);
+    if (i === undefined) {
+      i = this.terms.length;
+      this.terms.push(term);
+      this.index.set(term, i);
+    }
+    return i;
+  }
+}
+
+/** The word counts of a document in compact form (ids of a `TermDictionary`, parallel counts). */
+export interface PackedCounts {
+  t: Int32Array;
+  c: Float32Array;
+}
+
+/** Packs counts, keeping the `max` strongest words (ties by word, so the result does not depend on the order of reading). */
+export function packCounts(counts: TermCounts, dict: TermDictionary, max = Infinity): PackedCounts {
+  let entries = [...counts];
+  if (entries.length > max) {
+    entries.sort((p, q) => q[1] - p[1] || (p[0] < q[0] ? -1 : 1));
+    entries = entries.slice(0, max);
+  }
+  const t = new Int32Array(entries.length);
+  const c = new Float32Array(entries.length);
+  entries.forEach(([term, n], k) => {
+    t[k] = dict.id(term);
+    c[k] = n;
+  });
+  return { t, c };
+}
+
+/** Words in a single document cannot make two documents close; in a large share of a big corpus they separate nothing. */
+export function maxDocFrequency(n: number): number {
+  if (n < 30) return n;
+  return n < 5000 ? Math.floor(n * 0.4) : Math.max(2000, Math.floor(n * 0.05));
+}
+
 /**
- * TF-IDF vectors of a corpus. Words that occur in a single document (they cannot make two documents close) and, in a
- * corpus of 30 or more, in more than 40% of them (they separate nothing) are left out; the vocabulary is capped.
+ * TF-IDF vectors of a corpus. Words that occur in a single document and, in a corpus of 30 or more, in too many of
+ * them (`maxDocFrequency`) are left out; the vocabulary is capped.
  */
-export function buildVectors(counts: TermCounts[]): { vocab: Vocabulary; vectors: SparseVec[] } {
-  const n = counts.length;
-  const df = new Map<string, number>();
-  for (const c of counts) for (const t of c.keys()) df.set(t, (df.get(t) ?? 0) + 1);
-  const maxDf = n >= 30 ? Math.floor(n * 0.4) : n;
-  const terms = [...df.entries()]
-    .filter(([, d]) => d >= 2 && d <= maxDf)
-    .sort((p, q) => q[1] - p[1] || (p[0] < q[0] ? -1 : 1))
-    .slice(0, MAX_VOCAB);
+export function buildVectorsPacked(packed: readonly PackedCounts[], dict: TermDictionary): { vocab: Vocabulary; vectors: SparseVec[] } {
+  const n = packed.length;
+  const df = new Int32Array(dict.terms.length);
+  for (const p of packed) for (const t of p.t) df[t] = (df[t] as number) + 1;
+  const maxDf = maxDocFrequency(n);
+  const kept: number[] = [];
+  for (let t = 0; t < df.length; t++) if ((df[t] as number) >= 2 && (df[t] as number) <= maxDf) kept.push(t);
+  kept.sort((p, q) => (df[q] as number) - (df[p] as number) || ((dict.terms[p] as string) < (dict.terms[q] as string) ? -1 : 1));
+  kept.length = Math.min(kept.length, MAX_VOCAB);
   const vocab = makeVocabulary(
-    terms.map(([t]) => t),
-    terms.map(([, d]) => Math.log(1 + n / d)),
+    kept.map((t) => dict.terms[t] as string),
+    kept.map((t) => Math.log(1 + n / (df[t] as number))),
   );
-  return { vocab, vectors: counts.map((c) => vectorize(c, vocab)) };
+  const vocabOf = new Int32Array(dict.terms.length).fill(-1);
+  kept.forEach((t, i) => (vocabOf[t] = i));
+  const vectors = packed.map((p) => {
+    const counts: Array<[number, number]> = [];
+    for (let k = 0; k < p.t.length; k++) {
+      const i = vocabOf[p.t[k] as number] as number;
+      if (i >= 0) counts.push([i, p.c[k] as number]);
+    }
+    return vectorizeIndexed(counts, vocab);
+  });
+  return { vocab, vectors };
+}
+
+export function buildVectors(counts: TermCounts[]): { vocab: Vocabulary; vectors: SparseVec[] } {
+  const dict = new TermDictionary();
+  return buildVectorsPacked(
+    counts.map((c) => packCounts(c, dict)),
+    dict,
+  );
 }
 
 export function cosine(a: SparseVec, b: SparseVec): number {

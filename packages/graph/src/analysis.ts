@@ -1,4 +1,4 @@
-import { buildPostings, buildVectors, countTerms, cosine, makeScratch, nearest, sharedTerms, type Postings, type Scratch, type Vocabulary } from './tfidf.js';
+import { TermDictionary, buildPostings, buildVectorsPacked, countTerms, cosine, makeScratch, nearest, packCounts, sharedTerms, MAX_COUNTS_PER_DOC, type PackedCounts, type Postings, type Scratch, type Vocabulary } from './tfidf.js';
 import { checkpoint, type GraphDoc, type RunContext, type SparseVec } from './types.js';
 
 /** Weights of the three signals in the combined closeness of two documents. */
@@ -13,6 +13,8 @@ const MIN_SCORE = 0.03;
 /** A citation key shared by more documents than this, or a tag shared by more than `TAG_CAP`, does not make candidates. */
 const KEY_CAP = 300;
 const TAG_CAP = 25;
+/** Candidates one document can gather from shared citations and tags (a hostile or huge library must not make the pass quadratic). */
+const MAX_CANDIDATES = 1500;
 
 export type Reason = 'text' | 'citations' | 'tags';
 
@@ -60,15 +62,17 @@ export interface Analysis {
  */
 export async function analyze(docs: readonly GraphDoc[], ctx?: RunContext): Promise<Analysis> {
   const n = docs.length;
-  const counts = [];
+  const dict = docs.find((d) => d.dict)?.dict ?? new TermDictionary();
+  const counts: PackedCounts[] = [];
   for (let i = 0; i < n; i++) {
-    counts.push(countTerms(docs[i] as GraphDoc));
+    const d = docs[i] as GraphDoc;
+    counts.push(d.packed ?? packCounts(countTerms(d), dict, MAX_COUNTS_PER_DOC));
     if (i % 100 === 99) {
       ctx?.onProgress?.('vectors', i + 1, n);
       await checkpoint(ctx);
     }
   }
-  const { vocab, vectors } = buildVectors(counts);
+  const { vocab, vectors } = buildVectorsPacked(counts, dict);
   ctx?.onProgress?.('vectors', n, n);
   return makeAnalysis(docs, vocab, vectors);
 }
@@ -127,7 +131,7 @@ export function makeAnalysis(docs: readonly GraphDoc[], vocab: Vocabulary, vecto
       const cand = new Map<number, number>();
       for (const h of nearest(post, v, i, k * 2, 0.02, scratch)) cand.set(h.j, h.s);
       const wide = (l: number[] | undefined, cap: number) => {
-        if (l && l.length <= cap) for (const j of l) if (j !== i && !cand.has(j)) cand.set(j, cosine(v, vectors[j] as SparseVec));
+        if (l && l.length <= cap) for (const j of l) if (j !== i && !cand.has(j) && cand.size < MAX_CANDIDATES) cand.set(j, cosine(v, vectors[j] as SparseVec));
       };
       for (const key of refSets[i] as Set<string>) wide(byKey.get(key), KEY_CAP);
       for (const t of tagSets[i] as Set<string>) wide(byTag.get(t), TAG_CAP);

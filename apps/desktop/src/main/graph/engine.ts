@@ -1,7 +1,9 @@
+import path from 'node:path';
 import { AppError, type LibraryStore } from '@rl/core';
 import { atomicWriteFile } from '@rl/core/node';
 import { analyze, buildModel, similarTo, type Reason } from '@rl/graph';
 import { loadGraphDocs } from './inputs.js';
+import { cleanLeftovers, writeMeta } from './model-meta.js';
 
 /** The heavy work of the graph. Runs in a worker thread in the app (`graph-worker.ts`), in-process in tests. */
 export interface GraphStoreArgs {
@@ -27,6 +29,8 @@ export interface BuildSummary {
   documents: number;
   builtAt: string;
   seed: number;
+  /** Documents whose list of cited works was cut to the per-document cap (the user is told). */
+  trimmedCitations?: number;
 }
 
 export interface SimilarItem {
@@ -59,9 +63,11 @@ export function createGraphEngine(deps: EngineDeps): GraphEngine {
     async build(args, hooks = {}) {
       const store = deps.createStore(args);
       let total = 1;
+      const stats = { trimmedCitations: 0 };
       const docs = await loadGraphDocs(store, {
         cacheDir: args.cacheDir,
         signal: hooks.signal,
+        stats,
         // Reading the documents is the first half of the "vectors" phase.
         onProgress: (done, n) => {
           total = Math.max(1, n);
@@ -75,8 +81,11 @@ export function createGraphEngine(deps: EngineDeps): GraphEngine {
         onProgress: (phase, done, n) => hooks.onProgress?.(phase === 'vectors' ? { phase, done: total + done, total: total * 2 } : { phase, done, total: n }),
       });
       if (hooks.signal?.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
-      await atomicWriteFile(args.modelFile, JSON.stringify(model));
-      return { documents: docs.length, builtAt: model.builtAt, seed: model.seed };
+      const json = JSON.stringify(model);
+      await cleanLeftovers(path.dirname(args.modelFile));
+      await atomicWriteFile(args.modelFile, json);
+      await writeMeta(args.modelFile, { version: 1, modelBytes: Buffer.byteLength(json), builtAt: model.builtAt, seed: model.seed, ids: model.ids, sigs: model.sigs });
+      return { documents: docs.length, builtAt: model.builtAt, seed: model.seed, trimmedCitations: stats.trimmedCitations };
     },
 
     async similar(args, hooks = {}) {

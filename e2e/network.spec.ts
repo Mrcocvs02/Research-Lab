@@ -9,7 +9,7 @@ import { createLibraryViaWizard, ipcData, percentile, skipUnlessChannels, waitFo
  *
  * Phase 6 criterion, renderer half: the model is built with progress; the map shows points and cluster labels; the same
  * seed gives the same clusters after a rebuild; the expandable network holds 500 nodes without jank (p95 frame time
- * measured with requestAnimationFrame while panning: no long task, p95 within max(50 ms, twice the median frame)); a document added later gets a position (status
+ * measured with requestAnimationFrame while panning and zooming, while expanding a node (with the simulation ticks that settle it) and while dragging a node: no long task, p95 within max(50 ms, twice the median frame)); a document added later gets a position (status
  * shows it pending, the map has the point) without a full rebuild; from a macro-topic to a paper in at most four zooms
  * and back with the breadcrumb and the selection kept; from an author node to its topics and back to the author.
  */
@@ -67,6 +67,11 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     await window.keyboard.press('+');
     await window.keyboard.press('ArrowLeft');
     await window.keyboard.press('0');
+    // Keyboard selection on the map: ] goes to a point in view, Enter selects it and the detail opens.
+    await window.keyboard.press(']');
+    await expect(window.getByTestId('map-focus')).not.toHaveText('');
+    await window.keyboard.press('Enter');
+    await expect(window.getByTestId('net-detail')).toBeVisible();
 
     // 3. Same seed, same clusters after a rebuild.
     const first = await ipcData<MapData>(window, 'graph:map', {});
@@ -97,51 +102,88 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     await window.getByTestId('net-fit').click();
     await window.waitForTimeout(1500); // let the layout settle
     const box = (await net.boundingBox())!;
-    await window.evaluate(() => {
-      const w = window as unknown as { __frames: number[]; __run: boolean; __long: number[]; __obs?: PerformanceObserver };
-      w.__frames = [];
-      w.__long = [];
-      w.__run = true;
-      // Long tasks (> 50 ms of main-thread work) tell our own work apart from frames the machine was too busy to draw.
-      try {
-        w.__obs = new PerformanceObserver((list) => {
-          for (const e of list.getEntries()) w.__long.push(e.duration);
-        });
-        w.__obs.observe({ entryTypes: ['longtask'] });
-      } catch {
-        /* not supported */
+    const frameWindow = window;
+    /** Frames (requestAnimationFrame deltas) and long tasks while `action` runs. */
+    const measure = async (label: string, action: () => Promise<void>) => {
+      await frameWindow.evaluate(() => {
+        const w = window as unknown as { __frames: number[]; __run: boolean; __long: number[]; __obs?: PerformanceObserver };
+        w.__frames = [];
+        w.__long = [];
+        w.__run = true;
+        // Long tasks (> 50 ms of main-thread work) tell our own work apart from frames the machine was too busy to draw.
+        try {
+          w.__obs = new PerformanceObserver((list) => {
+            for (const e of list.getEntries()) w.__long.push(e.duration);
+          });
+          w.__obs.observe({ entryTypes: ['longtask'] });
+        } catch {
+          /* not supported */
+        }
+        let last = performance.now();
+        const loop = (t: number) => {
+          w.__frames.push(t - last);
+          last = t;
+          if (w.__run) requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
+      });
+      await action();
+      const r = await frameWindow.evaluate(() => {
+        const w = window as unknown as { __frames: number[]; __run: boolean; __long: number[]; __obs?: PerformanceObserver };
+        w.__run = false;
+        w.__obs?.disconnect();
+        return { frames: w.__frames.slice(1), long: w.__long };
+      });
+      const p50 = percentile(r.frames, 50);
+      const p95 = percentile(r.frames, 95);
+      console.log(`NET-FRAMES ${label} ${JSON.stringify({ n: r.frames.length, p50, p90: percentile(r.frames, 90), p95, p99: percentile(r.frames, 99), max: Math.max(...r.frames), longTasks: r.long.length, longMax: r.long.length ? Math.max(...r.long) : 0 })}`);
+      testInfo.annotations.push({ type: `p95-frame-ms (${label})`, description: `${p95.toFixed(1)} (median ${p50.toFixed(1)}) over ${r.frames.length} frames, ${r.long.length} long tasks (500+ nodes)` });
+      // "Senza scatti": no main-thread task over 50 ms, and no frame hitches beyond the window's own pace (an off-screen
+      // test window may draw at 30 Hz, so the bound is relative to the median frame).
+      expect(r.long, `long tasks while ${label} with 500+ nodes`).toHaveLength(0);
+      expect(p95, `p95 frame time ${p95.toFixed(1)} ms (median ${p50.toFixed(1)}) while ${label}`).toBeLessThanOrEqual(Math.max(FRAME_P95_MS, 2 * p50));
+    };
+
+    // 4a. Panning and zooming a settled network.
+    await measure('panning and zooming', async () => {
+      await window.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await window.mouse.down();
+      for (let i = 0; i < 120; i++) await window.mouse.move(box.x + box.width / 2 + 150 * Math.sin(i / 10), box.y + box.height / 2 + 100 * Math.cos(i / 10));
+      await window.mouse.up();
+      for (let i = 0; i < 12; i++) await window.mouse.wheel(0, i % 2 === 0 ? -120 : 120);
+    });
+
+    // 4b. Expanding a node (more nodes and edges arrive) and the simulation ticks that settle them.
+    const sizeBefore = await count();
+    await measure('expanding a node and settling', async () => {
+      await net.focus();
+      for (let k = 0; k < 9; k++) await window.keyboard.press(']');
+      await window.keyboard.press('Enter');
+      await window.waitForTimeout(2500);
+    });
+    console.log(`NET-EXPAND nodes ${sizeBefore} -> ${await count()}`);
+
+    // 4c. Dragging a node (the layout warms up around it). A node is found by hovering: its tooltip shows.
+    await window.getByTestId('net-fit').click();
+    await window.waitForTimeout(1500);
+    let grab: { x: number; y: number } | null = null;
+    for (let row = 1; row < 9 && !grab; row++) {
+      for (let col = 1; col < 13 && !grab; col++) {
+        const x = box.x + (box.width * col) / 13;
+        const y = box.y + (box.height * row) / 9;
+        await window.mouse.move(x, y);
+        await window.waitForTimeout(25);
+        if ((await window.getByTestId('net-tooltip').count()) > 0) grab = { x, y };
       }
-      let last = performance.now();
-      const loop = (t: number) => {
-        w.__frames.push(t - last);
-        last = t;
-        if (w.__run) requestAnimationFrame(loop);
-      };
-      requestAnimationFrame(loop);
+    }
+    expect(grab, 'a node under the pointer to drag').not.toBeNull();
+    await measure('dragging a node', async () => {
+      await window.mouse.move(grab!.x, grab!.y);
+      await window.mouse.down();
+      for (let i = 0; i < 90; i++) await window.mouse.move(grab!.x + 120 * Math.sin(i / 8), grab!.y + 80 * Math.cos(i / 8));
+      await window.mouse.up();
+      await window.waitForTimeout(1500);
     });
-    await window.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await window.mouse.down();
-    for (let i = 0; i < 120; i++) await window.mouse.move(box.x + box.width / 2 + 150 * Math.sin(i / 10), box.y + box.height / 2 + 100 * Math.cos(i / 10));
-    await window.mouse.up();
-    for (let i = 0; i < 12; i++) await window.mouse.wheel(0, i % 2 === 0 ? -120 : 120);
-    const measured = await window.evaluate(() => {
-      const w = window as unknown as { __frames: number[]; __run: boolean; __long: number[]; __obs?: PerformanceObserver };
-      w.__run = false;
-      w.__obs?.disconnect();
-      return { frames: w.__frames.slice(1), long: w.__long };
-    }).then((r) => {
-      const stats = { n: r.frames.length, p50: percentile(r.frames, 50), p90: percentile(r.frames, 90), p95: percentile(r.frames, 95), p99: percentile(r.frames, 99), max: Math.max(...r.frames), longTasks: r.long.length, longMax: r.long.length ? Math.max(...r.long) : 0 };
-      console.log(`NET-FRAMES ${JSON.stringify(stats)}`);
-      return { frames: r.frames, long: r.long };
-    });
-    const { frames } = measured;
-    const p50 = percentile(frames, 50);
-    const p95 = percentile(frames, 95);
-    testInfo.annotations.push({ type: 'p95-frame-ms', description: `${p95.toFixed(1)} (median ${p50.toFixed(1)}) over ${frames.length} frames, ${measured.long.length} long tasks (500+ nodes, panning and zooming)` });
-    // "Senza scatti": no main-thread task over 50 ms while panning and zooming, and no frame hitches beyond the window's own
-    // pace (an off-screen test window may draw at 30 Hz, so the bound is relative to the median frame).
-    expect(measured.long, 'long tasks while panning and zooming 500+ nodes').toHaveLength(0);
-    expect(p95, `p95 frame time ${p95.toFixed(1)} ms (median ${p50.toFixed(1)})`).toBeLessThanOrEqual(Math.max(FRAME_P95_MS, 2 * p50));
     await window.getByTestId('net-reset').click();
     await expect(window.getByTestId('net-count')).toHaveAttribute('data-count', '0');
 

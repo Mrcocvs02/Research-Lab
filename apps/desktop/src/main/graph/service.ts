@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
-import { AppError, type DocumentId, type DocumentRecord } from '@rl/core';
+import { AppError, GRAPH_LIMITS, type DocumentId, type DocumentRecord } from '@rl/core';
 import { readCachedText, createLibraryStore } from '@rl/data';
 import { STORE_K, countTerms, createPlacer, decodeModel, modelVector, neighborsOf, reasonsOf, sharedTerms, surprisingPairs, type GraphModel, type Reason } from '@rl/graph';
 import type { MainServices } from '../ipc/handlers/services.js';
@@ -8,17 +8,18 @@ import type { LibraryRuntime } from '../library/library-runtime.js';
 import { createGraphEngine, type BuildProgress, type GraphEngine, type GraphStoreArgs, type SimilarItem } from './engine.js';
 import { GRAPH_PAGES, GRAPH_TEXT_CHARS, docSig, folderOfPath, toGraphDoc } from './inputs.js';
 import { readLabels } from './labels-store.js';
+import { readMeta } from './model-meta.js';
 import { graphPaths } from './paths.js';
 import { loadView, scopeIds, titleOf, type LibraryView } from './view.js';
 
 /** Seed of the first build (a rebuild keeps the seed of the model it replaces unless one is given). */
 export const DEFAULT_SEED = 1;
-/** New or changed documents placed per `graph:map` call (the rest wait for the next call or a rebuild). */
+/** New or changed documents placed with their cached text per `graph:map` call; the rest are placed from their metadata alone (title, keywords, abstract), which needs no file read. */
 const MAX_PLACED_PER_CALL = 300;
 /** The loaded model is dropped from memory after this long without use. */
 const MODEL_IDLE_MS = 120_000;
-/** Largest model file read (a corrupt or hostile file must not fill the memory). */
-const MAX_MODEL_BYTES = 256 * 1024 * 1024;
+/** Largest model file read (a real model is about 1 KB per document, so 60,000 documents fit well below this; a corrupt or hostile file must not freeze or fill the main process). */
+const MAX_MODEL_BYTES = 96 * 1024 * 1024;
 
 type Placer = ReturnType<typeof createPlacer>;
 
@@ -36,9 +37,19 @@ interface Job {
   done: Promise<void>;
 }
 
+/** What the status needs of a model: its documents and signatures (from the small meta file, or from the loaded model). */
+interface ModelSummary {
+  ids: string[];
+  sigs: string[];
+  index: Map<string, number>;
+  builtAt: string;
+  seed: number;
+}
+
 interface State {
   job: Job | null;
   loaded: LoadedModel | null;
+  meta: { key: string; summary: ModelSummary } | null;
   /** Placements of documents newer than the model, by id (valid while the signature and the model are the same). */
   placed: Map<string, { sig: string; modelKey: string; value: ReturnType<Placer['place']> }>;
 }
@@ -46,7 +57,7 @@ interface State {
 const states = new WeakMap<object, State>();
 const stateOf = (rt: LibraryRuntime): State => {
   let st = states.get(rt);
-  if (!st) states.set(rt, (st = { job: null, loaded: null, placed: new Map() }));
+  if (!st) states.set(rt, (st = { job: null, loaded: null, meta: null, placed: new Map() }));
   return st;
 };
 
@@ -108,7 +119,7 @@ export async function loadModel(s: MainServices, rt: LibraryRuntime): Promise<Lo
 export const modelId = (m: GraphModel): string => `${m.builtAt}:${m.seed}`;
 
 /** Documents that are new or changed since the model, and the model documents that are gone. */
-export function drift(view: LibraryView, m: GraphModel, index: Map<string, number>): { pending: DocumentRecord[]; removed: number } {
+export function drift(view: LibraryView, m: Pick<GraphModel, 'ids' | 'sigs'>, index: Map<string, number>): { pending: DocumentRecord[]; removed: number } {
   const pending: DocumentRecord[] = [];
   for (const r of view.records) {
     const i = index.get(r.id);
@@ -121,19 +132,42 @@ export function drift(view: LibraryView, m: GraphModel, index: Map<string, numbe
 
 /* ------------------------------------------------ status, build, cancel ------------------------------------------------ */
 
+/** The documents and signatures of the model on disk without parsing it when the meta file describes it (else the model is loaded). */
+async function summaryOf(s: MainServices, rt: LibraryRuntime): Promise<ModelSummary | null> {
+  const st = stateOf(rt);
+  const paths = graphPaths(s.localDataDir, rt.libraryId);
+  const info = await stat(paths.modelFile).catch(() => null);
+  if (!info?.isFile() || info.size > MAX_MODEL_BYTES) return null;
+  const key = `${Math.round(info.mtimeMs)}:${info.size}`;
+  if (st.loaded?.key === key) {
+    const m = st.loaded.model;
+    return { ids: m.ids, sigs: m.sigs, index: st.loaded.index, builtAt: m.builtAt, seed: m.seed };
+  }
+  if (st.meta?.key === key) return st.meta.summary;
+  const meta = await readMeta(paths.metaFile, info.size);
+  if (meta) {
+    const summary = { ids: meta.ids, sigs: meta.sigs, index: new Map(meta.ids.map((id, i) => [id, i])), builtAt: meta.builtAt, seed: meta.seed };
+    st.meta = { key, summary };
+    return summary;
+  }
+  const lm = await loadModel(s, rt);
+  return lm ? { ids: lm.model.ids, sigs: lm.model.sigs, index: lm.index, builtAt: lm.model.builtAt, seed: lm.model.seed } : null;
+}
+
 export async function status(s: MainServices) {
   const rt = await s.runtime.require();
   const st = stateOf(rt);
   const view = await loadView(rt);
-  const lm = await loadModel(s, rt);
-  if (!lm) return { state: st.job ? ('building' as const) : ('none' as const), documents: view.records.length, builtAt: null, seed: null, pending: 0 };
-  const d = drift(view, lm.model, lm.index);
+  const sum = await summaryOf(s, rt);
+  if (!sum) return { state: st.job ? ('building' as const) : ('none' as const), documents: view.records.length, builtAt: null, seed: null, pending: 0, removed: 0 };
+  const d = drift(view, sum, sum.index);
   return {
     state: st.job ? ('building' as const) : d.pending.length + d.removed > 0 ? ('stale' as const) : ('ready' as const),
-    documents: lm.model.ids.length,
-    builtAt: lm.model.builtAt,
-    seed: lm.model.seed,
+    documents: sum.ids.length,
+    builtAt: sum.builtAt,
+    seed: sum.seed,
     pending: d.pending.length,
+    removed: d.removed,
   };
 }
 
@@ -143,42 +177,55 @@ export async function startBuild(s: MainServices, seedArg: number | undefined): 
   const rt = await s.runtime.require();
   const st = stateOf(rt);
   if (st.job) return { jobId: st.job.id };
-  const paths = graphPaths(s.localDataDir, rt.libraryId);
-  const seed = seedArg ?? (await loadModel(s, rt))?.model.seed ?? DEFAULT_SEED;
-  const { deviceId } = await s.settings.get();
+  // The job is registered before the first await below: two calls in the same tick must not start two builds.
   const jobId = randomUUID();
   const controller = new AbortController();
-  const args = { rootPath: rt.store.rootPath, dataDir: rt.store.dataDir, deviceId, cacheDir: rt.textCacheDir, modelFile: paths.modelFile, seed };
-  const emit = (phase: 'vectors' | 'similarity' | 'clusters' | 'layout' | 'done' | 'failed' | 'cancelled', done: number, total: number) => s.emit('graph:progress', { jobId, phase, done, total });
-  let lastPhase = '';
-  let lastAt = 0;
-  const onProgress = (p: BuildProgress) => {
-    const now = Date.now();
-    if (p.phase === lastPhase && p.done < p.total && now - lastAt < PHASES_MIN_GAP_MS) return;
-    lastPhase = p.phase;
-    lastAt = now;
-    emit(p.phase, p.done, p.total);
+  let release!: () => void;
+  st.job = { id: jobId, controller, done: new Promise<void>((resolve) => (release = resolve)) };
+  const finish = () => {
+    if (st.job?.id === jobId) st.job = null;
+    release();
   };
-  emit('vectors', 0, 0);
-  const done = engineOf(s)
-    .build(args, { signal: controller.signal, onProgress })
-    .then((summary) => {
-      clearTimeout(st.loaded?.timer);
-      st.loaded = null;
-      st.placed.clear();
-      emit('done', summary.documents, summary.documents);
-    })
-    .catch((e: unknown) => {
-      if (controller.signal.aborted || (e instanceof Error && e.name === 'AbortError')) emit('cancelled', 0, 0);
-      else {
-        s.log.error('the graph build failed', { error: e });
-        emit('failed', 0, 0);
-      }
-    })
-    .finally(() => {
-      if (st.job?.id === jobId) st.job = null;
-    });
-  st.job = { id: jobId, controller, done };
+  try {
+    const paths = graphPaths(s.localDataDir, rt.libraryId);
+    const seed = seedArg ?? (await loadModel(s, rt))?.model.seed ?? DEFAULT_SEED;
+    const { deviceId } = await s.settings.get();
+    const args = { rootPath: rt.store.rootPath, dataDir: rt.store.dataDir, deviceId, cacheDir: rt.textCacheDir, modelFile: paths.modelFile, seed };
+    const emit = (phase: 'vectors' | 'similarity' | 'clusters' | 'layout' | 'done' | 'failed' | 'cancelled', done: number, total: number, reason?: 'too-large' | 'timeout' | 'memory', trimmed?: number) =>
+      s.emit('graph:progress', { jobId, phase, done, total, ...(reason ? { reason } : {}), ...(trimmed ? { trimmedCitations: trimmed } : {}) });
+    let lastPhase = '';
+    let lastAt = 0;
+    const onProgress = (p: BuildProgress) => {
+      const now = Date.now();
+      if (p.phase === lastPhase && p.done < p.total && now - lastAt < PHASES_MIN_GAP_MS) return;
+      lastPhase = p.phase;
+      lastAt = now;
+      emit(p.phase, p.done, p.total);
+    };
+    emit('vectors', 0, 0);
+    engineOf(s)
+      .build(args, { signal: controller.signal, onProgress })
+      .then((summary) => {
+        clearTimeout(st.loaded?.timer);
+        st.loaded = null;
+        st.meta = null;
+        st.placed.clear();
+        emit('done', summary.documents, summary.documents, undefined, summary.trimmedCitations);
+      })
+      .catch((e: unknown) => {
+        if (controller.signal.aborted || (e instanceof Error && e.name === 'AbortError')) emit('cancelled', 0, 0);
+        else {
+          s.log.error('the graph build failed', { error: e });
+          const r = e instanceof AppError ? e.details?.['reason'] : undefined;
+          const reason = r === 'too-large' || r === 'timeout' || r === 'memory' ? r : undefined;
+          emit('failed', 0, 0, reason);
+        }
+      })
+      .finally(finish);
+  } catch (e) {
+    finish();
+    throw e;
+  }
   return { jobId };
 }
 
@@ -200,8 +247,8 @@ export async function whenBuilt(s: MainServices): Promise<void> {
 
 const clusterId = (m: GraphModel, c: number): string => (m.clusters[c] as { id: string }).id;
 
-async function counts(s: MainServices, rt: LibraryRuntime, view: LibraryView, rec: DocumentRecord) {
-  const cached = await readCachedText(rt.textCacheDir, rec.hash, GRAPH_PAGES);
+async function counts(rt: LibraryRuntime, view: LibraryView, rec: DocumentRecord, light: boolean) {
+  const cached = light ? null : await readCachedText(rt.textCacheDir, rec.hash, GRAPH_PAGES);
   return countTerms(toGraphDoc(rec, view.lookup, { abstract: cached?.meta.abstract, text: cached ? cached.pages.map((p) => p.text).join('\n').slice(0, GRAPH_TEXT_CHARS) : undefined }));
 }
 
@@ -218,10 +265,11 @@ export async function placePending(s: MainServices, rt: LibraryRuntime, view: Li
       out.set(rec.id, hit.value);
       continue;
     }
-    if (budget-- <= 0) continue;
+    // Over the budget a document is still on the map (placed from its metadata, not remembered: a later call with budget refines it).
+    const light = budget-- <= 0;
     lm.placer ??= createPlacer(lm.model);
-    const value = lm.placer.place(rec.id, await counts(s, rt, view, rec), lm.index.get(rec.id) ?? -1);
-    st.placed.set(rec.id, { sig, modelKey: key, value });
+    const value = lm.placer.place(rec.id, await counts(rt, view, rec, light), lm.index.get(rec.id) ?? -1);
+    if (!light) st.placed.set(rec.id, { sig, modelKey: key, value });
     out.set(rec.id, value);
   }
   return out;
@@ -245,6 +293,9 @@ export async function map(s: MainServices, scope: { folder?: string | undefined;
   }
   const placed = await placePending(s, rt, view, lm, wanted ? pending.filter((r) => wanted.has(r.id)) : pending);
   for (const [id, p] of placed) points.push({ docId: id, x: p.x, y: p.y, clusters: p.clusters.map((c) => clusterId(m, c)) });
+  // More documents than the reply may carry (60,000 can be built, 50,000 shown): the rest are counted so the view can say so.
+  const omitted = Math.max(0, points.length - GRAPH_LIMITS.mapPoints);
+  if (omitted > 0) points.length = GRAPH_LIMITS.mapPoints;
 
   // Clusters: sizes and centroids from the points that are on the map (a scope or a placement changes them).
   const acc = new Map<string, { n: number; sx: number; sy: number }>();
@@ -274,7 +325,7 @@ export async function map(s: MainServices, scope: { folder?: string | undefined;
       },
     ];
   });
-  return { points, clusters, seed: m.seed, builtAt: m.builtAt };
+  return { points, clusters, seed: m.seed, builtAt: m.builtAt, omitted };
 }
 
 /* ------------------------------------------- similar, surprising, neighbours ------------------------------------------- */
@@ -370,8 +421,7 @@ export async function neighbors(
   const docNode = (r: DocumentRecord): OutNode => ({ kind: 'doc', id: r.id, label: titleOf(r) });
   const has = (k: string) => req.kinds.includes(k);
   const { id } = req.node;
-  const tagCount = (t: string) => view.records.filter((r) => view.tagsOf(r).includes(t)).length;
-  const tagNode = (t: string): OutNode => ({ kind: 'tag', id: t, label: view.lookup.tagLabel(t) ?? t, count: tagCount(t) });
+  const tagNode = (t: string): OutNode => ({ kind: 'tag', id: t, label: view.lookup.tagLabel(t) ?? t, count: view.tagCount(t) });
 
   if (req.node.kind === 'doc') {
     const rec = view.byId.get(id);
@@ -450,7 +500,7 @@ export async function neighbors(
       const together = new Map<string, number>();
       for (const r of view.records) if (mine.has(r.id)) for (const t of view.tagsOf(r)) if (t !== id) together.set(t, (together.get(t) ?? 0) + 1);
       const related = [...together.entries()]
-        .map(([t, n]) => ({ t, w: n / (mine.size + tagCount(t) - n) }))
+        .map(([t, n]) => ({ t, w: n / (mine.size + view.tagCount(t) - n) }))
         .sort((a, b) => b.w - a.w || (a.t < b.t ? -1 : 1))
         .slice(0, req.limit);
       for (const r of related) {

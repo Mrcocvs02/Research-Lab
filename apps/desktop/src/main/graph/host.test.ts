@@ -155,4 +155,86 @@ describe('graph worker host', () => {
     await h.dispose();
     await expect(h.build(args)).rejects.toMatchObject({ code: 'LIBRARY_NOT_ACTIVE' });
   });
+
+  it('a call that arrives while the idle thread is being closed gets a fresh thread, not the dying one', async () => {
+    let closing!: () => void;
+    const closeStarted = new Promise<void>((r) => (closing = r));
+    let finishClose!: () => void;
+    const engines: GraphEngine[] = [];
+    const make = (slow: boolean): GraphEngine => ({
+      build: async () => summary,
+      similar: async () => [],
+      dispose: slow
+        ? () => {
+            closing();
+            return new Promise<void>((resolve) => (finishClose = resolve));
+          }
+        : async () => {},
+    });
+    const log: string[] = [];
+    let spawned = 0;
+    const h = createGraphHost({
+      spawn: () => {
+        const e = make(spawned++ === 0);
+        engines.push(e);
+        return fakeThread(e, log);
+      },
+      idleCloseMs: 20,
+    });
+    await h.build(args);
+    await closeStarted; // the idle timer fired and the thread has been told to close
+    expect(await h.build(args)).toEqual(summary);
+    expect(log.filter((l) => l === 'spawn')).toHaveLength(2);
+    finishClose();
+    await h.dispose();
+  });
+
+  it('stops a call that keeps reporting progress past the total time limit', async () => {
+    const engine: GraphEngine = {
+      build: (_a, hooks) =>
+        new Promise<never>(() => {
+          setInterval(() => hooks?.onProgress?.({ phase: 'vectors', done: 1, total: 2 }), 5).unref();
+        }),
+      similar: async () => [],
+      dispose: async () => {},
+    };
+    const log: string[] = [];
+    const h = host(engine, log, { stallMs: 10_000, maxCallMs: 80 });
+    await expect(h.build(args)).rejects.toMatchObject({ code: 'IO_ERROR', details: { reason: 'timeout' } });
+    expect(log).toEqual(['spawn', 'terminate']);
+    await h.dispose();
+  });
+
+  it('runs on-the-fly similarity one call at a time', async () => {
+    let running = 0;
+    let peak = 0;
+    const engine: GraphEngine = {
+      build: async () => summary,
+      similar: async () => {
+        peak = Math.max(peak, ++running);
+        await new Promise((r) => setTimeout(r, 15));
+        running--;
+        return [];
+      },
+      dispose: async () => {},
+    };
+    const h = host(engine, []);
+    const a = { rootPath: 'r', dataDir: 'd', deviceId: 'x', docId: 'a', limit: 3 };
+    await Promise.all([h.similar(a), h.similar(a), h.similar(a)]);
+    expect(peak).toBe(1);
+    await h.dispose();
+  });
+
+  it('carries the reason of an error across the thread boundary', async () => {
+    const engine: GraphEngine = {
+      build: async () => {
+        throw new AppError('INVALID_REQUEST', 'too many documents', { reason: 'too-large' });
+      },
+      similar: async () => [],
+      dispose: async () => {},
+    };
+    const h = host(engine, []);
+    await expect(h.build(args)).rejects.toMatchObject({ code: 'INVALID_REQUEST', details: { reason: 'too-large' } });
+    await h.dispose();
+  });
 });

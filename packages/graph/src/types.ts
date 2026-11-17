@@ -1,3 +1,5 @@
+import type { PackedCounts, TermDictionary } from './tfidf.js';
+
 /** One document as the graph sees it: plain data, no Electron, no files. */
 export interface GraphDoc {
   id: string;
@@ -18,6 +20,12 @@ export interface GraphDoc {
   refs: string[];
   /** Ids of library documents it cites or is cited by (direct links). */
   cites: string[];
+  /**
+   * Its words already counted (ids of `dict`, one dictionary for all the documents of a run). A loader that sets these
+   * empties `title`, `abstract`, `keywords` and `text`, so a big library never holds its texts and its counts at once.
+   */
+  packed?: PackedCounts;
+  dict?: TermDictionary;
 }
 
 /** Sparse L2-normalised vector: term indexes ascending, weights in 1/1000 steps. */

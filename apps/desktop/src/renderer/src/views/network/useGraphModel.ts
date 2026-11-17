@@ -23,6 +23,8 @@ export function useGraphModel() {
   const [building, setBuilding] = useState<Building | null>(null);
   const [mapVersion, setMapVersion] = useState(0);
   const [failed, setFailed] = useState(false);
+  const [failReason, setFailReason] = useState<string | null>(null);
+  const [trimmed, setTrimmed] = useState(0);
   const docsVersion = useChangeVersion('documents');
   const job = useRef<string | null>(null);
 
@@ -53,6 +55,8 @@ export function useGraphModel() {
             job.current = null;
             setBuilding(null);
             setFailed(e.phase === 'failed');
+            setFailReason(e.phase === 'failed' ? (e.reason ?? null) : null);
+            setTrimmed(e.phase === 'done' ? (e.trimmedCitations ?? 0) : 0);
             void refresh().then(() => setMapVersion((v) => v + 1));
           } else {
             job.current = e.jobId;
@@ -67,6 +71,8 @@ export function useGraphModel() {
     async (seed?: number) => {
       setError(null);
       setFailed(false);
+      setFailReason(null);
+      setTrimmed(0);
       try {
         const r = await rl.invoke('graph:build', seed !== undefined ? { seed } : {});
         job.current = r.jobId;
@@ -88,5 +94,5 @@ export function useGraphModel() {
     }
   }, []);
 
-  return { status, error, failed, building, mapVersion, build, cancel, refresh, bumpMap: () => setMapVersion((v) => v + 1) };
+  return { status, error, failed, failReason, trimmed, building, mapVersion, build, cancel, refresh, bumpMap: () => setMapVersion((v) => v + 1) };
 }

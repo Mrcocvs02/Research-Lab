@@ -67,6 +67,7 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
   const [hover, setHover] = useState<{ key: string; x: number; y: number } | null>(null);
   const [count, setCount] = useState(0);
   const [busy, setBusy] = useState(false);
+  const expanding = useRef(new Set<string>());
   const [error, setError] = useState<unknown>(null);
   const [note, setNote] = useState<string | null>(null);
   const hoverKey = useRef<string | null>(null);
@@ -268,6 +269,9 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
       setNote(t('network.net.alreadyExpanded'));
       return;
     }
+    // One expansion per node at a time (a double click must not ask twice).
+    if (expanding.current.has(n.key)) return;
+    expanding.current.add(n.key);
     setBusy(true);
     setError(null);
     setNote(null);
@@ -285,7 +289,8 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
     } catch (e) {
       setError(e);
     } finally {
-      setBusy(false);
+      expanding.current.delete(n.key);
+      setBusy(expanding.current.size > 0);
     }
   }
 
@@ -464,7 +469,7 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
           ref={view.canvas}
           className="map-canvas"
           tabIndex={0}
-          role="img"
+          role="application"
           aria-label={t('network.net.label')}
           data-testid="net-canvas"
           data-nodes={count}

@@ -134,6 +134,11 @@ export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMap
       </div>
       {error ? <ErrorNote testId="map-error">{errorMessage(error, t)}</ErrorNote> : null}
       {!map && !loading && !error && <p className="hint" data-testid="map-empty">{t('network.noMap')}</p>}
+      {map && map.omitted > 0 && (
+        <p className="hint" role="status" data-testid="map-omitted">
+          {t('network.mapOmitted', { count: map.omitted, shown: map.n })}
+        </p>
+      )}
       {map && map.n === 0 && <p className="hint" data-testid="map-no-points">{t('network.noPoints')}</p>}
       {map && (
         <div className="map-body">

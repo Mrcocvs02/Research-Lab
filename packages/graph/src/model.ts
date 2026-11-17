@@ -46,6 +46,9 @@ export interface GraphModel {
 }
 
 const FIELDS = 9;
+/** Documents a model may describe (the graph is refused above this when building; a file claiming more is damaged). */
+export const MAX_MODEL_DOCS = 100_000;
+const CLUSTER_ID = /^c\d+\.\d+$/;
 
 export function encodeNeighbors(list: readonly Neighbor[]): number[] {
   const out: number[] = [];
@@ -169,12 +172,19 @@ export function decodeModel(raw: unknown): GraphModel | null {
   if (!Array.isArray(m.ids) || !Array.isArray(m.sigs) || !Array.isArray(m.cl) || !Array.isArray(m.vi) || !Array.isArray(m.vw) || !Array.isArray(m.nb)) return null;
   if (!isNumArray(m.x) || !isNumArray(m.y) || !isNumArray(m.idf) || !Array.isArray(m.vocab) || !Array.isArray(m.clusters)) return null;
   const n = m.ids.length;
+  if (n > MAX_MODEL_DOCS) return null;
   if (m.sigs.length !== n || m.x.length !== n || m.y.length !== n || m.cl.length !== n || m.vi.length !== n || m.vw.length !== n || m.nb.length !== n) return null;
   if (!m.ids.every((s) => typeof s === 'string') || !m.sigs.every((s) => typeof s === 'string') || !m.vocab.every((s) => typeof s === 'string') || m.idf.length !== m.vocab.length) return null;
   if (typeof m.seed !== 'number' || typeof m.builtAt !== 'string') return null;
+  if (m.ids.some((s) => s.length > 100) || m.sigs.some((s) => s.length > 100) || m.idf.some((v) => v < 0)) return null;
   const cc = m.clusters.length;
-  for (const c of m.clusters) {
-    if (typeof c !== 'object' || c === null || typeof c.id !== 'string' || !isNumArray([c.parent, c.level, c.size, c.cx, c.cy]) || !Array.isArray(c.terms) || c.parent >= cc) return null;
+  const clusterIds = new Set<string>();
+  for (const [k, c] of m.clusters.entries()) {
+    if (typeof c !== 'object' || c === null || typeof c.id !== 'string' || !CLUSTER_ID.test(c.id) || clusterIds.has(c.id)) return null;
+    clusterIds.add(c.id);
+    // A parent comes before its children (no cycles); terms are short words, a handful per cluster.
+    if (!isNumArray([c.parent, c.level, c.size, c.cx, c.cy]) || !Number.isInteger(c.parent) || c.parent >= k || c.parent < -1 || c.size < 0 || c.level < 0) return null;
+    if (!Array.isArray(c.terms) || c.terms.length > 64 || !c.terms.every((t) => typeof t === 'string' && t.length <= 100)) return null;
   }
   const nv = m.vocab.length;
   for (let i = 0; i < n; i++) {
@@ -182,8 +192,15 @@ export function decodeModel(raw: unknown): GraphModel | null {
     const vw = m.vw[i];
     const nbi = m.nb[i];
     if (!isNumArray(m.cl[i]) || !isNumArray(vi) || !isNumArray(vw) || !isNumArray(nbi) || vi.length !== vw.length || nbi.length % FIELDS !== 0) return null;
-    if ((m.cl[i] as number[]).some((c) => c < 0 || c >= cc) || vi.some((t) => t < 0 || t >= nv)) return null;
-    for (let p = 0; p < nbi.length; p += FIELDS) if ((nbi[p] as number) < 0 || (nbi[p] as number) >= n) return null;
+    if ((m.cl[i] as number[]).some((c) => !Number.isInteger(c) || c < 0 || c >= cc) || vi.some((t, k) => !Number.isInteger(t) || t < 0 || t >= nv || (k > 0 && t <= (vi[k - 1] as number)))) return null;
+    if (vw.some((w) => w < 0 || w > 1.001)) return null;
+    for (let p = 0; p < nbi.length; p += FIELDS) {
+      const j = nbi[p] as number;
+      if (!Number.isInteger(j) || j < 0 || j >= n) return null;
+      // Scores and shares are x1000 (about 0..1000, a little over for rounded vectors); counts and flags are small non-negative integers.
+      for (const q of [1, 2, 3, 7]) if ((nbi[p + q] as number) < 0 || (nbi[p + q] as number) > 1500) return null;
+      for (const q of [4, 5, 6, 8]) if (!Number.isInteger(nbi[p + q]) || (nbi[p + q] as number) < 0) return null;
+    }
   }
   return m as GraphModel;
 }

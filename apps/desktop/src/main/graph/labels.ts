@@ -1,6 +1,6 @@
 import { folderOf, inEnabledFolder } from '@rl/ai';
 import { AppError, type LibraryConfig, type ReasoningLevel } from '@rl/core';
-import { globalMeans, modelVector, topTermsOf, type GraphModel } from '@rl/graph';
+import { modelVector, topTermsOf, type GraphModel } from '@rl/graph';
 import { z } from 'zod';
 import { availability, computePreview, loadCtx, monthUsage, type AiPreview } from '../ai/service.js';
 import { monthOf, usdOfUsage } from '../ai/usage.js';
@@ -15,6 +15,9 @@ const MAX_TITLES = 25;
 const TITLE_CHARS = 160;
 /** Refused documents listed in the preview (the rest are only counted by their absence from `allowed`). */
 const MAX_REFUSED_LISTED = 200;
+/** Characters of the whole prompt: over this the titles per cluster are trimmed (never the clusters). */
+const MAX_PROMPT_CHARS = 120_000;
+const MIN_TITLES = 3;
 const PURPOSE = 'graph:labels';
 
 const labelsSchema = z.object({ labels: z.array(z.object({ id: z.string().max(100), label: z.string().min(1).max(200) })).max(100) });
@@ -50,7 +53,18 @@ const systemPrompt = (cfg: Pick<LibraryConfig, 'language'>) =>
 async function planLabels(s: MainServices, rt: LibraryRuntime, cfg: LibraryConfig, lm: { model: GraphModel; index: Map<string, number> }, clusterIds: readonly string[]): Promise<Plan> {
   const view = await loadView(rt);
   const m = lm.model;
-  const means = globalMeans(m.vi.map((_, i) => modelVector(m, i)), m.vocab.length);
+  // Mean weight of every word over the documents of enabled folders only: what is not enabled does not even tilt the ranking.
+  const means = new Float64Array(m.vocab.length);
+  let enabledDocs = 0;
+  for (let i = 0; i < m.ids.length; i++) {
+    const rec = view.byId.get(m.ids[i] as string);
+    if (!rec || !inEnabledFolder(rec.path, cfg.aiEnabledFolders)) continue;
+    enabledDocs++;
+    const vi = m.vi[i] as number[];
+    const vw = m.vw[i] as number[];
+    for (let k = 0; k < vi.length; k++) means[vi[k] as number] = (means[vi[k] as number] as number) + (vw[k] as number);
+  }
+  for (let t = 0; t < means.length; t++) means[t] = (means[t] as number) / Math.max(1, enabledDocs);
   const entries: Entry[] = [];
   const sent = new Map<string, string>();
   const refused: string[] = [];
@@ -73,7 +87,20 @@ async function planLabels(s: MainServices, rt: LibraryRuntime, cfg: LibraryConfi
       docIds: docs.map((d) => d.id),
     });
   }
-  const prompt = entries.map((e) => `<<<DATA cluster\nid: ${e.id}\nterms: ${e.terms.map((t) => oneLine(t, 40)).join(', ')}\ntitles:\n${e.titles.map((t) => `- ${t}`).join('\n')}\nDATA>>>`).join('\n\n');
+  const render = () => entries.map((e) => `<<<DATA cluster\nid: ${e.id}\nterms: ${e.terms.map((t) => oneLine(t, 40)).join(', ')}\ntitles:\n${e.titles.map((t) => `- ${t}`).join('\n')}\nDATA>>>`).join('\n\n');
+  let prompt = render();
+  // A request for many clusters must fit the model's context: fewer titles each, the nearest to the centre kept.
+  for (let keep = MAX_TITLES; prompt.length > MAX_PROMPT_CHARS && keep > MIN_TITLES; ) {
+    keep = Math.max(MIN_TITLES, Math.floor(keep * 0.7));
+    for (const e of entries) {
+      e.titles.length = Math.min(e.titles.length, keep);
+      e.docIds.length = Math.min(e.docIds.length, keep);
+    }
+    prompt = render();
+  }
+  if (prompt.length > MAX_PROMPT_CHARS) throw new AppError('INVALID_REQUEST', 'Too many clusters for one request', { reason: 'too-large' });
+  const kept = new Set(entries.flatMap((e) => e.docIds));
+  for (const id of [...sent.keys()]) if (!kept.has(id)) sent.delete(id);
   return { entries, sent: [...sent].map(([id, path]) => ({ id, path })), refused, system: systemPrompt(cfg), prompt, modelKey: modelId(m) };
 }
 
@@ -97,9 +124,22 @@ export async function previewLabels(s: MainServices, req: { clusterIds: string[]
   return preview;
 }
 
+/** Libraries with a labelling in flight: the cap is checked from usage that is logged only after the send, so sends go one at a time. */
+const labelling = new Set<string>();
+
 /** Asks Claude to label the clusters (same preview, confirmation, cap and log rules as every other send). */
 export async function labelClusters(s: MainServices, req: { clusterIds: string[]; model: string; reasoning: ReasoningLevel; confirmed: boolean }): Promise<{ labelled: number }> {
   const ctx = await loadCtx(s);
+  if (labelling.has(ctx.rt.libraryId)) throw new AppError('CONFLICT', 'Cluster labels are already being requested', { reason: 'in-flight' });
+  labelling.add(ctx.rt.libraryId);
+  try {
+    return await sendLabels(s, ctx, req);
+  } finally {
+    labelling.delete(ctx.rt.libraryId);
+  }
+}
+
+async function sendLabels(s: MainServices, ctx: Awaited<ReturnType<typeof loadCtx>>, req: { clusterIds: string[]; model: string; reasoning: ReasoningLevel; confirmed: boolean }): Promise<{ labelled: number }> {
   const { rt, cfg, provider } = ctx;
   if (!cfg.ai.models.some((m) => m.id === req.model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
   // 1. Monthly cap. 2. Access.
@@ -157,11 +197,11 @@ export async function labelClusters(s: MainServices, req: { clusterIds: string[]
   const current = await loadModel(s, active);
   if (!current || modelId(current.model) !== plan.modelKey) throw new AppError('CONFLICT', 'The graph was rebuilt meanwhile', { reason: 'model-changed' });
   const asked = new Set(plan.entries.map((e) => e.id));
-  const add: Record<string, { text: string; meta: typeof result.meta }> = {};
+  const add = new Map<string, { text: string; meta: typeof result.meta }>();
   for (const l of result.value.labels) {
     const text = l.label.replace(/[\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100);
-    if (asked.has(l.id) && text !== '' && !(l.id in add)) add[l.id] = { text, meta: { ...result.meta, source: PURPOSE } };
+    if (asked.has(l.id) && text !== '' && !add.has(l.id)) add.set(l.id, { text, meta: { ...result.meta, source: PURPOSE } });
   }
   await writeLabels(s, rt, plan.modelKey, add);
-  return { labelled: Object.keys(add).length };
+  return { labelled: add.size };
 }

@@ -9,7 +9,7 @@ export interface Port {
 
 type Op = 'build' | 'similar' | 'dispose';
 type ToWorker = { id: number; op: Op; args: unknown } | { id: number; op: 'abort' };
-type FromWorker = { id: number; type: 'progress'; value: BuildProgress } | { id: number; type: 'result'; value: unknown } | { id: number; type: 'error'; code: string; message: string; aborted: boolean };
+type FromWorker = { id: number; type: 'progress'; value: BuildProgress } | { id: number; type: 'result'; value: unknown } | { id: number; type: 'error'; code: string; message: string; aborted: boolean; reason?: string };
 
 /** Worker side: answers the calls of `createGraphClient` with `engine`. */
 export function serveGraph(port: Port, engine: GraphEngine): void {
@@ -34,7 +34,8 @@ export function serveGraph(port: Port, engine: GraphEngine): void {
         (e: unknown) => {
           const code = e instanceof AppError ? e.code : 'IO_ERROR';
           const message = e instanceof AppError ? e.message.slice(0, 300) : 'graph worker error';
-          port.postMessage({ id, type: 'error', code, message, aborted: ac.signal.aborted } satisfies FromWorker);
+          const reason = e instanceof AppError && typeof e.details?.['reason'] === 'string' ? e.details['reason'] : undefined;
+          port.postMessage({ id, type: 'error', code, message, aborted: ac.signal.aborted, ...(reason ? { reason } : {}) } satisfies FromWorker);
         },
       )
       .finally(() => aborts.delete(id));
@@ -58,9 +59,9 @@ export function createGraphClient(port: Port, onExit?: () => void): GraphEngine 
     pending.delete(m.id);
     if (m.type === 'result') p.resolve(m.value);
     else if (m.aborted) p.reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
-    else p.reject(new AppError(m.code as ErrorCode, m.message));
+    else p.reject(new AppError(m.code as ErrorCode, m.message, m.reason ? { reason: m.reason } : undefined));
   });
-  port.on('error', () => failAll(new AppError('IO_ERROR', 'The graph worker crashed', { reason: 'crash' })));
+  port.on('error', (e?: { code?: string }) => failAll(new AppError('IO_ERROR', 'The graph worker crashed', { reason: e?.code === 'ERR_WORKER_OUT_OF_MEMORY' ? 'memory' : 'crash' })));
   port.on('exit', () => {
     failAll(new AppError('IO_ERROR', 'The graph worker stopped', { reason: 'crash' }));
     onExit?.();
@@ -70,8 +71,14 @@ export function createGraphClient(port: Port, onExit?: () => void): GraphEngine 
       if (dead) return reject(dead);
       if (hooks.signal?.aborted) return reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
       const id = nextId++;
-      pending.set(id, { resolve: resolve as (v: unknown) => void, reject, onProgress: hooks.onProgress });
-      hooks.signal?.addEventListener('abort', () => port.postMessage({ id, op: 'abort' } satisfies ToWorker), { once: true });
+      const onAbort = () => port.postMessage({ id, op: 'abort' } satisfies ToWorker);
+      const cleanup = () => hooks.signal?.removeEventListener('abort', onAbort);
+      pending.set(id, {
+        resolve: (v) => (cleanup(), (resolve as (v: unknown) => void)(v)),
+        reject: (e) => (cleanup(), reject(e)),
+        onProgress: hooks.onProgress,
+      });
+      hooks.signal?.addEventListener('abort', onAbort, { once: true });
       port.postMessage({ id, op, args } satisfies ToWorker);
     });
   return {

@@ -1,5 +1,5 @@
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
-import { clusterText, type PreparedMap } from './mapModel';
+import { useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent, type Ref } from 'react';
+import { clusterText, pointsInView, stepPoint, type PreparedMap } from './mapModel';
 import { groupColor, placeLabels, toScreenX, toScreenY, toWorldX, toWorldY } from './geometry';
 import { useDocTitle } from '../chat/useLabels';
 import { safeText } from '../library/safeText';
@@ -26,6 +26,16 @@ interface Props {
 const MAX_LABELS = 80;
 const GREY = '#8b93a4';
 
+/** Names the point the keyboard cursor is on for screen readers (the canvas itself has no children to focus). */
+function Announce({ docId }: { docId: string }) {
+  const title = useDocTitle(docId);
+  return (
+    <span className="visually-hidden" aria-live="polite" data-testid="map-focus">
+      {safeText(title ?? docId.slice(0, 8))}
+    </span>
+  );
+}
+
 function Tooltip({ docId, x, y }: { docId: string; x: number; y: number }) {
   const title = useDocTitle(docId);
   return (
@@ -37,12 +47,16 @@ function Tooltip({ docId, x, y }: { docId: string; x: number; y: number }) {
 
 /**
  * The 2D map on a canvas: one batched path per colour, culled to the viewport; hit testing through a grid. Pan with the
- * pointer, zoom with the wheel or +/-, arrows move, 0 resets, Escape hides the tooltip. React renders only when the
- * hovered point changes, never per frame.
+ * pointer, zoom with the wheel or +/-, arrows move, 0 resets, Escape hides the tooltip. From the keyboard, `]` and `[`
+ * go to the next or previous point in view (cluster by cluster), Enter selects it. React renders only when the hovered
+ * or focused point changes, never per frame.
  */
 export function MapCanvas({ map, level, selected, onSelect, aiBadge, label, fitKey, handle }: Props) {
   const [hover, setHover] = useState<{ docId: string; x: number; y: number } | null>(null);
+  const [focused, setFocused] = useState<string | null>(null);
   const hoverIdx = useRef(-1);
+  /** The point the keyboard cursor is on (-1: none). */
+  const cursor = useRef(-1);
   const selIdx = selected !== null ? (map.indexOf.get(selected) ?? -1) : -1;
   const selRef = useRef(selIdx);
   selRef.current = selIdx;
@@ -155,6 +169,30 @@ export function MapCanvas({ map, level, selected, onSelect, aiBadge, label, fitK
     bounds: () => (map.n > 0 ? map.bounds : null),
   });
 
+  const onKeyDown = (e: KeyboardEvent<HTMLCanvasElement>) => {
+    if (e.key === ']' || e.key === '[') {
+      const v = view.view.current;
+      const { w, h } = view.size.current;
+      const next = stepPoint(pointsInView(map, level, v, w, h), cursor.current >= 0 ? cursor.current : selRef.current, e.key === ']');
+      if (next < 0) return;
+      cursor.current = next;
+      hoverIdx.current = next;
+      setHover({ docId: map.ids[next]!, x: toScreenX(v, map.xs[next]!, w), y: toScreenY(v, map.ys[next]!, h) });
+      setFocused(map.ids[next]!);
+      view.requestDraw();
+      e.preventDefault();
+    } else if (e.key === 'Enter' && cursor.current >= 0) {
+      onSelect(map.ids[cursor.current]!);
+      e.preventDefault();
+    } else {
+      if (e.key === 'Escape') {
+        cursor.current = -1;
+        setFocused(null);
+      }
+      view.handlers.onKeyDown(e);
+    }
+  };
+
   useImperativeHandle(
     handle,
     () => ({
@@ -178,6 +216,8 @@ export function MapCanvas({ map, level, selected, onSelect, aiBadge, label, fitK
   }, [fitKey]);
   useEffect(() => {
     hoverIdx.current = -1;
+    cursor.current = -1;
+    setFocused(null);
     setHover(null);
     view.requestDraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,13 +229,15 @@ export function MapCanvas({ map, level, selected, onSelect, aiBadge, label, fitK
         ref={view.canvas}
         className="map-canvas"
         tabIndex={0}
-        role="img"
+        role="application"
         aria-label={label}
         data-testid="map-canvas"
         data-points={map.n}
         data-level={level}
         {...view.handlers}
+        onKeyDown={onKeyDown}
       />
+      {focused && <Announce docId={focused} />}
       {hover && <Tooltip docId={hover.docId} x={hover.x} y={hover.y} />}
     </div>
   );

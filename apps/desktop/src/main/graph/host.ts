@@ -18,6 +18,8 @@ export interface GraphHostOptions {
   abortGraceMs?: number;
   /** A call that reports nothing for this long is killed (default 10 min). */
   stallMs?: number;
+  /** No call runs longer than this, progress or not (default 30 min): a hostile or enormous library cannot pin the thread. */
+  maxCallMs?: number;
 }
 
 /** Engine handed to the handlers: also able to stop everything at quit. */
@@ -37,10 +39,13 @@ export function createGraphHost(options: GraphHostOptions): GraphHost {
   const idleCloseMs = options.idleCloseMs ?? 30_000;
   const graceMs = options.abortGraceMs ?? 5_000;
   const stallMs = options.stallMs ?? 600_000;
+  const maxCallMs = options.maxCallMs ?? 1_800_000;
   let raw: Live | null = null;
   let inFlight = 0;
   let idle: ReturnType<typeof setTimeout> | undefined;
   let disposed = false;
+  let similarTail: Promise<void> = Promise.resolve();
+  const noop = () => {};
 
   const start = (): Live => {
     if (disposed) throw new AppError('LIBRARY_NOT_ACTIVE', 'The graph worker was closed');
@@ -63,7 +68,11 @@ export function createGraphHost(options: GraphHostOptions): GraphHost {
     if (idleCloseMs <= 0 || disposed || !raw || inFlight > 0) return;
     const w = raw;
     idle = setTimeout(() => {
-      if (raw === w && inFlight === 0) void w.client.dispose().catch(() => {}).then(() => kill(w));
+      if (raw !== w || inFlight > 0) return;
+      // Retired before it is told to close: a call that arrives meanwhile starts a fresh thread instead of reaching this one.
+      raw = null;
+      w.gone = true;
+      void w.client.dispose().catch(() => {}).then(() => w.terminate().catch(() => {}));
     }, idleCloseMs);
     idle.unref?.();
   };
@@ -74,6 +83,7 @@ export function createGraphHost(options: GraphHostOptions): GraphHost {
     inFlight++;
     let stall: ReturnType<typeof setTimeout> | undefined;
     let grace: ReturnType<typeof setTimeout> | undefined;
+    let limit: ReturnType<typeof setTimeout> | undefined;
     let fail: ((e: unknown) => void) | undefined;
     const watchdog = new Promise<never>((_, reject) => (fail = reject));
     watchdog.catch(() => {});
@@ -86,6 +96,11 @@ export function createGraphHost(options: GraphHostOptions): GraphHost {
       stall.unref?.();
     };
     arm();
+    limit = setTimeout(() => {
+      fail?.(new AppError('IO_ERROR', 'The graph worker took too long and was stopped', { reason: 'timeout' }));
+      void kill(w);
+    }, maxCallMs);
+    limit.unref?.();
     const onAbort = () => {
       grace = setTimeout(() => {
         fail?.(abortError());
@@ -108,6 +123,7 @@ export function createGraphHost(options: GraphHostOptions): GraphHost {
     } finally {
       clearTimeout(stall);
       clearTimeout(grace);
+      clearTimeout(limit);
       hooks.signal?.removeEventListener('abort', onAbort);
       inFlight--;
       armIdle();
@@ -116,7 +132,12 @@ export function createGraphHost(options: GraphHostOptions): GraphHost {
 
   return {
     build: (args, hooks) => run((w, h) => w.client.build(args, h), hooks),
-    similar: (args, hooks) => run((w, h) => w.client.similar(args, h), hooks),
+    // One on-the-fly analysis at a time: several at once would each hold the whole library in the thread's heap.
+    similar: (args, hooks) => {
+      const turn = similarTail.then(() => run((w, h) => w.client.similar(args, h), hooks));
+      similarTail = turn.then(noop, noop);
+      return turn;
+    },
     async dispose() {
       disposed = true;
       clearTimeout(idle);

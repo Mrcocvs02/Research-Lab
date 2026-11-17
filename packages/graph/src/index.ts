@@ -5,7 +5,7 @@
  */
 export { MAX_EXPLORE_NODES, authorKey, createExploreIndex, fold } from './explore.js';
 export type { ExploreDimension, ExploreDoc, ExploreIndex, ExploreKind, ExploreNode, ExploreTaxonomy, PathStep } from './explore.js';
-export { citationKey, citationSignals } from './citation-keys.js';
+export { MAX_CITATION_KEYS, citationKey, citationSignals } from './citation-keys.js';
 export { GRAPH_K, STORE_K, TEXT_REASON_MIN, WEIGHTS, analyze, combine, makeAnalysis, reasonsOf, similarTo } from './analysis.js';
 export type { Analysis, Neighbor, Reason } from './analysis.js';
 export { buildModel, decodeModel, encodeNeighbors, modelVector, modelVocabulary, neighborsOf, MODEL_FORMAT, MODEL_VERSION } from './model.js';
@@ -15,8 +15,8 @@ export type { Placement, SurprisingPair } from './place.js';
 export { clusterHierarchy, globalMeans, louvain, symmetrize, topTermsOf } from './cluster.js';
 export type { ClusterNode } from './cluster.js';
 export { forceLayout } from './layout.js';
-export { buildVectors, countTerms, cosine, sharedTerms, vectorize } from './tfidf.js';
-export type { TermCounts, Vocabulary } from './tfidf.js';
+export { MAX_COUNTS_PER_DOC, TermDictionary, buildVectors, buildVectorsPacked, countTerms, cosine, packCounts, sharedTerms, vectorize } from './tfidf.js';
+export type { PackedCounts, TermCounts, Vocabulary } from './tfidf.js';
 export { abortError } from './types.js';
 export type { Edge, GraphDoc, RunContext, SparseVec } from './types.js';
 export { makeRandom } from './random.js';

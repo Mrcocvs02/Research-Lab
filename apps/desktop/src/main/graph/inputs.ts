@@ -1,11 +1,13 @@
-import type { AiField, DocumentRecord, LibraryStore, TaxonomyFile } from '@rl/core';
+import { AppError, GRAPH_LIMITS, type AiField, type DocumentRecord, type LibraryStore, type TaxonomyFile } from '@rl/core';
 import { readCachedText } from '@rl/data';
-import { citationSignals, type GraphDoc } from '@rl/graph';
+import { MAX_COUNTS_PER_DOC, TermDictionary, citationSignals, countTerms, packCounts, type GraphDoc } from '@rl/graph';
 import { makeTaxonomyLookup, type TaxonomyLookup } from '../library/indexable.js';
 
 /** Pages of the text cache read per document, and the characters kept of them. */
 export const GRAPH_PAGES = 3;
 export const GRAPH_TEXT_CHARS = 12_000;
+/** Documents the graph is built for (above this the build says so instead of running out of memory). */
+export const MAX_GRAPH_DOCS = GRAPH_LIMITS.buildDocuments;
 
 const usable = <T>(f: AiField<T> | undefined): T | undefined => (f && f.review.status !== 'rejected' ? f.value : undefined);
 
@@ -45,25 +47,44 @@ export interface LoadOptions {
   cacheDir?: string | undefined;
   signal?: AbortSignal | undefined;
   onProgress?: ((done: number, total: number) => void) | undefined;
+  /** Filled in while loading: how many documents had their citation list cut to the per-document cap. */
+  stats?: { trimmedCitations: number } | undefined;
 }
 
-/** Documents of a library for the graph: the present ones, with their citations and, when asked, cached text. */
+/**
+ * Documents of a library for the graph: the present ones, with their citations and, when asked, cached text. Words are
+ * counted as each document is read and the text is dropped (see `GraphDoc.packed`), so memory grows with the number of
+ * documents by a few KB each, not by their pages. More than `MAX_GRAPH_DOCS` documents is refused with a clear error.
+ */
 export async function loadGraphDocs(store: Pick<LibraryStore, 'documents' | 'citations' | 'readTaxonomy'>, options: LoadOptions = {}): Promise<GraphDoc[]> {
   const [records, tax, files] = await Promise.all([store.documents.list(), store.readTaxonomy().catch((): TaxonomyFile | null => null), store.citations.list().catch(() => [])]);
-  const lookup = makeTaxonomyLookup(tax);
-  const cit = new Map(files.map((f) => [f.docId as string, citationSignals(f)]));
   const present = records.filter((r) => !r.missing).sort((a, b) => (a.id < b.id ? -1 : 1));
+  if (present.length > MAX_GRAPH_DOCS) throw new AppError('INVALID_REQUEST', 'The library has too many documents for the graph', { reason: 'too-large', limit: MAX_GRAPH_DOCS, documents: present.length });
+  const lookup = makeTaxonomyLookup(tax);
+  // Citation keys shared by many documents are one string in memory.
+  const interned = new Map<string, string>();
+  const intern = (k: string) => interned.get(k) ?? (interned.set(k, k), k);
+  const cit = new Map<string, ReturnType<typeof citationSignals>>();
+  for (const f of files) {
+    const sig = citationSignals(f);
+    if (sig.trimmed && options.stats) options.stats.trimmedCitations++;
+    cit.set(f.docId as string, { ...sig, refs: sig.refs.map(intern) });
+  }
+  const dict = new TermDictionary();
   const out: GraphDoc[] = [];
   for (const rec of present) {
     if (options.signal?.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
     const cached = options.cacheDir ? await readCachedText(options.cacheDir, rec.hash, GRAPH_PAGES) : undefined;
-    out.push(
-      toGraphDoc(rec, lookup, {
-        abstract: cached?.meta.abstract,
-        text: cached ? cached.pages.map((p) => p.text).join('\n').slice(0, GRAPH_TEXT_CHARS) : undefined,
-        citations: cit.get(rec.id),
-      }),
-    );
+    const doc = toGraphDoc(rec, lookup, {
+      abstract: cached?.meta.abstract,
+      text: cached ? cached.pages.map((p) => p.text).join('\n').slice(0, GRAPH_TEXT_CHARS) : undefined,
+      citations: cit.get(rec.id),
+    });
+    doc.packed = packCounts(countTerms(doc), dict, MAX_COUNTS_PER_DOC);
+    doc.dict = dict;
+    doc.title = doc.abstract = doc.text = '';
+    doc.keywords = [];
+    out.push(doc);
     if (out.length % 50 === 0) options.onProgress?.(out.length, present.length);
   }
   options.onProgress?.(out.length, present.length);

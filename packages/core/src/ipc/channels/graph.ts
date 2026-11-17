@@ -6,7 +6,7 @@ import { defineChannels, defineEvents } from '../registry.js';
 import { aiPreviewSchema } from './ai.js';
 
 /** Upper bounds of the phase 6 channels. */
-export const GRAPH_LIMITS = { mapPoints: 50_000, similar: 50, surprising: 200, neighbors: 300, exploreNodes: 500, labelClusters: 100, topTerms: 12 } as const;
+export const GRAPH_LIMITS = { mapPoints: 50_000, buildDocuments: 60_000, citationKeys: 200, similar: 50, surprising: 200, neighbors: 300, exploreNodes: 500, labelClusters: 100, topTerms: 12 } as const;
 
 /** Why two documents are close (plan §4 phase 6): text (TF-IDF), shared citations, shared tags. */
 export const similarityReasonSchema = z.enum(['text', 'citations', 'tags']);
@@ -19,6 +19,8 @@ export const graphStatusSchema = z.object({
   seed: z.number().int().nullable(),
   /** Documents added or changed since the build, placed incrementally without a full rebuild. */
   pending: z.number().int().nonnegative(),
+  /** Documents of the model that are gone from the library since the build. */
+  removed: z.number().int().nonnegative(),
 });
 
 export const clusterViewSchema = z.object({
@@ -58,6 +60,8 @@ export const graphChannels = defineChannels('graph', {
       clusters: z.array(clusterViewSchema),
       seed: z.number().int(),
       builtAt: isoDateSchema,
+      /** Documents left off the map because there are more than `GRAPH_LIMITS.mapPoints` (0 almost always). */
+      omitted: z.number().int().nonnegative(),
     }),
   },
   /** Closest documents with the reasons and what they share. Works without a built model (computed on the fly, slower). */
@@ -114,7 +118,16 @@ export const graphChannels = defineChannels('graph', {
 });
 
 export const graphEvents = defineEvents('graph', {
-  progress: z.object({ jobId: z.string(), phase: z.enum(['vectors', 'similarity', 'clusters', 'layout', 'done', 'failed', 'cancelled']), done: z.number().int().nonnegative(), total: z.number().int().nonnegative() }),
+  progress: z.object({
+    jobId: z.string(),
+    phase: z.enum(['vectors', 'similarity', 'clusters', 'layout', 'done', 'failed', 'cancelled']),
+    done: z.number().int().nonnegative(),
+    total: z.number().int().nonnegative(),
+    /** With `failed`: `too-large` (more documents than the graph handles), `timeout` (time limit or no answer), `memory` (the worker ran out of memory). */
+    reason: z.enum(['too-large', 'timeout', 'memory']).optional(),
+    /** With `done`: documents whose list of cited works was cut to the per-document cap. */
+    trimmedCitations: z.number().int().positive().optional(),
+  }),
 });
 
 /** A dimension of the zoomable exploration (plan §4 phase 6). */

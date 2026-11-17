@@ -43,7 +43,7 @@ export interface MainServices {
   /** Native single-file picker for the Claude Code executable; resolves null when cancelled. */
   pickExecutable?(): Promise<string | null>;
   /** The system clipboard (Electron `clipboard`); the MCP configuration with its token is written here in main, never sent to the renderer. */
-  clipboard?: { writeText(text: string): void };
+  clipboard?: { writeText(text: string): void; readText(): string | Promise<string> };
   appInfo(): { name: string; version: string; platform: string; electron: string };
   /** Factory so a missing implementation only fails when the feature is used. */
   createImporter(options?: { updateConfig?: (fn: (current: LibraryConfig) => LibraryConfig | Promise<LibraryConfig>) => Promise<unknown> }): LegacyImporter;

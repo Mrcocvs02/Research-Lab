@@ -17,6 +17,8 @@ import { reviewHandlers } from './review-handlers.js';
 import { citationsHandlers } from './citations-handlers.js';
 import { recommendHandlers } from './recommend-handlers.js';
 import { watchHandlers } from './watch-handlers.js';
+import { exploreHandlers } from './explore-handlers.js';
+import { graphHandlers } from './graph-handlers.js';
 
 export type { MainServices } from './services.js';
 
@@ -49,5 +51,7 @@ export function buildHandlers(s: MainServices): HandlerMap<Channels> {
     ...citationsHandlers(s),
     ...recommendHandlers(s),
     ...watchHandlers(s),
+    ...graphHandlers(s),
+    ...exploreHandlers(s),
   };
 }

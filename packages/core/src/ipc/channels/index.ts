@@ -11,6 +11,7 @@ import { citationsChannels, citationsEvents, recommendChannels } from './citatio
 import { commandsChannels } from './commands.js';
 import { dialogChannels } from './dialog.js';
 import { documentsChannels } from './documents.js';
+import { exploreChannels, graphChannels, graphEvents } from './graph.js';
 import { importChannels, importEvents } from './import.js';
 import { inboxChannels, inboxEvents } from './inbox.js';
 import { jobsChannels, jobsEvents } from './jobs.js';
@@ -28,9 +29,9 @@ import { indexChannels, searchChannels } from './search.js';
 import { secretsChannels } from './secrets.js';
 import { settingsChannels } from './settings.js';
 
-export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels, citationsChannels, recommendChannels, watchChannels);
+export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels, citationsChannels, recommendChannels, watchChannels, graphChannels, exploreChannels);
 
-export const events = mergeRegistries(appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, watchEvents);
+export const events = mergeRegistries(appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, watchEvents, graphEvents);
 
 export type Channels = typeof channels;
 export type Events = typeof events;
@@ -56,3 +57,4 @@ export { reviewFieldSchema, reviewItemSchema, type ReviewField, type ReviewItem 
 export { inboxItemSchema, inboxMetadataSchema, type InboxItem, type InboxMetadata } from './inbox.js';
 export { citationLinkViewSchema, citationViewSchema, citationJobStatusSchema, readNextItemSchema, CITATION_LIMITS, type CitationView } from './citations.js';
 export { watchSourceViewSchema, publishedProposalSchema } from './watch.js';
+export { clusterViewSchema, exploreDimensionSchema, exploreNodeSchema, graphStatusSchema, similarityReasonSchema, GRAPH_LIMITS } from './graph.js';

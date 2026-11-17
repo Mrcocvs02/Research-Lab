@@ -250,7 +250,7 @@ describe('hardening of the child process and of error text', () => {
 
   it('scrubs the key, tokens and absolute paths from the error text; the full detail goes to the local hook only', async () => {
     const detail: string[] = [];
-    const leaky = `spawn ${win('C:', 'Users', 'someone', 'bin', 'claude.exe')} ENOENT; also /home/someone/.local/bin/claude and ${BS}${win('', 'host', 'share', 'x')}, Bearer abcdefghijklmnop, ${KEY}, ${'a1'.repeat(20)}`;
+    const leaky = `spawn ${win('C:', 'Profiles', 'someone', 'bin', 'claude.exe')} ENOENT; also /srv/someone/bin/claude and ${BS}${win('', 'host', 'share', 'x')}, Bearer abcdefghijklmnop, ${KEY}, ${'a1'.repeat(20)}`;
     const sdk = { ...fakeSdk([]).sdk, query: () => Object.assign((async function* () { throw new Error(leaky); })(), { close() {} }) } as unknown as SdkModule;
     const err = await mk(sdk, { onErrorDetail: (d: string) => detail.push(d) }).completeStructured({ model: 'm', reasoning: 'low', system: 's', prompt: 'p', schema: z.object({}), source: 'c' }).catch((e: unknown) => e as any);
     expect(err.message).not.toMatch(/someone|share|abcdefghijklmnop|SECRET|a1a1a1/);

@@ -17,7 +17,8 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 
 - Data: 2026-11-17.
 - Ultimo merge su `main`: `c40cb01` (p8-fix-e2e, D-305, D-306), verifica finale verde su questo commit. Tag `phase-6` e `phase-7` creati su `c40cb01` e pubblicati su `origin`.
-- Commit dei file di stato: "docs: final verification green, phase-6 and phase-7 tagged; phase 8 waits for the install test"; il suo hash si legge con `git -C C:/dev/research-lab log --oneline -1`. Non pubblicato: il push su `origin` non e stato fatto in questa sessione.
+- Installer di rilascio costruito (`apps/desktop/release/ResearchLab-Setup-0.0.0.exe`, 131 MB, non firmato) e copiato in `C:UsersPublic`, con due librerie di prova generate in `C:UsersPublicRL-prova` (`libreria-it`, `libreria-en`).
+- Rami di lavoro aperti (NON uniti): `design-arch` e `design-audit`, pubblicati su `origin` come copia di sicurezza.
 
 ## 3. Cosa e successo in questa sessione
 
@@ -35,11 +36,31 @@ I test rimandati nelle versioni precedenti del file sono stati eseguiti il 2026-
 
 Se in futuro la RAM libera non basta, la suite si ferma da sola: rieseguire solo i test mancanti, mai due pesanti insieme.
 
-## 5. In corso
+## 5. In corso: riprogettazione dell'interfaccia (2026-11-17 sera)
 
-Nessun lavoro in corso. La fase 8 e completa nel codice e verificata; il tag `phase-8` e la versione 1.0.0 (D-262) aspettano la prova di installazione dell'utente: `npm run dist`, poi `docs/PROVA-INSTALLAZIONE.md` su un secondo account Windows.
+Richieste dell'utente dopo aver provato l'app (da soddisfare tutte):
+- grafica poco attraente; impostazioni molto confuse; navigazione difficile; tutto piu chiaro e ordinato;
+- una sezione "Sviluppatore / Avanzate" con tutte le impostazioni non predefinite e tecniche;
+- cambiare account Claude in modo facile; scansione piu facile da trovare e fare;
+- la notifica sulla cartella di arrivo non si capisce;
+- lettore: il PDF appare stirato in orizzontale (difetto); annotazioni a STRUMENTI: prima si sceglie lo strumento (sposta, evidenziatore, sottolineatura, colore) poi si passa sul testo; la barra spaziatrice alterna lo strumento attuale e l'ultimo usato;
+- **DECISIONE DELL UTENTE**: evidenziazioni e sottolineature vanno SCRITTE NEL PDF ORIGINALE (devono vedersi in Chrome). Cambia la regola 1 solo per questo caso: aggiunta in coda di annotazioni PDF standard (aggiornamento incrementale, byte esistenti mai riscritti), copia di sicurezza dell'originale prima della prima scrittura, scrittura atomica, PDF cifrati/firmati esclusi, interruttore per libreria (acceso di default), comando "ripristina originale". Attenzione all'identita per hash (annotazioni, miniature, cache, duplicati). Area da revisione di sicurezza dedicata. RULES.md e CLAUDE.md vanno aggiornati con l'eccezione.
+- la ricerca funziona bene: va tenuta.
+- "fai tu i test della fase 8": l'agente fara installazione silenziosa in una cartella temporanea, avvio, disinstallazione e controllo dei dati (salvando e ripristinando prima le impostazioni dell'account dell'utente); il secondo account Windows non e accessibile all'agente.
 
-Prima di riprendere, verificare lo stato reale: controllare `git branch`, `git status` e `git log` su `main`, e che non ci siano worktree residui.
+Metodo scelto dall'utente: le scelte di struttura e grafica le fanno DUE subagent **Opus 5.5**:
+1. **architetto designer**, worktree `C:devl-wtdesign-arch` (ramo `design-arch`): scrive `docs/design/ARCHITETTURA-UI.md` (architettura dell'informazione, navigazione, sistema visivo, mappa delle impostazioni vecchie -> nuove, account Claude, scansione, notifiche, lettore a strumenti, scrittura nel PDF, piano di implementazione a ondate per subagent Sonnet), decisioni da D-310; nessuna modifica al codice dell'app in questo giro;
+2. **designer avversario**, worktree `C:devl-wtdesign-audit` (ramo `design-audit`): avvia l'app con Playwright su librerie sintetiche, fotografa ogni vista e dialogo (chiaro/scuro, 1280x800, 1920x1080, 1024x700; immagini in `audit-shots/`, mai committate), prova ogni funzione, scrive `docs/design/AUDIT.md` e `e2e/design-audit.spec.ts` (saltato senza `RL_DESIGN_AUDIT=1`), con la causa del PDF stirato.
+
+Stato al momento della pausa: entrambi erano a meta; e stato chiesto loro di salvare il lavoro (sezioni incomplete marcate "DA COMPLETARE"). Leggere i due file nei rispettivi rami per sapere dove ripartire.
+
+Passi successivi, in ordine:
+1. completare i due documenti (riprendere i subagent Opus con il contenuto dei rami);
+2. secondo giro: l'architetto rivede il progetto con AUDIT.md; il designer avversario attacca il progetto rivisto; versione finale;
+3. implementazione a ondate con subagent Sonnet (al massimo 2 insieme, file distinti), poi revisioni indipendente e di sicurezza (scrittura nei PDF!);
+4. test finali uno alla volta, poi i test di fase 8 fatti dall'agente, poi tag `phase-8` e versione 1.0.0.
+
+Prima di riprendere, verificare lo stato reale: `git worktree list`, `git log` dei rami `design-arch` e `design-audit`.
 
 ## 6. Come lavorare (preferenze dell'utente)
 

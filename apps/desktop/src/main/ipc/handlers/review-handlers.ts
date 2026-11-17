@@ -1,17 +1,23 @@
 /**
- * Phase 4, wave 4.2: contract in `packages/core/src/ipc/channels/review.ts`. Stub until the main side is merged.
+ * Review of the AI proposals (phase 4, wave 4.2): contract in `packages/core/src/ipc/channels/review.ts`, logic in
+ * `main/ai/review.ts`. Every decision is one logged change that `history:undo` reverts as a whole.
  */
-import { AppError } from '@rl/core';
+import { applyDecisions, listReview, reviewStats } from '../../ai/review.js';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
 
-const todo = (): never => {
-  throw new AppError('NOT_IMPLEMENTED', 'Not implemented yet');
-};
-
-export const reviewHandlers = (_s: MainServices): DomainHandlers<'review'> => ({
-  'review:list': todo,
-  'review:decide': todo,
-  'review:decideMany': todo,
-  'review:stats': todo,
+export const reviewHandlers = (s: MainServices): DomainHandlers<'review'> => ({
+  'review:list': async (q) => listReview(await s.runtime.require(), q),
+  'review:decide': async (d) => {
+    const rt = await s.runtime.require();
+    const r = await applyDecisions(s, rt, [d], `Review of AI ${d.field}: ${d.decision}`, true);
+    const { legacy: _legacy, ...document } = r.documents.get(d.docId)!;
+    return { document, changeId: r.changeId, createdNodeIds: r.createdNodeIds };
+  },
+  'review:decideMany': async ({ items, decision }) => {
+    const rt = await s.runtime.require();
+    const r = await applyDecisions(s, rt, items.map((i) => ({ ...i, decision })), `Review of ${items.length} AI proposal(s): ${decision}`, false);
+    return { changeId: r.changeId, changed: r.changed, failed: r.failed.map(({ docId, field, code }) => ({ docId, field, code })) };
+  },
+  'review:stats': async () => reviewStats(await s.runtime.require()),
 });

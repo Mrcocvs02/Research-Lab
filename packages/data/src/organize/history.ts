@@ -58,7 +58,7 @@ export interface HistoryResult {
   touched: { documents: boolean; taxonomy: boolean; projects: boolean };
 }
 
-const SUPPORTED = new Set(['tags.update', 'document.fields', 'taxonomy.update', 'project.create', 'project.update', 'project.remove']);
+const SUPPORTED = new Set(['tags.update', 'document.fields', 'ai.review', 'taxonomy.update', 'project.create', 'project.update', 'project.remove']);
 const conflict = (what: string, details: Rec = {}) => new AppError('CONFLICT', `${what} changed since; the change cannot be reverted safely`, { conflict: 'changed', ...details });
 const partialGroup = (changeId: string) => new AppError('CONFLICT', 'This change is only partly in the log that could be read; it cannot be reverted', { conflict: 'partial', reason: 'partial-group', changeId });
 const obj = (v: unknown): Rec => (v && typeof v === 'object' ? (v as Rec) : {});
@@ -73,6 +73,8 @@ const sameSet = (a: unknown, b: unknown) => canonical([...(Array.isArray(a) ? a 
  * result is validated with the schema of the file before anything is written.
  */
 const DOCUMENT_RESTORABLE = new Set<string>(['title', 'authors', 'year', 'type', 'ref', 'doi', 'arxivId', 'userDescription', 'study', 'extracted', 'tags']);
+/** AI fields a review decision changes (`ai.review` entries hold the whole field before and after, or null when absent). */
+const AI_RESTORABLE = new Set<string>(['summary', 'description', 'keywords', 'synonyms', 'suggestedTags', 'suggestedNewTags', 'relations']);
 const PROJECT_RESTORABLE = new Set<string>(['kind', 'name', 'description', 'status', 'members', 'notes', 'readingPlan', 'archivedFrom']);
 
 const invalidEntry = (what: string, details: Rec = {}) => new AppError('SCHEMA_INVALID', `A recorded change of ${what} is not valid; it cannot be reverted`, { conflict: 'invalid-entry', ...details });
@@ -105,14 +107,31 @@ export function restoreDocument(cur: DocumentRecord, entries: readonly ChangeEnt
       checkKeys(obj(e.before), new Set(['tags']), 'a document');
       if (!sameSet(next['tags'], obj(e.after)['tags'])) throw conflict('The tags of a document', { id: cur.id });
       next['tags'] = obj(e.before)['tags'];
+    } else if (e.action === 'ai.review') {
+      const before = obj(obj(e.before)['ai']);
+      const after = obj(obj(e.after)['ai']);
+      checkKeys(before, AI_RESTORABLE, 'a document');
+      checkKeys(after, AI_RESTORABLE, 'a document');
+      const ai = obj(next['ai']);
+      for (const key of Object.keys(after)) if (canonical(logValue(key, ai[key])) !== canonical(after[key])) throw conflict('An AI field of a document', { id: cur.id, field: key });
+      for (const key of Object.keys(before)) {
+        if (before[key] === null) delete ai[key];
+        else ai[key] = before[key];
+      }
+      next['ai'] = ai;
     } else restoreFields(next, e, cur.id, DOCUMENT_RESTORABLE, 'a document');
   }
   next['updatedAt'] = now;
   const parsed = documentRecordSchema.safeParse(next);
   if (!parsed.success) throw invalidEntry('a document', { id: cur.id });
   // Identity never moves: whatever the entries held, these are still the record's own.
+  const withoutReviewed = (ai: unknown) => Object.fromEntries(Object.entries(obj(ai)).filter(([k]) => !AI_RESTORABLE.has(k)));
+  const reviewed = entries.some((e) => e.action === 'ai.review');
   for (const k of ['id', 'path', 'hash', 'aliasPaths', 'ai', 'legacy'] as const) {
-    if (canonical((parsed.data as unknown as Rec)[k]) !== canonical((cur as unknown as Rec)[k])) throw invalidEntry('a document', { id: cur.id, field: k });
+    const a = (parsed.data as unknown as Rec)[k];
+    const b = (cur as unknown as Rec)[k];
+    // A review entry may change the reviewable AI fields and nothing else of `ai`.
+    if (canonical(k === 'ai' && reviewed ? withoutReviewed(a) : a) !== canonical(k === 'ai' && reviewed ? withoutReviewed(b) : b)) throw invalidEntry('a document', { id: cur.id, field: k });
   }
   return parsed.data;
 }
@@ -310,7 +329,7 @@ export class HistoryService {
         const d = a.depth.get(g.changeId) ?? 0;
         const undone = a.undone.get(g.changeId) ?? false;
         const actions = new Set(g.entries.map((e) => e.action));
-        const action = d > 0 ? (d % 2 === 1 ? 'history.undo' : 'history.redo') : actions.has('taxonomy.update') ? 'taxonomy.update' : ([...actions].find((x) => x.startsWith('project.')) ?? (actions.has('document.fields') ? 'document.fields' : (g.entries[0]?.action ?? 'unknown')));
+        const action = d > 0 ? (d % 2 === 1 ? 'history.undo' : 'history.redo') : actions.has('taxonomy.update') ? 'taxonomy.update' : actions.has('ai.review') ? 'ai.review' : ([...actions].find((x) => x.startsWith('project.')) ?? (actions.has('document.fields') ? 'document.fields' : (g.entries[0]?.action ?? 'unknown')));
         return {
           changeId: g.changeId,
           at: g.at,
@@ -410,6 +429,13 @@ export class HistoryService {
         return restoreDocument(cur, docEntries.get(id) as ChangeEntry[], now);
       });
     });
+    // The store logs tag changes itself; the AI review fields it does not know: their inverse is logged here, so that
+    // the undo is itself undoable (redo) as part of the same group.
+    for (const id of docs) {
+      for (const e of docEntries.get(id) as ChangeEntry[]) {
+        if (e.action === 'ai.review') await cs.appendLog({ type: 'change', at: now, deviceId: this.c.deviceId, actor: e.actor, target: { kind: 'document', id }, action: 'ai.review', before: e.after, after: e.before });
+      }
+    }
     for (const [id, es] of projEntries) {
       if (projFinal.get(id) === null) await cs.projects.remove(id);
       else await cs.projects.update(id, (cur) => restoreProject(cur, es, id, now) ?? (cur as Project));

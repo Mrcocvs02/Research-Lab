@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -524,5 +524,119 @@ describe('explore:*', () => {
     await store.documents.update(hex(0) as never, (cur) => ({ ...cur!, tags: [], revision: cur!.revision + 1 }));
     generation++;
     expect(ok(await call('explore:documents', { dimension: 'topic', id: 'tag0' })).total).toBe(COUNT / 4 - 1);
+  });
+});
+
+describe('concurrency, limits and housekeeping', () => {
+  const ask = (clusterIds: string[]) => ({ clusterIds, model: 'claude-haiku-5-5', reasoning: 'low', confirmed: false });
+  const topClusters = async (call: ReturnType<typeof harness>) => (ok(await call('graph:map', {})).clusters as any[]).filter((c) => c.level === 0).map((c) => c.id as string);
+
+  it('two build requests in the same tick start one build', async () => {
+    const call = harness();
+    const [a, b] = await Promise.all([call('graph:build', { seed: 3 }), call('graph:build', { seed: 3 })]);
+    expect(ok(a).jobId).toBe(ok(b).jobId);
+    await whenBuilt(services);
+    const done = events.filter((e) => e.channel === 'graph:progress' && e.payload.phase === 'done');
+    expect(done).toHaveLength(1);
+    expect(done[0]!.payload.jobId).toBe(ok(a).jobId);
+    expect(ok(await call('graph:status')).state).toBe('ready');
+  });
+
+  it('answers the status of a big model from the small meta file, without parsing the model', async () => {
+    const call = harness();
+    await built(call);
+    const file = path.join(local, 'graph', 'lib-1', 'model.json');
+    const size = (await readFile(file)).length;
+    // Same size, not a model: only the meta file can say what this status is.
+    await writeFile(file, 'x'.repeat(size));
+    rt = makeRuntime();
+    expect(ok(await call('graph:status'))).toMatchObject({ state: 'ready', documents: COUNT, pending: 0, removed: 0 });
+    // Anything that needs the model itself notices.
+    expect(fail(await call('graph:map', {})).code).toBe('NOT_FOUND');
+  });
+
+  it('counts documents removed since the build, apart from the changed ones', async () => {
+    const call = harness();
+    await built(call);
+    await store.documents.remove(hex(7) as never);
+    await store.documents.remove(hex(8) as never);
+    generation++;
+    expect(ok(await call('graph:status'))).toMatchObject({ state: 'stale', pending: 0, removed: 2 });
+  });
+
+  it('keeps every new or changed document on the map, even beyond the number placed with their text per call', async () => {
+    const call = harness();
+    await built(call);
+    for (let i = 0; i < 330; i++) await store.documents.put(record(2000 + i, { path: `folder${i % 3}/late${i}.pdf` }));
+    generation++;
+    expect(ok(await call('graph:status'))).toMatchObject({ state: 'stale', pending: 330 });
+    const m = ok(await call('graph:map', {}));
+    expect(m.points).toHaveLength(COUNT + 330);
+    expect(m.omitted).toBe(0);
+    const ids = new Set(m.points.map((p: any) => p.docId));
+    expect(ids.has(hex(2329))).toBe(true);
+  });
+
+  it('removes temporary files that a crash left behind, but not a fresh one', async () => {
+    const dir = path.join(local, 'graph', 'lib-1');
+    await mkdir(dir, { recursive: true });
+    const old = path.join(dir, '.model.json.0123456789ab.tmp');
+    const fresh = path.join(dir, '.labels.json.ba9876543210.tmp');
+    await writeFile(old, 'x');
+    await writeFile(fresh, 'x');
+    const longAgo = new Date(Date.now() - 3_600_000);
+    await utimes(old, longAgo, longAgo);
+    const call = harness();
+    await built(call);
+    const files = await readdir(dir);
+    expect(files).not.toContain('.model.json.0123456789ab.tmp');
+    expect(files).toContain('.labels.json.ba9876543210.tmp');
+    expect(files).toContain('meta.json');
+  });
+
+  it('refuses a second labelling while one is in flight, so the monthly cap cannot be raced', async () => {
+    const call = harness();
+    await built(call);
+    const ids = await topClusters(call);
+    const results = await Promise.all([call('graph:labelClusters', ask(ids)), call('graph:labelClusters', ask(ids))]);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    const refused = results.find((r) => !r.ok);
+    expect(refused && !refused.ok && refused.error.code).toBe('CONFLICT');
+    expect(prompts).toHaveLength(1);
+    expect(await store.readLog({ type: 'ai-send' })).toHaveLength(1);
+    // After the first one ends, the next goes.
+    expect(ok(await call('graph:labelClusters', ask(ids))).labelled).toBe(ids.length);
+  });
+
+  it('never lets the words of documents in folders that are not enabled reach the prompt (title, keywords, abstract)', async () => {
+    const secret = 'zzhiddenmarkerword';
+    for (const d of await store.documents.list()) {
+      if (!d.path.startsWith('folder1/')) continue; // a third of the corpus: a word in more than 40% of it is dropped from the vocabulary
+      await store.documents.update(d.id as never, (cur) => ({ ...cur!, title: `${cur!.title} ${secret}`, ai: { ...cur!.ai, keywords: aiField([secret, `${secret}two`]) as never, summary: aiField(`${secret} ${secret} abstract`) as never } }));
+    }
+    const call = harness();
+    await built(call);
+    // The word is in the model's vocabulary (the test would prove nothing otherwise).
+    const model = JSON.parse(await readFile(path.join(local, 'graph', 'lib-1', 'model.json'), 'utf8')) as { vocab: string[] };
+    expect(model.vocab).toContain(secret);
+    const ids = await topClusters(call);
+    ok(await call('graph:previewLabels', { clusterIds: ids, model: 'claude-haiku-5-5' }));
+    ok(await call('graph:labelClusters', ask(ids)));
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).not.toContain(secret);
+  });
+
+  it('treats labels that look like prototype keys as plain ids', async () => {
+    const call = harness();
+    await built(call);
+    const m = ok(await call('graph:map', {}));
+    const meta = { model: 'm', provider: 'mock', date: NOW, source: 'graph:labels' };
+    const labels = JSON.parse(JSON.stringify({ x: 1 }));
+    Object.defineProperty(labels, '__proto__', { value: { text: 'Evil', meta }, enumerable: true });
+    labels['constructor'] = { text: 'Ctor', meta };
+    await writeFile(path.join(local, 'graph', 'lib-1', 'labels.json'), JSON.stringify({ version: 1, modelKey: `${m.builtAt}:${m.seed}`, labels }));
+    const again = ok(await call('graph:map', {}));
+    expect(again.clusters.every((c: any) => c.aiLabel === null)).toBe(true);
+    expect(({} as any).text).toBeUndefined();
   });
 });

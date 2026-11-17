@@ -17,6 +17,8 @@ export interface LibraryView {
   tagsOf(rec: DocumentRecord): string[];
   /** Tag ids that count as `tagId`: itself and every descendant (by `parents`). */
   tagFamily(tagId: string): Set<string> | null;
+  /** Documents that carry a tag (implied tags included); counted once per view. */
+  tagCount(tag: string): number;
   folders(): Map<string, { direct: number; total: number }>;
   explore(): ExploreIndex;
 }
@@ -33,6 +35,7 @@ export async function loadView(rt: LibraryRuntime): Promise<LibraryView> {
   const records = all.filter((r) => !r.missing);
   const lookup = makeTaxonomyLookup(tax);
   const tagMemo = new Map<string, string[]>();
+  let tagCounts: Map<string, number> | undefined;
   let folderMap: ReturnType<LibraryView['folders']> | undefined;
   let exploreIndex: ExploreIndex | undefined;
   const view: LibraryView = {
@@ -45,6 +48,13 @@ export async function loadView(rt: LibraryRuntime): Promise<LibraryView> {
       let t = tagMemo.get(rec.id);
       if (!t) tagMemo.set(rec.id, (t = lookup.expandTags(rec.tags)));
       return t;
+    },
+    tagCount(tag) {
+      if (!tagCounts) {
+        tagCounts = new Map();
+        for (const r of records) for (const t of new Set(view.tagsOf(r))) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+      }
+      return tagCounts.get(tag) ?? 0;
     },
     tagFamily(tagId) {
       const nodes = tax?.nodes ?? [];

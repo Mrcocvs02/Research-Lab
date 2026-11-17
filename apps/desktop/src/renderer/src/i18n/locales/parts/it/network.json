@@ -1,0 +1,148 @@
+{
+  "network": {
+    "level": "Livello {{level}}",
+    "colorBy": "Colora per",
+    "fit": "Mostra tutto",
+    "mapInfo": "{{count}} documenti · seme {{seed}}",
+    "noMap": "La mappa non è ancora disponibile.",
+    "noPoints": "Nessun documento in questo ambito.",
+    "mapLabel": "Mappa dei documenti: trascina per spostare, rotella o più e meno per ingrandire, clicca un punto per sceglierlo.",
+    "legend": "Cluster",
+    "moreClusters": "e altri {{count}} cluster",
+    "detail": "Documento scelto",
+    "openReader": "Apri nel lettore",
+    "building": "Costruzione del modello…",
+    "buildFailed": "La costruzione non è riuscita. Riprova.",
+    "build": "Costruisci il modello",
+    "rebuild": "Ricostruisci",
+    "seed": "Seme",
+    "seedAuto": "auto",
+    "empty": "Il modello non è ancora stato costruito. La costruzione legge i documenti già in libreria, calcola la somiglianza da testo, citazioni e tag, li raggruppa in cluster e li dispone su una mappa. Non viene inviato nulla online.",
+    "tabs": "Viste della rete",
+    "status": {
+      "none": "Modello non costruito.",
+      "stale_one": "Modello utilizzabile; {{count}} documento aggiunto o modificato dopo la costruzione.",
+      "stale_other": "Modello utilizzabile; {{count}} documenti aggiunti o modificati dopo la costruzione.",
+      "ready": "Modello aggiornato ({{count}} documenti).",
+      "builtAt": "costruito {{date}}"
+    },
+    "phase": {
+      "vectors": "Lettura dei testi",
+      "similarity": "Calcolo della somiglianza",
+      "clusters": "Raggruppamento",
+      "layout": "Disposizione della mappa"
+    },
+    "tab": {
+      "map": "Mappa",
+      "network": "Rete",
+      "explore": "Esplora",
+      "surprising": "Coppie inattese"
+    },
+    "scope": {
+      "label": "Ambito",
+      "all": "Tutta la libreria",
+      "folder": "Cartella",
+      "project": "Progetto",
+      "tag": "Tag",
+      "pick": "Scegli…"
+    },
+    "labels": {
+      "open": "Etichetta i cluster con Claude",
+      "title": "Etichette dei cluster da Claude",
+      "intro": "Claude propone un nome breve per ogni cluster scelto, a partire dai termini caratteristici e dai titoli dei suoi documenti nelle cartelle abilitate all'AI. Il testo dei documenti non viene mai inviato. Prima di confermare vedi cosa verrebbe inviato.",
+      "selectLevel": "Livello {{level}}",
+      "clearLevel": "Deseleziona il livello {{level}}",
+      "none": "nessuno",
+      "clusters": "Cluster ({{count}} scelti)",
+      "tooMany": "Al massimo {{limit}} cluster per volta.",
+      "preview": "Anteprima di cosa viene inviato",
+      "previewTitle": "Invio della richiesta di etichette",
+      "send": "Invia ed etichetta",
+      "done_one": "{{count}} cluster etichettato.",
+      "done_other": "{{count}} cluster etichettati.",
+      "note": "Le etichette sono salvate su questo computer e sempre marcate come generate dall'AI."
+    },
+    "net": {
+      "fromDoc": "Parti dal documento scelto",
+      "fromFolder": "Parti da una cartella",
+      "fromTag": "Parti da un tag",
+      "limit": "Vicini",
+      "kinds": "Espandi per",
+      "kind": {
+        "similar": "simili",
+        "citations": "citazioni",
+        "tags": "tag",
+        "folder": "cartella",
+        "children": "sottocartelle",
+        "documents": "documenti"
+      },
+      "expand": "Espandi",
+      "collapse": "Comprimi",
+      "remove": "Rimuovi nodo",
+      "reset": "Azzera",
+      "count": "{{count}} nodi",
+      "legend": "Legenda",
+      "docNode": "documento",
+      "folderNode": "cartella",
+      "tagNode": "tag",
+      "edge": {
+        "cites": "cita",
+        "tagged": "con tag",
+        "contains": "contiene"
+      },
+      "empty": "Scegli un documento, una cartella o un tag per avviare la rete.",
+      "help": "Doppio clic su un nodo (o Espandi) per aggiungere i suoi vicini; trascina i nodi per spostarli; rotella per ingrandire.",
+      "label": "Rete di documenti, cartelle e tag",
+      "noKinds": "Nessuno dei tipi scelti vale per questo nodo.",
+      "alreadyExpanded": "Questo nodo è già espanso.",
+      "capped": "La rete è limitata a {{limit}} nodi.",
+      "nothingNew": "Nessun nuovo vicino."
+    },
+    "explore": {
+      "documents": "Documenti",
+      "noDocuments": "Nessun documento.",
+      "more": "altri {{count}}",
+      "dimension": "Dimensione",
+      "back": "Indietro",
+      "backTo": "Torna a {{label}}",
+      "breadcrumb": "Dove sei",
+      "related": "Nodi correlati",
+      "relatedTitle": "{{to}} correlati a {{label}}",
+      "noRelated": "Nessun nodo correlato.",
+      "empty": "Qui non c'è nulla.",
+      "nodes": "Nodi di questo livello",
+      "kind": {
+        "topic": "tema",
+        "author-group": "gruppo di autori",
+        "author": "autore",
+        "venue-area": "area",
+        "venue": "rivista"
+      },
+      "count": "Documenti",
+      "zoomIn": "Ingrandisci",
+      "relatedLabel": "Mostra correlati:"
+    },
+    "dim": {
+      "topic": "Temi",
+      "author": "Autori",
+      "venue": "Riviste"
+    },
+    "reason": {
+      "text": "testo",
+      "citations": "citazioni",
+      "tags": "tag"
+    },
+    "similar": {
+      "title": "Paper simili",
+      "score": "Somiglianza",
+      "sharedTags": "Tag in comune: {{tags}}",
+      "sharedCitations_one": "{{count}} citazione in comune",
+      "sharedCitations_other": "{{count}} citazioni in comune",
+      "sharedTerms": "Termini in comune: {{terms}}",
+      "none": "Nessun paper simile trovato.",
+      "surprisingTitle": "Vicini ma non sembra",
+      "surprisingHint": "Simili nel contenuto, ma senza tag, citazioni o cartella in comune.",
+      "noSurprising": "Nessuna coppia inattesa trovata."
+    }
+  }
+}

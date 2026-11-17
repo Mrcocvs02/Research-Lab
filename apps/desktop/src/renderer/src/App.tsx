@@ -25,6 +25,7 @@ const ProjectsView = lazyView(() => import('./views/projects/ProjectsView').then
 const ReaderView = lazyView(() => import('./views/reader/ReaderView').then((m) => ({ default: m.ReaderView })), ['doc-projects-reader', 'doc-reader', 'reader']);
 const InboxView = lazyView(() => import('./views/inbox/InboxView').then((m) => ({ default: m.InboxView })), ['inbox']);
 const DiscoverView = lazyView(() => import('./views/discover/DiscoverView').then((m) => ({ default: m.DiscoverView })), ['discover']);
+const NetworkView = lazyView(() => import('./views/network/NetworkView').then((m) => ({ default: m.NetworkView })), ['network']);
 const Wizard = lazyView(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })), ['settings-wizard', 'wizard']);
 
 export function App() {
@@ -137,6 +138,8 @@ function Root() {
           <ProjectsView key={app.activeProfile.id} />
         ) : section === 'discover' && app.activeProfile && !showWizard ? (
           <DiscoverView key={app.activeProfile.id} />
+        ) : section === 'network' && app.activeProfile && !showWizard ? (
+          <NetworkView key={app.activeProfile.id} />
         ) : section === 'inbox' && app.activeProfile && !showWizard ? (
           <InboxView key={app.activeProfile.id} tab={inboxTab} onTab={setInboxTab} />
         ) : (

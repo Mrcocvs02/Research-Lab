@@ -63,5 +63,10 @@
     "title": "Citazioni",
     "show": "Mostra le citazioni",
     "hide": "Nascondi le citazioni"
+  },
+  "similarPanel": {
+    "title": "Paper simili",
+    "show": "Mostra i paper simili",
+    "hide": "Nascondi i paper simili"
   }
 }

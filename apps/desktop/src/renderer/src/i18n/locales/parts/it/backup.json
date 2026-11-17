@@ -1,0 +1,187 @@
+{
+  "backup": {
+    "title": "Backup e ripristino",
+    "intro": "Un backup è un unico file con la cartella dati della libreria (note, evidenziazioni, citazioni, progetti, tassonomia) e, se vuoi, la cronologia delle chat e lo stato di lettura. I documenti originali non sono inclusi: restano dove sono. Chiavi API e token non vengono mai salvati.",
+    "internalNote": "È una tua copia, in una cartella che scegli tu, che puoi spostare, verificare e ripristinare. È diversa dalla copia di sicurezza automatica che l'app tiene per sé per annullare i propri errori.",
+    "destination": {
+      "label": "Cartella di destinazione",
+      "choose": "Scegli cartella…",
+      "change": "Cambia cartella…",
+      "clear": "Dimentica la cartella",
+      "none": "Nessuna cartella scelta.",
+      "hint": "Scegli una cartella fuori dalle cartelle delle librerie, ad esempio su un altro disco o in una cartella sincronizzata."
+    },
+    "schedule": {
+      "title": "Backup automatico",
+      "label": "Frequenza",
+      "hint": "Viene controllato una volta all'avvio dell'app; niente gira in background.",
+      "off": "Spento",
+      "daily": "Ogni giorno",
+      "weekly": "Ogni settimana",
+      "monthly": "Ogni mese",
+      "keep": "Backup automatici da conservare",
+      "keepHint": "I backup automatici più vecchi vengono rimossi; quelli fatti a mano non si rimuovono mai."
+    },
+    "autoError": "L'ultimo backup automatico non è stato eseguito: {{reason}}",
+    "autoErrorOther": "errore {{code}}",
+    "now": {
+      "title": "Esegui il backup ora",
+      "button": "Esegui il backup ora",
+      "needsDestination": "Scegli prima una cartella di destinazione.",
+      "needsLibrary": "Nessuna libreria attiva."
+    },
+    "last": "Ultimo backup di questa libreria: {{when}}",
+    "lastNone": "Nella cartella di destinazione non c'è ancora nessun backup di questa libreria.",
+    "stale": "L'ultimo backup risale a {{days}} giorni fa (più di {{limit}}). Conviene farne uno nuovo.",
+    "includeLocal": {
+      "label": "Includi cronologia delle chat, contatori d'uso e stato di lettura",
+      "hint": "Dati che non si possono ricostruire. Indice di ricerca, cache e miniature non vengono mai salvati: si ricostruiscono dopo il ripristino."
+    },
+    "preview": "Circa {{files}} file, {{size}} da salvare.",
+    "previewFree": "Spazio libero nella destinazione: {{free}}.",
+    "phase": {
+      "collect": "Raccolta dei file…",
+      "write": "Scrittura del backup…",
+      "verify": "Controllo del backup…",
+      "extract": "Estrazione dei file…",
+      "finish": "Completamento…",
+      "done": "Fatto"
+    },
+    "progress": "Avanzamento del backup",
+    "cancel": "Annulla",
+    "reveal": "Mostra nella cartella",
+    "verify": "Verifica",
+    "remove": "Rimuovi",
+    "removeTitle": "Rimuovi il backup",
+    "removeBody": "Il file \"{{name}}\" verrà cancellato dalla cartella di destinazione. L'operazione non si può annullare.",
+    "removeConfirm": "Cancella il file",
+    "result": {
+      "created": "Backup scritto: {{files}} file, {{size}}.",
+      "cancelled": "Annullato. Non è rimasto nessun file parziale.",
+      "failed": "L'operazione non è riuscita: {{message}}",
+      "verifyOk": "\"{{name}}\" è integro: {{files}} file controllati.",
+      "verifyBad": "\"{{name}}\" ha dei problemi e non va usato per un ripristino.",
+      "problems": "{{count}} file con problemi",
+      "reason": {
+        "missing": "manca",
+        "size": "ha la dimensione sbagliata",
+        "hash": "non corrisponde al suo controllo di integrità",
+        "unreadable": "non si può leggere",
+        "unexpected": "non è elencato nel backup"
+      }
+    },
+    "list": {
+      "title": "Backup",
+      "empty": "Nessun backup nella cartella di destinazione.",
+      "noDestination": "Scegli una cartella di destinazione per vedere qui i tuoi backup, oppure apri un file di backup.",
+      "openFile": "Apri un file di backup…",
+      "fileDialogTitle": "Scegli un file di backup",
+      "docs_one": "{{count}} documento",
+      "docs_other": "{{count}} documenti",
+      "origin": {
+        "manual": "manuale",
+        "auto": "automatico"
+      },
+      "local": "con dati locali",
+      "settings": "con impostazioni",
+      "newer": "formato più recente"
+    },
+    "errors": {
+      "no-destination": "Non è stata scelta nessuna cartella di destinazione.",
+      "inside-library": "La destinazione è dentro una cartella di libreria. Scegli una cartella fuori dalle tue librerie.",
+      "too-large": "La libreria ha troppi file per un solo backup.",
+      "not-enough-space": "Spazio libero insufficiente nella destinazione: servono {{needed}}, ne restano {{free}}.",
+      "not-empty": "La cartella dati di quella libreria esiste già nella cartella scelta e non è vuota. Non è stato cambiato nulla. Scegli un'altra cartella.",
+      "already-registered": "Una libreria usa già questa cartella. Scegli un'altra cartella in cui ripristinare.",
+      "integrity": "Il file di backup è danneggiato o incompleto, quindi non è stato ripristinato nulla. Usa Verifica per vedere quali file sono coinvolti, oppure prova con un altro backup.",
+      "newer-format": "Questo backup è stato fatto da una versione più recente dell'app e questa non lo può leggere.",
+      "not-a-backup": "Questo file non è un backup di Research Lab.",
+      "file-not-approved": "Scegli di nuovo il file con il selettore.",
+      "busy": "L'app è occupata con una scansione, la costruzione della rete o un altro backup. Riprova fra poco.",
+      "unknown": "L'operazione non è riuscita."
+    },
+    "restore": {
+      "button": "Ripristina…",
+      "title": "Ripristina un backup",
+      "intro": "Il backup diventa una nuova libreria. Niente di ciò che esiste ora viene sovrascritto e i tuoi documenti non vengono copiati né modificati.",
+      "library": "Libreria",
+      "made": "Fatto il",
+      "holds": "Contenuto",
+      "holdsValue": "{{documents}} documenti, {{files}} file, {{size}}",
+      "root": "Cartella dei documenti",
+      "rootHint": "Scegli la cartella in cui, su questo computer, si trovano i documenti di questa libreria. La cartella dati viene creata al suo interno.",
+      "chooseRoot": "Scegli cartella…",
+      "changeRoot": "Cambia cartella…",
+      "chooseRootTitle": "Scegli la cartella dei documenti",
+      "name": "Nome della libreria",
+      "nameHint": "Lascia vuoto per tenere il nome del backup.",
+      "local": "Ripristina cronologia delle chat, contatori d'uso e stato di lettura",
+      "localHint": "Salvati anche in questo backup.",
+      "localMissing": "Non salvati in questo backup.",
+      "settings": "Ripristina anche le impostazioni salvate",
+      "settingsHint": "Sostituisce lingua, profilo, aspetto, scorciatoie e stato della guida con quelli del backup.",
+      "settingsMissing": "Le impostazioni non sono state salvate in questo backup.",
+      "noOverwrite": "Per tornare a uno stato precedente, ripristina in una cartella diversa e poi togli dall'elenco la libreria che non vuoi più.",
+      "start": "Ripristina",
+      "failed": "Non è stato ripristinato nulla: {{message}}",
+      "cancelled": "Annullato. Non è rimasta nessuna libreria né cartella dati.",
+      "again": "Riprova",
+      "done": "La libreria è stata ripristinata. L'indice di ricerca si sta ricostruendo.",
+      "settingsApplied": "Le impostazioni salvate sono state applicate.",
+      "settingsKept": "Le tue impostazioni attuali sono state mantenute.",
+      "secretsTitle": "Inseriscili di nuovo nelle impostazioni (i segreti non vengono mai salvati in un backup):",
+      "secretsHint": "Apri le impostazioni: sezioni AI e MCP.",
+      "secretsNone": "Non serve reinserire nessun segreto.",
+      "rebuilding": "La prima ricerca può essere un po' più lenta mentre l'indice si ricostruisce.",
+      "secrets": {
+        "anthropic-api-key": "Chiave API di Anthropic",
+        "openalex-api-key": "Chiave API di OpenAlex",
+        "mcp-token": "Token del server MCP"
+      }
+    }
+  },
+  "maintenance": {
+    "title": "Manutenzione e prestazioni",
+    "intro": "Dimensioni di ciò che l'app conserva per la libreria attiva e strumenti per liberare spazio. Niente qui tocca i tuoi documenti o le tue note.",
+    "sizes": "Dimensioni e stato",
+    "loading": "Lettura delle dimensioni…",
+    "needsLibrary": "Nessuna libreria attiva.",
+    "refresh": "Aggiorna",
+    "rows": {
+      "documents": "Documenti",
+      "data": "Cartella dati della libreria",
+      "index": "Indice di ricerca",
+      "cache": "Cache",
+      "thumbs": "Miniature",
+      "graph": "Modello della rete",
+      "chats": "Cronologia delle chat",
+      "logs": "Log",
+      "memory": "Memoria dell'app",
+      "startup": "Tempo di avvio",
+      "workers": "Worker in background ora"
+    },
+    "memoryValue": "{{rss}} MB in uso, {{heap}} MB di dati degli script",
+    "startupValue": "{{ms}} ms",
+    "clean": {
+      "title": "Libera spazio",
+      "hint": "Cancella solo dati che l'app sa ricostruire da sola (si ricalcolano quando servono). La cartella dati della libreria, l'indice di ricerca, le chat e le impostazioni non vengono mai toccati.",
+      "button": "Pulisci la selezione"
+    },
+    "targets": {
+      "cache": "Cache",
+      "thumbs": "Miniature",
+      "graph": "Modello della rete",
+      "logs": "Log"
+    },
+    "cleaned": "Fatto: liberati {{size}}.",
+    "busy": "L'app è occupata con una scansione, la costruzione della rete o un backup. Riprova quando ha finito.",
+    "support": {
+      "title": "Assistenza",
+      "hint": "Il testo di diagnostica elenca versioni, lingua, conteggi e dimensioni. Non contiene mai nomi di file, titoli di documenti, percorsi, chiavi o token.",
+      "openLogs": "Apri la cartella dei log",
+      "copy": "Copia la diagnostica",
+      "shown": "Testo di diagnostica"
+    },
+    "copied": "Diagnostica copiata negli appunti."
+  }
+}

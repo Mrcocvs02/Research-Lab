@@ -3,6 +3,7 @@ import type { AppSettings, Language, LibraryConfig, LibraryProfile } from '@rl/c
 import i18n, { setLanguage } from '../i18n';
 import { flushAll } from '../lib/dirtyEditors';
 import { rl } from '../lib/rl';
+import { applyTheme } from '../lib/theme';
 
 export interface AppState {
   /** False until the first load finished. */
@@ -64,6 +65,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setReady(true);
     }
   }, []);
+
+  const theme = settings?.appearance?.theme;
+  useEffect(() => {
+    if (theme) applyTheme(theme);
+  }, [theme]);
 
   useEffect(() => {
     void refresh();

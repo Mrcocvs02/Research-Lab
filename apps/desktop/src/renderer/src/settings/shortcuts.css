@@ -1,0 +1,38 @@
+/* Shortcut editor and list (settings and guide, lazy). */
+.shortcut-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-3);
+}
+.shortcut-table th,
+.shortcut-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+  font-weight: normal;
+}
+.shortcut-table thead th {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.shortcut-table .kbd {
+  margin-left: 0;
+}
+.shortcut-table tr[data-conflict] .kbd {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.shortcut-table tr[data-changed] .kbd {
+  border-color: var(--accent);
+}
+.shortcut-table .field-error {
+  display: block;
+}
+.shortcut-recorder {
+  min-width: 12em;
+  border-style: dashed;
+}
+.shortcut-table .row-actions {
+  justify-content: flex-end;
+}

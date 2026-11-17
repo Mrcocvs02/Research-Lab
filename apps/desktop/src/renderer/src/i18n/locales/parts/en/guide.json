@@ -1,0 +1,53 @@
+{
+  "guide": {
+    "title": "Guide",
+    "intro": "A short guide by task. Open it any time with F1 or from the command palette.",
+    "shortcutsTitle": "Keyboard shortcuts",
+    "editShortcuts": "Change shortcuts in the settings",
+    "tasks": {
+      "addDocs": {
+        "title": "Add documents",
+        "body": "Open the Arrivals section and drop PDF files or a folder into the window, or choose them with the button. The app reads titles and metadata, files them in your library and shows what it found for you to confirm. Your originals are never changed."
+      },
+      "tags": {
+        "title": "Organize with tags and projects",
+        "body": "Select documents in the Library and give them tags from your taxonomy, or add them to a project. You can undo any change with Undo. The search box finds text, titles and authors; the advanced search can also ask Claude."
+      },
+      "read": {
+        "title": "Read and annotate",
+        "body": "Double-click a document to open it in the reader. Select text to highlight or underline it and to add a note. Notes, highlights and citations are saved in your library folder and travel with it."
+      },
+      "chat": {
+        "title": "Ask Claude",
+        "body": "Open the chat panel and use the command palette for ready-made requests. Claude only sees documents in folders you have enabled for it, and you can preview exactly what is sent before you send."
+      },
+      "network": {
+        "title": "Explore the network",
+        "body": "The Network section draws documents, authors and topics as a map and as a graph, so you can find clusters and related work. It is built from your own library and rebuilt when needed."
+      },
+      "export": {
+        "title": "Export and connect other tools",
+        "body": "Export a project or a selection as a second brain (notes with links) from the command palette. In the settings you can also start a local MCP server so other tools can read your library."
+      },
+      "backup": {
+        "title": "Back up your library",
+        "body": "In the settings choose a destination folder and press Back up now, or turn on the automatic backup. A backup can be verified and restored as a new library at any time. Secrets such as API keys are never saved in a backup."
+      }
+    },
+    "welcome": {
+      "title": "Welcome to Research Lab",
+      "body": "Your library is ready. The guide explains the main tasks in a few lines.",
+      "tips": "Tips",
+      "hide": "Hide",
+      "hideTip": "Hide this tip for good",
+      "open": "Open the guide",
+      "gotIt": "Got it",
+      "saveFailed": "Could not save this choice."
+    },
+    "tips": {
+      "palette": "Press {{palette}} for the command palette: go anywhere, back up, ask Claude.",
+      "search": "Press {{search}} to jump to the search box.",
+      "backup": "Set up a backup in the settings so your notes are never lost."
+    }
+  }
+}

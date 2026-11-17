@@ -17,6 +17,9 @@ const Palette = lazyView(() => import('../views/chat/Palette').then((m) => ({ de
 // The second-brain export dialog loads when an entry point (project, cluster, selection, palette) opens it.
 const ExportDialog = lazyView(() => import('../views/export/ExportDialog').then((m) => ({ default: m.ExportDialog })), ['export']);
 
+// The usage guide and the shortcut list (F1, Ctrl+/) load when first opened.
+const GuideDialog = lazyView(() => import('../views/guide/GuideDialog').then((m) => ({ default: m.GuideDialog })), ['guide', 'shortcuts']);
+
 export const SECTIONS = ['library', 'projects', 'discover', 'network', 'inbox', 'settings'] as const;
 export type SectionId = (typeof SECTIONS)[number];
 
@@ -30,7 +33,7 @@ interface Props {
 /** Window layout: sidebar, main area, collapsible chat panel, status bar. */
 export function Shell({ section, onSection, onNewLibrary, children }: Props) {
   const { t } = useTranslation();
-  const { chatOpen, setChatOpen, paletteOpen, setPaletteOpen, exportInit, closeExport } = useAiUi();
+  const { chatOpen, setChatOpen, paletteOpen, setPaletteOpen, exportInit, closeExport, guide, closeGuide } = useAiUi();
   const app = useApp();
   const chatCollapsed = !chatOpen;
   const chatId = useId();
@@ -114,6 +117,12 @@ export function Shell({ section, onSection, onNewLibrary, children }: Props) {
       {paletteOpen && (
         <Lazy>
           <Palette onClose={() => setPaletteOpen(false)} />
+        </Lazy>
+      )}
+
+      {guide && (
+        <Lazy>
+          <GuideDialog kind={guide} onClose={closeGuide} />
         </Lazy>
       )}
 

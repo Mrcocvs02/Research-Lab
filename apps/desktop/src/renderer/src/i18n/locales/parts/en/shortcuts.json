@@ -1,0 +1,51 @@
+{
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "intro": "Change, turn off or restore the keys of the commands. A key needs Ctrl or Alt (F1 to F12 can stand alone). Press Escape while recording to cancel.",
+    "scope": {
+      "global": "Everywhere in the app",
+      "reader": "In the PDF reader"
+    },
+    "scopeHint": {
+      "global": "Work in every view.",
+      "reader": "Work only while the reader is focused; they may reuse a key of another place but not of the same place."
+    },
+    "command": "Command",
+    "key": "Key",
+    "actions": "Actions",
+    "off": "Off",
+    "change": "Change",
+    "turnOff": "Turn off",
+    "default": "Default",
+    "changeFor": "Change the key of: {{command}}",
+    "offFor": "Turn off the key of: {{command}}",
+    "defaultFor": "Restore the default key ({{key}}) of: {{command}}",
+    "recording": "Press the new key…",
+    "recordingLabel": "Press the new key for: {{command}}",
+    "needsModifier": "Use Ctrl or Alt with the key (only F1 to F12 can be used alone).",
+    "fixedKey": "{{key}} is a fixed key and cannot be assigned.",
+    "conflictShort": "Same key as another command",
+    "conflictsTitle": "Two commands cannot share a key. Fix this to save:",
+    "conflict": "\"{{a}}\" and \"{{b}}\" both use {{key}}.",
+    "resetAll": "Restore all defaults",
+    "fixed": "Fixed keys that cannot be changed: Esc, Enter, the arrow keys, Ctrl+A, Ctrl+C, Ctrl+V and Ctrl+X.",
+    "commands": {
+      "palette.open": "Open the command palette",
+      "chat.toggle": "Show or hide the chat",
+      "history.undo": "Undo",
+      "history.redo": "Redo",
+      "search.focus": "Go to the search box",
+      "nav.library": "Go to Library",
+      "nav.projects": "Go to Projects",
+      "nav.network": "Go to Network",
+      "nav.inbox": "Go to Arrivals",
+      "nav.review": "Go to AI proposals to review",
+      "nav.settings": "Open settings",
+      "guide.open": "Open the guide",
+      "shortcuts.show": "Show the keyboard shortcuts",
+      "reader.find": "Find in the document",
+      "reader.highlight": "Highlight the current match",
+      "reader.underline": "Underline the current match"
+    }
+  }
+}

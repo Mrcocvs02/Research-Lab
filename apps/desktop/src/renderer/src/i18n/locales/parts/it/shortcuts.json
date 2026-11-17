@@ -1,0 +1,51 @@
+{
+  "shortcuts": {
+    "title": "Scorciatoie da tastiera",
+    "intro": "Cambia, spegni o ripristina i tasti dei comandi. Un tasto richiede Ctrl o Alt (da F1 a F12 possono stare da soli). Premi Esc durante la registrazione per annullare.",
+    "scope": {
+      "global": "Ovunque nell'app",
+      "reader": "Nel lettore PDF"
+    },
+    "scopeHint": {
+      "global": "Funzionano in ogni vista.",
+      "reader": "Funzionano solo con il lettore in primo piano; possono riusare un tasto di un altro ambito ma non dello stesso."
+    },
+    "command": "Comando",
+    "key": "Tasto",
+    "actions": "Azioni",
+    "off": "Spento",
+    "change": "Cambia",
+    "turnOff": "Spegni",
+    "default": "Predefinito",
+    "changeFor": "Cambia il tasto di: {{command}}",
+    "offFor": "Spegni il tasto di: {{command}}",
+    "defaultFor": "Ripristina il tasto predefinito ({{key}}) di: {{command}}",
+    "recording": "Premi il nuovo tasto…",
+    "recordingLabel": "Premi il nuovo tasto per: {{command}}",
+    "needsModifier": "Usa Ctrl o Alt insieme al tasto (solo da F1 a F12 si possono usare da soli).",
+    "fixedKey": "{{key}} è un tasto fisso e non si può assegnare.",
+    "conflictShort": "Stesso tasto di un altro comando",
+    "conflictsTitle": "Due comandi non possono avere lo stesso tasto. Risolvi per salvare:",
+    "conflict": "\"{{a}}\" e \"{{b}}\" usano entrambi {{key}}.",
+    "resetAll": "Ripristina tutti i predefiniti",
+    "fixed": "Tasti fissi che non si possono cambiare: Esc, Invio, le frecce, Ctrl+A, Ctrl+C, Ctrl+V e Ctrl+X.",
+    "commands": {
+      "palette.open": "Apri la tavolozza dei comandi",
+      "chat.toggle": "Mostra o nascondi la chat",
+      "history.undo": "Annulla",
+      "history.redo": "Ripeti",
+      "search.focus": "Vai alla casella di ricerca",
+      "nav.library": "Vai alla Libreria",
+      "nav.projects": "Vai ai Progetti",
+      "nav.network": "Vai alla Rete",
+      "nav.inbox": "Vai agli Arrivi",
+      "nav.review": "Vai alle proposte dell'AI da rivedere",
+      "nav.settings": "Apri le impostazioni",
+      "guide.open": "Apri la guida",
+      "shortcuts.show": "Mostra le scorciatoie da tastiera",
+      "reader.find": "Cerca nel documento",
+      "reader.highlight": "Evidenzia il risultato corrente",
+      "reader.underline": "Sottolinea il risultato corrente"
+    }
+  }
+}

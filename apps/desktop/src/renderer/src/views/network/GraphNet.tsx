@@ -1,3 +1,4 @@
+import { isDarkTheme } from '../../lib/theme';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, RequestOf } from '@rl/core';
@@ -82,7 +83,7 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
 
   const view = useCanvasView<NetNode>({
     draw(ctx, w, h, v) {
-      const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+      const dark = isDarkTheme();
       if (theme.current?.dark !== dark) {
         const css = getComputedStyle(ctx.canvas);
         const get = (n: string, d: string) => css.getPropertyValue(n).trim() || d;

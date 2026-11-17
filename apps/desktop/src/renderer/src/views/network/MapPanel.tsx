@@ -1,3 +1,4 @@
+import { isDarkTheme } from '../../lib/theme';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, RequestOf } from '@rl/core';
@@ -48,7 +49,7 @@ export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMap
     return kind === 'folder' ? { folder: value } : kind === 'project' ? { projectId: value } : { tagId: value };
   }, [kind, value]);
   const usable = status.state === 'ready' || status.state === 'stale';
-  const dark = typeof window !== 'undefined' && (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false);
+  const dark = typeof window !== 'undefined' && isDarkTheme();
 
   useEffect(() => {
     if (!usable) return;

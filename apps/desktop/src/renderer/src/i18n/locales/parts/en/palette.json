@@ -39,6 +39,39 @@
       },
       "exportDialog": {
         "label": "Export as a second brain…"
+      },
+      "goLibrary": {
+        "label": "Go to Library"
+      },
+      "goProjects": {
+        "label": "Go to Projects"
+      },
+      "goNetwork": {
+        "label": "Go to Network"
+      },
+      "goInbox": {
+        "label": "Go to Inbox"
+      },
+      "goReview": {
+        "label": "Go to AI proposals to review"
+      },
+      "goSettings": {
+        "label": "Open settings"
+      },
+      "newLibrary": {
+        "label": "New library…"
+      },
+      "backupNow": {
+        "label": "Back up now"
+      },
+      "openGuide": {
+        "label": "Open the guide"
+      },
+      "showShortcuts": {
+        "label": "Show keyboard shortcuts"
+      },
+      "switchLanguage": {
+        "label": "Switch language to {{language}}"
       }
     }
   }

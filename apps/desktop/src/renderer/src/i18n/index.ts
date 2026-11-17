@@ -15,6 +15,7 @@ export type StringPart =
   | 'addToProject'
   | 'advSearch'
   | 'aiSettings'
+  | 'backup'
   | 'chat'
   | 'chat-preview'
   | 'citations'
@@ -23,6 +24,7 @@ export type StringPart =
   | 'doc-projects-reader'
   | 'doc-reader'
   | 'doc-review'
+  | 'guide'
   | 'history'
   | 'inbox'
   | 'export'
@@ -35,6 +37,7 @@ export type StringPart =
   | 'review'
   | 'settings'
   | 'settings-wizard'
+  | 'shortcuts'
   | 'taxonomy'
   | 'wizard';
 

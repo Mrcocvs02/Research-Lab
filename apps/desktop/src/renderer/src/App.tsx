@@ -7,6 +7,7 @@ import { errorMessage } from './lib/errors';
 import { installWindowGuard } from './lib/dirtyEditors';
 import { AiUiProvider, useAiUi } from './lib/aiUi';
 import { LibraryEventsProvider } from './lib/events';
+import { KeymapProvider } from './lib/keymap';
 import { CitationJobsProvider } from './lib/citationJobs';
 import { HistoryProvider } from './lib/history';
 import { InboxProvider } from './lib/inbox';
@@ -26,12 +27,15 @@ const ReaderView = lazyView(() => import('./views/reader/ReaderView').then((m) =
 const InboxView = lazyView(() => import('./views/inbox/InboxView').then((m) => ({ default: m.InboxView })), ['inbox']);
 const DiscoverView = lazyView(() => import('./views/discover/DiscoverView').then((m) => ({ default: m.DiscoverView })), ['discover']);
 const NetworkView = lazyView(() => import('./views/network/NetworkView').then((m) => ({ default: m.NetworkView })), ['network']);
+// The welcome card of the first open after the wizard (D-262).
+const WelcomeCard = lazyView(() => import('./views/guide/WelcomeCard').then((m) => ({ default: m.WelcomeCard })), ['guide']);
 const Wizard = lazyView(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })), ['settings-wizard', 'wizard']);
 
 export function App() {
   return (
     <ErrorBoundary>
       <AppProvider>
+        <KeymapProvider>
         <LibraryEventsProvider>
           <NotifyProvider>
             <HistoryProvider>
@@ -51,6 +55,7 @@ export function App() {
             </HistoryProvider>
           </NotifyProvider>
         </LibraryEventsProvider>
+        </KeymapProvider>
       </AppProvider>
     </ErrorBoundary>
   );
@@ -74,8 +79,14 @@ function Root() {
   useEffect(() => {
     if (!navigation) return;
     closeReader();
+    if (navigation.to === 'newLibrary') {
+      setWizardOpen(true);
+      return;
+    }
     if (navigation.to === 'inbox' || navigation.to === 'review') setInboxTab(navigation.to === 'review' ? 'proposals' : 'arrivals');
-    setSection(navigation.to === 'settings' ? 'settings' : navigation.to === 'project' ? 'projects' : 'inbox');
+    setSection(navigation.to === 'settings' ? 'settings' : navigation.to === 'project' || navigation.to === 'projects' ? 'projects' : navigation.to === 'library' ? 'library' : navigation.to === 'network' ? 'network' : 'inbox');
+    // The focus target exists once the view is drawn.
+    if (navigation.focus === 'search') setTimeout(() => document.querySelector<HTMLInputElement>('[data-testid="search-input"]')?.focus(), 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navNonce]);
   const readerNonce = reader.target?.nonce;
@@ -113,6 +124,7 @@ function Root() {
     setSection('library');
   };
 
+  const showWelcome = hasLibraries && !showWizard && app.settings !== null && app.settings.firstRunDone && !app.settings.guide?.welcomeSeen;
   const readerOpen = reader.target !== null && section === 'library' && app.activeProfile !== null && !showWizard;
 
   return (
@@ -152,6 +164,11 @@ function Root() {
           </Lazy>
         )}
       </Shell>
+      {showWelcome && (
+        <Lazy>
+          <WelcomeCard />
+        </Lazy>
+      )}
       {showWizard && (
         <Lazy>
           <Wizard key={wizardOpen ? 'new' : 'first'} onFinished={() => void finished()} onCancel={hasLibraries ? () => setWizardOpen(false) : undefined} />

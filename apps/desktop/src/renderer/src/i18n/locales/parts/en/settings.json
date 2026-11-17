@@ -67,6 +67,13 @@
         "store": "Save",
         "remove": "Remove"
       }
+    },
+    "appearance": {
+      "label": "Appearance",
+      "hint": "Follow the system or choose light or dark. Applies immediately.",
+      "system": "Follow the system",
+      "light": "Light",
+      "dark": "Dark"
     }
   }
 }

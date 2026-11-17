@@ -39,6 +39,39 @@
       },
       "exportDialog": {
         "label": "Esporta come secondo cervello…"
+      },
+      "goLibrary": {
+        "label": "Vai alla Libreria"
+      },
+      "goProjects": {
+        "label": "Vai ai Progetti"
+      },
+      "goNetwork": {
+        "label": "Vai alla Rete"
+      },
+      "goInbox": {
+        "label": "Vai agli Arrivi"
+      },
+      "goReview": {
+        "label": "Vai alle proposte dell'AI da rivedere"
+      },
+      "goSettings": {
+        "label": "Apri le impostazioni"
+      },
+      "newLibrary": {
+        "label": "Nuova libreria…"
+      },
+      "backupNow": {
+        "label": "Esegui il backup ora"
+      },
+      "openGuide": {
+        "label": "Apri la guida"
+      },
+      "showShortcuts": {
+        "label": "Mostra le scorciatoie da tastiera"
+      },
+      "switchLanguage": {
+        "label": "Cambia la lingua in {{language}}"
       }
     }
   }

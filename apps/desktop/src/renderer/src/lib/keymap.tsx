@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { SHORTCUT_COMMANDS, SHORTCUT_IDS, effectiveShortcuts, normalizeAccelerator, type ShortcutId } from '@rl/core';
+import type { ShortcutId } from '@rl/core';
+import { SHORTCUT_COMMANDS, SHORTCUT_IDS, effectiveShortcuts, normalizeAccelerator } from './shortcutDefs';
 import { useApp } from '../state/app-context';
 
 /**

@@ -46,7 +46,7 @@ import { createMainWindow } from './window.js';
 app.setName(APP_NAME);
 applyResourceSwitches(app.commandLine);
 const runtime = configureRuntime(resolveRuntimeConfig(process.env, app.isPackaged));
-const dirs = resolveAppDirs(process.env, { userData: app.getPath('userData') }, app.isPackaged);
+const dirs = resolveAppDirs(process.env, { userData: app.getPath('userData') }, app.isPackaged, process.argv);
 app.setPath('userData', dirs.userData);
 app.setPath('sessionData', path.join(dirs.localData, 'session'));
 registerPrivilegedSchemes();

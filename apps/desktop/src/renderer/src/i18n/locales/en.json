@@ -142,6 +142,7 @@
     "noFolders": "No folder is enabled for the AI, so no document is ever sent.",
     "new": "New conversation",
     "history": "History",
+    "searchLabel": "search",
     "historyEmpty": "No conversations yet.",
     "deleteTitle": "Delete conversation",
     "deleteConfirm": "Delete the conversation \"{{title}}\" from the history? The log of what was sent to Claude keeps its records.",
@@ -252,6 +253,18 @@
     "languageHint": "Used for tags, summaries and answers about this library.",
     "dataDirName": "Data folder name",
     "dataDirNameHint": "Created inside the library folder. Notes and metadata are stored here; your documents are never modified."
+  },
+  "advSearch": {
+    "button": "Ask Claude",
+    "buttonHint": "Advanced search: Claude turns your request into keyword searches of the library and lists the most relevant documents",
+    "title": "Ask Claude to search the library",
+    "intro": "Describe what you are looking for in your own words. Claude runs a few keyword searches of the documents in the folders enabled for the AI, reads pages only when needed, and answers with the most relevant documents. The normal search is not changed.",
+    "text": "What are you looking for?",
+    "placeholder": "For example: papers comparing efficient attention methods for long documents",
+    "needText": "Write your request to see the estimate.",
+    "estimateNote": "Approximate: it covers your request and the instructions. The pages Claude reads add to it. No document is sent with the request itself.",
+    "go": "Search",
+    "fix_no-folders": "Enable at least one folder for the AI in the library settings. The normal search works as usual."
   },
   "search": {
     "label": "Search the library",

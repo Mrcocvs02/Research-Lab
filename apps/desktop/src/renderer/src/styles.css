@@ -847,6 +847,14 @@ legend {
   position: absolute;
   left: -9999px;
 }
+.search-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.search-row button {
+  white-space: nowrap;
+}
 .library-head .search-bar .hint {
   margin: 2px 0 0;
 }

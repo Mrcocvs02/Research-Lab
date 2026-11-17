@@ -10,6 +10,7 @@ import { useApp } from '../../state/app-context';
 import { formatTokens, formatUsd } from '../chat/format';
 import { safeText } from '../library/safeText';
 import { aiErrorText } from './aiErrors';
+import { useAiAvailability } from './useAiAvailability';
 
 type Estimate = ResponseOf<Channels, 'jobs:estimate'>;
 
@@ -37,6 +38,9 @@ export function JobDialog({ docIds, onClose }: { docIds: string[]; onClose(): vo
   const [error, setError] = useState<unknown>(null);
   const [starting, setStarting] = useState(false);
   const ticket = useRef(0);
+  // The estimate needs no network, but the job does: say it at once instead of after the confirmation.
+  const { reason: unavailable } = useAiAvailability();
+  const blocked = unavailable !== null && unavailable !== 'no-folders';
 
   const tooMany = docIds.length > AI_LIMITS.jobDocs;
   const request = useMemo(() => ({ kind: 'suggest' as const, docIds, fields, model, reasoning, regenerate }), [docIds, fields, model, reasoning, regenerate]);
@@ -54,7 +58,7 @@ export function JobDialog({ docIds, onClose }: { docIds: string[]; onClose(): vo
 
   const toggle = (f: AiJobField) => setFields((cur) => (cur.includes(f) ? cur.filter((x) => x !== f) : JOB_FIELDS.filter((x) => x === f || cur.includes(x))));
   const p = estimate?.preview;
-  const canStart = Boolean(estimate && p && estimate.toSend > 0 && !p.overCap && !starting);
+  const canStart = Boolean(estimate && p && estimate.toSend > 0 && !p.overCap && !blocked && !starting);
 
   const start = async () => {
     setStarting(true);
@@ -106,6 +110,12 @@ export function JobDialog({ docIds, onClose }: { docIds: string[]; onClose(): vo
 
         <section className="group" aria-live="polite" data-testid="job-estimate">
           <h3>{t('jobs.dialog.estimate')}</h3>
+          {blocked && (
+            <div className="callout" role="status" data-testid="job-unavailable" data-reason={unavailable}>
+              <p>{t(`chat.unavailable.${unavailable}`)}</p>
+              <p className="hint">{t(`chat.unavailable.fix_${unavailable}`)}</p>
+            </div>
+          )}
           {tooMany && <ErrorNote testId="job-too-many">{t('jobs.dialog.tooMany', { limit: AI_LIMITS.jobDocs })}</ErrorNote>}
           {fields.length === 0 && <p className="hint">{t('jobs.dialog.noFields')}</p>}
           {!estimate && !error && !tooMany && fields.length > 0 && <p className="hint">{t('common.loading')}</p>}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
 import { ErrorNote } from '../../components/ui';
@@ -14,6 +14,28 @@ import { useDecide, type ReviewField } from './useDecide';
 
 type Stats = ResponseOf<Channels, 'review:stats'>;
 const PAGE = 50;
+/** A running job writes a proposal per document: the queue (a pass over every document) follows it at most this often. */
+const JOB_RELOAD_MS = 2000;
+
+/** `value`, but taking a new one at most every `ms` (the first change at once, the last one always arrives). */
+function useThrottled<T>(value: T, ms: number): T {
+  const [out, setOut] = useState(value);
+  const last = useRef(0);
+  useEffect(() => {
+    const wait = last.current + ms - Date.now();
+    if (wait <= 0) {
+      last.current = Date.now();
+      setOut(value);
+      return;
+    }
+    const t = setTimeout(() => {
+      last.current = Date.now();
+      setOut(value);
+    }, wait);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return out;
+}
 const FIELDS: ReviewField[] = ['tags', 'newTags', 'description', 'summary', 'keywords', 'synonyms', 'relations'];
 
 /**
@@ -35,6 +57,8 @@ export function ReviewView() {
   const [busy, setBusy] = useState(false);
   // A running job writes proposals as they arrive: the queue follows its progress.
   const jobKey = job ? `${job.jobId}:${job.done}:${job.state}` : '';
+  // Progress and the change events of each written proposal arrive together: one throttled trigger for both.
+  const followKey = useThrottled(`${docsVersion}|${jobKey}`, JOB_RELOAD_MS);
 
   useEffect(() => {
     let live = true;
@@ -54,7 +78,7 @@ export function ReviewView() {
     return () => {
       live = false;
     };
-  }, [field, page, docsVersion, jobKey, tick]);
+  }, [field, page, followKey, tick]);
 
   const reload = useCallback(() => setTick((n) => n + 1), []);
   const groups = useMemo(() => {

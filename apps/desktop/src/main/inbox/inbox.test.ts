@@ -4,11 +4,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createMockAiProvider } from '@rl/ai';
-import { channels, createDispatcher, createMemoryLogger, defaultLibraryConfig, documentRecordSchema, taxonomyFileSchema, type IpcEnvelope, type LibraryConfig } from '@rl/core';
+import { AppError, channels, createDispatcher, createMemoryLogger, defaultLibraryConfig, documentRecordSchema, taxonomyFileSchema, type IpcEnvelope, type LibraryConfig } from '@rl/core';
 import { createLibraryStore, createOrganizer, createTextExtractor, type FileLibraryStore } from '@rl/data';
 import { writeSyntheticPdf } from '@rl/testkit';
 import { buildHandlers, type MainServices } from '../ipc/handlers/index.js';
 import { familyName, isValidCopyName, proposedFileName, safeSegment } from './names.js';
+import { abortAllJobs } from '../ai/jobs.js';
 import { whenInboxIdle } from './service.js';
 
 const NOW = '2026-01-02T03:04:05.000Z';
@@ -25,6 +26,7 @@ let fetched: string[];
 let scans: unknown[];
 let picks: string[];
 let readHashOverride: string | undefined;
+let completeWrap: ((p: any) => (r: any) => Promise<any>) | null;
 let failFetch: boolean;
 let changed: Array<[string, unknown]>;
 
@@ -75,7 +77,10 @@ function harness() {
     libraries: { profile: async () => ({ rootPath: root, id: 'lib-1' }), dataDir: async () => store.dataDir },
     settings: { get: async () => ({ deviceId: 'device-12345678', ai: { claudeCodePath: null } }) },
     secrets: { get: async () => null },
-    aiProvider: (cfg: { models: any }) => createMockAiProvider({ models: cfg.models }),
+    aiProvider: (cfg: { models: any }) => {
+      const p: any = createMockAiProvider({ models: cfg.models });
+      return completeWrap ? Object.assign({ ...p }, { completeStructured: completeWrap(p), access: () => p.access(), isAvailable: () => p.isAvailable() }) : p;
+    },
     isOnline: () => online,
     fetch: (async (url: string) => {
       fetched.push(url);
@@ -137,6 +142,7 @@ beforeEach(async () => {
   changed = [];
   readHashOverride = undefined;
   failFetch = false;
+  completeWrap = null;
 });
 afterEach(async () => {
   await whenInboxIdle();
@@ -624,6 +630,23 @@ describe('inbox security and robustness (review fixes)', () => {
     await writeFile(file, JSON.stringify({ version: 99, items: [] }));
     ok(await call('inbox:add', { paths: [await pdf('a.pdf')] }));
     expect(JSON.parse(await readFile(`${file}.bad`, 'utf8'))).toEqual({ version: 99, items: [] });
+  });
+
+  it('a tag proposal can be cancelled (library switch, quit): the call gets an aborted signal and nothing is stored', async () => {
+    const call = harness();
+    const id = await queued(call);
+    let started!: () => void;
+    const running = new Promise<void>((r) => (started = r));
+    completeWrap = () => (r: any) =>
+      new Promise((_res, rej) => {
+        started();
+        r.signal.addEventListener('abort', () => rej(new AppError('CANCELLED', 'Cancelled')));
+      });
+    const pending = call('inbox:proposeTags', { id, model: 'claude-haiku-5-5', reasoning: 'low', folder: 'robots', confirmed: true });
+    await running;
+    abortAllJobs();
+    expect(fail(await pending).code).toBe('CANCELLED');
+    expect(ok(await call('inbox:list')).items[0].proposal.tagsFrom).not.toBe('ai');
   });
 
   it('the fallback file name is a safe segment (alternate data stream, reserved name)', () => {

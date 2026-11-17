@@ -27,6 +27,7 @@ export type StringPart =
   | 'inbox'
   | 'export'
   | 'jobs'
+  | 'mcp'
   | 'network'
   | 'palette'
   | 'projects'

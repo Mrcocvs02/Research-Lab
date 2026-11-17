@@ -1,0 +1,86 @@
+{
+  "mcp": {
+    "title": "Server MCP per Claude Code",
+    "intro": "Permette a Claude Code, in esecuzione su questo computer, di cercare e leggere questa libreria finché l'app è aperta. Ascolta solo su questo computer (127.0.0.1), ogni richiesta richiede un token segreto ed è in sola lettura, a meno che tu non consenta le proposte qui sotto.",
+    "seesNothing": "Claude Code non vede nessun documento: nessuna cartella è abilitata all'AI. Abilita le cartelle nella sezione AI; per Claude Code esistono solo i documenti delle cartelle abilitate all'AI, mai quelle escluse.",
+    "seesAll": "Claude Code vede i documenti dell'intera libreria (è abilitata all'AI). Le cartelle escluse non compaiono mai.",
+    "seesFolders_one": "Claude Code vede solo i documenti della {{count}} cartella abilitata all'AI. Le altre cartelle per lui non esistono.",
+    "seesFolders_other": "Claude Code vede solo i documenti delle {{count}} cartelle abilitate all'AI. Le altre cartelle per lui non esistono.",
+    "enable": "Abilita il server MCP per questa libreria",
+    "enableHint": "Funziona solo mentre questa libreria è aperta nell'app.",
+    "status": {
+      "label": "Stato",
+      "running": "In esecuzione",
+      "failed": "Non in esecuzione",
+      "off": "Spento",
+      "address": "Indirizzo",
+      "calls": "Chiamate",
+      "callsCount_one": "{{count}} chiamata finora",
+      "callsCount_other": "{{count}} chiamate finora",
+      "callsLast_one": "{{count}} chiamata finora, l'ultima il {{when}}",
+      "callsLast_other": "{{count}} chiamate finora, l'ultima il {{when}}"
+    },
+    "problem": {
+      "PORT_IN_USE": {
+        "title": "La porta è già in uso",
+        "what": "Un altro programma usa la porta {{port}}. Scegli una porta diversa qui sotto (o lasciala vuota perché l'app ne scelga una libera), oppure chiudi l'altro programma. L'app non cambia mai la porta da sola."
+      },
+      "SECRET_UNAVAILABLE": {
+        "title": "L'archivio sicuro non è disponibile",
+        "what": "Il token non si può salvare perché l'archivio sicuro del sistema non è disponibile. Su Linux installa e sblocca un portachiavi (GNOME Keyring o KWallet); su Windows e macOS controlla di aver effettuato l'accesso al tuo account. Poi spegni e riaccendi il server."
+      },
+      "OTHER": {
+        "title": "Il server non si è avviato",
+        "what": "Spegnilo e riaccendilo. Se continua a fallire, riavvia l'app."
+      }
+    },
+    "tools": "Strumenti offerti a Claude Code: {{list}}.",
+    "write": {
+      "title": "Scrittura",
+      "label": "Consenti a Claude Code di proporre campi AI",
+      "warning": "Spenta per impostazione predefinita. Quando è accesa, Claude Code può solo PROPORRE campi AI (come un riassunto o dei tag): sono marcati come output AI e vanno alla tua revisione prima di essere accettati. Non può mai modificare le tue note né i tuoi campi.",
+      "confirmTitle": "Consentire le proposte di Claude Code?",
+      "confirmBody": "Claude Code potrà aggiungere campi AI proposti ai documenti delle cartelle che vede. Ogni proposta aspetta la tua revisione. Puoi spegnerlo in qualsiasi momento.",
+      "confirmYes": "Consenti le proposte"
+    },
+    "port": {
+      "title": "Porta",
+      "label": "Porta",
+      "hint": "Un numero tra {{min}} e {{max}}. Vuoto: l'app sceglie una porta libera e la ricorda su questo computer.",
+      "auto": "Automatica",
+      "invalid": "Inserisci un numero intero tra {{min}} e {{max}}, oppure lascia vuoto.",
+      "apply": "Applica la porta",
+      "useAuto": "Usa una porta automatica"
+    },
+    "copy": {
+      "title": "Collega Claude Code",
+      "hint": "Copia la configurazione e incollala in un terminale (comando) o nel .mcp.json del tuo progetto. Negli appunti va il vero token; questa finestra mostra solo un'anteprima mascherata. Svuota gli appunti dopo aver incollato.",
+      "cli": "Copia il comando",
+      "json": "Copia la voce .mcp.json",
+      "notRunning": "Il server deve essere in esecuzione per copiare la sua configurazione.",
+      "done": "Copiato negli appunti ({{format}}). Qui il token è nascosto:"
+    },
+    "rotate": {
+      "title": "Token",
+      "hint": "Crea un nuovo token se pensi che il vecchio sia stato visto da qualcun altro.",
+      "button": "Cambia il token…",
+      "confirmTitle": "Cambiare il token?",
+      "confirmBody": "Il token attuale smette di funzionare subito: ogni configurazione di Claude Code che lo usa va sostituita con una nuova copia.",
+      "confirmYes": "Cambia il token",
+      "done": "Il token è stato sostituito. Copia la nuova configurazione per Claude Code."
+    },
+    "log": {
+      "title": "Chiamate",
+      "hint": "Conservato solo su questo computer: lo strumento, l'esito e quanti documenti ha toccato. Non si salva nessun contenuto delle richieste né dei documenti.",
+      "empty": "Ancora nessuna chiamata.",
+      "when": "Quando",
+      "tool": "Strumento",
+      "outcome": "Esito",
+      "ms": "ms",
+      "docs": "Documenti",
+      "ok": "OK",
+      "failed": "Fallita ({{code}})",
+      "more": "Mostra altre ({{shown}} di {{total}})"
+    }
+  }
+}

@@ -98,7 +98,7 @@ describe('Settings', () => {
     expect(state.profiles).toHaveLength(1);
   });
 
-  it('edits the library config (name, MCP, export presets) and saves a patch that leaves the AI settings alone', async () => {
+  it('edits the library config (name, export presets) and saves a patch that leaves the AI settings alone', async () => {
     setup();
     await screen.findByTestId('library-config');
     fireEvent.change(screen.getByTestId('config-name'), { target: { value: '' } });
@@ -106,7 +106,6 @@ describe('Settings', () => {
     expect((screen.getByTestId('config-save') as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByTestId('config-name'), { target: { value: 'Alpha 2' } });
 
-    fireEvent.click(screen.getByLabelText('Enable the MCP server'));
     fireEvent.click(screen.getByTestId('add-preset'));
     expect(screen.getAllByTestId('export-preset')).toHaveLength(1);
 
@@ -114,10 +113,9 @@ describe('Settings', () => {
     await waitFor(() => expect(callsTo('library:setConfig')).toHaveLength(1));
     const sent = callsTo('library:setConfig')[0];
     expect(sent.libraryId).toBe('lib-a');
-    expect(sent.patch).toMatchObject({
-      name: 'Alpha 2',
-      mcp: { enabled: true, writeEnabled: false },
-    });
+    expect(sent.patch).toMatchObject({ name: 'Alpha 2' });
+    // The MCP server has its own section (the library config never touches it).
+    expect(sent.patch).not.toHaveProperty('mcp');
     expect(sent.patch.exportPresets).toHaveLength(1);
     expect(sent.patch).not.toHaveProperty('ai');
     expect(sent.patch).not.toHaveProperty('aiEnabledFolders');

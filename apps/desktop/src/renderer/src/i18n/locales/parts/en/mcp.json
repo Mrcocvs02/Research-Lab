@@ -1,0 +1,86 @@
+{
+  "mcp": {
+    "title": "MCP server for Claude Code",
+    "intro": "Lets Claude Code, running on this computer, search and read this library while the app is open. It listens only on this computer (127.0.0.1), every request needs a secret token, and it is read-only unless you allow proposals below.",
+    "seesNothing": "Claude Code can see no documents: no folder is enabled for AI. Enable folders in the AI section; only documents in AI-enabled folders exist for Claude Code, never excluded folders.",
+    "seesAll": "Claude Code can see the documents of the whole library (it is enabled for AI). Excluded folders never appear.",
+    "seesFolders_one": "Claude Code can see only the documents in the {{count}} folder enabled for AI. Other folders do not exist for it.",
+    "seesFolders_other": "Claude Code can see only the documents in the {{count}} folders enabled for AI. Other folders do not exist for it.",
+    "enable": "Enable the MCP server for this library",
+    "enableHint": "It runs only while this library is open in the app.",
+    "status": {
+      "label": "Status",
+      "running": "Running",
+      "failed": "Not running",
+      "off": "Off",
+      "address": "Address",
+      "calls": "Calls",
+      "callsCount_one": "{{count}} call so far",
+      "callsCount_other": "{{count}} calls so far",
+      "callsLast_one": "{{count}} call so far, the last on {{when}}",
+      "callsLast_other": "{{count}} calls so far, the last on {{when}}"
+    },
+    "problem": {
+      "PORT_IN_USE": {
+        "title": "The port is already in use",
+        "what": "Another program is using port {{port}}. Choose a different port below (or leave it empty to let the app pick a free one), or close the other program. The app never changes the port by itself."
+      },
+      "SECRET_UNAVAILABLE": {
+        "title": "Secure storage is not available",
+        "what": "The token cannot be stored because the system secure store is not available. On Linux install and unlock a keyring (GNOME Keyring or KWallet); on Windows and macOS check that you are signed in to your user account. Then switch the server off and on again."
+      },
+      "OTHER": {
+        "title": "The server could not start",
+        "what": "Switch it off and on again. If it keeps failing, restart the app."
+      }
+    },
+    "tools": "Tools offered to Claude Code: {{list}}.",
+    "write": {
+      "title": "Writing",
+      "label": "Allow Claude Code to propose AI fields",
+      "warning": "Off by default. When on, Claude Code can only PROPOSE AI fields (such as a summary or tags): they are marked as AI output and go to your review before anything is accepted. It can never change your notes or your own fields.",
+      "confirmTitle": "Allow proposals from Claude Code?",
+      "confirmBody": "Claude Code will be able to add proposed AI fields to documents in the folders it can see. Each proposal waits for your review. You can turn this off at any time.",
+      "confirmYes": "Allow proposals"
+    },
+    "port": {
+      "title": "Port",
+      "label": "Port",
+      "hint": "A number between {{min}} and {{max}}. Empty: the app picks a free port and remembers it on this computer.",
+      "auto": "Automatic",
+      "invalid": "Enter a whole number between {{min}} and {{max}}, or leave it empty.",
+      "apply": "Apply port",
+      "useAuto": "Use an automatic port"
+    },
+    "copy": {
+      "title": "Connect Claude Code",
+      "hint": "Copy the configuration and paste it in a terminal (command) or in your project's .mcp.json. The real token goes to the clipboard; this window only shows a masked preview. Clear the clipboard after pasting.",
+      "cli": "Copy command",
+      "json": "Copy .mcp.json entry",
+      "notRunning": "The server must be running to copy its configuration.",
+      "done": "Copied to the clipboard ({{format}}). The token is hidden here:"
+    },
+    "rotate": {
+      "title": "Token",
+      "hint": "Create a new token if you think the old one was seen by someone else.",
+      "button": "Rotate token…",
+      "confirmTitle": "Rotate the token?",
+      "confirmBody": "The current token stops working at once: every Claude Code configuration that uses it must be replaced with a new copy.",
+      "confirmYes": "Rotate token",
+      "done": "The token was replaced. Copy the new configuration for Claude Code."
+    },
+    "log": {
+      "title": "Calls",
+      "hint": "Kept on this computer only: the tool, the outcome and how many documents it touched. No content of the requests or of the documents is stored.",
+      "empty": "No calls yet.",
+      "when": "When",
+      "tool": "Tool",
+      "outcome": "Outcome",
+      "ms": "ms",
+      "docs": "Documents",
+      "ok": "OK",
+      "failed": "Failed ({{code}})",
+      "more": "Show more ({{shown}} of {{total}})"
+    }
+  }
+}

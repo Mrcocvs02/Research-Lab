@@ -482,3 +482,14 @@ export function generateIndexableDocuments(count: number, opts: CorpusOptions = 
   }));
   return { documents, manifest };
 }
+
+/**
+ * Writes a small text PDF for tests (and the e2e): title, authors and year on the first page, then the identifiers
+ * (`DOI: ...`, `arXiv:...`) and the body. Same renderer as the corpus, fixed dates, so the same input gives the same bytes.
+ */
+export async function writeSyntheticPdf(file: string, d: { title: string; authors: string[]; year: number; body: string; doi?: string; arxivId?: string }): Promise<void> {
+  const ids = [String(d.year), d.doi ? `DOI: ${d.doi}` : '', d.arxivId ? `arXiv:${d.arxivId} [cs.XX] 02 Jan ${d.year}` : ''].filter(Boolean).join('\n');
+  const draft = { title: d.title, authors: d.authors, abstract: d.body, year: d.year, pages: [ids] } as unknown as Draft;
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, await renderPdf(draft));
+}

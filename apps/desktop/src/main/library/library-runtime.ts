@@ -354,11 +354,28 @@ export class LibraryRuntime {
     },
   };
 
+  /** Text cache folder (machine-local); the extractor keeps one entry per content hash. */
+  get textCacheDir(): string {
+    return this.d.textCacheDir;
+  }
+
+  /**
+   * Extracts a file that is NOT in the library (a PDF dropped on the inbox) in the worker thread, under its watchdog; the
+   * text lands in the cache by hash. `rootPath` is the folder holding the file, `file` its name. Never throws, except on cancel.
+   */
+  extractFile(rootPath: string, file: string, hash: string, signal?: AbortSignal): Promise<ExtractResult> {
+    return this.extractAt(rootPath, file, hash, signal ?? new AbortController().signal);
+  }
+
   /** Extracts one file under the worker's watchdog; the result says what became of it (never throws, except on cancel). */
-  private async extractOne(rec: DocumentRecord, signal: AbortSignal): Promise<ExtractResult> {
-    const item = { path: rec.path, hash: rec.hash };
+  private extractOne(rec: DocumentRecord, signal: AbortSignal): Promise<ExtractResult> {
+    return this.extractAt(this.d.rootPath, rec.path, rec.hash, signal);
+  }
+
+  private async extractAt(rootPath: string, file: string, hash: string, signal: AbortSignal): Promise<ExtractResult> {
+    const item = { path: file, hash };
     try {
-      return await this.d.worker.extract({ rootPath: this.d.rootPath, cacheDir: this.d.textCacheDir, item }, { signal });
+      return await this.d.worker.extract({ rootPath, cacheDir: this.d.textCacheDir, item }, { signal });
     } catch (e) {
       if (signal.aborted || isAbort(e)) throw abortError();
       const reason = e instanceof AppError && typeof e.details?.['reason'] === 'string' ? e.details['reason'] : undefined;

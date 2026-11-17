@@ -1,7 +1,7 @@
-import { GRAPH_K, STORE_K, makeAnalysis, type Neighbor } from './analysis.js';
+import { GRAPH_K, STORE_K, analyze, type Neighbor } from './analysis.js';
 import { clusterHierarchy, globalMeans, symmetrize, topTermsOf } from './cluster.js';
 import { forceLayout } from './layout.js';
-import { buildVectors, countTerms, type Vocabulary } from './tfidf.js';
+import type { Vocabulary } from './tfidf.js';
 import { checkpoint, type Edge, type GraphDoc, type RunContext, type SparseVec } from './types.js';
 
 export const MODEL_FORMAT = 'rl-graph-model';
@@ -92,18 +92,8 @@ export interface BuildOptions extends RunContext {
 export async function buildModel(docs: readonly GraphDoc[], options: BuildOptions): Promise<GraphModel> {
   const n = docs.length;
   const ctx: RunContext = { signal: options.signal, onProgress: options.onProgress };
-  const counts = [];
-  for (let i = 0; i < n; i++) {
-    counts.push(countTerms(docs[i] as GraphDoc));
-    if (i % 100 === 99) {
-      ctx.onProgress?.('vectors', i + 1, n);
-      await checkpoint(ctx);
-    }
-  }
-  const { vocab, vectors } = buildVectors(counts);
-  counts.length = 0;
-  ctx.onProgress?.('vectors', n, n);
-  const analysis = makeAnalysis(docs, vocab, vectors);
+  const analysis = await analyze(docs, ctx);
+  const { vocab, vectors } = analysis;
 
   const nb: number[][] = [];
   const edges: Edge[] = [];

@@ -481,3 +481,48 @@ describe('cluster labels written by Claude', () => {
     expect(ok(await call('graph:map', {})).clusters.every((c: any) => c.aiLabel === null)).toBe(true);
   });
 });
+
+describe('explore:*', () => {
+  it('goes from the macro topic to a single paper in a few zooms and back, with the path kept', async () => {
+    const call = harness();
+    const top = ok(await call('explore:level', { dimension: 'topic' }));
+    expect(top.path).toEqual([]);
+    expect(top.nodes).toEqual([{ id: 'science', label: 'Science', kind: 'topic', count: COUNT, hasChildren: true }]);
+    const kids = ok(await call('explore:level', { dimension: 'topic', parentId: 'science' }));
+    expect(kids.nodes.map((n: any) => n.id).sort()).toEqual(['tag0', 'tag1', 'tag2', 'tag3']);
+    expect(kids.path).toEqual([{ id: 'science', label: 'Science' }]);
+    const leaf = ok(await call('explore:level', { dimension: 'topic', parentId: 'tag2' }));
+    expect(leaf.nodes).toEqual([]);
+    expect(leaf.path.map((p: any) => p.id)).toEqual(['science', 'tag2']);
+    const page = ok(await call('explore:documents', { dimension: 'topic', id: 'tag2', limit: 5, offset: 0 }));
+    expect(page.total).toBe(COUNT / 4);
+    expect(page.docIds).toHaveLength(5);
+    expect(page.docIds.every((id: string) => Number.parseInt(id, 16) % 4 === 2)).toBe(true);
+    expect(fail(await call('explore:level', { dimension: 'topic', parentId: 'nope' })).code).toBe('NOT_FOUND');
+    expect(fail(await call('explore:documents', { dimension: 'author', id: 'author:nobody' })).code).toBe('NOT_FOUND');
+  });
+
+  it('switches dimension from a node: topic -> authors and venues, author -> topics', async () => {
+    const call = harness();
+    const authors = ok(await call('explore:level', { dimension: 'author' })).nodes as any[];
+    expect(authors.length).toBeGreaterThan(0);
+    const members = ok(await call('explore:level', { dimension: 'author', parentId: authors[0].id })).nodes as any[];
+    expect(members.length).toBeGreaterThan(0);
+    const topics = ok(await call('explore:related', { from: { dimension: 'author', id: members[0].id }, to: 'topic' })).nodes as any[];
+    expect(topics.length).toBeGreaterThan(0);
+    expect(topics[0].path.length).toBeGreaterThan(0);
+    expect(topics[0].score).toBeGreaterThan(0);
+    const venues = ok(await call('explore:related', { from: { dimension: 'topic', id: 'tag1' }, to: 'venue', limit: 3 })).nodes as any[];
+    expect(venues.length).toBeGreaterThan(0);
+    expect(venues.every((v) => v.kind === 'venue' && v.path.length === 2)).toBe(true);
+    expect(fail(await call('explore:related', { from: { dimension: 'topic', id: 'nope' }, to: 'venue' })).code).toBe('NOT_FOUND');
+  });
+
+  it('follows the documents: a new tag shows after the library changes', async () => {
+    const call = harness();
+    expect(ok(await call('explore:level', { dimension: 'topic', parentId: 'science' })).nodes).toHaveLength(4);
+    await store.documents.update(hex(0) as never, (cur) => ({ ...cur!, tags: [], revision: cur!.revision + 1 }));
+    generation++;
+    expect(ok(await call('explore:documents', { dimension: 'topic', id: 'tag0' })).total).toBe(COUNT / 4 - 1);
+  });
+});

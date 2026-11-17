@@ -1,8 +1,7 @@
 import { TEXT_REASON_MIN, type Neighbor } from './analysis.js';
-import { modelVocabulary, neighborsOf, type GraphModel } from './model.js';
+import { modelVector, modelVocabulary, neighborsOf, type GraphModel } from './model.js';
 import { hash32 } from './random.js';
 import { buildPostings, makeScratch, nearest, vectorize, type TermCounts } from './tfidf.js';
-import type { SparseVec } from './types.js';
 
 export interface Placement {
   x: number;
@@ -22,14 +21,13 @@ const JITTER = 0.02;
  * plus a small jitter that depends only on the document id (so it never lands exactly on a neighbour and is the same
  * every time); its clusters are those most of its neighbours are in.
  */
-export function createPlacer(model: GraphModel): { place(id: string, counts: TermCounts, exclude?: number): Placement; vector(counts: TermCounts): SparseVec } {
+export function createPlacer(model: GraphModel): { place(id: string, counts: TermCounts, exclude?: number): Placement } {
   const vocab = modelVocabulary(model);
-  const vectors: SparseVec[] = model.vi.map((_, i) => ({ i: Int32Array.from(model.vi[i] as number[]), w: Float32Array.from(model.vw[i] as number[]) }));
+  const vectors = model.vi.map((_, i) => modelVector(model, i));
   const post = buildPostings(vectors, vocab.terms.length);
   const scratch = makeScratch(model.ids.length);
   const clusterOf = (j: number) => model.cl[j] as number[];
   return {
-    vector: (counts) => vectorize(counts, vocab),
     place(id, counts, exclude = -1) {
       const v = vectorize(counts, vocab);
       const near = nearest(post, v, exclude, PLACE_K, 0.05, scratch);

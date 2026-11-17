@@ -156,6 +156,33 @@ function topicDim(docs: readonly ExploreDoc[], tax: ExploreTaxonomy): Dim {
   };
 }
 
+/**
+ * Louvain groups of keys (nodes in `keys` order, `edges` by index): groups of two or more are named from their most used
+ * member (`idOf`); the keys left alone go together to `otherId`.
+ */
+function groupKeys(keys: string[], edges: Edge[], countOf: (k: string) => number, idOf: (top: string) => string, otherId: string): { members: Map<string, string[]>; of: Map<string, string> } {
+  const groups = new Map<number, string[]>();
+  louvain(keys.length, symmetrize(edges), 1).forEach((c, i) => (groups.get(c) ?? groups.set(c, []).get(c)!).push(keys[i] as string));
+  const members = new Map<string, string[]>();
+  const of = new Map<string, string>();
+  const other: string[] = [];
+  for (const list of [...groups.values()].sort((p, q) => (p[0] as string).localeCompare(q[0] as string))) {
+    if (list.length < 2) {
+      other.push(...list);
+      continue;
+    }
+    list.sort((p, q) => countOf(q) - countOf(p) || (p < q ? -1 : 1));
+    const id = idOf(list[0] as string);
+    members.set(id, list);
+    for (const m of list) of.set(m, id);
+  }
+  if (other.length > 0) {
+    members.set(otherId, other.sort());
+    for (const m of other) of.set(m, otherId);
+  }
+  return { members, of };
+}
+
 function authorDim(docs: readonly ExploreDoc[]): Dim {
   const byAuthor = new Map<string, Set<number>>();
   const names = new Map<string, Map<string, number>>();
@@ -186,27 +213,8 @@ function authorDim(docs: readonly ExploreDoc[]): Dim {
     if (cur) cur.w += 1;
     else weight.set(key, { a, b, w: 1 });
   }
-  const comm = louvain(keys.length, symmetrize([...weight.values()]), 1);
-  const groups = new Map<number, string[]>();
-  comm.forEach((c, i) => (groups.get(c) ?? groups.set(c, []).get(c)!).push(keys[i] as string));
   const countOf = (k: string) => (byAuthor.get(k) as Set<number>).size;
-  const groupOf = new Map<string, string>();
-  const groupMembers = new Map<string, string[]>();
-  const other: string[] = [];
-  for (const members of [...groups.values()].sort((p, q) => (p[0] as string).localeCompare(q[0] as string))) {
-    if (members.length < 2) {
-      other.push(...members);
-      continue;
-    }
-    members.sort((p, q) => countOf(q) - countOf(p) || (p < q ? -1 : 1));
-    const id = `group:${members[0]}`;
-    groupMembers.set(id, members);
-    for (const m of members) groupOf.set(m, id);
-  }
-  if (other.length > 0) {
-    groupMembers.set('group:other', other.sort());
-    for (const m of other) groupOf.set(m, 'group:other');
-  }
+  const { members: groupMembers, of: groupOf } = groupKeys(keys, [...weight.values()], countOf, (top) => `group:${top}`, 'group:other');
   const display = (k: string) => mostCommon(names.get(k) as Map<string, number>);
   const groupDocs = (id: string) => {
     const s = new Set<number>();
@@ -278,27 +286,8 @@ function venueDim(docs: readonly ExploreDoc[], tax: ExploreTaxonomy): Dim {
       .slice(0, 5);
     for (const h of near) edges.push({ a: i, b: h.j, w: h.s });
   });
-  const comm = louvain(keys.length, symmetrize(edges), 1);
-  const groups = new Map<number, string[]>();
-  comm.forEach((c, i) => (groups.get(c) ?? groups.set(c, []).get(c)!).push(keys[i] as string));
   const countOf = (k: string) => (byVenue.get(k) as Set<number>).size;
-  const areaOf = new Map<string, string>();
-  const areaMembers = new Map<string, string[]>();
-  const other: string[] = [];
-  for (const members of [...groups.values()].sort((p, q) => (p[0] as string).localeCompare(q[0] as string))) {
-    if (members.length < 2) {
-      other.push(...members);
-      continue;
-    }
-    members.sort((p, q) => countOf(q) - countOf(p) || (p < q ? -1 : 1));
-    const id = `area:${(members[0] as string).slice(6)}`;
-    areaMembers.set(id, members);
-    for (const m of members) areaOf.set(m, id);
-  }
-  if (other.length > 0) {
-    areaMembers.set('area:other', other.sort());
-    for (const m of other) areaOf.set(m, 'area:other');
-  }
+  const { members: areaMembers, of: areaOf } = groupKeys(keys, edges, countOf, (top) => `area:${top.slice(6)}`, 'area:other');
   const display = (k: string) => mostCommon(names.get(k) as Map<string, number>);
   const areaDocs = (id: string) => {
     const s = new Set<number>();

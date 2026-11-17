@@ -226,3 +226,16 @@ describe('surprising pairs', () => {
     expect(surprisingPairs(cited, { limit: 500 }).some((p) => ids(p.a, p.b) === [docs[0]!.id, docs[4]!.id].sort().join())).toBe(false);
   });
 });
+
+describe('budget', () => {
+  it('builds the model of 1000 documents in a couple of seconds, with a bounded file', async () => {
+    const docs = syntheticDocs(1000, { topics: 12, vocabulary: 120 });
+    const t = performance.now();
+    const m = await build(docs);
+    const ms = performance.now() - t;
+    expect(ms).toBeLessThan(4000);
+    expect(JSON.stringify(m).length).toBeLessThan(3 * 1024 * 1024);
+    expect(Math.max(...m.vi.map((v) => v.length))).toBeLessThanOrEqual(64);
+    expect(m.vocab.length).toBeLessThanOrEqual(30_000);
+  });
+});

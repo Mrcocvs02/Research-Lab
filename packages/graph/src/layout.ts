@@ -80,10 +80,10 @@ export async function forceLayout(n: number, edges: readonly Edge[], cluster: In
       const ey = (y[e.a] as number) - (y[e.b] as number);
       const d = Math.sqrt(ex * ex + ey * ey) + 1e-9;
       const f = (d / k) * (0.3 + e.w) * 0.5;
-      dx[e.a] = (dx[e.a] as number) - (ex / d) * f * d;
-      dy[e.a] = (dy[e.a] as number) - (ey / d) * f * d;
-      dx[e.b] = (dx[e.b] as number) + (ex / d) * f * d;
-      dy[e.b] = (dy[e.b] as number) + (ey / d) * f * d;
+      dx[e.a] = (dx[e.a] as number) - ex * f;
+      dy[e.a] = (dy[e.a] as number) - ey * f;
+      dx[e.b] = (dx[e.b] as number) + ex * f;
+      dy[e.b] = (dy[e.b] as number) + ey * f;
     }
     for (let i = 0; i < n; i++) {
       const mx = dx[i] as number;

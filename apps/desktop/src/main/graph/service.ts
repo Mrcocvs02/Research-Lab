@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { AppError, type DocumentId, type DocumentRecord } from '@rl/core';
 import { readCachedText, createLibraryStore } from '@rl/data';
-import { STORE_K, countTerms, createPlacer, decodeModel, neighborsOf, reasonsOf, sharedTerms, surprisingPairs, type GraphModel, type Reason } from '@rl/graph';
+import { STORE_K, countTerms, createPlacer, decodeModel, modelVector, neighborsOf, reasonsOf, sharedTerms, surprisingPairs, type GraphModel, type Reason } from '@rl/graph';
 import type { MainServices } from '../ipc/handlers/services.js';
 import type { LibraryRuntime } from '../library/library-runtime.js';
 import { createGraphEngine, type BuildProgress, type GraphEngine, type GraphStoreArgs, type SimilarItem } from './engine.js';
@@ -284,7 +284,7 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 function similarFromModel(view: LibraryView, lm: LoadedModel, rec: DocumentRecord, i: number, limit: number): SimilarItem[] {
   const m = lm.model;
   const mine = new Set(view.tagsOf(rec));
-  const vec = (k: number) => ({ i: Int32Array.from(m.vi[k] as number[]), w: Float32Array.from(m.vw[k] as number[]) });
+  const vec = (k: number) => modelVector(m, k);
   const vi = vec(i);
   const items: SimilarItem[] = [];
   for (const n of neighborsOf(m, i)) {
@@ -328,7 +328,7 @@ export async function surprising(s: MainServices, docId: string | undefined, lim
     doc = lm.index.get(docId);
     if (doc === undefined) return { pairs: [] };
   }
-  const vec = (k: number) => ({ i: Int32Array.from(m.vi[k] as number[]), w: Float32Array.from(m.vw[k] as number[]) });
+  const vec = (k: number) => modelVector(m, k);
   const pairs = surprisingPairs(m, { doc, limit: limit * 2 })
     .filter((p) => view.byId.has(m.ids[p.a] as string) && view.byId.has(m.ids[p.b] as string))
     .slice(0, limit)

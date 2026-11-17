@@ -25,7 +25,7 @@ import { atomicWriteJson, readJsonFile, resolveInRoot } from '@rl/core/node';
 import type { MainServices } from '../ipc/handlers/services.js';
 import { isInsideLibrary } from '../export/target.js';
 import { reconcileMcp } from '../mcp/service.js';
-import { collectFiles, extractArchive, openArchive, renameIntoPlace, verifyArchive, writeArchive, type SourceFile } from './archive.js';
+import { collectFiles, extractArchive, LOCAL_PREFIX, openArchive, renameIntoPlace, verifyArchive, writeArchive, type SourceFile } from './archive.js';
 import { readState, updateState } from './state.js';
 
 type JobKind = 'create' | 'verify' | 'restore';
@@ -50,7 +50,8 @@ const JOBS_KEPT = 10;
 const PROGRESS_MIN_GAP_MS = 150;
 /** Compressed size estimate for the free-space check: the data folder is JSON and Markdown, which deflate far below half. */
 const SPACE_FACTOR = 0.5;
-const STALE_PART_MS = 24 * 60 * 60 * 1000;
+/** A `.part` file older than this is the residue of a crash (a running backup rewrites its file all the time). */
+const STALE_PART_MS = 60 * 60 * 1000;
 const PART_PREFIX = '.rlbackup-';
 const CADENCE_MS = { daily: 24 * 3600_000, weekly: 7 * 24 * 3600_000, monthly: 30 * 24 * 3600_000 } as const;
 
@@ -103,8 +104,9 @@ function launch(s: MainServices, kind: JobKind, total: number, file: string | nu
   };
   job.finished = (async () => {
     try {
+      // A run that returned normally is done, even when a cancel arrived at the last moment (the file or library exists).
       job.result = await run(job, set);
-      job.state = job.controller.signal.aborted ? 'cancelled' : 'done';
+      job.state = 'done';
     } catch (e) {
       if (job.controller.signal.aborted || AppError.from(e).code === 'CANCELLED') {
         job.state = 'cancelled';
@@ -142,7 +144,12 @@ export function cancel(s: MainServices, jobId: string): { cancelled: boolean } {
   return { cancelled: true };
 }
 
-/** Resolves when the running job (if any) has finished (tests, the start-up check). */
+/** Cancels every running job (app quit); `whenBackupDone` then waits for their clean-up. */
+export function cancelAllBackups(s: MainServices): void {
+  for (const j of jobsOf(s).values()) if (j.state === 'running') j.controller.abort();
+}
+
+/** Resolves when the running job (if any) has finished (tests, the start-up check, the quit). */
 export async function whenBackupDone(s: MainServices): Promise<void> {
   await Promise.all([...jobsOf(s).values()].map((j) => j.finished));
 }
@@ -235,6 +242,50 @@ async function removeStaleParts(dest: string): Promise<void> {
   }
 }
 
+const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Residue of a restore that was cut short by a crash or a kill: `<dataDirName>.restore-<12 hex>` in the target root and
+ * `restore-<12 hex>` in the local data folder. Only folders of exactly that shape, that are real folders (never links)
+ * and that no profile uses, are removed. Runs inside the exclusive section, so no job of ours is writing them.
+ */
+export async function sweepRestoreResidue(s: MainServices, root: string | null, dataDirName: string | null): Promise<number> {
+  const profiles = (await s.settings.get()).libraries;
+  const used = new Set<string>();
+  for (const l of profiles) {
+    used.add(path.resolve(l.rootPath, l.dataDirName).toLowerCase());
+    used.add(path.resolve(s.localDataDir, 'chat', l.id).toLowerCase());
+  }
+  let removed = 0;
+  const sweep = async (dir: string, pattern: RegExp): Promise<void> => {
+    for (const name of await readdir(dir).catch(() => [] as string[])) {
+      if (!pattern.test(name)) continue;
+      const abs = path.join(dir, name);
+      if (used.has(path.resolve(abs).toLowerCase())) continue;
+      const st = await lstat(abs).catch(() => null);
+      if (!st?.isDirectory()) continue;
+      await rm(abs, { recursive: true, force: true }).then(() => removed++, () => {});
+    }
+  };
+  if (root && dataDirName) await sweep(root, new RegExp(`^${escapeRe(dataDirName)}\\.restore-[0-9a-f]{12}$`));
+  await sweep(s.localDataDir, /^restore-[0-9a-f]{12}$/);
+  return removed;
+}
+
+/** Renames with the retries of `renameRetry` (a scanner or sync client can hold a fresh file for a moment). */
+async function renameFileRetry(from: string, to: string): Promise<void> {
+  for (let i = 0; ; i++) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code ?? '';
+      if (i >= 5 || !['EPERM', 'EBUSY', 'EACCES'].includes(code)) throw new AppError('IO_ERROR', 'The backup file could not be put in place', { code });
+      await new Promise((r) => setTimeout(r, 100 * 2 ** i));
+    }
+  }
+}
+
 async function uniqueFinal(dest: string, base: string): Promise<string> {
   for (let i = 1; ; i++) {
     const name = i === 1 ? `${base}${BACKUP_LIMITS.extension}` : `${base}-${i}${BACKUP_LIMITS.extension}`;
@@ -250,6 +301,9 @@ export interface CreateRequest {
 
 export function create(s: MainServices, req: CreateRequest): Promise<{ jobId: string }> {
   return exclusive(s, async () => {
+    // The chats are the one part that is not rebuildable and may hold sensitive text: an automatic backup never takes
+    // them; only a manual backup, with the user's explicit choice, does (D-295).
+    const includeLocal = (req.origin ?? 'manual') === 'manual' && req.includeLocal;
     const profile = await s.libraries.profile(req.libraryId);
     const app = await s.settings.get();
     const dest = app.backup.destination;
@@ -260,7 +314,7 @@ export function create(s: MainServices, req: CreateRequest): Promise<{ jobId: st
     const dataDir = await s.libraries.dataDir(profile.id);
     if (!(await stat(dataDir).then((st) => st.isDirectory(), () => false))) throw new AppError('NOT_FOUND', 'The library data folder is missing');
     const config = await s.libraries.getConfig(profile.id);
-    const { data, local } = await gather(s, profile.id, dataDir, req.includeLocal);
+    const { data, local } = await gather(s, profile.id, dataDir, includeLocal);
     const total = data.bytes + local.bytes;
     const free = await freeBytes(dest);
     const needed = Math.ceil(total * SPACE_FACTOR);
@@ -271,6 +325,7 @@ export function create(s: MainServices, req: CreateRequest): Promise<{ jobId: st
     return launch(s, 'create', total, null, async (job, set) => {
       set('write');
       await removeStaleParts(dest);
+      await sweepRestoreResidue(s, null, null).catch(() => 0);
       const tmp = path.join(dest, `${PART_PREFIX}${randomBytes(6).toString('hex')}.part`);
       try {
         const written = await writeArchive({
@@ -286,7 +341,7 @@ export function create(s: MainServices, req: CreateRequest): Promise<{ jobId: st
         if (job.controller.signal.aborted) throw new AppError('CANCELLED', 'The backup was cancelled');
         set('finish');
         const finalPath = await uniqueFinal(dest, `${slugOf(profile.name)}-${stampOf(createdAt)}`);
-        await rename(tmp, finalPath);
+        await renameFileRetry(tmp, finalPath);
         job.file = finalPath;
         await updateState(s.localDataDir, (st) => {
           st.destination = dest;
@@ -294,7 +349,7 @@ export function create(s: MainServices, req: CreateRequest): Promise<{ jobId: st
           if (origin === 'auto') st.lastAutoError = null;
         });
         await applyRetention(dest, profile.id, app.backup.keep).catch((e: unknown) => s.log.warn('old automatic backups could not be removed', { error: e }));
-        return emptyResult({ file: finalPath, bytes: written.bytes, files: written.files });
+        return emptyResult({ file: finalPath, bytes: written.bytes, files: written.files, skipped: written.skipped });
       } catch (e) {
         await rm(tmp, { force: true }).catch(() => {});
         throw e;
@@ -381,6 +436,10 @@ export async function remove(s: MainServices, req: { file: string }): Promise<{ 
   const f = approvedFile(s, req.file);
   const dest = (await s.settings.get()).backup.destination;
   if (!dest || !sameFile(path.dirname(f), path.resolve(dest)) || !isBackupName(f)) throw new AppError('INVALID_REQUEST', 'Only backups listed in the backup folder can be removed', { reason: 'file-not-listed' });
+  // A verify or restore reading this file, or a job about to start, would lose it under its feet.
+  if (starting.has(s) || [...jobsOf(s).values()].some((j) => j.state === 'running' && j.file !== null && sameFile(j.file, f))) {
+    throw new AppError('CONFLICT', 'A backup job is using this file', { reason: 'busy' });
+  }
   const st = await lstat(f).catch(() => null);
   if (!st?.isFile()) throw new AppError('NOT_FOUND', 'The backup file does not exist');
   await openArchive(f); // a file that is not a backup is never deleted from here
@@ -481,11 +540,19 @@ export function restore(s: MainServices, req: RestoreRequest): Promise<{ jobId: 
     if (app.libraries.some((l) => sameFile(path.resolve(l.rootPath), path.resolve(root)))) {
       throw new AppError('CONFLICT', 'A library already uses this folder', { reason: 'already-registered' });
     }
+    await sweepRestoreResidue(s, root, dataDirName).catch((e: unknown) => s.log.warn('old restore folders could not be removed', { error: e }));
     const dataDir = await resolveInRoot(root, dataDirName);
     const existing = await stat(dataDir).then((st) => st, () => null);
     if (existing && (!existing.isDirectory() || (await readdir(dataDir)).length > 0)) throw new AppError('CONFLICT', 'The data folder already exists and is not empty', { reason: 'not-empty' });
     const withLocal = req.restoreLocal && manifest.includesLocal;
     const bytes = sumSizes(manifest);
+    // Free space on both volumes (uncompressed sizes are exact): the data folder goes to the root, the chats to the local folder.
+    const localBytes = withLocal ? manifest.entries.filter((e) => e.path.startsWith(LOCAL_PREFIX)).reduce((n, e) => n + e.size, 0) : 0;
+    const dataBytes = manifest.entries.filter((e) => !e.path.startsWith(LOCAL_PREFIX)).reduce((n, e) => n + e.size, 0);
+    for (const [dir, needed] of [[root, dataBytes], [s.localDataDir, localBytes]] as const) {
+      const free = await freeBytes(dir);
+      if (needed > 0 && free !== null && free < needed) throw new AppError('CONFLICT', 'Not enough free space to restore the backup', { reason: 'not-enough-space', needed, free });
+    }
     return launch(s, 'restore', bytes * 2, f, async (job, set) => {
       const signal = job.controller.signal;
       set('verify');
@@ -508,8 +575,21 @@ export function restore(s: MainServices, req: RestoreRequest): Promise<{ jobId: 
           for (const sub of DATA_SUBDIRS) await mkdir(path.join(tmpData, sub), { recursive: true });
           const name = req.name ?? manifest.libraryName;
           const configFile = path.join(tmpData, dataPath.config);
-          const config = await readJsonFile(configFile, libraryConfigSchema).catch(() => null);
-          if (config && config.name !== name) await atomicWriteJson(configFile, { ...config, name });
+          const parsed = await readJsonFile(configFile, libraryConfigSchema).catch(() => null);
+          // A library configuration that does not parse is a damaged (or hostile) backup, never silently replaced.
+          if (!parsed) throw new AppError('CONFLICT', 'The library configuration in the backup is not valid', { reason: 'integrity' });
+          // A restored library never starts with the MCP server on, with writes allowed or without the confirmation
+          // before an AI send: those are the user's choice again on this machine (D-295). Folders and usage cap stay.
+          const resetOnRestore: NonNullable<Result['resetOnRestore']> = [];
+          const config = structuredClone(parsed);
+          if (config.mcp.enabled) resetOnRestore.push('mcp');
+          if (config.mcp.writeEnabled) resetOnRestore.push('mcp-write');
+          if (!config.ai.confirmBeforeSend) resetOnRestore.push('confirm-before-send');
+          config.mcp.enabled = false;
+          config.mcp.writeEnabled = false;
+          config.ai.confirmBeforeSend = true;
+          config.name = name;
+          if (resetOnRestore.length > 0 || parsed.name !== name) await atomicWriteJson(configFile, config);
           if (signal.aborted) throw new AppError('CANCELLED', 'The restore was cancelled');
           set('finish');
           await renameRetry(tmpData, dataDir);
@@ -525,12 +605,19 @@ export function restore(s: MainServices, req: RestoreRequest): Promise<{ jobId: 
             if (a.activeLibraryId === null) a.activeLibraryId = id;
             if (portable) Object.assign(a, portable);
           });
-          const secretsToEnter = await missingSecrets(s, id, config);
-          if ((await s.settings.get()).activeLibraryId === id) {
-            await s.runtime.sync({ autoScan: true });
-            await reconcileMcp(s);
+          // From here the library is registered and nothing may undo it half way: the steps below are best effort
+          // (logged, never fatal), so the job never ends `failed` with a profile or data folder behind (D-295).
+          let secretsToEnter: Result['secretsToEnter'] = [];
+          try {
+            secretsToEnter = await missingSecrets(s, id, config);
+            if ((await s.settings.get()).activeLibraryId === id) {
+              await s.runtime.sync({ autoScan: true });
+              await reconcileMcp(s);
+            }
+          } catch (e) {
+            s.log.warn('the restored library was registered but a follow-up step failed', { error: e });
           }
-          return emptyResult({ file: f, bytes: reader.size, files: check.files, restoredLibraryId: id, settingsRestored: portable !== null, secretsToEnter });
+          return emptyResult({ file: f, bytes: reader.size, files: check.files, restoredLibraryId: id, settingsRestored: portable !== null, secretsToEnter, resetOnRestore });
         } catch (e) {
           // Nothing is left behind: no data folder, no local copy, no profile.
           await rm(tmpData, { recursive: true, force: true }).catch(() => {});
@@ -577,7 +664,7 @@ export async function autoBackupOnStart(s: MainServices, now: () => number = Dat
     const mine = (await listIn(dest, BACKUP_LIMITS.listed)).filter((l) => l.libraryId === app.activeLibraryId);
     const newest = mine[0]?.info.createdAt;
     if (newest && now() - Date.parse(newest) < CADENCE_MS[app.backup.auto]) return;
-    const { jobId } = await create(s, { includeLocal: true, origin: 'auto' });
+    const { jobId } = await create(s, { includeLocal: false, origin: 'auto' });
     const job = jobOf(s, jobId);
     await job.finished;
     if (job.state === 'failed') await fail(job.error?.reason ?? job.error?.code ?? 'UNKNOWN');

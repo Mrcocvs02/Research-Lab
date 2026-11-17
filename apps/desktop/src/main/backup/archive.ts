@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { lstat, mkdir, open, readdir, rename, rmdir } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, rename, rmdir, type FileHandle } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
@@ -77,6 +77,36 @@ export function isSafeEntryName(name: string): boolean {
 /** The names an archive may contain (besides the manifest). */
 export const isAllowedEntryName = (name: string): boolean => isSafeEntryName(name) && (name === SETTINGS_NAME || name.startsWith(LIBRARY_PREFIX) || name.startsWith(`${LOCAL_PREFIX}chat/`));
 
+/** Pauses (ms) between the attempts to open a file another program holds for a moment (antivirus, sync client). */
+const OPEN_RETRY_MS = [50, 100, 200, 400];
+
+/**
+ * Opens a source file for reading, or null when it is gone or changed under us (`skip`). A file that is not the one
+ * we listed (a different inode, a link, another size between the check and the open) is treated as changed. EPERM and
+ * EBUSY are retried with a short backoff, then the backup fails with a clear reason (never a silently incomplete backup).
+ */
+async function openSource(abs: string, delays: readonly number[]): Promise<FileHandle | null> {
+  for (let i = 0; ; i++) {
+    try {
+      const before = await lstat(abs);
+      if (!before.isFile()) return null;
+      const fh = await open(abs, 'r');
+      const now = await fh.stat().catch(() => null);
+      if (!now?.isFile() || now.size !== before.size || (now.ino !== 0 && before.ino !== 0 && now.ino !== before.ino) || (now.dev !== 0 && before.dev !== 0 && now.dev !== before.dev)) {
+        await fh.close().catch(() => {});
+        return null;
+      }
+      return fh;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code ?? '';
+      if (code === 'ENOENT') return null;
+      if (!['EPERM', 'EBUSY'].includes(code)) throw e;
+      if (i >= delays.length) throw new AppError('IO_ERROR', 'A file could not be read because another program is using it', { reason: 'file-locked', code });
+      await new Promise((r) => setTimeout(r, delays[i]));
+    }
+  }
+}
+
 export interface WriteArchiveInput {
   /** Temporary file to create (the caller renames it once this resolves). */
   tmpFile: string;
@@ -88,22 +118,23 @@ export interface WriteArchiveInput {
   documents: number;
   signal?: AbortSignal | undefined;
   onBytes?: (n: number) => void;
+  /** Test hook: pauses between the attempts to open a locked file. */
+  retryDelaysMs?: readonly number[];
 }
 
-/** Writes the archive (entries in order, manifest last). Returns the archive size and the number of data entries. */
-export async function writeArchive(input: WriteArchiveInput): Promise<{ bytes: number; files: number; manifest: BackupManifest }> {
+/** Writes the archive (entries in order, manifest last). Returns the archive size, the number of data entries and the files that vanished meanwhile. */
+export async function writeArchive(input: WriteArchiveInput): Promise<{ bytes: number; files: number; skipped: number; manifest: BackupManifest }> {
   const zip = await ZipWriter.create(input.tmpFile);
   try {
     const entries: BackupManifest['entries'] = [];
+    let skipped = 0;
     const add = async (src: SourceFile, name: string): Promise<void> => {
       if (input.signal?.aborted) throw new AppError('CANCELLED', 'The backup was cancelled');
-      // Opened first: a file that vanished meanwhile (a sync tool's temporary file) is skipped, not an error.
-      let fh;
-      try {
-        fh = await open(src.abs, 'r');
-      } catch (e) {
-        if (['ENOENT', 'EPERM', 'EBUSY'].includes((e as NodeJS.ErrnoException).code ?? '')) return;
-        throw e;
+      // A file that vanished or changed meanwhile (a sync tool's temporary file) is skipped and counted, not an error.
+      const fh = await openSource(src.abs, input.retryDelaysMs ?? OPEN_RETRY_MS);
+      if (!fh) {
+        skipped++;
+        return;
       }
       let r;
       if (src.size <= SMALL_FILE_BYTES) {
@@ -131,7 +162,7 @@ export async function writeArchive(input: WriteArchiveInput): Promise<{ bytes: n
     };
     await zip.addBuffer(MANIFEST_NAME, Buffer.from(`${JSON.stringify(manifest)}\n`, 'utf8'));
     const bytes = await zip.finish();
-    return { bytes, files: entries.length, manifest };
+    return { bytes, files: entries.length, skipped, manifest };
   } catch (e) {
     await zip.abort();
     throw e;
@@ -187,12 +218,17 @@ export async function verifyArchive(reader: ZipReader, manifest: BackupManifest,
     else listed.set(e.path, e);
   }
   const seen = new Set<string>();
+  // A name that differs only by case or Unicode form from an earlier one would collide on a case-insensitive disk.
+  const folded = new Set<string>();
   for (const z of reader.entries.slice(0, -1)) {
     if (o.signal?.aborted) throw new AppError('CANCELLED', 'Cancelled');
     const m = listed.get(z.name);
     // A name that is not a safe path (zip-slip, absolute, drive, backslash), a name outside the layout, a repeated
     // entry and an entry the manifest does not list are all "unexpected": counted once per entry.
-    if (seen.has(z.name) || !m || !isAllowedEntryName(z.name)) {
+    const key = z.name.normalize('NFC').toLowerCase();
+    const duplicate = seen.has(z.name) || folded.has(key);
+    folded.add(key);
+    if (duplicate || !m || !isAllowedEntryName(z.name)) {
       seen.add(z.name);
       flag(z.name, 'unexpected');
       continue;

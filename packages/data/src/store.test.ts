@@ -169,7 +169,7 @@ describe('library store', () => {
     await store.projects.put(project('proj-1'));
     expect((await store.projects.list()).map((p) => p.id)).toEqual(['proj-1']);
 
-    await store.writeWatch({ schemaVersion: 1, sources: [{ id: 'w1', kind: 'topic', query: 'q', label: '', enabled: true }], seen: [] });
+    await store.writeWatch({ schemaVersion: 1, sources: [{ id: 'w1', kind: 'topic', query: 'q', label: '', enabled: true }], seen: [], dismissedRecommendations: [] });
     expect((await store.readWatch()).sources).toHaveLength(1);
 
     await store.writeConfig({ ...defaultLibraryConfig(), name: 'Mine' });

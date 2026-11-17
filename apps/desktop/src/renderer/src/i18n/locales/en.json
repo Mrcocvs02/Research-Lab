@@ -37,6 +37,7 @@
     "FOLDER_NOT_AI_ENABLED": "This folder is not enabled for sending to Claude.",
     "AI_BUDGET_EXCEEDED": "The usage cap has been reached.",
     "AI_PROVIDER_ERROR": "The AI provider returned an error.",
+    "NETWORK_ERROR": "An online source could not be reached. Check the connection and try again.",
     "SECRET_UNAVAILABLE": "Secure storage is not available on this computer, so keys cannot be saved.",
     "READ_ONLY": "Your settings were saved by a newer version of the app, so they are read-only here. Update the app to change them.",
     "CANCELLED": "The operation was cancelled.",

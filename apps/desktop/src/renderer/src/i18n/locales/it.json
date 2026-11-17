@@ -37,6 +37,7 @@
     "FOLDER_NOT_AI_ENABLED": "Questa cartella non è abilitata all'invio a Claude.",
     "AI_BUDGET_EXCEEDED": "Il tetto di utilizzo è stato raggiunto.",
     "AI_PROVIDER_ERROR": "Il fornitore AI ha restituito un errore.",
+    "NETWORK_ERROR": "Una fonte online non è raggiungibile. Controlla la connessione e riprova.",
     "SECRET_UNAVAILABLE": "L'archivio sicuro non è disponibile su questo computer: le chiavi non si possono salvare.",
     "READ_ONLY": "Le impostazioni sono state salvate da una versione più recente dell\\’app, quindi qui sono in sola lettura. Aggiorna l\\’app per modificarle.",
     "CANCELLED": "L'operazione è stata annullata.",

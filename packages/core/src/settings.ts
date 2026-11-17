@@ -101,6 +101,11 @@ export const appSettingsSchema = z.object({
   activeLibraryId: itemIdSchema.nullable().default(null),
   /** True once the guided first run has been completed or skipped. */
   firstRunDone: z.boolean().default(false),
+  /**
+   * Online sources (phase 5). `openAlexEmail`: send the profile's email with OpenAlex requests (its "polite pool",
+   * faster and more reliable). Off by default: the email leaves the machine only if the user turns this on.
+   */
+  network: z.object({ openAlexEmail: z.boolean().default(false) }).prefault({}),
   /** AI settings of THIS machine (never synced). */
   ai: z
     .object({
@@ -123,6 +128,7 @@ export const appSettingsPatchSchema = z.object({
   uiLanguage: languageSchema.optional(),
   user: userProfilePatchSchema.optional(),
   firstRunDone: z.boolean().optional(),
+  network: z.object({ openAlexEmail: z.boolean().optional() }).optional(),
 });
 export type AppSettingsPatch = z.infer<typeof appSettingsPatchSchema>;
 

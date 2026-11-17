@@ -14,6 +14,9 @@ import { annotationsHandlers, notesHandlers, readerHandlers, thumbsHandlers } fr
 import { inboxHandlers } from './inbox-handlers.js';
 import { jobsHandlers } from './jobs-handlers.js';
 import { reviewHandlers } from './review-handlers.js';
+import { citationsHandlers } from './citations-handlers.js';
+import { recommendHandlers } from './recommend-handlers.js';
+import { watchHandlers } from './watch-handlers.js';
 
 export type { MainServices } from './services.js';
 
@@ -43,5 +46,8 @@ export function buildHandlers(s: MainServices): HandlerMap<Channels> {
     ...jobsHandlers(s),
     ...reviewHandlers(s),
     ...inboxHandlers(s),
+    ...citationsHandlers(s),
+    ...recommendHandlers(s),
+    ...watchHandlers(s),
   };
 }

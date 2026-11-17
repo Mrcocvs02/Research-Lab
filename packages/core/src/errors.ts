@@ -17,6 +17,8 @@ export const ERROR_CODES = [
   'FOLDER_NOT_AI_ENABLED',
   'AI_BUDGET_EXCEEDED',
   'AI_PROVIDER_ERROR',
+  /** An online source (OpenAlex, arXiv, Semantic Scholar) could not be reached; `details.reason` says why. */
+  'NETWORK_ERROR',
   'SECRET_UNAVAILABLE',
   'READ_ONLY',
   'CANCELLED',

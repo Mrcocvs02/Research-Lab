@@ -7,6 +7,7 @@ import { aiChannels } from './ai.js';
 import { annotationsChannels } from './annotations.js';
 import { appChannels, appEvents } from './app.js';
 import { chatChannels, chatEvents } from './chat.js';
+import { citationsChannels, citationsEvents, recommendChannels } from './citations.js';
 import { commandsChannels } from './commands.js';
 import { dialogChannels } from './dialog.js';
 import { documentsChannels } from './documents.js';
@@ -21,14 +22,15 @@ import { readerChannels } from './reader.js';
 import { reviewChannels } from './review.js';
 import { taxonomyChannels } from './taxonomy.js';
 import { thumbsChannels } from './thumbs.js';
+import { watchChannels, watchEvents } from './watch.js';
 import { scanChannels, scanEvents } from './scan.js';
 import { indexChannels, searchChannels } from './search.js';
 import { secretsChannels } from './secrets.js';
 import { settingsChannels } from './settings.js';
 
-export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels);
+export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels, citationsChannels, recommendChannels, watchChannels);
 
-export const events = mergeRegistries(appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents);
+export const events = mergeRegistries(appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, watchEvents);
 
 export type Channels = typeof channels;
 export type Events = typeof events;
@@ -52,3 +54,5 @@ export { chatCardSchema, chatConversationSummarySchema, chatTurnSchema, chatUsag
 export { aiJobFieldSchema, aiJobRequestSchema, aiJobStatusSchema, type AiJobField, type AiJobStatus } from './jobs.js';
 export { reviewFieldSchema, reviewItemSchema, type ReviewField, type ReviewItem } from './review.js';
 export { inboxItemSchema, inboxMetadataSchema, type InboxItem, type InboxMetadata } from './inbox.js';
+export { citationLinkViewSchema, citationViewSchema, citationJobStatusSchema, readNextItemSchema, CITATION_LIMITS, type CitationView } from './citations.js';
+export { watchSourceViewSchema, publishedProposalSchema } from './watch.js';

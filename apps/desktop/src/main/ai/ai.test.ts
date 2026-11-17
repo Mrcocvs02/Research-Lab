@@ -47,7 +47,7 @@ function harness() {
     },
     runtime: { sync: async () => {}, hold: () => () => {}, status: () => ({}), require: async () => rt },
     libraries: { profile: async () => ({ rootPath: root, id: 'lib-1' }), dataDir: async () => store.dataDir },
-    settings: { get: async () => ({ deviceId: 'device-12345678' }) },
+    settings: { get: async () => ({ deviceId: 'device-12345678', ai: { claudeCodePath: null } }) },
     secrets: { get: async () => null },
     aiProvider: (cfg: { models: any }) => createMockAiProvider({ models: cfg.models, ...script }),
     isOnline: () => online,
@@ -291,7 +291,7 @@ describe('chat:send', () => {
     const rt = { libraryId: 'lib-1', store, search: async () => ({ total: 0, hits: [] }), reindexDocuments: async () => {} };
     const services = {
       log, localDataDir: local, emit: () => {}, runtime: { sync: async () => {}, require: async () => rt }, libraries: { dataDir: async () => store.dataDir, profile: async () => ({ rootPath: root }) },
-      settings: { get: async () => ({ deviceId: 'device-12345678' }) },
+      settings: { get: async () => ({ deviceId: 'device-12345678', ai: { claudeCodePath: null } }) },
       aiProvider: () => ({ ...createMockAiProvider(), id: 'claude-agent-sdk' as const }),
       isOnline: () => false,
     } as unknown as MainServices;

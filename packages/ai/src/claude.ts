@@ -50,27 +50,35 @@ export interface ExecutableLookup {
   bundled?: () => string | null;
 }
 
+export type ExecutableSource = 'settings' | 'path' | 'local-bin' | 'sdk' | 'none';
+
 /**
  * Where the Claude Code executable is (D-203): the path in the settings, then `claude` in the PATH, then `~/.local/bin`,
- * then the one shipped with the SDK package (development). Null when none exists.
+ * then the one shipped with the SDK package (development), and where it was found.
  */
-export function resolveClaudeExecutable(o: ExecutableLookup = {}): string | null {
+export function findClaudeExecutable(o: ExecutableLookup = {}): { path: string | null; source: ExecutableSource } {
   const env = o.env ?? process.env;
   const platform = o.platform ?? process.platform;
   const exists = o.exists ?? ((p: string) => existsSync(p));
   const exe = platform === 'win32' ? 'claude.exe' : 'claude';
   const pathMod = platform === 'win32' ? path.win32 : path.posix;
-  if (o.configured && exists(o.configured)) return o.configured;
+  if (o.configured && exists(o.configured)) return { path: o.configured, source: 'settings' };
   const pathVar = env.PATH ?? env.Path ?? '';
   for (const dir of pathVar.split(platform === 'win32' ? ';' : ':')) {
     if (!dir) continue;
     const p = pathMod.join(dir, exe);
-    if (exists(p)) return p;
+    if (exists(p)) return { path: p, source: 'path' };
   }
   const home = o.home ?? os.homedir();
   const local = pathMod.join(home, '.local', 'bin', exe);
-  if (exists(local)) return local;
-  return (o.bundled ?? bundledExecutable)();
+  if (exists(local)) return { path: local, source: 'local-bin' };
+  const bundled = (o.bundled ?? bundledExecutable)();
+  return bundled ? { path: bundled, source: 'sdk' } : { path: null, source: 'none' };
+}
+
+/** Same as `findClaudeExecutable`, the path only. Null when none exists. */
+export function resolveClaudeExecutable(o: ExecutableLookup = {}): string | null {
+  return findClaudeExecutable(o).path;
 }
 
 /** The executable of the optional platform package of the SDK (`@anthropic-ai/claude-agent-sdk-<platform>-<arch>`), if installed. */
@@ -180,7 +188,7 @@ export interface ClaudeProviderOptions {
   models?: ModelConfig[];
   /** Empty folder used as the agent's cwd (created when missing). */
   workDir: string;
-  /** Explicit Claude Code path from the settings, if any. */
+  /** Explicit Claude Code path from the settings, if any (the user's choice, see `ai:chooseExecutable`). */
   configuredExecutable?: () => string | null;
   clientApp?: string;
   /** Test seams. */
@@ -243,14 +251,15 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
   const models = options.models ?? DEFAULT_MODELS;
   const env = () => options.env ?? process.env;
   const getKey = async () => (options.getApiKey ? await options.getApiKey().catch(() => null) : null);
-  const executable = () =>
-    resolveClaudeExecutable({
+  const executableInfo = () =>
+    findClaudeExecutable({
       configured: options.configuredExecutable?.() ?? null,
       env: env(),
       ...(options.home ? { home: options.home } : {}),
       ...(options.exists ? { exists: options.exists } : {}),
       ...(options.bundled ? { bundled: options.bundled } : {}),
     });
+  const executable = () => executableInfo().path;
   const loadSdk = options.loadSdk ?? (async () => (await import('@anthropic-ai/claude-agent-sdk')) as unknown as SdkModule);
 
   const access = async (): Promise<AiAccess> =>
@@ -284,6 +293,8 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
 
   return {
     id: 'claude-agent-sdk',
+
+    executable: executableInfo,
 
     async *chat(request: ChatRequest): AsyncGenerator<ChatEvent> {
       const key = await getKey();

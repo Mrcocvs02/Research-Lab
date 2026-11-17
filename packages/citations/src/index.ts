@@ -8,3 +8,5 @@ export function createCitationSources(): CitationSource[] {
 export function createCitationService(_sources: CitationSource[]): CitationService {
   throw new Error('not implemented');
 }
+
+export * from './metadata.js';

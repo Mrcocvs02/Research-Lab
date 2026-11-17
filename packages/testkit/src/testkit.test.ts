@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { PDFDocument } from 'pdf-lib';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -14,6 +15,7 @@ import {
   saveSnapshot,
   snapshotTree,
   withRealFixtureCopy,
+  writeSyntheticPdf,
   type FixtureLibrary,
 } from './index';
 
@@ -220,5 +222,23 @@ describe('withRealFixtureCopy', () => {
     const diff = diffSnapshots(before, await snapshotTree(src.root));
     expect(diff.clean).toBe(true);
     expect(diff.touched).toEqual([]);
+  });
+});
+
+describe('writeSyntheticPdf', () => {
+  it('writes the same small PDF for the same input, with the identifiers on its first page', async () => {
+    const dir = path.join(os.tmpdir(), `rl-synth-${process.pid}`);
+    const input = { title: 'A synthetic title', authors: ['Ada Example'], year: 2020, body: 'Some body text.', doi: '10.1234/synthetic.1', arxivId: '2401.01234v1' };
+    try {
+      await writeSyntheticPdf(path.join(dir, 'a.pdf'), input);
+      await writeSyntheticPdf(path.join(dir, 'sub', 'b.pdf'), input);
+      const a = await readFile(path.join(dir, 'a.pdf'));
+      expect(a.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      expect(a.equals(await readFile(path.join(dir, 'sub', 'b.pdf')))).toBe(true);
+      expect(await pdfContainsText(path.join(dir, 'a.pdf'), '10.1234/synthetic.1')).toBe(true);
+      expect(await pdfContainsText(path.join(dir, 'a.pdf'), 'A synthetic title')).toBe(true);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

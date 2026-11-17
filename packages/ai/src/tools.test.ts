@@ -43,6 +43,12 @@ describe('folder rules', () => {
     expect(inEnabledFolder('any/p.pdf', [''])).toBe(true);
     expect(inEnabledFolder('any/p.pdf', [])).toBe(false);
   });
+
+  it("'.' enables only the files directly in the root", () => {
+    expect(inEnabledFolder('p.pdf', ['.'])).toBe(true);
+    expect(inEnabledFolder('open/p.pdf', ['.'])).toBe(false);
+    expect(inEnabledFolder('open/p.pdf', ['.', 'open'])).toBe(true);
+  });
 });
 
 describe('library tools: privacy gate', () => {

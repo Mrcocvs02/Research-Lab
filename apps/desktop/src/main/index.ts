@@ -24,6 +24,7 @@ import { presentPdf } from './ipc/handlers/doc-files.js';
 import { buildHandlers, type MainServices } from './ipc/handlers/index.js';
 import { createProviderFactory } from './ai/provider-factory.js';
 import { abortAllChatTurns } from './ai/service.js';
+import { abortAllJobs } from './ai/jobs.js';
 import { createBackupPolicy } from './library/backup-policy.js';
 import { RuntimeManager } from './library/runtime-manager.js';
 import { spawnScanWorker, watchdogFromEnv } from './library/worker-host.js';
@@ -126,12 +127,31 @@ async function main(): Promise<void> {
       const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
+    async pickPdfFiles() {
+      // Same test hook as the folder dialog: one path instead of the dialog.
+      const override = e2eDialogOverride(process.env, app.isPackaged);
+      if (override) return [override];
+      const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+      const options: Electron.OpenDialogOptions = { properties: ['openFile', 'multiSelections'], filters: [{ name: 'PDF', extensions: ['pdf'] }] };
+      const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
+      return result.canceled ? [] : result.filePaths;
+    },
+    async pickExecutable() {
+      const override = e2eDialogOverride(process.env, app.isPackaged);
+      if (override) return override;
+      const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+      const options: Electron.OpenDialogOptions = { properties: ['openFile'], ...(process.platform === 'win32' ? { filters: [{ name: 'Executable', extensions: ['exe'] }] } : {}) };
+      const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
+      return result.canceled ? null : (result.filePaths[0] ?? null);
+    },
     appInfo: () => ({ name: APP_NAME, version: app.getVersion(), platform: process.platform, electron: process.versions.electron ?? '' }),
     createImporter: (options) => createLegacyImporter(options),
     backupDataDir: (libraryId, dataDir) => backupPolicy(libraryId, dataDir, { force: true }),
     // RL_AI_PROVIDER=mock is honoured only in a development run (runtime.aiProvider is null when packaged).
     aiProvider: createProviderFactory({ forceMock: runtime.aiProvider === 'mock', mockScript: { demo: true }, localDataDir: dirs.localData, secrets, clientApp: `research-lab/${app.getVersion()}` }),
     isOnline: () => net.isOnline(),
+    fetch: (input, init) => net.fetch(input as string, init as never) as Promise<Response>,
+    metadataFile: runtime.metadataFile,
   };
 
   // The reader loads PDFs through rl-doc://; every request looks the document up in the active library again.
@@ -173,6 +193,7 @@ async function main(): Promise<void> {
     quitting = true;
     // A running chat turn owns a Claude Code process: it ends with the app.
     abortAllChatTurns();
+    abortAllJobs();
     // A worker stuck in a synchronous loop must not keep the app from quitting: after a limit it is killed.
     const limit = new Promise<void>((resolve) => setTimeout(resolve, 15_000).unref());
     void Promise.race([runtimeManager.closeAll(), limit])

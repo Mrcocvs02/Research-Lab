@@ -1,17 +1,13 @@
 /**
- * Phase 4, wave 4.2: contract in `packages/core/src/ipc/channels/jobs.ts`. Stub until the main side is merged.
+ * Bulk AI jobs (phase 4, wave 4.2): contract in `packages/core/src/ipc/channels/jobs.ts`, logic in `main/ai/jobs.ts`.
  */
-import { AppError } from '@rl/core';
+import { cancelJob, estimateJob, listJobs, startJob } from '../../ai/jobs.js';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
 
-const todo = (): never => {
-  throw new AppError('NOT_IMPLEMENTED', 'Not implemented yet');
-};
-
-export const jobsHandlers = (_s: MainServices): DomainHandlers<'jobs'> => ({
-  'jobs:estimate': todo,
-  'jobs:start': todo,
-  'jobs:cancel': todo,
-  'jobs:list': todo,
+export const jobsHandlers = (s: MainServices): DomainHandlers<'jobs'> => ({
+  'jobs:estimate': (req) => estimateJob(s, req),
+  'jobs:start': (req) => startJob(s, req),
+  'jobs:cancel': async ({ jobId }) => ({ cancelled: cancelJob(jobId) }),
+  'jobs:list': async () => ({ items: listJobs() }),
 });

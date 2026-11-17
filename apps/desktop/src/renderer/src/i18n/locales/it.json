@@ -119,8 +119,10 @@
       "cap": "Il tetto di spesa mensile è stato raggiunto, quindi non è stato inviato nulla. Alza il tetto nelle impostazioni o aspetta il mese prossimo.",
       "noAccess": "Nessun accesso a Claude. Accedi con Claude Code o salva una chiave API nelle impostazioni.",
       "offline": "Claude non è raggiungibile: controlla la connessione a internet e riprova.",
-      "generic": "Claude non ha potuto rispondere. Riprova tra un momento."
+      "generic": "Claude non ha potuto rispondere. Riprova tra un momento.",
+      "turnRunning": "Claude sta ancora scrivendo una risposta. Aspetta che finisca, o fermala, prima di inviare un altro messaggio."
     },
+    "busyOther": "Una risposta è ancora in corso in un’altra conversazione. Aspetta o fermala per scrivere qui.",
     "turnUsage": "{{input}} token in ingresso, {{output}} in uscita",
     "withDocs_one": "Con {{count}} documento come contesto",
     "withDocs_other": "Con {{count}} documenti come contesto",
@@ -177,6 +179,8 @@
       "reason_missing": "il file manca",
       "reason_unknown": "il documento non è nella libreria",
       "folders": "Cartelle:",
+      "introAgent": "Il tuo messaggio verrà inviato al modello {{model}}. Mentre risponde, Claude può leggere con i suoi strumenti documenti delle cartelle qui sotto; ogni lettura è registrata nel registro. Confermi una sola volta per questa conversazione.",
+      "agentFolders": "Claude può leggere documenti in queste cartelle:",
       "tokens": "Circa {{tokens}} token in ingresso",
       "noPrice": "costo non stimato",
       "cost": "costo stimato {{usd}}",
@@ -264,6 +268,8 @@
     "needText": "Scrivi la richiesta per vedere la stima.",
     "estimateNote": "Approssimativa: comprende la richiesta e le istruzioni. Le pagine che Claude legge si aggiungono. Con la richiesta non parte nessun documento.",
     "go": "Cerca",
+    "sentTo": "La richiesta va al modello {{model}}.",
+    "folders": "Durante la ricerca Claude può leggere documenti in queste cartelle:",
     "fix_no-folders": "Abilita almeno una cartella per l’AI nelle impostazioni della libreria. La ricerca normale funziona come sempre."
   },
   "search": {

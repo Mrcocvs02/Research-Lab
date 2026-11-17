@@ -335,8 +335,8 @@ describe('graph:neighbors', () => {
     const doc = ok(await call('graph:neighbors', { node: { kind: 'doc', id: hex(0) }, kinds: ['similar', 'citations', 'tags', 'folder'], limit: 5 }));
     const kinds = new Set(doc.edges.map((e: any) => e.kind));
     expect([...kinds].sort()).toEqual(['cites', 'contains', 'similar', 'tagged']);
-    expect(doc.edges).toContainEqual({ from: hex(0), to: hex(1), kind: 'cites', weight: 1 });
-    expect(doc.edges).toContainEqual({ from: hex(2), to: hex(0), kind: 'cites', weight: 1 });
+    expect(doc.edges).toContainEqual({ from: `doc:${hex(0)}`, to: `doc:${hex(1)}`, kind: 'cites', weight: 1 });
+    expect(doc.edges).toContainEqual({ from: `doc:${hex(2)}`, to: `doc:${hex(0)}`, kind: 'cites', weight: 1 });
     expect(doc.nodes).toContainEqual({ kind: 'tag', id: 'tag0', label: 'Topic 0', count: COUNT / 4 });
     expect(doc.nodes.find((n: any) => n.kind === 'folder')).toMatchObject({ id: 'folder0', count: COUNT / 3 });
 
@@ -344,7 +344,7 @@ describe('graph:neighbors', () => {
     expect(root.nodes.map((n: any) => n.id)).toEqual(['folder0', 'folder1', 'folder2']);
     const files = ok(await call('graph:neighbors', { node: { kind: 'folder', id: 'folder1' }, kinds: ['documents', 'folder'], limit: 7 }));
     expect(files.nodes.filter((n: any) => n.kind === 'doc')).toHaveLength(7);
-    expect(files.edges).toContainEqual({ from: '', to: 'folder1', kind: 'contains', weight: 1 });
+    expect(files.edges).toContainEqual({ from: 'folder:', to: 'folder:folder1', kind: 'contains', weight: 1 });
     fail(await call('graph:neighbors', { node: { kind: 'folder', id: 'missing' }, kinds: ['children'] }));
 
     const tag = ok(await call('graph:neighbors', { node: { kind: 'tag', id: 'science' }, kinds: ['children', 'documents'], limit: 100 }));
@@ -353,7 +353,7 @@ describe('graph:neighbors', () => {
     await store.documents.update(hex(0) as never, (cur) => ({ ...cur!, tags: ['tag0', 'tag1'], revision: cur!.revision + 1 }));
     generation++;
     const related = ok(await call('graph:neighbors', { node: { kind: 'tag', id: 'tag0' }, kinds: ['tags'], limit: 5 }));
-    expect(related.edges.map((e: any) => [e.to, e.kind])).toEqual([['tag1', 'similar']]);
+    expect(related.edges.map((e: any) => [e.to, e.kind])).toEqual([['tag:tag1', 'similar']]);
     expect(related.edges[0].weight).toBeGreaterThan(0);
     expect(related.edges[0].weight).toBeLessThan(1);
     fail(await call('graph:neighbors', { node: { kind: 'doc', id: hex(9999) }, kinds: ['similar'] }));

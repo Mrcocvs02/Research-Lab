@@ -94,7 +94,8 @@ export const graphChannels = defineChannels('graph', {
     }),
     response: z.object({
       nodes: z.array(z.object({ kind: z.enum(['doc', 'folder', 'tag']), id: z.string().max(1024), label: z.string(), count: z.number().int().nonnegative().optional() })),
-      edges: z.array(z.object({ from: z.string().max(1024), to: z.string().max(1024), kind: z.enum(['similar', 'cites', 'tagged', 'contains']), weight: z.number().min(0).max(1) })),
+      /** `from` / `to` are node KEYS `<kind>:<id>` (a folder and a tag may share the same id). */
+      edges: z.array(z.object({ from: z.string().max(1100), to: z.string().max(1100), kind: z.enum(['similar', 'cites', 'tagged', 'contains']), weight: z.number().min(0).max(1) })),
     }),
   },
   /**

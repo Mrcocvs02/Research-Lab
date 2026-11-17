@@ -353,6 +353,9 @@ interface OutEdge {
   weight: number;
 }
 
+/** Node key used by edges: a folder and a tag may share the same id string. */
+const key = (kind: NodeKind, id: string) => `${kind}:${id}`;
+
 const folderLabel = (f: string) => (f === '' ? '/' : f.slice(f.lastIndexOf('/') + 1));
 
 export async function neighbors(
@@ -363,7 +366,7 @@ export async function neighbors(
   const view = await loadView(rt);
   const nodes = new Map<string, OutNode>();
   const edges: OutEdge[] = [];
-  const addNode = (n: OutNode) => nodes.set(`${n.kind}:${n.id}`, n);
+  const addNode = (n: OutNode) => nodes.set(key(n.kind, n.id), n);
   const docNode = (r: DocumentRecord): OutNode => ({ kind: 'doc', id: r.id, label: titleOf(r) });
   const has = (k: string) => req.kinds.includes(k);
   const { id } = req.node;
@@ -378,7 +381,7 @@ export async function neighbors(
         const other = view.byId.get(it.docId);
         if (!other) continue;
         addNode(docNode(other));
-        edges.push({ from: id, to: other.id, kind: 'similar', weight: it.score });
+        edges.push({ from: key('doc', id), to: key('doc', other.id), kind: 'similar', weight: it.score });
       }
     }
     if (has('citations')) {
@@ -390,20 +393,20 @@ export async function neighbors(
           if (!other || other.id === id || n >= req.limit) continue;
           n++;
           addNode(docNode(other));
-          edges.push(outgoing ? { from: id, to: other.id, kind: 'cites', weight: 1 } : { from: other.id, to: id, kind: 'cites', weight: 1 });
+          edges.push({ from: key('doc', outgoing ? id : other.id), to: key('doc', outgoing ? other.id : id), kind: 'cites', weight: 1 });
         }
       }
     }
     if (has('tags')) {
       for (const t of rec.tags.slice(0, req.limit)) {
         addNode(tagNode(t));
-        edges.push({ from: id, to: t, kind: 'tagged', weight: 1 });
+        edges.push({ from: key('doc', id), to: key('tag', t), kind: 'tagged', weight: 1 });
       }
     }
     if (has('folder')) {
       const f = folderOfPath(rec.path);
       addNode({ kind: 'folder', id: f, label: folderLabel(f), count: view.folders().get(f)?.total ?? 0 });
-      edges.push({ from: f, to: id, kind: 'contains', weight: 1 });
+      edges.push({ from: key('folder', f), to: key('doc', id), kind: 'contains', weight: 1 });
     }
   } else if (req.node.kind === 'folder') {
     const folders = view.folders();
@@ -412,19 +415,19 @@ export async function neighbors(
       const kids = [...folders.keys()].filter((f) => f !== '' && folderOfPath(f) === id).sort();
       for (const f of kids.slice(0, req.limit)) {
         addNode({ kind: 'folder', id: f, label: folderLabel(f), count: (folders.get(f) as { total: number }).total });
-        edges.push({ from: id, to: f, kind: 'contains', weight: 1 });
+        edges.push({ from: key('folder', id), to: key('folder', f), kind: 'contains', weight: 1 });
       }
     }
     if (has('documents')) {
       for (const r of view.records.filter((x) => folderOfPath(x.path) === id).sort((a, b) => (a.path < b.path ? -1 : 1)).slice(0, req.limit)) {
         addNode(docNode(r));
-        edges.push({ from: id, to: r.id, kind: 'contains', weight: 1 });
+        edges.push({ from: key('folder', id), to: key('doc', r.id), kind: 'contains', weight: 1 });
       }
     }
     if (has('folder') && id !== '') {
       const parent = folderOfPath(id);
       addNode({ kind: 'folder', id: parent, label: folderLabel(parent), count: folders.get(parent)?.total ?? 0 });
-      edges.push({ from: parent, to: id, kind: 'contains', weight: 1 });
+      edges.push({ from: key('folder', parent), to: key('folder', id), kind: 'contains', weight: 1 });
     }
   } else {
     const family = view.tagFamily(id);
@@ -432,13 +435,13 @@ export async function neighbors(
     if (has('documents')) {
       for (const r of view.records.filter((x) => view.tagsOf(x).some((t) => family.has(t))).sort((a, b) => (a.path < b.path ? -1 : 1)).slice(0, req.limit)) {
         addNode(docNode(r));
-        edges.push({ from: r.id, to: id, kind: 'tagged', weight: 1 });
+        edges.push({ from: key('doc', r.id), to: key('tag', id), kind: 'tagged', weight: 1 });
       }
     }
     if (has('children')) {
       for (const n of (view.tax?.nodes ?? []).filter((x) => x.parents.includes(id) && x.status !== 'deprecated').sort((a, b) => (a.id < b.id ? -1 : 1)).slice(0, req.limit)) {
         addNode(tagNode(n.id));
-        edges.push({ from: id, to: n.id, kind: 'contains', weight: 1 });
+        edges.push({ from: key('tag', id), to: key('tag', n.id), kind: 'contains', weight: 1 });
       }
     }
     if (has('tags')) {
@@ -452,7 +455,7 @@ export async function neighbors(
         .slice(0, req.limit);
       for (const r of related) {
         addNode(tagNode(r.t));
-        edges.push({ from: id, to: r.t, kind: 'similar', weight: clamp01(r.w) });
+        edges.push({ from: key('tag', id), to: key('tag', r.t), kind: 'similar', weight: clamp01(r.w) });
       }
     }
   }

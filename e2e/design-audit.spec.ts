@@ -611,6 +611,8 @@ async function libraryTour(a: Audit, ctx: LaunchedApp, lang: 'it' | 'en'): Promi
     await w.getByTestId('new-top-level').click();
     await a.shot('taxonomy-new-form', 2);
     await w.getByTestId('new-node-label').fill(lang === 'it' ? 'Metodi' : 'Methods');
+    await w.waitForTimeout(300);
+    a.facts[`taxonomy-create-enabled-${lang}`] = await w.getByTestId('new-node-create').isEnabled();
     await w.getByTestId('new-node-create').click();
     await w.getByTestId('new-top-level').click();
     await w.getByTestId('new-node-label').fill(lang === 'it' ? 'Risultati' : 'Results');
@@ -692,6 +694,8 @@ async function libraryTour(a: Audit, ctx: LaunchedApp, lang: 'it' | 'en'): Promi
 
 async function readerTour(a: Audit, ctx: LaunchedApp, title: string, relPath: string): Promise<void> {
   const w = a.page;
+  // A failed taxonomy step can leave the library in taxonomy mode: back to the list first.
+  if (await visibleNow(w.getByTestId('taxonomy-back'))) await w.getByTestId('taxonomy-back').click();
   const toggle = w.getByTestId('chat-toggle');
   if ((await toggle.getAttribute('aria-expanded')) === 'true') await toggle.click();
   await w.getByTestId('search-sort').selectOption('title').catch(() => {});

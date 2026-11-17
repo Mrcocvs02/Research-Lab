@@ -7,7 +7,7 @@ import { rl } from '../lib/rl';
 import { useApp } from '../state/app-context';
 import { safeText } from '../views/library/safeText';
 import { formatSize } from '../views/library/formatSize';
-import { backupErrorText, jobErrorText } from './backupText';
+import { backupErrorText, jobErrorText, type BackupResultExt } from './backupText';
 import { useBackupJob } from './useBackupJob';
 import './backup.css';
 
@@ -26,7 +26,7 @@ export function RestoreDialog({ info, onClose }: { info: BackupInfo; onClose(): 
   const [error, setError] = useState<unknown>(null);
   const j = useBackupJob();
   const status = j.status;
-  const result = status?.state === 'done' ? status.result : null;
+  const result = (status?.state === 'done' ? status.result : null) as BackupResultExt | null;
 
   const choose = async () => {
     setError(null);
@@ -51,7 +51,7 @@ export function RestoreDialog({ info, onClose }: { info: BackupInfo; onClose(): 
   const close = () => {
     if (j.running) j.cancel();
     // The new profile (and perhaps the settings) exist now: the window learns about them.
-    if (status?.state === 'done') void app.refresh();
+    if (status?.result?.restoredLibraryId) void app.refresh();
     onClose();
   };
 
@@ -131,6 +131,19 @@ export function RestoreDialog({ info, onClose }: { info: BackupInfo; onClose(): 
                     <p className="callout" role="status">
                       {t('backup.restore.done')}
                     </p>
+                    {result.resetOnRestore && result.resetOnRestore.length > 0 && (
+                      <div className="callout warn" role="status" data-testid="restore-reset">
+                        <p>{t('backup.restore.resetTitle')}</p>
+                        <ul>
+                          {result.resetOnRestore.map((s) => (
+                            <li key={s} data-reset={s}>
+                              {t(`backup.restore.reset.${s}`)}
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="hint">{t('backup.restore.resetHint')}</p>
+                      </div>
+                    )}
                     <p>{result.settingsRestored ? t('backup.restore.settingsApplied') : t('backup.restore.settingsKept')}</p>
                     {result.secretsToEnter.length > 0 ? (
                       <div className="callout warn" data-testid="restore-secrets">

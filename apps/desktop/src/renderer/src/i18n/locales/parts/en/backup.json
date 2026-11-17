@@ -9,7 +9,8 @@
       "change": "Change folder…",
       "clear": "Forget folder",
       "none": "No folder chosen yet.",
-      "hint": "Choose a folder outside your library folders, for example on another disk or a synced folder."
+      "hint": "Choose a folder outside your library folders, for example on another disk or a synced folder.",
+      "syncNote": "If the destination is in a synced folder, the backup files are uploaded with it. Automatic backups never include chat history; manual ones only if you choose it below."
     },
     "schedule": {
       "title": "Automatic backup",
@@ -68,7 +69,9 @@
         "hash": "does not match its checksum",
         "unreadable": "cannot be read",
         "unexpected": "is not listed in the backup"
-      }
+      },
+      "skipped_one": "1 file disappeared while the backup was running and is not in it. Run the backup again.",
+      "skipped_other": "{{count}} files disappeared while the backup was running and are not in it. Run the backup again."
     },
     "list": {
       "title": "Backups",
@@ -98,7 +101,10 @@
       "not-a-backup": "This file is not a Research Lab backup.",
       "file-not-approved": "Pick the file again with the file chooser.",
       "busy": "The app is busy with a scan, a network build or another backup. Try again in a moment.",
-      "unknown": "The operation failed."
+      "unknown": "The operation failed.",
+      "file-not-listed": "That file is not in the backup folder. Pick it again with the file chooser.",
+      "invalid-path": "That path cannot be used.",
+      "running": "Another backup or restore is already running."
     },
     "restore": {
       "button": "Restore…",
@@ -137,6 +143,13 @@
         "anthropic-api-key": "Anthropic API key",
         "openalex-api-key": "OpenAlex API key",
         "mcp-token": "MCP server token"
+      },
+      "resetTitle": "Some settings were switched to safe values because they came from a backup:",
+      "resetHint": "Turn them on again in the settings if you want them (MCP and AI sections).",
+      "reset": {
+        "mcp": "The MCP server is off.",
+        "mcp-write": "MCP write access is off.",
+        "confirm-before-send": "Asking before sending text to Claude is on."
       }
     }
   },
@@ -158,7 +171,8 @@
       "logs": "Logs",
       "memory": "App memory",
       "startup": "Start-up time",
-      "workers": "Background workers now"
+      "workers": "Background workers now",
+      "backups": "Safety copy"
     },
     "memoryValue": "{{rss}} MB in use, {{heap}} MB of script data",
     "startupValue": "{{ms}} ms",
@@ -182,6 +196,7 @@
       "copy": "Copy diagnostics",
       "shown": "Diagnostics text"
     },
-    "copied": "Diagnostics copied to the clipboard."
+    "copied": "Diagnostics copied to the clipboard.",
+    "backupsNote": "The app's own safety copy (the one that undoes its mistakes) is not touched by cleaning; it is cleaned by the app itself."
   }
 }

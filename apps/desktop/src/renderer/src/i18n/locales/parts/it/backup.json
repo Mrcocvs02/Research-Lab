@@ -9,7 +9,8 @@
       "change": "Cambia cartella…",
       "clear": "Dimentica la cartella",
       "none": "Nessuna cartella scelta.",
-      "hint": "Scegli una cartella fuori dalle cartelle delle librerie, ad esempio su un altro disco o in una cartella sincronizzata."
+      "hint": "Scegli una cartella fuori dalle cartelle delle librerie, ad esempio su un altro disco o in una cartella sincronizzata.",
+      "syncNote": "Se la destinazione è in una cartella sincronizzata, i file di backup vengono caricati con essa. I backup automatici non includono mai le chat; quelli manuali solo se lo scegli qui sotto."
     },
     "schedule": {
       "title": "Backup automatico",
@@ -68,7 +69,9 @@
         "hash": "non corrisponde al suo controllo di integrità",
         "unreadable": "non si può leggere",
         "unexpected": "non è elencato nel backup"
-      }
+      },
+      "skipped_one": "1 file è sparito mentre il backup era in corso e non è incluso. Rifai il backup.",
+      "skipped_other": "{{count}} file sono spariti mentre il backup era in corso e non sono inclusi. Rifai il backup."
     },
     "list": {
       "title": "Backup",
@@ -98,7 +101,10 @@
       "not-a-backup": "Questo file non è un backup di Research Lab.",
       "file-not-approved": "Scegli di nuovo il file con il selettore.",
       "busy": "L'app è occupata con una scansione, la costruzione della rete o un altro backup. Riprova fra poco.",
-      "unknown": "L'operazione non è riuscita."
+      "unknown": "L'operazione non è riuscita.",
+      "file-not-listed": "Quel file non è nella cartella dei backup. Sceglilo di nuovo con il selettore di file.",
+      "invalid-path": "Quel percorso non si può usare.",
+      "running": "Un altro backup o ripristino è già in corso."
     },
     "restore": {
       "button": "Ripristina…",
@@ -137,6 +143,13 @@
         "anthropic-api-key": "Chiave API di Anthropic",
         "openalex-api-key": "Chiave API di OpenAlex",
         "mcp-token": "Token del server MCP"
+      },
+      "resetTitle": "Alcune impostazioni sono state messe su valori sicuri perché venivano da un backup:",
+      "resetHint": "Riattivale nelle impostazioni se le vuoi (sezioni MCP e AI).",
+      "reset": {
+        "mcp": "Il server MCP è spento.",
+        "mcp-write": "La scrittura via MCP è spenta.",
+        "confirm-before-send": "La conferma prima di inviare testo a Claude è attiva."
       }
     }
   },
@@ -158,7 +171,8 @@
       "logs": "Log",
       "memory": "Memoria dell'app",
       "startup": "Tempo di avvio",
-      "workers": "Worker in background ora"
+      "workers": "Worker in background ora",
+      "backups": "Copia di sicurezza"
     },
     "memoryValue": "{{rss}} MB in uso, {{heap}} MB di dati degli script",
     "startupValue": "{{ms}} ms",
@@ -182,6 +196,7 @@
       "copy": "Copia la diagnostica",
       "shown": "Testo di diagnostica"
     },
-    "copied": "Diagnostica copiata negli appunti."
+    "copied": "Diagnostica copiata negli appunti.",
+    "backupsNote": "La copia di sicurezza interna dell'app (quella che annulla i suoi errori) non viene toccata dalla pulizia: la gestisce l'app."
   }
 }

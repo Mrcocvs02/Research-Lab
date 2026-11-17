@@ -46,6 +46,7 @@
       "reader.find": "Find in the document",
       "reader.highlight": "Highlight the current match",
       "reader.underline": "Underline the current match"
-    }
+    },
+    "conflictRefused": "Could not save: the shortcut is already used by another command ({{commands}}). Fix the conflict and save again."
   }
 }

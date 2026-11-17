@@ -83,6 +83,7 @@ export function MaintenanceSection() {
         ['thumbs', formatSize(report.local.thumbs)],
         ['graph', formatSize(report.local.graph)],
         ['chats', formatSize(report.local.chats)],
+        ...(typeof report.local.backups === 'number' ? ([['backups', formatSize(report.local.backups)]] as Array<[string, string]>) : []),
         ['logs', formatSize(report.logsBytes)],
       ]
     : [];
@@ -95,28 +96,35 @@ export function MaintenanceSection() {
       <div className="group">
         <h3>{t('maintenance.sizes')}</h3>
         {report ? (
-          <dl className="kv" data-testid="maintenance-report">
-            {sizeRows.map(([k, v]) => (
-              <div key={k} className="fact-row">
-                <dt>{t(`maintenance.rows.${k}`)}</dt>
-                <dd data-testid={`maintenance-${k}`}>{v}</dd>
-              </div>
-            ))}
-            <div className="fact-row">
-              <dt>{t('maintenance.rows.memory')}</dt>
-              <dd data-testid="maintenance-memory">{t('maintenance.memoryValue', { rss: n(Math.round(report.process.rssMb)), heap: n(Math.round(report.process.heapMb)) })}</dd>
-            </div>
-            {report.process.startupMs !== null && (
+          <>
+            <dl className="kv" data-testid="maintenance-report">
+              {sizeRows.map(([k, v]) => (
+                <div key={k} className="fact-row">
+                  <dt>{t(`maintenance.rows.${k}`)}</dt>
+                  <dd data-testid={`maintenance-${k}`}>{v}</dd>
+                </div>
+              ))}
               <div className="fact-row">
-                <dt>{t('maintenance.rows.startup')}</dt>
-                <dd>{t('maintenance.startupValue', { ms: n(Math.round(report.process.startupMs)) })}</dd>
+                <dt>{t('maintenance.rows.memory')}</dt>
+                <dd data-testid="maintenance-memory">{t('maintenance.memoryValue', { rss: n(Math.round(report.process.rssMb)), heap: n(Math.round(report.process.heapMb)) })}</dd>
               </div>
-            )}
-            <div className="fact-row">
-              <dt>{t('maintenance.rows.workers')}</dt>
-              <dd>{n(report.workers)}</dd>
-            </div>
-          </dl>
+              {report.process.startupMs !== null && (
+                <div className="fact-row">
+                  <dt>{t('maintenance.rows.startup')}</dt>
+                  <dd>{t('maintenance.startupValue', { ms: n(Math.round(report.process.startupMs)) })}</dd>
+                </div>
+              )}
+              <div className="fact-row">
+                <dt>{t('maintenance.rows.workers')}</dt>
+                <dd>{n(report.workers)}</dd>
+              </div>
+            </dl>
+          {typeof report.local.backups === 'number' && (
+            <p className="hint" data-testid="maintenance-backups-note">
+              {t('maintenance.backupsNote')}
+            </p>
+          )}
+          </>
         ) : (
           <p className="hint">{libraryId ? t('maintenance.loading') : t('maintenance.needsLibrary')}</p>
         )}

@@ -8,7 +8,7 @@ import { useLibraryEvents } from '../lib/events';
 import { useApp } from '../state/app-context';
 import { formatSize } from '../views/library/formatSize';
 import { safeText } from '../views/library/safeText';
-import { autoErrorText, backupErrorText, daysSince, jobErrorText, STALE_BACKUP_DAYS } from './backupText';
+import { autoErrorText, backupErrorText, daysSince, jobErrorText, STALE_BACKUP_DAYS, type BackupResultExt } from './backupText';
 import { RestoreDialog } from './RestoreDialog';
 import { useBackupJob } from './useBackupJob';
 import './backup.css';
@@ -196,6 +196,9 @@ export function BackupSection() {
           )}
         </div>
         <p className="hint">{t('backup.destination.hint')}</p>
+        <p className="hint" data-testid="backup-sync-note">
+          {t('backup.destination.syncNote')}
+        </p>
       </div>
 
       <div className="group">
@@ -296,6 +299,11 @@ export function BackupSection() {
                     ) : (
                       <p className="callout" role="status">
                         {t('backup.result.created', { files: n(status.result.files), size: formatSize(status.result.bytes) })}
+                      </p>
+                    )}
+                    {target?.kind !== 'verify' && ((status.result as BackupResultExt).skipped ?? 0) > 0 && (
+                      <p className="callout warn" role="status" data-testid="backup-skipped">
+                        {t('backup.result.skipped', { count: (status.result as BackupResultExt).skipped })}
                       </p>
                     )}
                     <ProblemList status={status} />

@@ -25,8 +25,12 @@ export function eventAccelerator(e: KeyLike): string | null {
   if (key === ' ') key = 'Space';
   // Shift changes the character of digits ("!"): the physical digit is what the user means.
   const digit = e.code ? /^Digit(\d)$/.exec(e.code) : null;
-  if (digit && e.shiftKey) key = digit[1]!;
-  const parts = [e.ctrlKey || e.metaKey ? 'Ctrl' : '', e.altKey ? 'Alt' : '', e.shiftKey ? 'Shift' : '', key].filter(Boolean);
+  // ...unless Shift+digit is itself an assignable punctuation key of the layout (Italian: Shift+7 is "/").
+  if (digit && e.shiftKey && !(key.length === 1 && ",./;'[]-=\\".includes(key))) key = digit[1]!;
+  // A punctuation character that needs Shift on this layout ("/" is Shift+7 on an Italian keyboard) already carries the
+  // Shift: the accelerator is the character, so Ctrl+/ matches on every layout (D-301).
+  const shift = e.shiftKey && !(key.length === 1 && !/[\p{L}\p{N}]/u.test(key));
+  const parts = [e.ctrlKey || e.metaKey ? 'Ctrl' : '', e.altKey ? 'Alt' : '', shift ? 'Shift' : '', key].filter(Boolean);
   return normalizeAccelerator(parts.join('+'));
 }
 

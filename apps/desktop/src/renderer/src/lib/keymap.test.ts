@@ -31,6 +31,25 @@ describe('eventAccelerator', () => {
   });
 });
 
+describe('eventAccelerator on layouts where punctuation needs Shift', () => {
+  const ev = (init: { key: string; code?: string; shiftKey?: boolean }) => ({ ctrlKey: true, metaKey: false, shiftKey: false, altKey: false, ...init });
+  it('Italian layout: "/" is Shift+7, "," and "." are plain, "+" is not assignable', () => {
+    expect(eventAccelerator(ev({ key: '/', code: 'Digit7', shiftKey: true }))).toBe('Ctrl+/');
+    expect(eventAccelerator(ev({ key: ',', code: 'Comma' }))).toBe('Ctrl+,');
+    expect(eventAccelerator(ev({ key: '+', code: 'BracketRight' }))).toBeNull();
+  });
+  it('US layout: "/" and "," are plain, "?" (Shift+/) and "+" (Shift+=) are not assignable', () => {
+    expect(eventAccelerator(ev({ key: '/', code: 'Slash' }))).toBe('Ctrl+/');
+    expect(eventAccelerator(ev({ key: ',', code: 'Comma' }))).toBe('Ctrl+,');
+    expect(eventAccelerator(ev({ key: '+', code: 'Equal', shiftKey: true }))).toBeNull();
+    expect(eventAccelerator(ev({ key: '?', code: 'Slash', shiftKey: true }))).toBeNull();
+  });
+  it('still keeps Shift for letters and for named keys', () => {
+    expect(eventAccelerator(ev({ key: 'H', shiftKey: true }))).toBe('Ctrl+Shift+H');
+    expect(eventAccelerator(ev({ key: 'ArrowUp', shiftKey: true }))).toBe('Ctrl+Shift+ArrowUp');
+  });
+});
+
 describe('resolveShortcut', () => {
   const press = (k: string, mods: Partial<Record<'ctrlKey' | 'shiftKey' | 'altKey', boolean>> = {}) => ({ key: k, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, ...mods });
   it('finds the command of a scope with the defaults', () => {

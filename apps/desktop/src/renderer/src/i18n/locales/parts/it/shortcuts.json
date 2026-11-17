@@ -46,6 +46,7 @@
       "reader.find": "Cerca nel documento",
       "reader.highlight": "Evidenzia il risultato corrente",
       "reader.underline": "Sottolinea il risultato corrente"
-    }
+    },
+    "conflictRefused": "Impossibile salvare: la scorciatoia è già usata da un altro comando ({{commands}}). Risolvi il conflitto e salva di nuovo."
   }
 }

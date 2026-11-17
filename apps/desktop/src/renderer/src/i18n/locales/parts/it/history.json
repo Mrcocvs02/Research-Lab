@@ -1,0 +1,22 @@
+{
+  "history": {
+    "empty": "Ancora nessuna modifica.",
+    "undoThis": "Annulla questa",
+    "redoThis": "Ripeti questa",
+    "undoneBadge": "annullata",
+    "otherDevice": "altro dispositivo",
+    "incompleteBadge": "incompleta",
+    "incompleteWhy": "Il registro è molto grande e ne è stata letta solo la parte più recente: questa modifica potrebbe avere voci mancanti, quindi non si può annullare.",
+    "kind": {
+      "change": "modifica",
+      "undo": "annulla",
+      "redo": "ripeti"
+    },
+    "actions": {
+      "tags_update": "Tag modificati su {{documents}} documenti",
+      "taxonomy_update": "Tassonomia modificata ({{tags}} elementi)",
+      "document_fields": "Dati del documento modificati",
+      "project_update": "Progetto modificato"
+    }
+  }
+}

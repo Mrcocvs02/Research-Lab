@@ -1,0 +1,17 @@
+{
+  "profile": {
+    "name": "Nome",
+    "namePlaceholder": "Maria Rossi",
+    "variants": "Nomi con cui compari tra gli autori",
+    "variantsHint": "Uno per riga. Servono a riconoscere i tuoi paper.",
+    "variantsPlaceholder": "Rossi, M.\nRossi, Maria",
+    "email": "Email",
+    "orcid": "ORCID",
+    "openAlexId": "Id autore OpenAlex"
+  },
+  "library": {
+    "name": "Nome della libreria",
+    "language": "Lingua dei documenti",
+    "languageHint": "Usata per tag, riassunti e risposte su questa libreria."
+  }
+}

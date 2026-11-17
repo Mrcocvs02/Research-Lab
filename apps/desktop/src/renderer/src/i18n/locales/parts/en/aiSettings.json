@@ -1,0 +1,91 @@
+{
+  "settings": {
+    "library": {
+      "aiFolders": "Folders enabled for Claude",
+      "aiFoldersHint": "Only documents in these folders (and their sub-folders) may be sent to Claude.",
+      "confirmBeforeSend": "Ask for confirmation, with a preview, before every send",
+      "modelId": "Model id",
+      "modelLabel": "Label",
+      "addModel": "Add model",
+      "removeModel": "Remove model {{name}}",
+      "defaultModel": "Default model",
+      "monthlyCap": "Monthly usage cap (USD)",
+      "monthlyCapHint": "Leave empty for no cap.",
+      "batchConfirm": "Confirm batch jobs above (USD)",
+      "batchConfirmHint": "Larger jobs show an estimate and ask first."
+    },
+    "ai": {
+      "title": "Claude (AI)",
+      "intro": "Chat, tags and descriptions use Claude. Nothing is sent from any folder until you enable it below, and every send is listed in the log.",
+      "nothingSent": "No folder is enabled: nothing is sent to Claude.",
+      "foldersEnabled_one": "{{count}} folder enabled for sending",
+      "foldersEnabled_other": "{{count}} folders enabled for sending",
+      "statusTitle": "Status",
+      "provider": "Provider",
+      "access": "Access",
+      "refresh": "Check again",
+      "providers": {
+        "claude-agent-sdk": "Claude (Agent SDK)",
+        "anthropic-api": "Anthropic API",
+        "gemini": "Gemini",
+        "mock": "Test provider"
+      },
+      "auth": {
+        "claude-code": "Claude Code login",
+        "api-key": "API key",
+        "none": "None"
+      },
+      "available": "Available",
+      "notAvailable": "Not available",
+      "reason": {
+        "no-access": "no access to Claude",
+        "offline": "Claude cannot be reached",
+        "cap-reached": "monthly cap reached",
+        "error": "error"
+      },
+      "help": "To enable access, sign in with the Claude Code command-line tool on this computer (the app uses that login), or store an API key below.",
+      "statusUnknown": "The status could not be read.",
+      "modelsTitle": "Models and limits",
+      "apiKey": {
+        "title": "API key (optional)",
+        "hint": "Only needed if you do not use the Claude Code login. It is kept in the system's secure storage and is never shown again.",
+        "label": "Anthropic API key",
+        "stored": "Stored",
+        "notStored": "Not stored",
+        "placeholder": "Paste the key",
+        "replacePlaceholder": "Paste a new key to replace it",
+        "store": "Store key",
+        "remove": "Remove key"
+      },
+      "log": {
+        "title": "What was sent to Claude",
+        "hint": "Every send, newest first: when, to which model, why, which documents and how much.",
+        "empty": "Nothing has been sent yet.",
+        "date": "Date",
+        "model": "Model",
+        "purpose": "Purpose",
+        "documents": "Documents",
+        "tokens": "Tokens",
+        "cost": "Cost",
+        "more": "Show more",
+        "confirmed": "confirmed",
+        "moreDocs": "+{{count}} more"
+      },
+      "exe": {
+        "label": "Claude Code program",
+        "notFound": "Not found",
+        "choose": "Choose…",
+        "auto": "Automatic",
+        "source_settings": "chosen by you",
+        "source_path": "found on the PATH",
+        "source_local-bin": "found in your local programs folder",
+        "source_sdk": "the copy bundled with the app",
+        "source_none": "not found"
+      },
+      "rootAll": "Whole library",
+      "rootAllHint": "Every folder and file, including those added later.",
+      "rootFiles": "Files in the library root",
+      "rootFilesHint": "Only the files directly in the root, not the folders."
+    }
+  }
+}

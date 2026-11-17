@@ -1,0 +1,98 @@
+{
+  "common": {
+    "no": "No"
+  },
+  "library": {
+    "dataDirName": "Data folder name",
+    "dataDirNameHint": "Created inside the library folder. Notes and metadata are stored here; your documents are never modified."
+  },
+  "wizard": {
+    "title": "New library",
+    "progress": "Step {{current}} of {{total}}",
+    "back": "Back",
+    "next": "Next",
+    "create": "Create library",
+    "creating": "Creating…",
+    "cancel": "Cancel",
+    "steps": {
+      "language": "Welcome",
+      "profile": "About you",
+      "folder": "Library folder",
+      "details": "Library details",
+      "legacy": "Existing index found",
+      "taxonomy": "Starting taxonomy",
+      "aiFolders": "Folders enabled for Claude",
+      "summary": "Summary"
+    },
+    "language": {
+      "intro": "Welcome to Research Lab. Choose the language of the interface. You can change it later in the settings.",
+      "label": "Interface language"
+    },
+    "profile": {
+      "intro": "These details help the app recognise your own papers and query citation services. Everything here is optional.",
+      "optional": "You can leave all fields empty and fill them in later from the settings."
+    },
+    "folder": {
+      "intro": "Choose the folder that holds your documents. It can be any folder, including one that a cloud service already synchronises.",
+      "choose": "Choose folder…",
+      "change": "Choose another folder…",
+      "dialogTitle": "Choose the library folder",
+      "safe": "Your documents are never modified, moved or deleted. The app only writes inside its own data folder."
+    },
+    "legacy": {
+      "intro": "An index created by the previous tool was found in this folder. You can import it once.",
+      "documents_one": "{{count}} document",
+      "documents_other": "{{count}} documents",
+      "taxonomy_one": "{{count}} taxonomy entry",
+      "taxonomy_other": "{{count}} taxonomy entries",
+      "import": "Import this index into the new library",
+      "readOnly": "The old index is only read, never changed. It can stay as a backup."
+    },
+    "import": {
+      "runningTitle": "Importing the index",
+      "running": "Importing the existing index. This may take a moment.",
+      "progressLabel": "Import progress",
+      "counts": "{{done}} of {{total}}",
+      "countsUnknown": "{{done}} processed",
+      "failedHint": "The library was created. You can continue without the import and try it again later.",
+      "continueWithout": "Continue without importing",
+      "done": "Import complete: {{documents}} documents and {{nodes}} taxonomy entries.",
+      "warnings_one": "{{count}} warning was recorded.",
+      "warnings_other": "{{count}} warnings were recorded.",
+      "open": "Open the library"
+    },
+    "taxonomy": {
+      "intro": "A taxonomy is the list of topics used to tag documents. Choose how to start.",
+      "fromImport": "The taxonomy comes from the imported index, so this choice is not needed.",
+      "legend": "Starting taxonomy",
+      "empty": "Empty, I will build it myself",
+      "file": "From a JSON file",
+      "chooseFile": "Choose file…",
+      "changeFile": "Choose another file…",
+      "dialogTitle": "Choose a taxonomy file",
+      "claude": "Proposed by Claude from the first documents",
+      "claudeNote": "Available after connecting Claude."
+    },
+    "ai": {
+      "intro": "Documents are sent to Claude only from the folders you enable here. By default no folder is enabled.",
+      "why": "Why: some material may be confidential. Sending is enabled folder by folder, and every send shows a preview first and is recorded in a log. Check the data terms of your Claude plan before enabling folders with non-public material.",
+      "treeLabel": "Folders in the library",
+      "noneSelected": "No folder enabled: nothing will be sent to Claude.",
+      "selected_one": "{{count}} folder enabled, including its sub-folders.",
+      "selected_other": "{{count}} folders enabled, including their sub-folders.",
+      "confirmNone": "I understand that nothing will be sent to Claude for now",
+      "confirmSome_one": "I confirm that documents in the {{count}} selected folder may be sent to Claude",
+      "confirmSome_other": "I confirm that documents in the {{count}} selected folders may be sent to Claude"
+    },
+    "summary": {
+      "intro": "Check the details and create the library.",
+      "folder": "Folder",
+      "import": "Import of the old index",
+      "importYes": "Yes ({{count}} documents)",
+      "taxonomy": "Starting taxonomy",
+      "taxonomyImport": "From the imported index",
+      "ai": "Folders enabled for Claude",
+      "aiNone": "None"
+    }
+  }
+}

@@ -53,6 +53,38 @@ describe('OpenAlex source', () => {
     expect((await src.fetchCitedBy({ doi: '10.1001/W1' })).map((c) => c.externalId)).toEqual(['W10', 'W11']);
   });
 
+  it('adds the API key to OpenAlex requests only, reads it per request, and pages on with a key', async () => {
+    let key: string | null = 'k-secret-1';
+    const pagedWithKey = (u: URL) =>
+      (u.searchParams.get('filter') ?? '') === 'cites:W1' && u.searchParams.get('cursor') !== '*' && !u.searchParams.has('api_key') ? new Response('{}', { status: 401 }) : undefined;
+    const { f, urls } = fake(routes[0]!, pagedWithKey, routes[1]!, (u) => (u.host === 'api.semanticscholar.org' ? json({}) : undefined), (u) => (u.host === 'export.arxiv.org' ? new Response('<feed/>') : undefined));
+    const net = createNet({ fetch: f, apiKey: () => key, email: () => 'me@example.org', ...noSleep });
+    const cites = await createOpenAlex(net, () => new Date()).fetchCitedBy({ doi: '10.1001/W1' });
+    expect(cites.map((c) => c.externalId)).toEqual(['W10', 'W11', 'W12']);
+    expect(urls.length).toBeGreaterThan(2);
+    expect(urls.every((u) => u.includes('api_key=k-secret-1') && u.includes('mailto='))).toBe(true);
+    await net.text('https://api.semanticscholar.org/graph/v1/paper/x', 'application/json');
+    await net.text('https://export.arxiv.org/api/query?id_list=1', 'application/atom+xml');
+    expect(urls.slice(-2).some((u) => /api_key|k-secret/.test(u))).toBe(false);
+    key = null;
+    await net.text('https://api.openalex.org/works/doi:10.1001/w1', 'application/json');
+    expect(urls.at(-1)).not.toContain('api_key');
+  });
+
+  it('never puts the API key in an error', async () => {
+    const f = (async () => new Response('{}', { status: 401 })) as unknown as typeof fetch;
+    const net = createNet({ fetch: f, apiKey: () => 'k-secret-2', ...noSleep });
+    const e = await net.json('https://api.openalex.org/works?filter=cites:W1').catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(AppError);
+    expect(JSON.stringify({ m: (e as AppError).message, d: (e as AppError).details, c: String((e as AppError).cause ?? '') })).not.toContain('k-secret-2');
+    const g = (async () => {
+      throw new Error('boom https://api.openalex.org/works?api_key=k-secret-2');
+    }) as unknown as typeof fetch;
+    const e2 = await createNet({ fetch: g, apiKey: () => 'k-secret-2', ...noSleep }).json('https://api.openalex.org/works').catch((x: unknown) => x);
+    expect(JSON.stringify({ m: (e2 as AppError).message, d: (e2 as AppError).details })).not.toContain('k-secret-2');
+    expect(String((e2 as AppError).cause ?? '')).not.toContain('k-secret-2');
+  });
+
   it('resolves by DOI, keeps the order of the references and counts citations; no email unless given', async () => {
     const { f, urls } = fake(...routes);
     const src = createOpenAlex(createNet({ fetch: f, ...noSleep }), () => new Date('2024-01-01T00:00:00Z'));

@@ -21,6 +21,7 @@ let libraryId: string;
 let online: boolean;
 let settings: { network: { openAlexEmail: boolean }; user: { email: string; authorVariants: string[]; openAlexId: string } };
 let urls: string[];
+let secretValue: string | null;
 let events: Array<[string, any]>;
 let net: (u: URL, signal?: AbortSignal) => Response | Promise<Response>;
 let organizer: ReturnType<typeof createOrganizer>;
@@ -73,6 +74,12 @@ function harness() {
     emit: (e: string, p: unknown) => events.push([e, p]),
     runtime: { sync: async () => {}, hold: () => () => {}, status: () => ({}), require: async () => rt },
     settings: { get: async () => settings },
+    secrets: {
+      get: async () => secretValue,
+      set: async (_s: unknown, _n: string, v: string) => void (secretValue = v),
+      has: async () => secretValue !== null,
+      delete: async () => void (secretValue = null),
+    },
     isOnline: () => online,
     shell: { openExternal: async (u: string) => void openedUrls.push(u) },
     fetch: (async (url: string, init?: RequestInit) => {
@@ -106,6 +113,7 @@ beforeEach(async () => {
   libraryId = 'lib-1';
   online = true;
   urls = [];
+  secretValue = null;
   events = [];
   reindexed = [];
   openedUrls = [];
@@ -155,6 +163,23 @@ describe('citations:get and citations:refresh', () => {
     settings.user.email = '';
     ok(await call('citations:refresh', { docId: hex(1) }));
     expect(urls.some((u) => u.includes('mailto'))).toBe(false);
+  });
+
+  it('sends the OpenAlex key from the secret store, re-read after it is saved or removed, never logged', async () => {
+    const app = { kind: 'app' };
+    ok(await call('secrets:set', { scope: app, name: 'openalex-api-key', value: 'k-secret-3' }));
+    ok(await call('citations:refresh', { docId: hex(1) }));
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.every((u) => u.includes('api_key=k-secret-3'))).toBe(true);
+    ok(await call('secrets:set', { scope: app, name: 'openalex-api-key', value: 'k-secret-4' }));
+    urls.length = 0;
+    ok(await call('citations:refresh', { docId: hex(1), what: ['references'] }));
+    expect(urls.every((u) => u.includes('api_key=k-secret-4'))).toBe(true);
+    ok(await call('secrets:delete', { scope: app, name: 'openalex-api-key' }));
+    urls.length = 0;
+    ok(await call('citations:refresh', { docId: hex(1), what: ['references'] }));
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.some((u) => u.includes('api_key'))).toBe(false);
   });
 
   it('errors: offline, nothing to look up, unknown work, rate limit', async () => {
@@ -726,9 +751,9 @@ describe('net fixtures hook', () => {
       }),
     );
   });
-  it('serves exact keys (query decoded and sorted, mailto ignored), then the key without a query, else 404', async () => {
+  it('serves exact keys (query decoded and sorted, mailto and api_key ignored), then the key without a query, else 404', async () => {
     const f = fixtureFetch(file);
-    expect((await f('https://api.openalex.org/works/doi:10.1001/w1?select=id&mailto=x%40y.z')).status).toBe(200);
+    expect((await f('https://api.openalex.org/works/doi:10.1001/w1?select=id&mailto=x%40y.z&api_key=zzz')).status).toBe(200);
     const batch = await f('https://api.openalex.org/works?select=id,doi,title,publication_year,authorships,primary_location&per-page=50&filter=openalex_id%3AW2%7CW7%7CW8');
     expect(((await batch.json()) as { results: unknown[] }).results).toHaveLength(1);
     expect(((await (await f('https://api.openalex.org/works?filter=cites%3AW1&cursor=*')).json()) as { results: unknown[] }).results).toEqual([]);

@@ -1,0 +1,29 @@
+{
+  "chat": {
+    "busyOther": "Una risposta è ancora in corso in un’altra conversazione. Aspetta o fermala per scrivere qui.",
+    "removeContext": "Togli {{name}} dal contesto",
+    "new": "Nuova conversazione",
+    "history": "Cronologia",
+    "searchLabel": "ricerca",
+    "historyEmpty": "Ancora nessuna conversazione.",
+    "deleteTitle": "Elimina la conversazione",
+    "deleteConfirm": "Eliminare la conversazione \"{{title}}\" dalla cronologia? Il registro di ciò che è stato inviato a Claude conserva le sue voci.",
+    "delete": "Elimina",
+    "deleteOne": "Elimina {{title}}",
+    "turns_one": "{{count}} messaggio",
+    "turns_other": "{{count}} messaggi",
+    "empty": "Chiedi della tua libreria. Seleziona dei documenti nell'elenco, o aprine uno nel lettore, per darli come contesto.",
+    "conversation": "Conversazione",
+    "contextReader": "Contesto: il documento aperto, pagina {{page}}",
+    "context_one": "Contesto: {{count}} documento",
+    "context_other": "Contesto: {{count}} documenti",
+    "contextLimit": "Si possono dare al massimo {{limit}} documenti come contesto: verranno usati solo i primi {{limit}} su {{count}}.",
+    "input": "Messaggio",
+    "inputPlaceholder": "Scrivi un messaggio…",
+    "cancel": "Ferma",
+    "send": "Invia",
+    "shortcuts": "Invio manda, Maiusc+Invio va a capo. Ctrl+J mostra o nasconde la chat, Ctrl+K apre i comandi.",
+    "usage": "Questo mese: {{used}}",
+    "usageCap": "Questo mese: {{used}} su {{cap}}"
+  }
+}

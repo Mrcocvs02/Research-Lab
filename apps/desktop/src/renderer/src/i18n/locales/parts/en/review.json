@@ -1,0 +1,41 @@
+{
+  "review": {
+    "acceptSome_one": "Accept {{count}} tag",
+    "acceptSome_other": "Accept {{count}} tags",
+    "edit": "Edit",
+    "saveEdit": "Save edit",
+    "editText": "Text",
+    "editList": "One item per line",
+    "edited": "Edited by you; the original proposal is kept.",
+    "tagsLabel": "Proposed tags: click to keep or drop",
+    "newTagKeep": "Create and apply this tag",
+    "newTagLabel": "Label",
+    "newTagParent": "Parent tag",
+    "newTagAliases": "Aliases (separated by commas)",
+    "noParent": "(top level)",
+    "fields": {
+      "tags": "Tags",
+      "newTags": "New tags",
+      "description": "Description",
+      "summary": "Summary",
+      "keywords": "Keywords",
+      "synonyms": "Synonyms",
+      "relations": "Related documents"
+    },
+    "statsLabel": "Review statistics",
+    "pending_one": "{{count}} proposal to review",
+    "pending_other": "{{count}} proposals to review",
+    "rateNone": "No tag reviewed yet",
+    "rate": "Tags accepted: {{percent}}% ({{accepted}} of {{proposed}})",
+    "filter": "Show",
+    "allFields": "All fields",
+    "acceptAll": "Accept all on this page",
+    "rejectAll": "Reject all on this page",
+    "empty": "No AI proposals to review.",
+    "listLabel": "AI proposals by document",
+    "pages": "Pages",
+    "prev": "Previous",
+    "next": "Next",
+    "pageOf": "Page {{page}} of {{pages}}"
+  }
+}

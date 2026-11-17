@@ -1,4 +1,5 @@
 import { abortAllJobs } from '../../ai/jobs.js';
+import { invalidateOpenAlexKey, OPENALEX_KEY_SECRET } from '../../citations/context.js';
 import { abortChatTurnsAndWait } from '../../ai/service.js';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -71,11 +72,13 @@ export const dialogHandlers = (s: MainServices): DomainHandlers<'dialog'> => ({
 export const secretsHandlers = (s: MainServices): DomainHandlers<'secrets'> => ({
   'secrets:set': async ({ scope, name, value }) => {
     await s.secrets.set(scope, name, value);
+    if (name === OPENALEX_KEY_SECRET) invalidateOpenAlexKey(s);
     return {};
   },
   'secrets:has': async ({ scope, name }) => ({ exists: await s.secrets.has(scope, name) }),
   'secrets:delete': async ({ scope, name }) => {
     await s.secrets.delete(scope, name);
+    if (name === OPENALEX_KEY_SECRET) invalidateOpenAlexKey(s);
     return {};
   },
 });

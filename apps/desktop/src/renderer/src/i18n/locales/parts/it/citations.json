@@ -1,0 +1,18 @@
+{
+  "citations": {
+    "loading": "Caricamento delle citazioni…",
+    "neverFetched": "Le citazioni di questo documento non sono ancora state scaricate. La rete si usa solo su richiesta: «Aggiorna» cerca il documento su OpenAlex (con arXiv e Semantic Scholar come ripiego) e invia solo identificatori e titolo, mai il testo.",
+    "refresh": "Aggiorna",
+    "refreshing": "Aggiornamento…",
+    "refreshHint": "Scarica ora riferimenti e opere che citano il documento dalle fonti online.",
+    "summary": "Riferimenti: {{inLibrary}} in libreria / {{missing}} mancanti",
+    "citedByCount_one": "Citato da {{count}} opera in totale",
+    "citedByCount_other": "Citato da {{count}} opere in totale",
+    "checkedAt": "Ultimo controllo: {{date}}",
+    "references": "Riferimenti ({{count}})",
+    "citedBy": "Citato da ({{count}} elencati)",
+    "emptyRefs": "Nessun riferimento salvato.",
+    "emptyCitedBy": "Nessuna opera citante salvata.",
+    "notFound": "Nessuna fonte online conosce questa opera, oppure manca un DOI, un id arXiv o un titolo utilizzabile per cercarla."
+  }
+}

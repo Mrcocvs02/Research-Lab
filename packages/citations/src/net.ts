@@ -9,6 +9,11 @@ export interface NetOptions {
   fetch: typeof fetch;
   /** The email sent with OpenAlex requests; called for each request so that the setting is read when it is used. Null: none. */
   email?: () => string | null | undefined;
+  /**
+   * The optional OpenAlex API key, read for each request (never stored here). Added as `api_key` to OpenAlex requests only;
+   * the URL carrying it is only handed to `fetch`, never to an error or a log.
+   */
+  apiKey?: () => string | null | undefined;
   /** Injected in tests. */
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   now?: () => number;
@@ -53,7 +58,9 @@ export function createNet(o: NetOptions): Net {
   const text: Net['text'] = async (url, accept, signal, maxBytes) => {
     const u = new URL(url);
     const email = u.host === 'api.openalex.org' ? o.email?.() : null;
-    const full = email ? `${url}${u.search ? '&' : '?'}mailto=${encodeURIComponent(email)}` : url;
+    const key = u.host === 'api.openalex.org' ? o.apiKey?.()?.trim() : null;
+    const extra = [email ? `mailto=${encodeURIComponent(email)}` : '', key ? `api_key=${encodeURIComponent(key)}` : ''].filter(Boolean).join('&');
+    const full = extra ? `${url}${u.search ? '&' : '?'}${extra}` : url;
     for (let attempt = 0; ; attempt++) {
       // The slot is reserved before waiting: concurrent callers queue behind one another.
       const at = Math.max(now(), next.get(u.host) ?? 0);

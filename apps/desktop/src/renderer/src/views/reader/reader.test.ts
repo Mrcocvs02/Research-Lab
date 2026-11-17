@@ -142,7 +142,7 @@ describe('lazy loading', () => {
     const root = path.resolve(import.meta.dirname, '..', '..');
     const app = readFileSync(path.join(root, 'App.tsx'), 'utf8');
     expect(app).not.toMatch(/^import .*views\/reader/m);
-    expect(app).toMatch(/lazyRetry\(\(\) => import\('\.\/views\/reader\/ReaderView'\)/);
+    expect(app).toMatch(/lazy(?:Retry|View)\(\(\) => import\('\.\/views\/reader\/ReaderView'\)/);
     const offenders: string[] = [];
     const walk = (dir: string) => {
       for (const name of readdirSync(dir)) {

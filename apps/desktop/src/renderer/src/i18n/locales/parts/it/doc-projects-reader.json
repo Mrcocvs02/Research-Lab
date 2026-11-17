@@ -1,0 +1,16 @@
+{
+  "doc": {
+    "studyState": "Stato di studio"
+  },
+  "notes": {
+    "layout": "Disposizione",
+    "layout_split": "Affiancati",
+    "layout_edit": "Modifica",
+    "layout_preview": "Anteprima",
+    "preview": "Anteprima delle note",
+    "markdownHint": "Titoli con #, elenchi con -, **grassetto**, *corsivo*, `codice`. L'HTML non viene interpretato.",
+    "empty": "Niente da mostrare.",
+    "unsaved": "Modifiche non salvate",
+    "saved": "Salvato"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "common": {
+    "no": "No"
+  },
+  "library": {
+    "dataDirName": "Nome della cartella dati",
+    "dataDirNameHint": "Viene creata dentro la cartella della libreria. Qui stanno note e metadati; i tuoi documenti non vengono mai modificati."
+  },
+  "wizard": {
+    "title": "Nuova libreria",
+    "progress": "Passo {{current}} di {{total}}",
+    "back": "Indietro",
+    "next": "Avanti",
+    "create": "Crea la libreria",
+    "creating": "Creazione in corso…",
+    "cancel": "Annulla",
+    "steps": {
+      "language": "Benvenuto",
+      "profile": "Chi sei",
+      "folder": "Cartella della libreria",
+      "details": "Dettagli della libreria",
+      "legacy": "Indice esistente trovato",
+      "taxonomy": "Tassonomia di partenza",
+      "aiFolders": "Cartelle abilitate a Claude",
+      "summary": "Riepilogo"
+    },
+    "language": {
+      "intro": "Benvenuto in Research Lab. Scegli la lingua dell'interfaccia. Potrai cambiarla poi dalle impostazioni.",
+      "label": "Lingua dell'interfaccia"
+    },
+    "profile": {
+      "intro": "Questi dati aiutano l'app a riconoscere i tuoi paper e a interrogare i servizi di citazioni. Tutto qui è facoltativo.",
+      "optional": "Puoi lasciare tutti i campi vuoti e compilarli più avanti dalle impostazioni."
+    },
+    "folder": {
+      "intro": "Scegli la cartella che contiene i tuoi documenti. Può essere una cartella qualsiasi, anche una già sincronizzata da un servizio cloud.",
+      "choose": "Scegli cartella…",
+      "change": "Scegli un'altra cartella…",
+      "dialogTitle": "Scegli la cartella della libreria",
+      "safe": "I tuoi documenti non vengono mai modificati, spostati o cancellati. L'app scrive solo nella propria cartella dati."
+    },
+    "legacy": {
+      "intro": "In questa cartella è stato trovato un indice creato dallo strumento precedente. Puoi importarlo una volta sola.",
+      "documents_one": "{{count}} documento",
+      "documents_other": "{{count}} documenti",
+      "taxonomy_one": "{{count}} voce di tassonomia",
+      "taxonomy_other": "{{count}} voci di tassonomia",
+      "import": "Importa questo indice nella nuova libreria",
+      "readOnly": "Il vecchio indice viene solo letto, mai modificato. Può restare come copia di sicurezza."
+    },
+    "import": {
+      "runningTitle": "Importazione dell'indice",
+      "running": "Importazione dell'indice esistente in corso. Può richiedere un momento.",
+      "progressLabel": "Avanzamento dell'importazione",
+      "counts": "{{done}} di {{total}}",
+      "countsUnknown": "{{done}} elaborati",
+      "failedHint": "La libreria è stata creata. Puoi continuare senza importare e riprovare più tardi.",
+      "continueWithout": "Continua senza importare",
+      "done": "Importazione completata: {{documents}} documenti e {{nodes}} voci di tassonomia.",
+      "warnings_one": "È stato registrato {{count}} avviso.",
+      "warnings_other": "Sono stati registrati {{count}} avvisi.",
+      "open": "Apri la libreria"
+    },
+    "taxonomy": {
+      "intro": "La tassonomia è l'elenco dei temi usati per taggare i documenti. Scegli come partire.",
+      "fromImport": "La tassonomia arriva dall'indice importato, quindi questa scelta non serve.",
+      "legend": "Tassonomia di partenza",
+      "empty": "Vuota, la costruisco io",
+      "file": "Da un file JSON",
+      "chooseFile": "Scegli file…",
+      "changeFile": "Scegli un altro file…",
+      "dialogTitle": "Scegli un file di tassonomia",
+      "claude": "Proposta da Claude sui primi documenti",
+      "claudeNote": "Disponibile dopo aver collegato Claude."
+    },
+    "ai": {
+      "intro": "I documenti vengono inviati a Claude solo dalle cartelle che abiliti qui. Per impostazione predefinita nessuna cartella è abilitata.",
+      "why": "Perché: alcuni materiali possono essere riservati. L'invio si abilita cartella per cartella, ogni invio mostra prima un'anteprima ed è registrato in un elenco. Prima di abilitare cartelle con materiale non pubblico controlla le condizioni del tuo piano Claude sull'uso dei dati.",
+      "treeLabel": "Cartelle della libreria",
+      "noneSelected": "Nessuna cartella abilitata: nulla verrà inviato a Claude.",
+      "selected_one": "{{count}} cartella abilitata, comprese le sue sottocartelle.",
+      "selected_other": "{{count}} cartelle abilitate, comprese le loro sottocartelle.",
+      "confirmNone": "Ho capito che per ora nulla verrà inviato a Claude",
+      "confirmSome_one": "Confermo che i documenti della cartella selezionata ({{count}}) possono essere inviati a Claude",
+      "confirmSome_other": "Confermo che i documenti delle {{count}} cartelle selezionate possono essere inviati a Claude"
+    },
+    "summary": {
+      "intro": "Controlla i dettagli e crea la libreria.",
+      "folder": "Cartella",
+      "import": "Importazione del vecchio indice",
+      "importYes": "Sì ({{count}} documenti)",
+      "taxonomy": "Tassonomia di partenza",
+      "taxonomyImport": "Dall'indice importato",
+      "ai": "Cartelle abilitate a Claude",
+      "aiNone": "Nessuna"
+    }
+  }
+}

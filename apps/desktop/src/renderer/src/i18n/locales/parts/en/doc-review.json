@@ -1,0 +1,24 @@
+{
+  "ai": {
+    "legacy": "Imported from the old index",
+    "review": {
+      "proposed": "proposed",
+      "accepted": "accepted",
+      "rejected": "rejected",
+      "edited": "edited"
+    }
+  },
+  "review": {
+    "done_accept": "Proposal accepted.",
+    "done_reject": "Proposal rejected.",
+    "done_edit": "Proposal edited and kept.",
+    "many_accept_one": "{{count}} proposal accepted.",
+    "many_accept_other": "{{count}} proposals accepted.",
+    "many_reject_one": "{{count}} proposal rejected.",
+    "many_reject_other": "{{count}} proposals rejected.",
+    "someFailed_one": "{{count}} proposal could not be decided (it changed meanwhile).",
+    "someFailed_other": "{{count}} proposals could not be decided (they changed meanwhile).",
+    "accept": "Accept",
+    "reject": "Reject"
+  }
+}

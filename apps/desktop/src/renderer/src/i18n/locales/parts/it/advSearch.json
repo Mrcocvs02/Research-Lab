@@ -1,0 +1,14 @@
+{
+  "advSearch": {
+    "title": "Chiedi a Claude di cercare nella libreria",
+    "intro": "Descrivi con parole tue cosa cerchi. Claude fa alcune ricerche per parole chiave nei documenti delle cartelle abilitate per l’AI, legge le pagine solo se serve e risponde con i documenti più pertinenti. La ricerca normale non cambia.",
+    "text": "Cosa stai cercando?",
+    "placeholder": "Per esempio: articoli che confrontano metodi di attenzione efficiente per documenti lunghi",
+    "needText": "Scrivi la richiesta per vedere la stima.",
+    "estimateNote": "Approssimativa: comprende la richiesta e le istruzioni. Le pagine che Claude legge si aggiungono. Con la richiesta non parte nessun documento.",
+    "go": "Cerca",
+    "sentTo": "La richiesta va al modello {{model}}.",
+    "folders": "Durante la ricerca Claude può leggere documenti in queste cartelle:",
+    "fix_no-folders": "Abilita almeno una cartella per l’AI nelle impostazioni della libreria. La ricerca normale funziona come sempre."
+  }
+}

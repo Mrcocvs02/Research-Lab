@@ -1,0 +1,56 @@
+{
+  "projects": {
+    "status": {
+      "active": "Attivo",
+      "paused": "In pausa",
+      "done": "Concluso",
+      "archived": "Archiviato"
+    },
+    "statusLabel": "Stato",
+    "new": "Nuovo progetto o collezione",
+    "create": "Crea",
+    "createHint": "Un progetto raccoglie documenti di qualsiasi cartella, con note e un piano di lettura.",
+    "showArchived": "Mostra gli archiviati",
+    "none": "Ancora nessun progetto.",
+    "rename": "Rinomina",
+    "archive": "Archivia",
+    "restore": "Ripristina",
+    "back": "Tutti i progetti",
+    "description": "Descrizione",
+    "counts": "{{total}} documenti: {{toRead}} da leggere, {{reading}} in lettura, {{read}} letti",
+    "missingCount_one": "{{count}} mancante",
+    "missingCount_other": "{{count}} mancanti",
+    "sections": "Sezioni del progetto",
+    "tabs": {
+      "members": "Documenti",
+      "notes": "Note",
+      "plan": "Piano di lettura"
+    },
+    "noMembers": "Ancora nessun documento. Seleziona documenti nella libreria e scegli \"Aggiungi al progetto\".",
+    "membersHint": "I documenti possono venire da cartelle diverse. Cambia qui lo stato di studio.",
+    "pickOne": "Seleziona {{title}}",
+    "removeSelected_one": "Togli {{count}} dal progetto",
+    "removeSelected_other": "Togli {{count}} dal progetto",
+    "removeConfirm_one": "Togli {{count}} documento dal progetto",
+    "removeConfirm_other": "Togli {{count}} documenti dal progetto",
+    "removed_one": "{{count}} documento tolto dal progetto (il file non cambia).",
+    "removed_other": "{{count}} documenti tolti dal progetto (i file non cambiano).",
+    "unknownDoc": "documento sconosciuto"
+  },
+  "notes": {
+    "label": "Note (Markdown)"
+  },
+  "plan": {
+    "hint": "Trascina una riga, premi Alt+Su o Alt+Giù su di essa, oppure usa le frecce per riordinare.",
+    "progress": "{{total}} voci: {{read}} lette, {{reading}} in lettura, {{toRead}} da leggere",
+    "empty": "Il piano è vuoto. Aggiungi sotto i documenti del progetto.",
+    "itemLabel": "{{position}}. {{title}}",
+    "status": "Stato di {{title}}",
+    "moveUp": "Sposta su {{title}}",
+    "moveDown": "Sposta giù {{title}}",
+    "remove": "Togli {{title}} dal piano",
+    "moved": "{{title}} è ora il numero {{position}} di {{total}}",
+    "addAll": "Aggiungi i {{count}} documenti non nel piano",
+    "addOne": "Aggiungi: {{title}}"
+  }
+}

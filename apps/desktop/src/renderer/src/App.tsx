@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ErrorBoundary, Lazy, lazyRetry } from './components/Lazy';
+import { ErrorBoundary, Lazy, lazyView } from './components/Lazy';
 import { NoticeBanner } from './components/NoticeBanner';
 import { ErrorNote } from './components/ui';
 import { errorMessage } from './lib/errors';
@@ -19,13 +19,13 @@ import { Shell, type SectionId } from './shell/Shell';
 import { AppProvider, useApp } from './state/app-context';
 
 // Only the Library view is part of the first screen; the others load when they are opened (docs/RULES.md, lightness).
-const Settings = lazyRetry(() => import('./settings/Settings').then((m) => ({ default: m.Settings })));
-const ProjectsView = lazyRetry(() => import('./views/projects/ProjectsView').then((m) => ({ default: m.ProjectsView })));
+const Settings = lazyView(() => import('./settings/Settings').then((m) => ({ default: m.Settings })), ['settings', 'settings-wizard']);
+const ProjectsView = lazyView(() => import('./views/projects/ProjectsView').then((m) => ({ default: m.ProjectsView })), ['doc-projects-reader', 'projects']);
 // The reader (and pdf.js with it) loads the first time a document is opened in it.
-const ReaderView = lazyRetry(() => import('./views/reader/ReaderView').then((m) => ({ default: m.ReaderView })));
-const InboxView = lazyRetry(() => import('./views/inbox/InboxView').then((m) => ({ default: m.InboxView })));
-const DiscoverView = lazyRetry(() => import('./views/discover/DiscoverView').then((m) => ({ default: m.DiscoverView })));
-const Wizard = lazyRetry(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })));
+const ReaderView = lazyView(() => import('./views/reader/ReaderView').then((m) => ({ default: m.ReaderView })), ['doc-projects-reader', 'doc-reader', 'reader']);
+const InboxView = lazyView(() => import('./views/inbox/InboxView').then((m) => ({ default: m.InboxView })), ['inbox']);
+const DiscoverView = lazyView(() => import('./views/discover/DiscoverView').then((m) => ({ default: m.DiscoverView })), ['discover']);
+const Wizard = lazyView(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })), ['settings-wizard', 'wizard']);
 
 export function App() {
   return (

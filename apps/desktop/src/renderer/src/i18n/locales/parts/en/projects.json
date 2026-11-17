@@ -1,0 +1,56 @@
+{
+  "projects": {
+    "status": {
+      "active": "Active",
+      "paused": "Paused",
+      "done": "Done",
+      "archived": "Archived"
+    },
+    "statusLabel": "Status",
+    "new": "New project or collection",
+    "create": "Create",
+    "createHint": "A project gathers documents from any folder, with notes and a reading plan.",
+    "showArchived": "Show archived",
+    "none": "No projects yet.",
+    "rename": "Rename",
+    "archive": "Archive",
+    "restore": "Restore",
+    "back": "All projects",
+    "description": "Description",
+    "counts": "{{total}} documents: {{toRead}} to read, {{reading}} reading, {{read}} read",
+    "missingCount_one": "{{count}} missing",
+    "missingCount_other": "{{count}} missing",
+    "sections": "Project sections",
+    "tabs": {
+      "members": "Documents",
+      "notes": "Notes",
+      "plan": "Reading plan"
+    },
+    "noMembers": "No documents yet. Select documents in the library and choose \"Add to project\".",
+    "membersHint": "Documents can come from different folders. Change a study state right here.",
+    "pickOne": "Select {{title}}",
+    "removeSelected_one": "Remove {{count}} from project",
+    "removeSelected_other": "Remove {{count}} from project",
+    "removeConfirm_one": "Remove {{count}} document from the project",
+    "removeConfirm_other": "Remove {{count}} documents from the project",
+    "removed_one": "{{count}} document removed from the project (the file is untouched).",
+    "removed_other": "{{count}} documents removed from the project (the files are untouched).",
+    "unknownDoc": "unknown document"
+  },
+  "notes": {
+    "label": "Notes (Markdown)"
+  },
+  "plan": {
+    "hint": "Drag a row, press Alt+Up or Alt+Down on it, or use the arrows to reorder.",
+    "progress": "{{total}} items: {{read}} read, {{reading}} reading, {{toRead}} to read",
+    "empty": "The plan is empty. Add documents of the project below.",
+    "itemLabel": "{{position}}. {{title}}",
+    "status": "State of {{title}}",
+    "moveUp": "Move {{title}} up",
+    "moveDown": "Move {{title}} down",
+    "remove": "Remove {{title}} from the plan",
+    "moved": "{{title}} is now number {{position}} of {{total}}",
+    "addAll": "Add all {{count}} documents not in the plan",
+    "addOne": "Add: {{title}}"
+  }
+}

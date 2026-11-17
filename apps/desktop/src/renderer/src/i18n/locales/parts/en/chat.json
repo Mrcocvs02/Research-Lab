@@ -1,0 +1,29 @@
+{
+  "chat": {
+    "busyOther": "An answer is still being written in another conversation. Wait for it or stop it to send here.",
+    "removeContext": "Remove {{name}} from the context",
+    "new": "New conversation",
+    "history": "History",
+    "searchLabel": "search",
+    "historyEmpty": "No conversations yet.",
+    "deleteTitle": "Delete conversation",
+    "deleteConfirm": "Delete the conversation \"{{title}}\" from the history? The log of what was sent to Claude keeps its records.",
+    "delete": "Delete",
+    "deleteOne": "Delete {{title}}",
+    "turns_one": "{{count}} message",
+    "turns_other": "{{count}} messages",
+    "empty": "Ask about your library. Select documents in the list, or open one in the reader, to give them as context.",
+    "conversation": "Conversation",
+    "contextReader": "Context: the open document, page {{page}}",
+    "context_one": "Context: {{count}} document",
+    "context_other": "Context: {{count}} documents",
+    "contextLimit": "At most {{limit}} documents can be given as context: only the first {{limit}} of {{count}} will be used.",
+    "input": "Message",
+    "inputPlaceholder": "Write a message…",
+    "cancel": "Stop",
+    "send": "Send",
+    "shortcuts": "Enter sends, Shift+Enter adds a line. Ctrl+J shows or hides the chat, Ctrl+K opens the commands.",
+    "usage": "This month: {{used}}",
+    "usageCap": "This month: {{used}} of {{cap}}"
+  }
+}

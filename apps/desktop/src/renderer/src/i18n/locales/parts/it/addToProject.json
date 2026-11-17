@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "addTitle_one": "Aggiungi {{count}} documento a un progetto",
+    "addTitle_other": "Aggiungi {{count}} documenti a un progetto",
+    "added_one": "{{count}} documento aggiunto a {{name}}.",
+    "added_other": "{{count}} documenti aggiunti a {{name}}.",
+    "tooMany": "Un progetto può contenere al massimo {{limit}} documenti; ne sono selezionati {{n}}.",
+    "adding": "Aggiungo {{count}} documenti… può volerci un po'.",
+    "noneYet": "Ancora nessun progetto. Creane uno qui sotto.",
+    "newFromSelection": "Oppure creane uno nuovo",
+    "createWith_one": "Crea con {{count}} documento",
+    "createWith_other": "Crea con {{count}} documenti"
+  }
+}

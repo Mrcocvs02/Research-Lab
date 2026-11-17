@@ -1,0 +1,36 @@
+{
+  "jobs": {
+    "started": "The job started. Follow it in the status bar.",
+    "fields": {
+      "tags": "Tags",
+      "description": "Description",
+      "summary": "Summary",
+      "keywords": "Keywords",
+      "synonyms": "Synonyms"
+    },
+    "dialog": {
+      "title": "Propose with AI",
+      "intro_one": "Claude will propose values for {{count}} document. Nothing is applied until you review it.",
+      "intro_other": "Claude will propose values for {{count}} documents. Nothing is applied until you review it.",
+      "fields": "What to propose",
+      "regenerate": "Propose again",
+      "regenerateHint": "Also for fields that already have a proposed or rejected value. Accepted and edited values are never replaced.",
+      "estimate": "What would be sent",
+      "tooMany": "A job takes at most {{limit}} documents. Select fewer.",
+      "noFields": "Choose at least one field.",
+      "toSend_one": "{{count}} document will be sent",
+      "toSend_other": "{{count}} documents will be sent",
+      "allowed_one": "{{count}} document is in a folder enabled for the AI",
+      "allowed_other": "{{count}} documents are in folders enabled for the AI",
+      "skipped_one": "{{count}} document skipped: it already has these values",
+      "skipped_other": "{{count}} documents skipped: they already have these values",
+      "refused_one": "{{count}} document will not be sent:",
+      "refused_other": "{{count}} documents will not be sent:",
+      "overCap": "This job would go over the monthly cap and will be refused. Raise the cap in the settings or wait for next month.",
+      "bigJob": "This job is large: it costs more than the amount that asks for confirmation.",
+      "nothing": "Nothing to send with these choices.",
+      "note": "Only an excerpt of each document (details and first pages) is sent, and every send is listed in the AI log.",
+      "confirm": "Start"
+    }
+  }
+}

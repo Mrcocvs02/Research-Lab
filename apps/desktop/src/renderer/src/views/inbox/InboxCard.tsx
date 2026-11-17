@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ModelConfig, ReasoningLevel, ResponseOf } from '@rl/core';
-import { Lazy, lazyRetry } from '../../components/Lazy';
+import { Lazy, lazyView } from '../../components/Lazy';
 import { CheckField, ErrorNote } from '../../components/ui';
 import { useLibraryEvents } from '../../lib/events';
 import { useHistory } from '../../lib/history';
@@ -18,7 +18,7 @@ import { resolveId } from '../library/taxonomyModel';
 import { useTaxonomy } from '../library/useTaxonomy';
 import type { InboxItem } from './InboxView';
 
-const PreviewDialog = lazyRetry(() => import('../chat/PreviewDialog').then((m) => ({ default: m.PreviewDialog })));
+const PreviewDialog = lazyView(() => import('../chat/PreviewDialog').then((m) => ({ default: m.PreviewDialog })), ['chat-preview']);
 type Preview = ResponseOf<Channels, 'inbox:previewTags'>;
 
 interface MetaDraft {

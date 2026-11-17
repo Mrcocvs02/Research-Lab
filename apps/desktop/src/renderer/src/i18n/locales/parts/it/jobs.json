@@ -1,0 +1,36 @@
+{
+  "jobs": {
+    "started": "Il lavoro è partito. Lo segui nella barra di stato.",
+    "fields": {
+      "tags": "Tag",
+      "description": "Descrizione",
+      "summary": "Riassunto",
+      "keywords": "Parole chiave",
+      "synonyms": "Sinonimi"
+    },
+    "dialog": {
+      "title": "Proponi con l’AI",
+      "intro_one": "Claude proporrà dei valori per {{count}} documento. Nulla viene applicato finché non lo riesamini.",
+      "intro_other": "Claude proporrà dei valori per {{count}} documenti. Nulla viene applicato finché non li riesamini.",
+      "fields": "Cosa proporre",
+      "regenerate": "Proponi di nuovo",
+      "regenerateHint": "Anche per i campi che hanno già un valore proposto o rifiutato. I valori accettati o modificati non vengono mai sostituiti.",
+      "estimate": "Cosa verrebbe inviato",
+      "tooMany": "Un lavoro accetta al massimo {{limit}} documenti. Selezionane meno.",
+      "noFields": "Scegli almeno un campo.",
+      "toSend_one": "Verrà inviato {{count}} documento",
+      "toSend_other": "Verranno inviati {{count}} documenti",
+      "allowed_one": "{{count}} documento è in una cartella abilitata per l’AI",
+      "allowed_other": "{{count}} documenti sono in cartelle abilitate per l’AI",
+      "skipped_one": "{{count}} documento saltato: ha già questi valori",
+      "skipped_other": "{{count}} documenti saltati: hanno già questi valori",
+      "refused_one": "{{count}} documento non verrà inviato:",
+      "refused_other": "{{count}} documenti non verranno inviati:",
+      "overCap": "Questo lavoro supererebbe il tetto mensile e verrebbe rifiutato. Alza il tetto nelle impostazioni o attendi il mese prossimo.",
+      "bigJob": "Il lavoro è grande: costa più della soglia che richiede conferma.",
+      "nothing": "Con queste scelte non c’è nulla da inviare.",
+      "note": "Di ogni documento viene inviato solo un estratto (dati e prime pagine) e ogni invio compare nel registro dell’AI.",
+      "confirm": "Avvia"
+    }
+  }
+}

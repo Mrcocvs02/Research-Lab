@@ -1,0 +1,18 @@
+{
+  "citations": {
+    "loading": "Loading citations…",
+    "neverFetched": "Citations have not been fetched for this document yet. The network is used only when you ask: Refresh looks the document up in OpenAlex (with arXiv and Semantic Scholar as fallbacks) and sends only its identifiers and title, never its text.",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing…",
+    "refreshHint": "Fetches references and citing works from the online sources now.",
+    "summary": "References: {{inLibrary}} in library / {{missing}} missing",
+    "citedByCount_one": "Cited by {{count}} work in all",
+    "citedByCount_other": "Cited by {{count}} works in all",
+    "checkedAt": "Last checked: {{date}}",
+    "references": "References ({{count}})",
+    "citedBy": "Cited by ({{count}} listed)",
+    "emptyRefs": "No references stored.",
+    "emptyCitedBy": "No citing works stored.",
+    "notFound": "No online source knows this work, or it has no DOI, arXiv id or usable title to look it up."
+  }
+}

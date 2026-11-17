@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense, type ComponentType, type ErrorInfo, type ReactNode } from 'react';
-import i18n from '../i18n';
+import i18n, { loadStrings, type StringPart } from '../i18n';
 
 /**
  * `React.lazy` that retries the import once before failing (a chunk can miss a read for a moment, for example while the
@@ -7,6 +7,14 @@ import i18n from '../i18n';
  */
 export function lazyRetry<T extends ComponentType<any>>(load: () => Promise<{ default: T }>, delayMs = 250) {
   return lazy(() => load().catch(() => new Promise<{ default: T }>((resolve, reject) => setTimeout(() => load().then(resolve, reject), delayMs))));
+}
+
+/**
+ * A lazy view: its code and the strings parts it uses (`i18n/locales/parts`) load together, so the first render has all
+ * its texts. Every key a file uses is in the core or in the parts of each lazy view that includes the file (tested).
+ */
+export function lazyView<T extends ComponentType<any>>(load: () => Promise<{ default: T }>, parts: readonly StringPart[]) {
+  return lazyRetry(() => Promise.all([load(), loadStrings(parts)]).then(([m]) => m));
 }
 
 // Built in, for when the dictionary chunk is the one that failed to load: the boundary must still speak.

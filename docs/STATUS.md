@@ -1,7 +1,7 @@
 # Stato
 
 - **Fase:** 6 in corso. Fasi 4 e 5 complete nel codice ma senza tag: i criteri su dati reali aspettano l'utente.
-- **Onda:** fase 6, lato main e interfaccia in parallelo (contratti D-238)
+- **Onda:** revisioni di fase 6; fase 7 lato main (contratti D-241, D-242)
 - **Fatto:**
   - Fasi 0, 1, 2 e 3 chiuse (tag `phase-0`, `phase-1`, `phase-2`, `phase-3`).
   - Fase 2: backend (tassonomia a livelli liberi, tag in blocco, modifica documenti, apertura file con lista permessa, annulla/ripeti, progetti e collezioni, albero cartelle), interfaccia completa, ordinamento per dimensione, filtri lato server, correzioni da reviewer e security.
@@ -20,7 +20,7 @@
   - Leggerezza unita (D-239, D-240): testi per vista (JS iniziale 371,8/391 KiB), chiave OpenAlex facoltativa, preload da 133,8 a 2,4 KiB (elenchi di nomi dei canali al posto del registro zod). Verifiche: e2e 46/50 (4 saltate: libreria reale o Claude vero), budget rispettati (avvio 497/530 ms misurato a PC scarico).
   - Fase 6, lato main unito (`p6-main`, D-243, D-244): modello locale TF-IDF con citazioni e tag, cluster Louvain a livelli con seme, layout a forze, posizionamento incrementale, "vicini che non sembrano", esplorazione per temi/autori/riviste, etichette dei cluster con Claude; worker su richiesta; 1385 unitari verdi nel ramo; budget del main 845,8/880 KiB. Contratti di fase 7 scritti (D-241, D-242).
   - Fase 6, interfaccia unita (`p6-ui`, D-245): sezione Rete con mappa su canvas, rete espandibile, esplorazione per zoom, vicini, coppie inattese, etichette dei cluster con Claude. E2e del criterio verde (`e2e/network.spec.ts`: costruzione con avanzamento, stessi cluster a parità di seme, 500+ nodi senza long task con p95 33,5 ms, documento nuovo posizionato senza ricostruire, ≤ 4 zoom e ritorno, autore → temi → ritorno). Budget totali del renderer 1500/1710 KiB.
-- **In corso:** revisore indipendente di fase 6 (rapporto in `phase6-review.md` dello scratchpad) e subagent `p7-main` (worktree `C:\dev\rl-wt\p7-main`: export second brain e server MCP, lato main). Dopo: revisione di sicurezza di fase 6, correzioni, suite completa, tag `phase-6`.
+- **In corso (ripresa del 2026-11-17 dopo l'interruzione per limite di crediti):** il revisore di fase 6 si era fermato senza rapporto ed è stato rilanciato; `p7-main` aveva l'export fatto (fb3e2fc, 28ffcfc) e `packages/mcp` scritto ma non committato (ora 7ea5074, 12 test verdi): un subagent finisce il lato main del server MCP (servizio, strumenti con le regole di cartella, handler, registro). Dopo: revisione di sicurezza di fase 6, correzioni, suite completa, tag `phase-6`; poi interfaccia di fase 7.
 - **Bloccato:** —
 - **Prossimo (in ordine):**
   1. Criteri di fase 4 che servono all'utente (poi tag `phase-4`): 5 paper campione con almeno l'80% dei tag accettati (lavoro AI con Claude vero e revisione), un PDF vero trascinato nella cartella di arrivo in meno di un minuto con i metadati giusti, prova della chat su una cartella della libreria reale scelta dall'utente. Nota: Haiku con ragionamento basso a volte risponde in italiano a una domanda breve in inglese.

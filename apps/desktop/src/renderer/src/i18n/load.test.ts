@@ -3,7 +3,8 @@ import i18n, { loadStrings, setLanguage, type StringPart } from './index';
 import { flatten, partOf, type Tree } from './testing';
 
 const at = (tree: Tree, key: string) => key.split('.').reduce<string | Tree | undefined>((o, k) => (typeof o === 'object' ? o[k] : undefined), tree);
-const wizardKey = flatten(partOf('en', 'wizard'))[0]!;
+// A key whose text differs between the languages.
+const wizardKey = flatten(partOf('en', 'wizard')).find((k) => at(partOf('en', 'wizard'), k) !== at(partOf('it', 'wizard'), k))!;
 
 describe('loading strings by part', () => {
   it('serves a part in both languages, and again when switching back', async () => {

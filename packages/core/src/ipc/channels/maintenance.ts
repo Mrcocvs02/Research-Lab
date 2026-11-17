@@ -13,14 +13,17 @@ const bytes = z.number().int().nonnegative();
  * a document title or an absolute path.
  */
 export const maintenanceChannels = defineChannels('maintenance', {
-  /** Sizes of the data of a library on this computer and a snapshot of the app process. */
+  /**
+   * Sizes of the data of a library on this computer and a snapshot of the app process. `local.backups`: the app's own
+   * safety copies of the data folder taken before a bulk write (D-264); they are never cleaned from here.
+   */
   report: {
     request: z.object({ libraryId: itemIdSchema.optional() }),
     response: z.object({
       documents: z.number().int().nonnegative(),
       /** Bytes of the library data folder (synced) and of the local folders of the library (never synced). */
       dataBytes: bytes,
-      local: z.object({ index: bytes, cache: bytes, thumbs: bytes, graph: bytes, chats: bytes }),
+      local: z.object({ index: bytes, cache: bytes, thumbs: bytes, graph: bytes, chats: bytes, backups: bytes.optional() }),
       logsBytes: bytes,
       process: z.object({ rssMb: z.number().nonnegative(), heapMb: z.number().nonnegative(), uptimeSec: z.number().nonnegative(), startupMs: z.number().nonnegative().nullable() }),
       /** Worker threads alive right now (scan, graph): they close after 60 s idle. */

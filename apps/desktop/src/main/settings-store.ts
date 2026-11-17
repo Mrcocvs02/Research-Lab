@@ -49,6 +49,11 @@ export class SettingsStore {
     return structuredClone(this.pending);
   }
 
+  /** Adds a notice raised after the start (e.g. the automatic backup); the caller also emits it for a window that is listening. */
+  raiseNotice(notice: AppNotice): void {
+    if (!this.pending.some((n) => n.id === notice.id)) this.pending.push(notice);
+  }
+
   dismissNotice(id: string): void {
     const i = this.pending.findIndex((n) => n.id === id);
     if (i >= 0) this.pending.splice(i, 1);

@@ -60,6 +60,10 @@ export interface MainServices {
   fetch?: typeof fetch;
   /** The graph worker (build, similarity on the fly), started on demand; absent: the work runs in-process (tests). */
   graphEngine?: () => GraphEngine;
+  /** Milliseconds from the start of the process to the first window content (set once; null until then). */
+  startupMs?: () => number | null;
+  /** Worker threads alive right now (scan and graph). */
+  workers?: () => number;
   /** Test hook (RL_E2E=1, development run only): JSON file that replaces the online metadata lookup. */
   metadataFile?: string | null;
 }

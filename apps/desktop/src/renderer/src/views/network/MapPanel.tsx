@@ -4,6 +4,7 @@ import type { Channels, RequestOf } from '@rl/core';
 import { Lazy, lazyView } from '../../components/Lazy';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
+import { useAiUi } from '../../lib/aiUi';
 import { rl } from '../../lib/rl';
 import { RlError } from '../../lib/rl-error';
 import { safeText } from '../library/safeText';
@@ -30,6 +31,7 @@ interface Props {
 /** The map tab: scope, level, the canvas, the legend of clusters and the labels by Claude. */
 export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMapChanged }: Props) {
   const { t } = useTranslation();
+  const { openExport } = useAiUi();
   const [kind, setKind] = useState<ScopeKind>('all');
   const [value, setValue] = useState('');
   const [level, setLevel] = useState(0);
@@ -146,6 +148,9 @@ export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMap
                     <span className="legend-text">{safeText(txt.text || c.id)}</span>
                     {txt.ai && <span className="ai-badge">{t('ai.badge')}</span>}
                     <span className="hint">{c.size}</span>
+                  </button>
+                  <button type="button" className="link legend-export" onClick={() => openExport({ clusters: [{ id: c.id, label: txt.text || c.id }], name: txt.text })} aria-label={t('secondBrain.clusterAria', { name: safeText(txt.text || c.id) })} data-testid="cluster-export">
+                    {t('secondBrain.clusterButton')}
                   </button>
                 </li>
               );

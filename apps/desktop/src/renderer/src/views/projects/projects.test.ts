@@ -4,10 +4,12 @@ import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError, type LibraryProfile } from '@rl/core';
 import i18n from '../../i18n';
+import { AiUiProvider } from '../../lib/aiUi';
 import { LibraryEventsProvider } from '../../lib/events';
 import { parseBlocks, renderBlocks } from '../../lib/markdown';
 import { NotifyProvider } from '../../lib/notify';
 import { AppProvider } from '../../state/app-context';
+import { ExportProbe } from '../../testing/exportProbe';
 import { makeDocs, memoryLibrary } from '../../testing/memoryLibrary';
 import { callsTo, emitEvent, memoryBackend, setHandlers } from '../../testing/mockRl';
 import { moveItem, notInPlan, planProgress, sortPlan, toRequestItems, type PlanItemView } from './readingPlan';
@@ -76,7 +78,7 @@ function setup(init: Parameters<typeof memoryLibrary>[0] = {}, override: Record<
   const lib = memoryLibrary({ docs: makeDocs(4), ...init });
   const { handlers } = memoryBackend({ profiles: [profile] });
   setHandlers({ ...handlers, ...lib.handlers, ...override });
-  render(createElement(AppProvider, null, createElement(LibraryEventsProvider, null, createElement(NotifyProvider, null, createElement(ProjectsView)))));
+  render(createElement(AppProvider, null, createElement(LibraryEventsProvider, null, createElement(NotifyProvider, null, createElement(AiUiProvider, null, createElement(ProjectsView), createElement(ExportProbe))))));
   return lib;
 }
 
@@ -210,5 +212,14 @@ describe('ProjectsView', () => {
     fireEvent.click(screen.getByTestId('members-remove'));
     fireEvent.click(screen.getByTestId('members-remove-confirm'));
     await screen.findByText(/removed from the project/);
+  });
+});
+
+describe('ProjectDetailView: second-brain export', () => {
+  it('starts the export from the project page with the project and its name', async () => {
+    setup({ projects: [{ id: 'p1', kind: 'project', name: 'Thesis', description: '', notes: '', status: 'active', revision: 0, members: [], plan: [] }] });
+    fireEvent.click(await screen.findByTestId('project-open'));
+    fireEvent.click(await screen.findByTestId('project-export'));
+    expect(JSON.parse(screen.getByTestId('export-probe').textContent!)).toEqual({ projectId: 'p1', name: 'Thesis' });
   });
 });

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { ProjectDetail, StudyState } from '@rl/core';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
+import { useAiUi } from '../../lib/aiUi';
 import { useLibraryEvents } from '../../lib/events';
 import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
@@ -78,6 +79,7 @@ export function ProjectDetailView({ id, onBack }: { id: string; onBack(): void }
   const { t } = useTranslation();
   const { invalidate } = useLibraryEvents();
   const { info, reportError } = useNotify();
+  const { openExport } = useAiUi();
   const [detail, setDetailState] = useState<ProjectDetail | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [tab, setTab] = useState<Tab>('members');
@@ -201,6 +203,9 @@ export function ProjectDetailView({ id, onBack }: { id: string; onBack(): void }
           {t(`projects.status.${p.status}`)}
         </span>
         <span className="badge">{t(`projects.kind.${p.kind}`)}</span>
+        <button type="button" onClick={() => openExport({ projectId: id, name: p.name })} data-testid="project-export">
+          {t('secondBrain.button')}
+        </button>
       </div>
       <div className="project-fields">
         <div className="field">

@@ -12,8 +12,6 @@ interface Draft {
   name: string;
   language: Language;
   excluded: string[];
-  mcpEnabled: boolean;
-  mcpWrite: boolean;
   presets: ExportPreset[];
 }
 
@@ -21,8 +19,6 @@ const toDraft = (c: LibraryConfig): Draft => ({
   name: c.name,
   language: c.language,
   excluded: c.excludedFolders,
-  mcpEnabled: c.mcp.enabled,
-  mcpWrite: c.mcp.writeEnabled,
   presets: c.exportPresets,
 });
 
@@ -34,7 +30,6 @@ function toCandidate(base: LibraryConfig, d: Draft): unknown {
     language: d.language,
     excludedFolders: d.excluded,
     exportPresets: d.presets,
-    mcp: { enabled: d.mcpEnabled, writeEnabled: d.mcpWrite },
   };
 }
 
@@ -110,7 +105,6 @@ export function LibraryConfigSection() {
           language: c.language,
           excludedFolders: c.excludedFolders,
           exportPresets: c.exportPresets,
-          mcp: c.mcp,
         },
       });
       ownSave.current = true;
@@ -135,13 +129,6 @@ export function LibraryConfigSection() {
         <h3>{t('settings.library.excluded')}</h3>
         <p className="hint">{t('settings.library.excludedHint')}</p>
         <FolderTree load={loadFolders} value={draft.excluded} onChange={(v) => edit({ excluded: v })} ariaLabel={t('settings.library.excluded')} testId="config-excluded-tree" />
-      </div>
-
-      <div className="group">
-        <h3>{t('settings.library.mcp')}</h3>
-        <p className="hint">{t('settings.library.mcpHint')}</p>
-        <CheckField label={t('settings.library.mcpEnabled')} checked={draft.mcpEnabled} onChange={(e) => edit({ mcpEnabled: e.target.checked, ...(e.target.checked ? {} : { mcpWrite: false }) })} />
-        <CheckField label={t('settings.library.mcpWrite')} hint={t('settings.library.mcpWriteHint')} checked={draft.mcpWrite} disabled={!draft.mcpEnabled} onChange={(e) => edit({ mcpWrite: e.target.checked })} />
       </div>
 
       <div className="group">

@@ -4,10 +4,12 @@ import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError, type LibraryProfile } from '@rl/core';
 import i18n from '../../i18n';
+import { AiUiProvider } from '../../lib/aiUi';
 import { LibraryEventsProvider } from '../../lib/events';
 import { HistoryProvider } from '../../lib/history';
 import { NotifyProvider } from '../../lib/notify';
 import { AppProvider } from '../../state/app-context';
+import { ExportProbe } from '../../testing/exportProbe';
 import { makeDocs, memoryLibrary, type FakeNode } from '../../testing/memoryLibrary';
 import { callsTo, emitEvent, memoryBackend, setHandlers } from '../../testing/mockRl';
 import { Facets, toggleFilter } from './Facets';
@@ -24,7 +26,7 @@ function setup(init: Parameters<typeof memoryLibrary>[0] = {}, override: Record<
   const { handlers } = memoryBackend({ profiles: [profile] });
   setHandlers({ ...handlers, ...lib.handlers, ...override });
   render(
-    createElement(AppProvider, null, createElement(LibraryEventsProvider, null, createElement(NotifyProvider, null, createElement(HistoryProvider, null, createElement(LibraryView))))),
+    createElement(AppProvider, null, createElement(LibraryEventsProvider, null, createElement(NotifyProvider, null, createElement(HistoryProvider, null, createElement(AiUiProvider, null, createElement(LibraryView), createElement(ExportProbe)))))),
   );
   return lib;
 }
@@ -819,5 +821,19 @@ describe('LibraryView: propose with AI', () => {
     expect(await screen.findByTestId('job-dialog')).toBeTruthy();
     await waitFor(() => expect(screen.getByTestId('job-to-send').textContent).toBe('2 documents will be sent'));
     expect(callsTo('jobs:estimate')[0].docIds).toHaveLength(2);
+  });
+});
+
+describe('LibraryView: second-brain export', () => {
+  it('starts the export from the selected documents', async () => {
+    const docs = makeDocs(4);
+    setup({ docs });
+    await ready();
+    expect(screen.getByTestId('export-probe').textContent).toBe('closed');
+    fireEvent.click(rowOf('Paper 0000'));
+    fireEvent.click(rowOf('Paper 0002'), { ctrlKey: true });
+    fireEvent.click(screen.getByTestId('bulk-export'));
+    const init = JSON.parse(screen.getByTestId('export-probe').textContent!);
+    expect([...init.docIds].sort()).toEqual([docs[0]!.docId, docs[2]!.docId].sort());
   });
 });

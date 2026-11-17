@@ -161,6 +161,14 @@
   padding: 3px 4px;
   text-align: left;
 }
+.legend li {
+  display: flex;
+  align-items: center;
+}
+.legend-export {
+  flex: none;
+  font-size: 12px;
+}
 .legend-item:hover {
   background: var(--surface-2);
 }

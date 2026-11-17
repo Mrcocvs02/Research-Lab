@@ -28,6 +28,18 @@ export interface Navigation {
   nonce: number;
 }
 
+/** What the second-brain export dialog starts from (any mix; the dialog lets the user change it). */
+export interface ExportInit {
+  projectId?: string;
+  folders?: string[];
+  tagIds?: string[];
+  /** Clusters of the graph model, with the text shown for them. */
+  clusters?: Array<{ id: string; label: string }>;
+  docIds?: string[];
+  /** Name to start the folder name from. */
+  name?: string;
+}
+
 interface AiUiValue {
   chatOpen: boolean;
   setChatOpen(open: boolean): void;
@@ -55,6 +67,10 @@ interface AiUiValue {
   /** The Inbox section, on the arrivals tab or on the AI proposals (review). */
   openInbox(): void;
   openReview(): void;
+  /** The second-brain export dialog (lazy, in the Shell): `exportInit` is what it starts from, null when closed. */
+  exportInit: ExportInit | null;
+  openExport(init?: ExportInit): void;
+  closeExport(): void;
 }
 
 const NONE: AiUiValue = {
@@ -78,6 +94,9 @@ const NONE: AiUiValue = {
   openSettings() {},
   openInbox() {},
   openReview() {},
+  exportInit: null,
+  openExport() {},
+  closeExport() {},
 };
 const Ctx = createContext<AiUiValue>(NONE);
 export const useAiUi = (): AiUiValue => useContext(Ctx);
@@ -93,6 +112,9 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   const [prefill, setPrefill] = useState<AiUiValue['prefill']>(null);
   const [searchRequest, setSearchRequest] = useState<SearchRequest | null>(null);
   const [navigation, setNavigation] = useState<Navigation | null>(null);
+  const [exportInit, setExportInit] = useState<ExportInit | null>(null);
+  const openExport = useCallback((init: ExportInit = {}) => setExportInit(init), []);
+  const closeExport = useCallback(() => setExportInit(null), []);
 
   const publishSelection = useCallback((ids: readonly string[]) => setSelection((cur) => (sameIds(cur, ids) ? cur : ids)), []);
   const publishReader = useCallback((ctx: ReaderContext | null) => setReader((cur) => (cur?.docId === ctx?.docId && cur?.page === ctx?.page ? cur : ctx)), []);
@@ -128,8 +150,8 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   }, [chatOpen, setChatOpen]);
 
   const value = useMemo(
-    () => ({ chatOpen, setChatOpen, paletteOpen, setPaletteOpen, selection, publishSelection, chatBusy, setChatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview }),
-    [chatOpen, setChatOpen, paletteOpen, selection, publishSelection, chatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview],
+    () => ({ chatOpen, setChatOpen, paletteOpen, setPaletteOpen, selection, publishSelection, chatBusy, setChatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview, exportInit, openExport, closeExport }),
+    [chatOpen, setChatOpen, paletteOpen, selection, publishSelection, chatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview, exportInit, openExport, closeExport],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

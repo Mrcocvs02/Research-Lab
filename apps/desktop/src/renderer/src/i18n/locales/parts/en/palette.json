@@ -36,6 +36,9 @@
       "secondBrain": {
         "label": "Export the second brain",
         "prompt": "Prepare an export of my library as a second brain: notes, links between documents and a summary of each topic."
+      },
+      "exportDialog": {
+        "label": "Export as a second brain…"
       }
     }
   }

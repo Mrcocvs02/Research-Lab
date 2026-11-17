@@ -36,6 +36,9 @@
       "secondBrain": {
         "label": "Esporta il secondo cervello",
         "prompt": "Prepara un'esportazione della mia libreria come secondo cervello: note, collegamenti tra documenti e un riassunto di ogni argomento."
+      },
+      "exportDialog": {
+        "label": "Esporta come secondo cervello…"
       }
     }
   }

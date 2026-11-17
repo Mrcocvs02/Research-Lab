@@ -8,6 +8,8 @@ import { SecretsSection } from './SecretsSection';
 
 // The AI settings (and the log viewer) load when the Settings page opens, not with the first screen.
 const AiSection = lazyView(() => import('./AiSection').then((m) => ({ default: m.AiSection })), ['aiSettings']);
+// Likewise the MCP server settings (and the log of its calls).
+const McpSection = lazyView(() => import('./McpSection').then((m) => ({ default: m.McpSection })), ['mcp']);
 
 /** All settings in one scrollable page. */
 export function Settings({ onNewLibrary }: { onNewLibrary: () => void }) {
@@ -21,6 +23,9 @@ export function Settings({ onNewLibrary }: { onNewLibrary: () => void }) {
       <NetworkSection />
       <Lazy>
         <AiSection />
+      </Lazy>
+      <Lazy>
+        <McpSection />
       </Lazy>
       <SecretsSection />
     </div>

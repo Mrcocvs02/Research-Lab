@@ -104,7 +104,8 @@
       "unknown": "The operation failed.",
       "file-not-listed": "That file is not in the backup folder. Pick it again with the file chooser.",
       "invalid-path": "That path cannot be used.",
-      "running": "Another backup or restore is already running."
+      "running": "Another backup or restore is already running.",
+      "file-locked": "A library file is locked by another program (sync or antivirus). Try again shortly."
     },
     "restore": {
       "button": "Restore…",

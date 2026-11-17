@@ -5,7 +5,7 @@ import { RlError } from '../lib/rl-error';
 import { formatSize } from '../views/library/formatSize';
 
 /** Reasons of CONFLICT / INVALID_REQUEST that the backup and restore flows explain themselves (`backup.errors.<reason>`). */
-export const BACKUP_REASONS = ['no-destination', 'inside-library', 'too-large', 'not-enough-space', 'not-empty', 'already-registered', 'integrity', 'newer-format', 'not-a-backup', 'file-not-approved', 'file-not-listed', 'invalid-path', 'running', 'busy'] as const;
+export const BACKUP_REASONS = ['no-destination', 'inside-library', 'too-large', 'not-enough-space', 'not-empty', 'already-registered', 'integrity', 'newer-format', 'not-a-backup', 'file-not-approved', 'file-not-listed', 'invalid-path', 'running', 'busy', 'file-locked'] as const;
 type Reason = (typeof BACKUP_REASONS)[number];
 
 /** Optional fields the main process adds to the results (D-300); typed here so the code works before and after the contract has them. */

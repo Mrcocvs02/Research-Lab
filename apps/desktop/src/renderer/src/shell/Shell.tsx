@@ -2,9 +2,11 @@ import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Lazy, lazyRetry } from '../components/Lazy';
 import { useAiUi } from '../lib/aiUi';
+import { CitationIndicator } from '../lib/citationJobs';
 import { useInbox } from '../lib/inbox';
 import { JobIndicator } from '../lib/jobs';
 import { useNotify } from '../lib/notify';
+import { useWatchCount } from '../lib/watch';
 import { useApp } from '../state/app-context';
 import { scanText } from '../views/library/ScanStatusText';
 import { useScanStatus } from '../views/library/useScanStatus';
@@ -13,7 +15,7 @@ import { useScanStatus } from '../views/library/useScanStatus';
 const ChatPanel = lazyRetry(() => import('../views/chat/ChatPanel').then((m) => ({ default: m.ChatPanel })));
 const Palette = lazyRetry(() => import('../views/chat/Palette').then((m) => ({ default: m.Palette })));
 
-export const SECTIONS = ['library', 'projects', 'network', 'inbox', 'settings'] as const;
+export const SECTIONS = ['library', 'projects', 'discover', 'network', 'inbox', 'settings'] as const;
 export type SectionId = (typeof SECTIONS)[number];
 
 interface Props {
@@ -31,6 +33,7 @@ export function Shell({ section, onSection, onNewLibrary, children }: Props) {
   const chatCollapsed = !chatOpen;
   const chatId = useId();
   const inbox = useInbox();
+  const discoverCount = useWatchCount();
   // The chat is mounted the first time the panel opens and then kept (hidden when collapsed), so a running answer goes on.
   const [chatLoaded, setChatLoaded] = useState(chatOpen);
   useEffect(() => {
@@ -56,6 +59,11 @@ export function Shell({ section, onSection, onNewLibrary, children }: Props) {
                   {id === 'inbox' && inbox.count > 0 && (
                     <span className="nav-badge" data-testid="inbox-badge" aria-label={t('inbox.badge', { count: inbox.count })}>
                       {inbox.count}
+                    </span>
+                  )}
+                  {id === 'discover' && discoverCount > 0 && (
+                    <span className="nav-badge" data-testid="discover-badge" aria-label={t('discover.badge', { count: discoverCount })}>
+                      {discoverCount}
                     </span>
                   )}
                 </button>
@@ -171,6 +179,7 @@ function StatusBar() {
         </span>
       )}
       <JobIndicator />
+      <CitationIndicator />
       <span className="spacer" />
       {app.version && <span>{t('status.version', { version: app.version })}</span>}
     </footer>

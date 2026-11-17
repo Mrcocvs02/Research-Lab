@@ -969,6 +969,7 @@
     "badge_one": "{{count}} file in the inbox",
     "badge_other": "{{count}} files in the inbox",
     "needsLibrary": "Open a library first: files are added to the active library.",
+    "noPath": "That item is not a file on this computer, so it cannot be added. Save it first, then drop the saved file.",
     "dropHint": "Drop PDF files here to add them to the inbox",
     "tabs": "Inbox",
     "tab_arrivals": "Arrivals",

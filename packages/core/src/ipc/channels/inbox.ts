@@ -88,13 +88,23 @@ const addResponse = z.object({
  * original. Network: only the metadata services, only for identifiers found in the file; nothing of the file goes.
  */
 export const inboxChannels = defineChannels('inbox', {
+  /**
+   * How many items wait (badge of the navigation), without reading a document or touching the network: the dropped
+   * items of the local queue plus the number of flagged library files remembered from the last listing or recount.
+   * `recount: true` counts the flagged records again (once a scan has finished); lookups never run from here.
+   */
+  count: {
+    request: z.object({ recount: z.boolean().default(false) }),
+    response: z.object({ count: z.number().int().nonnegative() }),
+  },
   list: {
     request: z.object({}),
     response: z.object({ items: z.array(inboxItemSchema).max(INBOX_LIMITS.items) }),
   },
   /**
    * Adds files dropped on the window. `paths` are what the preload's `pathForFile` returned for the dropped files:
-   * main checks each one (absolute, regular file, `%PDF-` header, size) and only reads it.
+   * main checks each one (a local absolute path, never a network or device path starting with two backslashes; the
+   * `.pdf` extension; regular file, `%PDF-` header, size) and only reads it.
    */
   add: {
     request: z.object({ paths: z.array(z.string().min(1).max(4096)).min(1).max(INBOX_LIMITS.addBatch) }),

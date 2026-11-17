@@ -234,8 +234,8 @@ export const scrub = (text: string, key: string | null): string => {
   t = t.replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, '$1 [token]');
   t = t.replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]*)?/g, '[token]');
   t = t.replace(/\b[A-Za-z0-9_-]{32,}\b/g, '[token]');
-  t = t.replace(/\\[^\s"'`<>|]+/g, '[path]'); // UNC and \?\ forms
-  t = t.replace(/\b[A-Za-z]:[\/][^\s"'`<>|*?]*/g, '[path]');
+  t = t.replace(/\\\\[^\s"'`<>|]+/g, '[path]'); // UNC and verbatim (double backslash) forms
+  t = t.replace(/\b[A-Za-z]:[\\/][^\s"'`<>|*?]*/g, '[path]');
   t = t.replace(/(^|[\s("'=])\/(?:[\w.@~+-]+\/)+[\w.@~+-]*/g, '$1[path]');
   t = t.replace(/(^|[\s("'=])~\/[^\s"'`]*/g, '$1[path]');
   return t;

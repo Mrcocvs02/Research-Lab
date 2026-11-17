@@ -221,3 +221,61 @@ describe('claude provider structured output and availability', () => {
     expect(mk(fakeSdk([]).sdk).estimateCost({ model: 'unknown', promptChars: 4 }).usd).toBeNull();
   });
 });
+
+const BS = String.fromCharCode(92);
+const win = (...parts: string[]) => parts.join(BS);
+
+describe('hardening of the child process and of error text', () => {
+  it('child env is an allow-list: what the CLI needs stays, NODE_OPTIONS and the rest never reach it', () => {
+    const o = buildQueryOptions({
+      ...base,
+      apiKey: KEY,
+      baseEnv: {
+        Path: win('C:', 'bin'), SystemRoot: win('C:', 'Windows'), TEMP: win('C:', 't'), USERPROFILE: win('C:', 'usr'), APPDATA: win('C:', 'a'), LOCALAPPDATA: win('C:', 'l'), ProgramData: win('C:', 'p'), HTTPS_PROXY: 'http://p:1', CLAUDE_CODE_OAUTH_TOKEN: 'tok', LC_ALL: 'C',
+        NODE_OPTIONS: '--require x', NODE_PATH: '/n', GITHUB_TOKEN: 'g', AWS_SECRET_ACCESS_KEY: 's', RL_E2E: '1', ELECTRON_RUN_AS_NODE: '1', LD_PRELOAD: 'x',
+      },
+    });
+    expect(Object.keys(o.env!).sort()).toEqual(['ANTHROPIC_API_KEY', 'APPDATA', 'CLAUDE_AGENT_SDK_CLIENT_APP', 'CLAUDE_CODE_OAUTH_TOKEN', 'HTTPS_PROXY', 'LC_ALL', 'LOCALAPPDATA', 'Path', 'ProgramData', 'SystemRoot', 'TEMP', 'USERPROFILE']);
+  });
+
+  it('skips relative PATH entries when looking for the executable', () => {
+    const seen: string[] = [];
+    const r = resolveClaudeExecutable({ platform: 'linux', env: { PATH: 'bin:./tools::/opt/bin' }, home: '/h', exists: (p) => (seen.push(p), p === '/opt/bin/claude'), bundled: () => null });
+    expect(r).toBe('/opt/bin/claude');
+    expect(seen.some((p) => p.startsWith('bin') || p.startsWith('./'))).toBe(false);
+    const ok = win('C:', 'ok');
+    const w = resolveClaudeExecutable({ platform: 'win32', env: { PATH: `.;tools;${ok}` }, home: win('C:', 'h'), exists: (p) => /^(tools|\.)/.test(p) || p === win(ok, 'claude.exe'), bundled: () => null });
+    expect(w).toBe(win(ok, 'claude.exe'));
+  });
+
+  it('scrubs the key, tokens and absolute paths from the error text; the full detail goes to the local hook only', async () => {
+    const detail: string[] = [];
+    const leaky = `spawn ${win('C:', 'Users', 'someone', 'bin', 'claude.exe')} ENOENT; also /home/someone/.local/bin/claude and ${BS}${win('', 'host', 'share', 'x')}, Bearer abcdefghijklmnop, ${KEY}, ${'a1'.repeat(20)}`;
+    const sdk = { ...fakeSdk([]).sdk, query: () => Object.assign((async function* () { throw new Error(leaky); })(), { close() {} }) } as unknown as SdkModule;
+    const err = await mk(sdk, { onErrorDetail: (d: string) => detail.push(d) }).completeStructured({ model: 'm', reasoning: 'low', system: 's', prompt: 'p', schema: z.object({}), source: 'c' }).catch((e: unknown) => e as Error);
+    expect(err.message).not.toMatch(/someone|share|abcdefghijklmnop|SECRET|a1a1a1/);
+    expect(err.message).toContain('[path]');
+    expect(detail[0]).toContain('someone');
+    expect(detail[0]).not.toContain(KEY);
+    const events = await collect(mk({ ...fakeSdk([]).sdk, query: () => Object.assign((async function* () { throw new Error(leaky); })(), { close() {} }) } as unknown as SdkModule).chat({ model: 'm', reasoning: 'low', system: 's', messages: [{ role: 'user', content: 'hi' }] }));
+    const e = events.find((x) => x.type === 'error') as { message: string };
+    expect(e.message).not.toMatch(/someone|abcdefghijklmnop|SECRET/);
+  });
+
+  it('structured results carry the provider cost and the tokens of every attempt; errors carry them and whether anything was sent', async () => {
+    let n = 0;
+    const sdk = {
+      ...fakeSdk([]).sdk,
+      query: () => Object.assign((async function* () { yield resultMsg({ structured_output: ++n === 1 ? { bad: 1 } : { tags: ['a'] } }); })(), { close() {} }),
+    } as unknown as SdkModule;
+    const r = await mk(sdk).completeStructured({ model: 'm', reasoning: 'low', system: 's', prompt: 'p', schema: z.object({ tags: z.array(z.string()) }), source: 'c' });
+    expect(r.usage.costUsd).toBeCloseTo(0.0246, 6);
+    expect(r.usage.inputTokens).toBe(300);
+    const bad = { ...fakeSdk([]).sdk, query: () => Object.assign((async function* () { yield resultMsg({ structured_output: 1 }); })(), { close() {} }) } as unknown as SdkModule;
+    const e = await mk(bad).completeStructured({ model: 'm', reasoning: 'low', system: 's', prompt: 'p', schema: z.object({ tags: z.array(z.string()) }), source: 'c' }).catch((x: unknown) => x as { details?: any });
+    expect(e.details).toMatchObject({ sent: true, usage: { inputTokens: 300, costUsd: expect.any(Number) } });
+    const never = { ...fakeSdk([]).sdk, query: () => Object.assign((async function* () { throw new Error('spawn failed'); })(), { close() {} }) } as unknown as SdkModule;
+    const e2 = await mk(never).completeStructured({ model: 'm', reasoning: 'low', system: 's', prompt: 'p', schema: z.object({}), source: 'c' }).catch((x: unknown) => x as { details?: any });
+    expect(e2.details).toMatchObject({ sent: false });
+  });
+});

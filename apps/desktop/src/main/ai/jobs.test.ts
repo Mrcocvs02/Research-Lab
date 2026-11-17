@@ -20,6 +20,7 @@ let store: FileLibraryStore;
 let progress: any[];
 let wrap: ((p: any) => any) | null;
 let script: MockScript;
+let activeLib = 'lib-1';
 
 const config = (over: Partial<LibraryConfig> & { ai?: Partial<LibraryConfig['ai']> } = {}): LibraryConfig => {
   const base = defaultLibraryConfig();
@@ -28,7 +29,7 @@ const config = (over: Partial<LibraryConfig> & { ai?: Partial<LibraryConfig['ai'
 
 function harness() {
   const log = createMemoryLogger();
-  const rt = { libraryId: 'lib-1', store, search: async () => ({ total: 0, hits: [] }), reindexDocuments: async () => {} };
+  const rt = { get libraryId() { return activeLib; }, store, search: async () => ({ total: 0, hits: [] }), reindexDocuments: async () => {} };
   const services = {
     log,
     localDataDir: local,
@@ -81,6 +82,7 @@ beforeEach(async () => {
   progress = [];
   wrap = null;
   script = {};
+  activeLib = 'lib-1';
 });
 afterEach(async () => {
   abortAllJobs();
@@ -234,5 +236,124 @@ describe('jobs:start', () => {
     const d = (await store.documents.get(hex(1) as never))!;
     expect(d.ai.suggestedTags?.value).toEqual(['robotics']);
     expect(d.ai.suggestedNewTags?.value).toEqual([{ label: 'Soft robots', parentId: 'robotics', aliases: ['SR'], reason: 'none fits' }]);
+  });
+});
+
+describe('jobs: failures, cost, stale runtime', () => {
+  const many = async (n: number) => {
+    for (let i = 4; i < 4 + n; i++) await store.documents.put(doc(i, `open/p${i}.pdf`));
+    return [hex(1), hex(2), ...Array.from({ length: n }, (_, i) => hex(i + 4))];
+  };
+
+  it('stops after three consecutive provider failures instead of trying every document, and logs no send when nothing left', async () => {
+    const ids = await many(6);
+    let calls = 0;
+    script = { fail: { code: 'AI_PROVIDER_ERROR', message: 'Claude could not be started', sent: false } };
+    wrap = (p) => ({ ...p, completeStructured: async (r: any) => (calls++, p.completeStructured(r)) });
+    const call = harness();
+    ok(await call('jobs:start', req({ docIds: ids })));
+    await whenJobsIdle();
+    const job = ok(await call('jobs:list')).items[0];
+    expect(calls).toBe(3);
+    expect(job).toMatchObject({ state: 'failed', failed: 3, error: { code: 'AI_PROVIDER_ERROR' } });
+    expect((await sends()).filter((l) => l.purpose === 'job:suggest')).toHaveLength(0);
+  });
+
+  it('a provider failure that may have sent the content is still logged, with the tokens it reports', async () => {
+    wrap = (p) => ({
+      ...p,
+      completeStructured: async () => {
+        throw new AppError('AI_PROVIDER_ERROR', 'schema mismatch', { sent: true, usage: { inputTokens: 700, outputTokens: 40, costUsd: 0.25 } });
+      },
+    });
+    const call = harness();
+    ok(await call('jobs:start', req({ docIds: [hex(1)] })));
+    await whenJobsIdle();
+    const log = (await sends()).filter((l) => l.purpose === 'job:suggest');
+    expect(log).toHaveLength(1);
+    expect(log[0]).toMatchObject({ approxInputTokens: 700, estimatedCostUsd: 0.25 });
+    expect(ok(await call('jobs:list')).items[0].usd).toBeCloseTo(0.25, 6);
+  });
+
+  it('a consecutive-failure count restarts after a success', async () => {
+    const ids = await many(4);
+    let n = 0;
+    wrap = (p) => ({
+      ...p,
+      completeStructured: async (r: any) => {
+        n++;
+        if (n % 3 === 0) return p.completeStructured(r);
+        throw new AppError('AI_PROVIDER_ERROR', 'down', { sent: false });
+      },
+    });
+    const call = harness();
+    ok(await call('jobs:start', req({ docIds: ids })));
+    await whenJobsIdle();
+    expect(ok(await call('jobs:list')).items[0]).toMatchObject({ state: 'done', done: 2, failed: 4 });
+  });
+
+  it('counts the cost the provider reports (cache reads priced by the provider), in the log and in the job total', async () => {
+    script = { usage: { inputTokens: 1_000_000, outputTokens: 1000, costUsd: 0.0421 } };
+    const call = harness();
+    ok(await call('jobs:start', req({ docIds: [hex(1)] })));
+    await whenJobsIdle();
+    expect(ok(await call('jobs:list')).items[0].usd).toBeCloseTo(0.0421, 6);
+    expect((await sends()).find((l) => l.purpose === 'job:suggest')).toMatchObject({ estimatedCostUsd: 0.0421, approxInputTokens: 1_000_000 });
+  });
+
+  it('writes nothing when the job is aborted after the model answered; the send is still logged', async () => {
+    wrap = (p) => ({
+      ...p,
+      completeStructured: async (r: any) => {
+        const out = await p.completeStructured(r);
+        abortAllJobs();
+        return out;
+      },
+    });
+    const call = harness();
+    ok(await call('jobs:start', req({ docIds: [hex(1), hex(2)] })));
+    await whenJobsIdle();
+    expect(ok(await call('jobs:list')).items[0]).toMatchObject({ state: 'cancelled', done: 0 });
+    expect((await store.documents.get(hex(1) as never))!.ai.suggestedTags).toBeUndefined();
+    expect((await sends()).filter((l) => l.purpose === 'job:suggest')).toHaveLength(1);
+  });
+
+  it('a library switch while the model answers (running) or before the next document stops the job without writing to the wrong library', async () => {
+    wrap = (p) => ({
+      ...p,
+      completeStructured: async (r: any) => {
+        const out = await p.completeStructured(r);
+        activeLib = 'lib-2'; // setActive: another library is current now
+        return out;
+      },
+    });
+    const call = harness();
+    ok(await call('jobs:start', req({ docIds: [hex(1), hex(2)] })));
+    await whenJobsIdle();
+    expect(ok(await call('jobs:list')).items[0]).toMatchObject({ state: 'cancelled', done: 0 });
+    expect((await store.documents.get(hex(1) as never))!.ai.suggestedTags).toBeUndefined();
+    expect((await store.documents.get(hex(2) as never))!.ai.suggestedTags).toBeUndefined();
+  });
+
+  it('a queued job is stopped by abortAllJobs (library switch) without ever calling the provider', async () => {
+    let calls = 0;
+    wrap = (p) => ({
+      ...p,
+      completeStructured: async (r: any) => {
+        calls++;
+        await new Promise((_res, rej) => r.signal.addEventListener('abort', () => rej(new AppError('CANCELLED', 'Cancelled'))));
+        return p.completeStructured(r);
+      },
+    });
+    const call = harness();
+    const a = ok(await call('jobs:start', req({ docIds: [hex(1)] }))).jobId;
+    const b = ok(await call('jobs:start', req({ docIds: [hex(2)], fields: ['keywords'] }))).jobId;
+    for (let i = 0; i < 300 && calls < 1; i++) await new Promise((r) => setTimeout(r, 10));
+    abortAllJobs();
+    await whenJobsIdle();
+    const items = ok(await call('jobs:list')).items;
+    expect(items.find((x: any) => x.jobId === a).state).toBe('cancelled');
+    expect(items.find((x: any) => x.jobId === b).state).toBe('cancelled');
+    expect(calls).toBe(1);
   });
 });

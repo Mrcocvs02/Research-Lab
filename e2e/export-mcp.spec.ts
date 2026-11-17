@@ -152,6 +152,8 @@ test('export a project as a second brain, answer control questions from the fold
     await dialog.getByTestId('export-folder-name').fill(EXPORT_DIR);
     await expect(dialog.getByTestId('export-target-note')).toHaveAttribute('data-state', 'new', { timeout: 30_000 });
     await dialog.getByTestId('export-run').click();
+    // The papers are in folders not enabled for AI: the export asks before writing them (D-241).
+    await dialog.getByTestId('export-confirm-yes').click();
     const result = dialog.getByTestId('export-result');
     await expect(result).toHaveAttribute('data-state', 'done', { timeout: 120_000 });
     const written = Number(await dialog.getByTestId('res-written').textContent());
@@ -215,6 +217,8 @@ test('export a project as a second brain, answer control questions from the fold
     await expect(dialog.getByTestId('export-target-note')).toContainText('1 file has a generated section you edited by hand');
     await expect(dialog.getByTestId('export-run')).toHaveText('Update the export');
     await dialog.getByTestId('export-run').click();
+    // The papers are in folders not enabled for AI: the export asks before writing them (D-241).
+    await dialog.getByTestId('export-confirm-yes').click();
     await expect(dialog.getByTestId('export-result')).toHaveAttribute('data-state', 'done', { timeout: 120_000 });
     await expect(dialog.getByTestId('res-kept')).toHaveText('1');
     await expect(dialog.getByTestId('res-kept-list')).toContainText(`papers/${keyA}.md`);
@@ -321,7 +325,8 @@ test('MCP server from the settings: configuration from the clipboard, tools over
     await expect(section.getByTestId('mcp-state')).toHaveText('Off');
     await expect(section.getByTestId('mcp-sees')).toContainText('1 folder enabled for AI');
     await expect(section.getByTestId('mcp-copy-cli')).toBeDisabled();
-    await section.getByTestId('mcp-enable').check();
+    // A controlled checkbox: it changes once the main answers, so click and then wait for the state.
+    await section.getByTestId('mcp-enable').click();
     await expect(section.getByTestId('mcp-state')).toHaveText('Running', { timeout: 30_000 });
     await expect(section.getByTestId('mcp-url')).toContainText('http://127.0.0.1:');
 
@@ -373,10 +378,10 @@ test('MCP server from the settings: configuration from the clipboard, tools over
 
     // Writing: only proposals, after an explicit confirmation; the tool list then has it.
     await expect(section.getByTestId('mcp-write-warning')).toContainText('PROPOSE');
-    await section.getByTestId('mcp-write').check();
+    await section.getByTestId('mcp-write').click();
     await section.getByTestId('mcp-write-yes').click();
     await expect.poll(async () => ((await rpc(url, token, 'tools/list')).json.result.tools as Array<{ name: string }>).map((t) => t.name)).toContain('write_ai_field');
-    await section.getByTestId('mcp-write').uncheck();
+    await section.getByTestId('mcp-write').click();
     await expect.poll(async () => ((await rpc(url, token, 'tools/list')).json.result.tools as Array<{ name: string }>).map((t) => t.name)).not.toContain('write_ai_field');
 
     // Rotating the token (after confirmation) replaces the old one at once.
@@ -390,7 +395,7 @@ test('MCP server from the settings: configuration from the clipboard, tools over
     expect((await rpc(fresh.url, fresh.token, 'tools/list')).status).toBe(200);
 
     // Off again: the server stops.
-    await section.getByTestId('mcp-enable').uncheck();
+    await section.getByTestId('mcp-enable').click();
     await expect(section.getByTestId('mcp-state')).toHaveText('Off');
     await expect(fetch(fresh.url, { method: 'POST' })).rejects.toThrow();
 

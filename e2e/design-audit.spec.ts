@@ -17,7 +17,8 @@ import { ipcData, waitForScan } from './helpers/phase1';
  * Every step is best effort: a failure is recorded and the tour goes on.
  */
 const ENABLED = process.env.RL_DESIGN_AUDIT === '1';
-const OUT = path.resolve(import.meta.dirname, '../audit-shots');
+// RL_DESIGN_AUDIT_OUT: a sub-folder of audit-shots/ for this run (file names repeat between runs).
+const OUT = path.resolve(import.meta.dirname, '../audit-shots', process.env.RL_DESIGN_AUDIT_OUT ?? '');
 
 test.use({ actionTimeout: 8_000 });
 test.describe.configure({ mode: 'serial' });
@@ -72,8 +73,16 @@ class Audit {
       const msg = String((e as Error)?.message ?? e).split('\n')[0]!.slice(0, 400);
       this.failures.push({ step: name, error: msg });
       console.log(`[audit:${this.run}] step failed: ${name}: ${msg}`);
-      // Leave transient UI (dialogs, menus) behind so the next step starts clean.
+      // Leave transient UI (dialogs, menus) behind so the next step starts clean. Esc only reaches a dialog that holds
+      // the focus: when the focus was lost, close it with its own close button.
       await this.page.keyboard.press('Escape').catch(() => {});
+      for (let i = 0; i < 3; i++) {
+        const close = this.page.locator('.dialog .dialog-head button.icon-button').last();
+        if (!(await close.isVisible().catch(() => false))) break;
+        this.facts[`dialog-left-open-after-${name}`] = true;
+        await close.click({ timeout: 2_000 }).catch(() => {});
+        await this.page.waitForTimeout(300);
+      }
     }
   }
 
@@ -318,6 +327,66 @@ function readerGeometry() {
   };
 }
 
+/** Computed style of the app sidebar and of the open dialog (pdf.js' own `.sidebar` / `.dialog` rules leak into them). */
+function styleProbe() {
+  const pick = (el: Element | null) => {
+    if (!el) return null;
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    return { w: Math.round(r.width), h: Math.round(r.height), borderRadius: s.borderRadius, boxShadow: s.boxShadow.slice(0, 80), padding: s.padding, border: s.border.slice(0, 60), background: s.backgroundColor, inset: `${s.top} ${s.left}`, position: s.position, margin: s.margin };
+  };
+  return { sidebar: pick(document.querySelector('.sidebar')), dialog: pick(document.querySelector('.dialog')) };
+}
+
+/** Rules of the lazily loaded reader stylesheet (pdf.js' pdf_viewer.css) that hit app elements outside the PDF area,
+ * plus the class names the two stylesheets share. */
+function leakedRules() {
+  const isReaderSheet = (sh: CSSStyleSheet) => {
+    try {
+      return [...sh.cssRules].some((r) => r instanceof CSSStyleRule && r.selectorText.includes('.pdfViewer'));
+    } catch {
+      return false;
+    }
+  };
+  const flat = (list: CSSRuleList): CSSStyleRule[] => {
+    const out: CSSStyleRule[] = [];
+    for (const r of [...list]) {
+      if (r instanceof CSSStyleRule) out.push(r);
+      else if ('cssRules' in r) out.push(...flat((r as CSSGroupingRule).cssRules));
+    }
+    return out;
+  };
+  const sheets = [...document.styleSheets];
+  const reader = sheets.filter(isReaderSheet);
+  const others = sheets.filter((sh) => !reader.includes(sh));
+  const classes = (rules: CSSStyleRule[]) => new Set(rules.flatMap((r) => r.selectorText.match(/\.[a-zA-Z][\w-]*/g) ?? []));
+  const readerRules = reader.flatMap((sh) => flat(sh.cssRules));
+  let appRules: CSSStyleRule[] = [];
+  for (const sh of others) {
+    try {
+      appRules = appRules.concat(flat(sh.cssRules));
+    } catch {
+      /* cross-origin */
+    }
+  }
+  const appClasses = classes(appRules);
+  const shared = [...classes(readerRules)].filter((c) => appClasses.has(c)).sort();
+  const area = document.querySelector('[data-testid="reader-pages-area"]');
+  const hits: { selector: string; count: number; sample: string; css: string }[] = [];
+  for (const r of readerRules) {
+    let els: Element[] = [];
+    try {
+      els = [...document.querySelectorAll(r.selectorText)].filter((e) => !area?.contains(e) && !e.closest('.pdfViewer'));
+    } catch {
+      continue;
+    }
+    if (els.length === 0 || r.selectorText === ':root' || /^\*|^html|^body/.test(r.selectorText)) continue;
+    const e = els[0]!;
+    hits.push({ selector: r.selectorText.slice(0, 80), count: els.length, sample: `${e.tagName.toLowerCase()}.${String((e as HTMLElement).className).slice(0, 40)}`, css: r.style.cssText.slice(0, 160) });
+  }
+  return { readerSheets: reader.length, readerRules: readerRules.length, sharedClassNames: shared, rulesHittingAppNow: hits.slice(0, 40) };
+}
+
 async function visibleNow(l: Locator): Promise<boolean> {
   return l.first().isVisible().catch(() => false);
 }
@@ -416,21 +485,41 @@ async function libraryTour(a: Audit, ctx: LaunchedApp, lang: 'it' | 'en'): Promi
     await rowsL.first().click();
     await w.waitForTimeout(500);
     await a.shot('library-one-click-selected', 1, { note: 'a single click only selects: no detail pane' });
-    // The card opens with a second click on the selected row (or Enter, or the selection bar button).
+    // A second click on the selected row: does it open the card? (Recorded, not assumed.) Wait past the double-click time.
+    await w.waitForTimeout(700);
     await rowsL.first().click();
+    await w.waitForTimeout(600);
+    a.facts['detail-opens-on-second-click'] = await visibleNow(w.getByTestId('detail-pane'));
+    // The discoverable way: the "Details" button of the selection bar (Enter on the focused row does the same).
+    if (!(await visibleNow(w.getByTestId('detail-pane')))) await w.getByTestId('selection-details').click();
     await expect(w.getByTestId('detail-pane')).toBeVisible();
-    await w.waitForTimeout(500);
+    await w.waitForTimeout(800);
+    a.facts['detail-pane-geometry'] = await w.getByTestId('detail-pane').evaluate((e) => ({ w: Math.round(e.getBoundingClientRect().width), scrollH: e.scrollHeight, clientH: e.clientHeight, sections: [...e.querySelectorAll('h2, h3')].map((h) => (h.textContent || '').trim().slice(0, 40)) }));
     await a.shot('library-detail', 2, { focus: 15 });
+    await w.getByTestId('detail-pane').evaluate((e) => e.scrollTo(0, e.scrollHeight));
+    await w.waitForTimeout(300);
+    await a.shot('library-detail-bottom', 2);
   });
   await a.step('detail similar', async () => {
-    await w.getByTestId('similar-toggle').click();
-    await w.waitForTimeout(800);
-    await a.shot('library-detail-similar', 2);
+    const t = w.getByTestId('detail-pane').getByTestId('similar-toggle');
+    await t.scrollIntoViewIfNeeded();
+    await t.click();
+    await w.waitForTimeout(2500);
+    await w.getByTestId('detail-pane').getByTestId('doc-similar').scrollIntoViewIfNeeded().catch(() => {});
+    await a.shot('library-detail-similar', 3);
   });
   await a.step('detail citations', async () => {
-    await w.getByTestId('citations-toggle').click();
-    await w.waitForTimeout(800);
-    await a.shot('library-detail-citations', 2);
+    const t = w.getByTestId('detail-pane').getByTestId('citations-toggle');
+    await t.scrollIntoViewIfNeeded();
+    await t.click();
+    await w.waitForTimeout(2500);
+    await w.getByTestId('detail-pane').getByTestId('doc-citations').scrollIntoViewIfNeeded().catch(() => {});
+    await a.shot('library-detail-citations', 3);
+    if (await visibleNow(w.getByTestId('citations-refresh'))) {
+      await w.getByTestId('citations-refresh').click().catch(() => {});
+      await w.waitForTimeout(2500);
+      await a.shot('library-detail-citations-refresh-offline', 4);
+    }
   });
   await a.step('library multi select', async () => {
     await rowsL.first().click();
@@ -452,9 +541,36 @@ async function libraryTour(a: Audit, ctx: LaunchedApp, lang: 'it' | 'en'): Promi
   });
   await a.step('bulk export', async () => {
     await w.getByTestId('bulk-export').click();
+    const dialog = w.getByTestId('export-dialog');
+    await expect(dialog).toBeVisible();
     await w.waitForTimeout(1200);
     await a.shot('export-dialog-from-selection', 3);
-    await w.keyboard.press('Escape');
+    a.facts['export-dialog-geometry'] = await dialog.evaluate((e) => ({ scrollH: e.scrollHeight, clientH: e.clientHeight, controls: e.querySelectorAll('button, input, select, textarea').length }));
+    // Full flow: destination (test hook: a folder outside the library), folder name, run, confirm, result.
+    await dialog.getByTestId('export-choose').click();
+    await expect(dialog.getByTestId('export-dest-path')).toBeVisible();
+    await dialog.getByTestId('export-folder-name').fill(lang === 'it' ? 'secondo-cervello' : 'second-brain');
+    await expect(dialog.getByTestId('export-target-note')).toHaveAttribute('data-state', /.+/, { timeout: 30_000 });
+    await w.waitForTimeout(600);
+    await a.shot('export-dialog-destination-chosen', 6);
+    await dialog.getByTestId('export-run').scrollIntoViewIfNeeded();
+    await a.shot('export-dialog-run-button', 6);
+    await dialog.getByTestId('export-run').click();
+    await w.waitForTimeout(300);
+    a.facts['export-focus-after-run'] = await w.evaluate(() => { const e = document.activeElement; return e ? `${e.tagName.toLowerCase()} ${e.getAttribute('data-testid') ?? ''} inDialog=${!!e.closest('.dialog')}` : null; });
+    // Documents outside the AI-enabled folders: the dialog asks for a confirmation inline, below the fold.
+    await dialog.getByTestId('export-confirm-yes').waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
+    if (await visibleNow(dialog.getByTestId('export-confirm-yes'))) {
+      await dialog.getByTestId('export-confirm-yes').scrollIntoViewIfNeeded();
+      await a.shot('export-confirm', 7);
+      await dialog.getByTestId('export-confirm-yes').click();
+    }
+    await w.waitForTimeout(800);
+    await a.shot('export-running', 8);
+    await expect(dialog.getByTestId('export-result')).toHaveAttribute('data-state', /done|failed/, { timeout: 120_000 });
+    await w.waitForTimeout(500);
+    await a.shot('export-result', 8);
+    await dialog.getByTestId('export-close').click().catch(() => w.keyboard.press('Escape'));
   });
   await a.step('bulk citations', async () => {
     await w.getByTestId('bulk-citations').click();
@@ -538,8 +654,10 @@ async function libraryTour(a: Audit, ctx: LaunchedApp, lang: 'it' | 'en'): Promi
     await w.keyboard.press('Escape');
   });
   await a.step('guide F1', async () => {
+    a.facts['styles-before-reader-sidebar'] = await w.evaluate(styleProbe);
     await w.keyboard.press('F1');
     await w.waitForTimeout(800);
+    a.facts['styles-before-reader-dialog'] = await w.evaluate(styleProbe);
     await a.shot('guide-dialog', 1);
     await w.keyboard.press('Escape');
   });
@@ -558,6 +676,17 @@ async function libraryTour(a: Audit, ctx: LaunchedApp, lang: 'it' | 'en'): Promi
 
   await a.step('reader', async () => {
     await readerTour(a, ctx, pdf.title!, pdf.relPath);
+  });
+  await a.step('pdf.js CSS leak after the reader', async () => {
+    if (await visibleNow(w.getByTestId('reader'))) await w.getByTestId('reader-close').click();
+    await nav(a, 'library');
+    a.facts['styles-after-reader-sidebar'] = await w.evaluate(styleProbe);
+    await a.shot('library-after-reader', 1);
+    await w.keyboard.press('F1');
+    await w.waitForTimeout(800);
+    a.facts['styles-after-reader-dialog'] = await w.evaluate(styleProbe);
+    await a.shot('guide-dialog-after-reader', 1);
+    await w.keyboard.press('Escape');
   });
 }
 
@@ -581,6 +710,7 @@ async function readerTour(a: Audit, ctx: LaunchedApp, title: string, relPath: st
     a.facts[`reader-geometry-${label}-${a.size}`] = { media, ...g };
   };
   await geo('fit');
+  a.facts['pdfjs-css-rules-outside-reader'] = await w.evaluate(leakedRules);
   await a.shot('reader-open-fit', 2, { focus: 20 });
   await a.shot('reader-open-fit-device', 2, { fullScale: true });
   await w.getByTestId('reader-zoom-in').click();
@@ -711,15 +841,37 @@ async function readerTour(a: Audit, ctx: LaunchedApp, title: string, relPath: st
           const before = await w.getByTestId('annotation-mark').count();
           await w.getByTestId('ann-highlight').click();
           await w.waitForTimeout(800);
-          const mark = await w.evaluate((n) => {
-            const m = document.querySelectorAll('[data-testid="annotation-mark"]')[n];
-            if (!m) return null;
-            const r = m.getBoundingClientRect();
-            return { x: r.x, y: r.y, w: r.width, h: r.height };
+          // Where the glyphs are really drawn: the canvas is squeezed into the page box, so a text-layer x maps to
+          // canvas.x + (x - textLayer.x) * canvas.w / textLayer.w. The highlight follows the text layer.
+          const m = await w.evaluate((n) => {
+            const mk = document.querySelectorAll('[data-testid="annotation-mark"]')[n];
+            const pg = document.querySelector('[data-testid="reader-pages-area"] .page[data-page-number="1"]');
+            const c = pg?.querySelector('canvas')?.getBoundingClientRect();
+            const t = pg?.querySelector('.textLayer')?.getBoundingClientRect();
+            if (!mk || !c || !t) return null;
+            const r = mk.getBoundingClientRect();
+            const sx = c.width / t.width;
+            const glyphX = c.x + (r.x - t.x) * sx;
+            const glyphW = r.width * sx;
+            return {
+              mark: { x: r.x, y: r.y, w: r.width, h: r.height },
+              canvas: { x: c.x, w: c.width, h: c.height },
+              textLayer: { x: t.x, w: t.width, h: t.height },
+              scaleX: Math.round(sx * 1000) / 1000,
+              glyphsDrawnAt: { x: Math.round(glyphX), w: Math.round(glyphW) },
+              offsetLeftPx: Math.round(r.x - glyphX),
+              offsetRightPx: Math.round(r.x + r.width - (glyphX + glyphW)),
+              overlapRatio: Math.round((Math.max(0, Math.min(r.x + r.width, glyphX + glyphW) - Math.max(r.x, glyphX)) / r.width) * 100) / 100,
+            };
           }, before);
-          a.facts['reader-1920-selection-vs-mark'] = { selection: sel, mark };
+          a.facts['reader-1920-selection-vs-mark'] = { selection: sel, ...m };
           await a.shot('reader-1920-after-highlight', 4, { fullScale: true });
+          await w.keyboard.press('Escape');
         }
+        a.facts['reader-1920-scroll'] = await w.evaluate(() => {
+          const area = document.querySelector('[data-testid="reader-pages-area"]') as HTMLElement | null;
+          return area ? { scrollW: area.scrollWidth, clientW: area.clientWidth, horizontalScroll: area.scrollWidth > area.clientWidth + 1 } : null;
+        });
       }
     }
     await a.setSize(1280, 800);
@@ -744,10 +896,10 @@ async function sectionsTour(a: Audit, ctx: LaunchedApp, lang: 'it' | 'en'): Prom
     await w.waitForTimeout(800);
     // Creating a project opens it straight away.
     await a.shot('project-detail', 3);
-    const tabs = w.getByTestId('project-detail').getByRole('tab');
+    const tabs = w.getByTestId('project-detail').locator('[data-testid^="project-tab-"]');
     const n = await tabs.count();
     for (let i = 0; i < n; i++) {
-      await tabs.nth(i).click();
+      await tabs.nth(i).click({ timeout: 4000 }).catch(() => {});
       await w.waitForTimeout(400);
       await a.shot(`project-detail-tab${i + 1}`, 4);
     }
@@ -917,12 +1069,20 @@ async function settingsActions(a: Audit): Promise<void> {
     const mcp = w.getByTestId('mcp-settings');
     await mcp.scrollIntoViewIfNeeded();
     a.facts['mcp-enable-disabled'] = await w.getByTestId('mcp-enable').isDisabled().catch(() => null);
-    await w.getByTestId('mcp-enable').click({ force: true });
-    await w.waitForTimeout(2500);
-    await w.getByTestId('mcp-status').scrollIntoViewIfNeeded().catch(() => {});
+    await a.shot('settings-mcp-off', 1);
+    // A controlled checkbox: the state changes after the main process answers, so click and wait for the badge.
+    await w.getByTestId('mcp-enable').click();
+    await expect(mcp.getByTestId('mcp-state')).toHaveText(/In esecuzione|Running/, { timeout: 30_000 });
+    await w.waitForTimeout(800);
+    await mcp.scrollIntoViewIfNeeded();
+    a.facts['mcp-section-on'] = await mcp.evaluate((e) => ({ h: Math.round(e.getBoundingClientRect().height), controls: e.querySelectorAll('button, input, select, textarea').length, text: (e.textContent || '').replace(/\s+/g, ' ').slice(0, 600) }));
     await a.shot('settings-mcp-enabled', 2);
+    await w.getByTestId('mcp-status').scrollIntoViewIfNeeded().catch(() => {});
+    await a.shot('settings-mcp-enabled-status', 2);
+    await w.evaluate(() => document.querySelector('main')?.scrollBy(0, 500));
+    await a.shot('settings-mcp-enabled-lower', 2);
   });
-  await a.step('backup choose destination (library root via dialog override)', async () => {
+  await a.step('backup choose destination inside the library (error state)', async () => {
     const b = w.getByTestId('backup-section');
     await b.scrollIntoViewIfNeeded();
     await w.getByTestId('backup-choose').click();
@@ -930,21 +1090,26 @@ async function settingsActions(a: Audit): Promise<void> {
     await w.getByTestId('backup-now').scrollIntoViewIfNeeded().catch(() => {});
     await a.shot('settings-backup-after-choose', 2);
   });
-  await a.step('restore dialog', async () => {
-    const btn = w.getByTestId('backup-open-file');
-    if (await visibleNow(btn)) {
-      await btn.click();
-      await w.waitForTimeout(1500);
-      await a.shot('settings-restore-attempt', 2);
-      await w.keyboard.press('Escape');
-    }
-  });
   await a.step('shortcut recorder', async () => {
     const s = w.getByTestId('shortcuts-section');
     await s.scrollIntoViewIfNeeded();
-    await w.getByTestId('shortcut-change').first().click();
+    await a.shot('settings-shortcuts-table', 1);
+    // Second row (chat toggle): Ctrl+K belongs to the first command, so recording it here is a conflict.
+    await s.getByTestId('shortcut-change').nth(1).click();
     await w.waitForTimeout(300);
+    await s.getByTestId('shortcut-recorder').scrollIntoViewIfNeeded().catch(() => {});
     await a.shot('settings-shortcut-recording', 2);
+    // A key combination another command already uses: what does the conflict look like?
+    await w.keyboard.press('Control+k');
+    await w.waitForTimeout(500);
+    a.facts['shortcut-conflict'] = await s.evaluate((e) => ({ problem: e.querySelector('[data-testid="shortcut-problem"]')?.textContent ?? null, conflicts: e.querySelector('[data-testid="shortcuts-conflicts"]')?.textContent ?? null }));
+    await a.shot('settings-shortcut-conflict', 3);
+    await s.getByTestId('shortcut-change').nth(2).click();
+    await w.keyboard.press('Control+Alt+j');
+    await w.waitForTimeout(400);
+    await a.shot('settings-shortcut-recorded', 4);
+    // Leave the saved shortcuts as they were: reset the draft without saving.
+    await s.getByTestId('shortcuts-reset').click().catch(() => {});
     await w.keyboard.press('Escape');
   });
   await a.step('maintenance diagnostics', async () => {
@@ -965,6 +1130,66 @@ async function settingsActions(a: Audit): Promise<void> {
     await w.waitForTimeout(800);
     await a.shot('wizard-again-from-sidebar', 1);
     await w.getByTestId('wizard-cancel').click().catch(() => w.keyboard.press('Escape'));
+  });
+}
+
+/** Backup to a folder outside the library, then restore it as a new library into an empty folder (test hooks: the
+ * folder dialogs return paths set in the main process environment; no native dialog ever opens). */
+async function backupRestore(a: Audit, backupDir: string, restoreRoot: string): Promise<void> {
+  const w = a.page;
+  await a.step('backup to a valid destination', async () => {
+    await a.ctx.app.evaluate((_e, dir) => {
+      process.env.RL_E2E_BACKUP_DIALOG_PATH = dir;
+    }, backupDir);
+    await nav(a, 'settings');
+    const b = w.getByTestId('backup-section');
+    await b.scrollIntoViewIfNeeded();
+    await w.getByTestId('backup-choose').click();
+    await expect(w.getByTestId('backup-destination')).toBeVisible({ timeout: 10_000 });
+    await w.waitForTimeout(800);
+    await b.scrollIntoViewIfNeeded();
+    await a.shot('settings-backup-destination-ok', 2);
+    await w.getByTestId('backup-now').scrollIntoViewIfNeeded();
+    await w.getByTestId('backup-now').click();
+    await w.waitForTimeout(600);
+    await a.shot('settings-backup-running', 3);
+    await expect(w.getByTestId('backup-result')).toBeVisible({ timeout: 120_000 });
+    await w.waitForTimeout(800);
+    await w.getByTestId('backup-result').scrollIntoViewIfNeeded();
+    await a.shot('settings-backup-done', 3);
+    await w.getByTestId('backup-job-close').click().catch(() => {});
+    await w.waitForTimeout(800);
+    await w.getByTestId('backup-list').scrollIntoViewIfNeeded().catch(() => {});
+    await a.shot('settings-backup-list', 4);
+  });
+  await a.step('restore dialog', async () => {
+    await w.getByTestId('backup-restore').first().click();
+    await expect(w.getByTestId('restore-dialog')).toBeVisible();
+    await w.waitForTimeout(600);
+    await a.shot('restore-dialog', 5);
+    // First the library root (not empty: the expected refusal), then an empty folder.
+    await w.getByTestId('restore-choose-root').click();
+    await w.waitForTimeout(1200);
+    await a.shot('restore-root-not-empty', 6);
+    await a.ctx.app.evaluate((_e, dir) => {
+      process.env.RL_E2E_DIALOG_PATH = dir;
+    }, restoreRoot);
+    await w.getByTestId('restore-choose-root').click();
+    await expect(w.getByTestId('restore-root')).toBeVisible({ timeout: 10_000 });
+    await w.waitForTimeout(500);
+    await a.shot('restore-root-chosen', 7);
+    await w.getByTestId('restore-start').click();
+    await w.waitForTimeout(600);
+    await a.shot('restore-running', 8);
+    await expect(w.getByTestId('restore-result')).toBeVisible({ timeout: 180_000 });
+    await w.waitForTimeout(800);
+    await a.shot('restore-done', 8);
+    await w.getByTestId('restore-close').click();
+    await w.waitForTimeout(1500);
+    await a.shot('after-restore-settings', 9);
+    await nav(a, 'library');
+    await w.waitForTimeout(1000);
+    await a.shot('after-restore-library', 10);
   });
 }
 
@@ -1014,7 +1239,12 @@ async function matrix(a: Audit): Promise<void> {
 
 async function runTour(lang: 'it' | 'en', full: boolean): Promise<void> {
   mkdirSync(OUT, { recursive: true });
-  const ctx = await launchApp({ library: lang, dialogPath: true, offline: true, env: { RL_AI_PROVIDER: 'mock' } });
+  const outside = await mkdtemp(path.join(os.tmpdir(), 'rl-audit-out-'));
+  const exportDir = path.join(outside, 'export');
+  const backupDir = path.join(outside, 'backups');
+  const restoreRoot = path.join(outside, 'restored');
+  for (const d of [exportDir, backupDir, restoreRoot]) mkdirSync(d, { recursive: true });
+  const ctx = await launchApp({ library: lang, dialogPath: true, offline: true, env: { RL_AI_PROVIDER: 'mock', RL_E2E_EXPORT_DIALOG_PATH: exportDir } });
   const a = new Audit(lang, ctx);
   try {
     a.facts['dpr'] = await ctx.window.evaluate(() => window.devicePixelRatio);
@@ -1040,6 +1270,7 @@ async function runTour(lang: 'it' | 'en', full: boolean): Promise<void> {
       await settingsActions(a);
       await a.step('settings tour (after AI)', async () => settingsTour(a, 'post'));
       await matrix(a);
+      await backupRestore(a, backupDir, restoreRoot);
     }
     a.flush();
   } finally {
@@ -1050,12 +1281,12 @@ async function runTour(lang: 'it' | 'en', full: boolean): Promise<void> {
 
 test('design audit tour, Italian UI on the Italian library', async () => {
   test.skip(!ENABLED, 'design audit: set RL_DESIGN_AUDIT=1');
-  test.setTimeout(30 * 60_000);
+  test.setTimeout(40 * 60_000);
   await runTour('it', true);
 });
 
 test('design audit tour, English UI on the English library', async () => {
   test.skip(!ENABLED, 'design audit: set RL_DESIGN_AUDIT=1');
-  test.setTimeout(20 * 60_000);
+  test.setTimeout(40 * 60_000);
   await runTour('en', process.env.RL_DESIGN_AUDIT_FULL_EN === '1');
 });

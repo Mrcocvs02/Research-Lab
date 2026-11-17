@@ -44,6 +44,29 @@ describe('folder rules', () => {
     expect(inEnabledFolder('any/p.pdf', [])).toBe(false);
   });
 
+  it('spellings of one folder are one folder; a climbing path and a different case never match', () => {
+    for (const f of ['x', './x', 'x/', 'x//', 'x/.', './x/./']) {
+      expect(inEnabledFolder('x/p.pdf', [f])).toBe(true);
+      expect(inEnabledFolder('x/sub/p.pdf', [f])).toBe(true);
+      expect(inEnabledFolder('xy/p.pdf', [f])).toBe(false);
+      expect(inEnabledFolder('p.pdf', [f])).toBe(false);
+    }
+    // The path of a record is read the same way.
+    expect(inEnabledFolder('./x//p.pdf', ['x'])).toBe(true);
+    // './' and './.' are the root itself, not the whole library.
+    for (const f of ['.', './', './.']) {
+      expect(inEnabledFolder('p.pdf', [f])).toBe(true);
+      expect(inEnabledFolder('x/p.pdf', [f])).toBe(false);
+    }
+    // '..' is never a way in; case fails closed (a folder the user did not mean is not opened).
+    expect(inEnabledFolder('y/p.pdf', ['x/../y'])).toBe(false);
+    expect(inEnabledFolder('p.pdf', ['..'])).toBe(false);
+    expect(inEnabledFolder('Papers/p.pdf', ['papers'])).toBe(false);
+    // A composed and a decomposed accent are the same folder name.
+    expect(inEnabledFolder('café/p.pdf', ['café'])).toBe(true);
+    expect(inEnabledFolder('café/p.pdf', ['café'])).toBe(true);
+  });
+
   it("'.' enables only the files directly in the root", () => {
     expect(inEnabledFolder('p.pdf', ['.'])).toBe(true);
     expect(inEnabledFolder('open/p.pdf', ['.'])).toBe(false);

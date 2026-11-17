@@ -119,6 +119,10 @@ export const backupResultSchema = z.object({
   settingsRestored: z.boolean(),
   /** Restore only: secrets the AI or the MCP server will need again (the user enters them in the settings). */
   secretsToEnter: z.array(z.enum(['anthropic-api-key', 'openalex-api-key', 'mcp-token'])).max(10),
+  /** Restore only (optional, additive): settings of the restored library that were switched to the safe value (D-295). */
+  resetOnRestore: z.array(z.enum(['mcp', 'mcp-write', 'confirm-before-send'])).max(3).optional(),
+  /** Create only (optional, additive): files that vanished while the backup ran (ENOENT) and are not in it. */
+  skipped: z.number().int().nonnegative().optional(),
 });
 
 export const backupJobStatusSchema = z.object({

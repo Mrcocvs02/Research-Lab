@@ -9,6 +9,7 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "dist:dir": "electron-vite build && electron-builder --dir --config electron-builder.config.mjs",
+    "dist:test-dir": "node ../../tools/dist-test-dir.mjs",
     "dist": "electron-vite build && electron-builder --config electron-builder.config.mjs"
   },
   "dependencies": {

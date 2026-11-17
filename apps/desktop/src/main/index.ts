@@ -19,6 +19,7 @@ import { createThumbHandler } from './thumb-protocol.js';
 import { thumbDir } from './thumbs.js';
 import { ApprovedPaths } from './approved-paths.js';
 import { e2eDialogOverride } from './dialog-override.js';
+import { honoursDialogHooks, honoursProfileSwitch, mustRefuseDebugSwitches, PACKAGED_TEST_BUILD } from './debug-switches.js';
 import { resolveAppDirs } from './dirs.js';
 import { presentPdf } from './ipc/handlers/doc-files.js';
 import { buildHandlers, type MainServices } from './ipc/handlers/index.js';
@@ -30,7 +31,7 @@ import { createBackupPolicy } from './library/backup-policy.js';
 import { RuntimeManager } from './library/runtime-manager.js';
 import { spawnScanWorker, watchdogFromEnv } from './library/worker-host.js';
 import { spawnGraphWorker, type GraphHost } from './graph/host.js';
-import { autoBackupOnStart } from './backup/service.js';
+import { autoBackupOnStart, cancelAllBackups, whenBackupDone } from './backup/service.js';
 import { closeGraph } from './graph/service.js';
 import { reconcileMcp, stopMcp } from './mcp/service.js';
 import { LibraryService } from './library-service.js';
@@ -44,9 +45,17 @@ import { createMainWindow } from './window.js';
 // Name and paths must be fixed before `ready`. Env overrides keep tests off real data, but only in a
 // development run: the installed app (`app.isPackaged`) ignores every RL_* / ELECTRON_RENDERER_URL variable.
 app.setName(APP_NAME);
+// An installed build does not run with a remote debugging port or pipe (D-296): nothing below runs, no window opens.
+const refusedDebugSwitches = mustRefuseDebugSwitches(app.isPackaged, PACKAGED_TEST_BUILD, process.argv, (n) => app.commandLine.hasSwitch(n));
+if (refusedDebugSwitches) app.exit(1);
 applyResourceSwitches(app.commandLine);
 const runtime = configureRuntime(resolveRuntimeConfig(process.env, app.isPackaged));
-const dirs = resolveAppDirs(process.env, { userData: app.getPath('userData') }, app.isPackaged, process.argv);
+// `--user-data-dir` is also read by Chromium itself, so the default user-data folder is rebuilt here when it is ignored.
+const profileSwitch = honoursProfileSwitch(app.isPackaged, PACKAGED_TEST_BUILD);
+const defaultUserData = profileSwitch || !process.argv.some((a) => a.startsWith('--user-data-dir')) ? app.getPath('userData') : path.join(app.getPath('appData'), APP_NAME);
+const dirs = resolveAppDirs(process.env, { userData: defaultUserData }, app.isPackaged, profileSwitch ? process.argv : []);
+// The e2e dialog hooks exist in a development run and in a test build of the packaged app, never in an installed one.
+const dialogHooksPackaged = !honoursDialogHooks(app.isPackaged, PACKAGED_TEST_BUILD);
 app.setPath('userData', dirs.userData);
 app.setPath('sessionData', path.join(dirs.localData, 'session'));
 registerPrivilegedSchemes();
@@ -64,6 +73,7 @@ function emit<K extends EventName>(event: K, payload: unknown): void {
 }
 
 async function main(): Promise<void> {
+  if (refusedDebugSwitches) return;
   await app.whenReady();
   installGlobalSecurity();
   if (!runtime.rendererDevUrl) {
@@ -114,7 +124,7 @@ async function main(): Promise<void> {
     shell: { openPath: (p) => shell.openPath(p), showItemInFolder: (p) => shell.showItemInFolder(p), openExternal: (u) => shell.openExternal(u) },
     async pickFolder(purpose, title) {
       // Test hook: only in a development run with RL_E2E=1 (see runtime.ts, dialog-override.ts).
-      const override = e2eDialogOverride(process.env, app.isPackaged, purpose);
+      const override = e2eDialogOverride(process.env, dialogHooksPackaged, purpose);
       if (override) return override;
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
       const options: Electron.OpenDialogOptions = {
@@ -136,7 +146,7 @@ async function main(): Promise<void> {
     },
     async pickPdfFiles() {
       // Same test hook as the folder dialog: one path instead of the dialog.
-      const override = e2eDialogOverride(process.env, app.isPackaged);
+      const override = e2eDialogOverride(process.env, dialogHooksPackaged);
       if (override) return [override];
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
       const options: Electron.OpenDialogOptions = { properties: ['openFile', 'multiSelections'], filters: [{ name: 'PDF', extensions: ['pdf'] }] };
@@ -144,7 +154,7 @@ async function main(): Promise<void> {
       return result.canceled ? [] : result.filePaths;
     },
     async pickExecutable() {
-      const override = e2eDialogOverride(process.env, app.isPackaged);
+      const override = e2eDialogOverride(process.env, dialogHooksPackaged);
       if (override) return override;
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
       const options: Electron.OpenDialogOptions = { properties: ['openFile'], ...(process.platform === 'win32' ? { filters: [{ name: 'Executable', extensions: ['exe'] }] } : {}) };
@@ -205,6 +215,8 @@ async function main(): Promise<void> {
   void runtimeManager
     .sync({ autoScan: true })
     .then(() => reconcileMcp(services))
+    // The automatic backup waits for the first scan to end: both read the same folder, and one heavy job at a time.
+    .then(() => runtimeManager.require().then((rt) => rt.whenIdle()).catch(() => undefined))
     .then(() => autoBackupOnStart(services))
     .catch((e: unknown) => log.warn('start-up tasks failed', { error: e }));
   let quitting = false;
@@ -215,10 +227,12 @@ async function main(): Promise<void> {
     // A running chat turn owns a Claude Code process: it ends with the app.
     abortAllChatTurns();
     abortAllJobs();
+    // A running backup is cancelled and waited for below, so no partial file or restore folder outlives the app.
+    cancelAllBackups(services);
     void closeGraph(services);
     // A worker stuck in a synchronous loop must not keep the app from quitting: after a limit it is killed.
     const limit = new Promise<void>((resolve) => setTimeout(resolve, 15_000).unref());
-    void Promise.race([Promise.all([runtimeManager.closeAll(), stopMcp(services)]), limit])
+    void Promise.race([Promise.all([runtimeManager.closeAll(), stopMcp(services), whenBackupDone(services)]), limit])
       .then(() => runtimeManager.terminateAll())
       .catch((e: unknown) => log.warn('closing the library runtime failed', { error: e }))
       .finally(() => app.quit());

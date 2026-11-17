@@ -28,7 +28,16 @@ const U16 = 0xffff;
 /** Bit 3: data descriptor, bit 11: UTF-8 names. */
 const FLAGS = 0x0808;
 /** Largest central directory read (entries are capped too; this stops a hostile file from asking for memory). */
-const MAX_CENTRAL_BYTES = 256 * 1024 * 1024;
+const MAX_CENTRAL_BYTES = 64 * 1024 * 1024;
+/** Name, extra field and comment of a central entry are each at most this long (ours are far shorter). */
+const MAX_FIELD_BYTES = 1024;
+/** Largest central entry: the fixed part plus name, extra and comment at their limits. */
+const MAX_CENTRAL_ENTRY = 46 + 3 * MAX_FIELD_BYTES;
+/** Sum of declared uncompressed sizes accepted in one archive (D-295). */
+export const MAX_TOTAL_USIZE = 64 * 1024 ** 3;
+/** An entry above this size may not inflate more than `MAX_RATIO` times its compressed size (deflate itself cannot exceed ~1032). */
+const RATIO_FROM = 1024 * 1024;
+const MAX_RATIO = 1000;
 
 const notABackup = (why: string) => new AppError('INVALID_REQUEST', 'The file is not a Research Lab backup', { reason: 'not-a-backup', why });
 
@@ -207,12 +216,38 @@ export interface ZipEntry {
   csize: number;
   usize: number;
   offset: number;
+  /** Bytes of the name in the central directory (the local header must have the same). */
+  nameLen: number;
 }
+
+const integrity = (message: string) => new AppError('CONFLICT', message, { reason: 'integrity' });
 
 const wide = (v: bigint): number => {
   if (v > BigInt(Number.MAX_SAFE_INTEGER)) throw notABackup('zip64');
   return Number(v);
 };
+
+/**
+ * Plausibility of the entries (D-295): no entry's local record `[offset, offset + 30 + name + data)` overlaps another
+ * (overlapping entries are the way to build a zip bomb out of one small payload), none runs into the central
+ * directory, the declared uncompressed sizes add up to at most `MAX_TOTAL_USIZE` and no entry inflates absurdly.
+ * CONFLICT `integrity` otherwise. The extra field of a local header is not known here (it is checked when streaming).
+ */
+export function checkLayout(entries: readonly ZipEntry[], cdOffset: number): void {
+  let total = 0;
+  for (const e of entries) {
+    total += e.usize;
+    if (total > MAX_TOTAL_USIZE) throw integrity('The backup declares too much data');
+    if (e.usize > RATIO_FROM && (e.csize === 0 || e.usize / e.csize > MAX_RATIO)) throw integrity('An entry inflates beyond any plausible ratio');
+  }
+  const order = [...entries].sort((a, b) => a.offset - b.offset);
+  let end = 0;
+  for (const e of order) {
+    if (e.offset < end) throw integrity('Entries overlap');
+    end = e.offset + 30 + e.nameLen + e.csize;
+  }
+  if (end > cdOffset) throw integrity('An entry runs into the central directory');
+}
 
 export class ZipReader {
   private constructor(
@@ -258,6 +293,8 @@ export class ZipReader {
         cdOffset = wide(z.readBigUInt64LE(48));
       }
       if (count > maxEntries || cdSize > MAX_CENTRAL_BYTES || cdOffset + cdSize > st.size) throw notABackup('limits');
+      // A directory cannot be larger than `count` entries at their limits: checked before anything is allocated.
+      if (cdSize > count * MAX_CENTRAL_ENTRY) throw notABackup('central-size');
       const cd = Buffer.alloc(cdSize);
       let got = 0;
       while (got < cdSize) {
@@ -277,6 +314,7 @@ export class ZipReader {
         const extraLen = cd.readUInt16LE(p + 30);
         const commentLen = cd.readUInt16LE(p + 32);
         let offset = cd.readUInt32LE(p + 42);
+        if (nameLen > MAX_FIELD_BYTES || extraLen > MAX_FIELD_BYTES || commentLen > MAX_FIELD_BYTES) throw notABackup('central');
         const end = p + 46 + nameLen + extraLen + commentLen;
         if (end > cd.length) throw notABackup('central');
         if ((flags & 1) !== 0 || (method !== 0 && method !== 8)) throw notABackup('method');
@@ -301,9 +339,10 @@ export class ZipReader {
           }
           x += 4 + len;
         }
-        entries.push({ name, method, crc: cd.readUInt32LE(p + 16), csize, usize, offset });
+        entries.push({ name, method, crc: cd.readUInt32LE(p + 16), csize, usize, offset, nameLen });
         p = end;
       }
+      checkLayout(entries, cdOffset);
       return new ZipReader(file, entries, st.size);
     } finally {
       await fh.close().catch(() => {});
@@ -332,10 +371,12 @@ export class ZipReader {
         const fh = await open(file, 'r');
         let dataStart: number;
         try {
-          const h = Buffer.alloc(30);
-          const n = (await fh.read(h, 0, 30, e.offset)).bytesRead;
-          if (n < 30 || h.readUInt32LE(0) !== SIG_LOCAL) throw new AppError('CONFLICT', 'A local header is damaged', { reason: 'integrity' });
-          dataStart = e.offset + 30 + h.readUInt16LE(26) + h.readUInt16LE(28);
+          const h = Buffer.alloc(30 + e.nameLen);
+          const n = (await fh.read(h, 0, h.length, e.offset)).bytesRead;
+          if (n < h.length || h.readUInt32LE(0) !== SIG_LOCAL) throw integrity('A local header is damaged');
+          // The local name must be the central one: a header that says otherwise belongs to another entry.
+          if (h.readUInt16LE(26) !== e.nameLen || h.toString('utf8', 30) !== e.name) throw integrity('A local header does not match the directory');
+          dataStart = e.offset + 30 + e.nameLen + h.readUInt16LE(28);
         } finally {
           await fh.close().catch(() => {});
         }

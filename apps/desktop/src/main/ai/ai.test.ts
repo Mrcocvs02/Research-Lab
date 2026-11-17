@@ -7,7 +7,7 @@ import { channels, createDispatcher, createMemoryLogger, defaultLibraryConfig, d
 import { createLibraryStore, type FileLibraryStore } from '@rl/data';
 import { buildHandlers, type MainServices } from '../ipc/handlers/index.js';
 import { resolveRuntimeConfig } from '../runtime.js';
-import { buildDataBlock, CONTEXT_DOC_CHARS } from './service.js';
+import { buildDataBlock, CONTEXT_DOC_CHARS, DELTA_COALESCE_MS } from './service.js';
 import { ChatStore, titleFrom } from './chat-store.js';
 import { createProviderFactory } from './provider-factory.js';
 import { COMMAND_LIMITS, ensureGuide, listUserCommands } from './guide-files.js';
@@ -46,7 +46,7 @@ function harness() {
       else changed.push([e, p]);
     },
     runtime: { sync: async () => {}, hold: () => () => {}, status: () => ({}), require: async () => rt },
-    libraries: { profile: async () => ({ rootPath: root, id: 'lib-1' }), dataDir: async () => store.dataDir },
+    libraries: { profile: async () => ({ rootPath: root, id: 'lib-1' }), dataDir: async () => store.dataDir, setActive: async (id: string) => id, forget: async () => null },
     settings: { get: async () => ({ deviceId: 'device-12345678', ai: { claudeCodePath: null } }) },
     secrets: { get: async () => null },
     aiProvider: (cfg: { models: any }) => createMockAiProvider({ models: cfg.models, ...script }),
@@ -152,8 +152,11 @@ describe('ai:preview', () => {
     await store.writeConfig(config({ ai: { confirmBeforeSend: true } as never }));
     const call = harness();
     expect(ok(await preview(call)).needsConfirmation).toBe(true);
-    expect(ok(await preview(call, { docIds: [], promptChars: 10 })).needsConfirmation).toBe(false);
-    expect(ok(await preview(call, { docIds: [hex(2)] })).needsConfirmation).toBe(false); // nothing allowed goes
+    // D-227: a chat or search may read the enabled folders with its tools, so it asks even with nothing selected; the preview lists them.
+    const bare = ok(await preview(call, { docIds: [], promptChars: 10 }));
+    expect(bare).toMatchObject({ needsConfirmation: true, allowed: [], folders: ['open'], model: 'claude-haiku-5-5' });
+    expect(ok(await preview(call, { purpose: 'search', docIds: [] })).needsConfirmation).toBe(true);
+    expect(ok(await preview(call, { purpose: 'tags', docIds: [hex(2)] })).needsConfirmation).toBe(false); // a bulk job reads no folder by itself
     await store.writeConfig(config({ ai: { confirmBeforeSend: false, usageCap: { monthlyUsd: null, confirmBatchAboveUsd: 0.0001 } } as never }));
     expect(ok(await preview(call, { purpose: 'tags', model: 'claude-opus-5-5', docIds: [hex(1), hex(3)] })).needsConfirmation).toBe(true);
     expect(ok(await preview(call, { purpose: 'chat', model: 'claude-opus-5-5', docIds: [hex(1), hex(3)] })).needsConfirmation).toBe(false);
@@ -178,7 +181,7 @@ describe('chat:send', () => {
     const r = ok(await send(call, { contextDocIds: [hex(1)] }));
     await until(finished(r.turnId));
     const types = events.map((e) => e.event.type);
-    expect(types).toEqual(['text-delta', 'text-delta', 'usage', 'done']);
+    expect(types).toEqual(['text-delta', 'usage', 'done']); // the two chunks arrive together: one coalesced delta
     expect(events.every((e) => e.conversationId === r.conversationId && e.turnId === r.turnId)).toBe(true);
     expect(events.filter((e) => e.event.type === 'text-delta').map((e) => e.event.text).join('')).toBe('The answer is short.');
 
@@ -233,6 +236,7 @@ describe('chat:send', () => {
 
   it('continues a conversation with the earlier turns as history', async () => {
     let seen: string[] = [];
+    let n = 0;
     script = { reply: (req) => ((seen = req.messages.map((m) => `${m.role}:${m.content.slice(0, 12)}`)), 'ok') };
     const call = harness();
     const a = ok(await send(call, { text: 'first question' }));
@@ -297,12 +301,64 @@ describe('chat:send', () => {
     const call = harness();
     const e = fail(await send(call, { contextDocIds: [hex(1)] }));
     expect(e).toMatchObject({ code: 'CONFLICT', details: { reason: 'needs-confirmation' } });
-    expect(ok(await send(call)).turnId).toBeTruthy(); // no documents: no confirmation
-    await until(() => events.some((x) => x.event.type === 'done'));
-    events = [];
     const r = ok(await send(call, { contextDocIds: [hex(1)], confirmed: true }));
     await until(finished(r.turnId));
-    expect((await sends()).filter((x) => x.purpose === 'chat').map((x) => x.confirmed)).toEqual(expect.arrayContaining([true]));
+    expect((await sends()).filter((x) => x.purpose === 'chat').map((x) => x.confirmed)).toEqual([true]);
+  });
+
+  describe('D-227: one confirmation per conversation', () => {
+    const doneCount = () => events.filter((x) => x.event.type === 'done').length;
+
+    it('asks at the first send even without documents, with the model and the readable folders, then not again', async () => {
+      await store.writeConfig(config({ ai: { confirmBeforeSend: true } as never }));
+      const call = harness();
+      const e = fail(await send(call));
+      expect(e).toMatchObject({ code: 'CONFLICT', details: { reason: 'needs-confirmation', preview: { model: 'claude-haiku-5-5', folders: ['open'], allowed: [], needsConfirmation: true } } });
+      expect(await sends()).toEqual([]);
+      const r = ok(await send(call, { confirmed: true }));
+      await until(() => doneCount() === 1);
+      // Same conversation: no new confirmation, and the log still says the user confirmed.
+      const r2 = ok(await send(call, { conversationId: r.conversationId }));
+      await until(() => doneCount() === 2);
+      expect(r2.conversationId).toBe(r.conversationId);
+      expect((await sends()).filter((x) => x.purpose === 'chat').map((x) => x.confirmed)).toEqual([true, true]);
+      // A new conversation asks again.
+      expect(fail(await send(call)).details).toMatchObject({ reason: 'needs-confirmation' });
+    });
+
+    it('does not ask when the library does not ask; logs confirmed false then', async () => {
+      const call = harness();
+      const r = ok(await send(call));
+      await until(finished(r.turnId));
+      expect((await sends())[0]!.confirmed).toBe(false);
+    });
+
+    it('treats a conversation file written before as not confirmed, and keeps the flag once confirmed', async () => {
+      await store.writeConfig(config({ ai: { confirmBeforeSend: true } as never }));
+      const id = 'old-conversation';
+      const cs = new ChatStore(local, 'lib-1');
+      await cs.update(id, () => ({ version: 1, id, title: 'Old', mode: 'chat', confirmed: false, createdAt: NOW, updatedAt: NOW, turns: [] }));
+      // Strip the field as a file of an earlier version would not have it.
+      const file = path.join(local, 'chat', 'lib-1', `${id}.json`);
+      const raw = JSON.parse(await readFile(file, 'utf8'));
+      delete raw.confirmed;
+      await writeFile(file, JSON.stringify(raw));
+      expect((await cs.get(id))!.confirmed).toBe(false);
+      const call = harness();
+      expect(fail(await send(call, { conversationId: id })).details).toMatchObject({ reason: 'needs-confirmation' });
+      ok(await send(call, { conversationId: id, confirmed: true }));
+      await until(() => doneCount() === 1);
+      expect((await cs.get(id))!.confirmed).toBe(true);
+    });
+
+    it('a search conversation needs the confirmation of its dialog and logs it', async () => {
+      await store.writeConfig(config({ ai: { confirmBeforeSend: true } as never }));
+      const call = harness();
+      expect(fail(await send(call, { mode: 'search' })).details).toMatchObject({ reason: 'needs-confirmation', preview: { folders: ['open'] } });
+      const r = ok(await send(call, { mode: 'search', confirmed: true }));
+      await until(finished(r.turnId));
+      expect((await sends())[0]!.confirmed).toBe(true);
+    });
   });
 
   it('refuses over the cap and, without access or network, says why', async () => {
@@ -357,6 +413,90 @@ describe('chat:send', () => {
     expect(turn.text.length).toBeGreaterThan(0);
     expect(ok(await call('chat:cancel', { turnId: 'unknown' }))).toEqual({ cancelled: false });
     expect(await sends()).toHaveLength(1); // the cancelled turn is still logged
+  });
+
+  it('accepts one of two simultaneous sends: the slot is reserved before any await', async () => {
+    script = { holdUntilAborted: true };
+    const call = harness();
+    const results = await Promise.all([send(call), send(call)]);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    const lost = results.find((r) => !r.ok)!;
+    expect(fail(lost).details).toMatchObject({ reason: 'turn-running' });
+    ok(await call('chat:cancel', { turnId: ok(results.find((r) => r.ok)!).turnId }));
+    await until(() => events.some((e) => e.event.type === 'error'));
+    // An early refusal gives the slot back.
+    expect(fail(await send(call, { model: 'nope' })).code).toBe('INVALID_REQUEST');
+    script = {};
+    const again = ok(await send(call));
+    await until(finished(again.turnId));
+  });
+
+  it.each(['library:setActive', 'library:forget'])('%s aborts a running turn, logs its send, and the next library can send', async (channel) => {
+    script = { reply: 'partial', chunks: 1, holdUntilAborted: true };
+    const call = harness();
+    const r = ok(await send(call));
+    await until(() => events.some((e) => e.event.type === 'text-delta'));
+    ok(await call(channel, { libraryId: 'lib-2' }));
+    expect(events.at(-1)!.event).toMatchObject({ type: 'error', code: 'CANCELLED' });
+    expect(await sends()).toHaveLength(1);
+    expect(ok(await call('chat:get', { conversationId: r.conversationId })).turns[1]).toMatchObject({ error: { code: 'CANCELLED' } });
+    script = {};
+    events = [];
+    const next = ok(await send(call));
+    await until(finished(next.turnId));
+  });
+
+  it('logs the send even when the chat store cannot save the turn, and never overwrites an unreadable conversation', async () => {
+    script = { reply: 'partial', chunks: 1, holdUntilAborted: true };
+    const call = harness();
+    const r = ok(await send(call));
+    await until(() => events.some((e) => e.event.type === 'text-delta'));
+    const file = path.join(local, 'chat', 'lib-1', `${r.conversationId}.json`);
+    await writeFile(file, '{ not json');
+    ok(await call('chat:cancel', { turnId: r.turnId }));
+    await until(finished(r.turnId));
+    expect(await sends()).toHaveLength(1);
+    expect(await readFile(file, 'utf8')).toBe('{ not json');
+    expect(await readFile(`${file}.bad`, 'utf8')).toBe('{ not json');
+    // The slot was released: the next send works.
+    script = {};
+    const next = ok(await send(call));
+    await until(finished(next.turnId));
+  });
+
+  it('merges text deltas that arrive together, and keeps them apart when they are spread in time', async () => {
+    script = { chunkList: ['a', 'b', 'c'] };
+    const call = harness();
+    const r = ok(await send(call));
+    await until(finished(r.turnId));
+    expect(events.filter((e) => e.event.type === 'text-delta').map((e) => e.event.text)).toEqual(['abc']);
+    events = [];
+    script = { chunkList: ['a', 'b', 'c'], delayMs: DELTA_COALESCE_MS * 3 };
+    const r2 = ok(await send(call));
+    await until(finished(r2.turnId));
+    const deltas = events.filter((e) => e.event.type === 'text-delta').map((e) => e.event.text);
+    expect(deltas.length).toBeGreaterThan(1);
+    expect(deltas.join('')).toBe('abc');
+  });
+
+  it('sends as history only the earlier turns whose documents are still in enabled folders', async () => {
+    let seen: string[] = [];
+    let n = 0;
+    script = { reply: (req) => ((seen = req.messages.map((m) => m.content)), `ANSWER-${++n}`) };
+    const call = harness();
+    const r = ok(await send(call, { text: 'FIRST-QUESTION', contextDocIds: [hex(1)] }));
+    await until(finished(r.turnId));
+    ok(await send(call, { conversationId: r.conversationId, text: 'SECOND-QUESTION' }));
+    await until(() => events.filter((e) => e.event.type === 'done').length === 2);
+    expect(seen.join('|')).toContain('FIRST-QUESTION');
+    expect(seen.join('|')).toContain('ANSWER-1');
+    // The folder of the first question's document is disabled: it and its answer leave the history.
+    await store.writeConfig(config({ aiEnabledFolders: ['other'] }));
+    ok(await send(call, { conversationId: r.conversationId, text: 'THIRD-QUESTION' }));
+    await until(() => events.filter((e) => e.event.type === 'done').length === 3);
+    expect(seen.join('|')).not.toContain('FIRST-QUESTION');
+    expect(seen.join('|')).not.toContain('ANSWER-1');
+    expect(seen.join('|')).toContain('THIRD-QUESTION');
   });
 
   it('a provider error ends the turn with an error event and keeps what came before', async () => {
@@ -490,5 +630,34 @@ describe('pieces', () => {
     expect(real({ provider: 'claude-agent-sdk', models })!.id).toBe('claude-agent-sdk');
     expect(real({ provider: 'mock', models })).toBeNull();
     expect(real({ provider: 'gemini', models })).toBeNull();
+  });
+});
+
+describe('ChatStore list and unreadable files', () => {
+  const conv = (id: string, title: string, at: string) => ({ version: 1 as const, id, title, mode: 'chat' as const, confirmed: false, createdAt: at, updatedAt: at, turns: [] });
+
+  it('lists from a small index, follows changes and deletions, skips unreadable files', async () => {
+    const cs = new ChatStore(local, 'lib-1');
+    await cs.update('c1', () => conv('c1', 'One', '2026-01-01T00:00:00.000Z'));
+    await cs.update('c2', () => conv('c2', 'Two', '2026-01-02T00:00:00.000Z'));
+    expect((await cs.list(10)).map((c) => c.title)).toEqual(['Two', 'One']);
+    const index = JSON.parse(await readFile(path.join(local, 'chat', 'lib-1', '.index.json'), 'utf8'));
+    expect(Object.keys(index).sort()).toEqual(['c1', 'c2']);
+    await cs.update('c1', (c) => ({ ...c!, title: 'One again', updatedAt: '2026-01-03T00:00:00.000Z', turns: [{ id: 't', role: 'user', text: 'x', at: NOW, cards: [], contextDocIds: [] }] }));
+    expect(await cs.list(10)).toEqual([expect.objectContaining({ title: 'One again', turns: 1 }), expect.objectContaining({ title: 'Two' })]);
+    await writeFile(path.join(local, 'chat', 'lib-1', 'c2.json'), '{ broken');
+    expect((await cs.list(10)).map((c) => c.id)).toEqual(['c1']);
+    await cs.delete('c1');
+    expect(await cs.list(10)).toEqual([]);
+  });
+
+  it('refuses to update a file that failed to load and keeps a .bad copy', async () => {
+    const cs = new ChatStore(local, 'lib-1');
+    await cs.update('c1', () => conv('c1', 'One', NOW));
+    const file = path.join(local, 'chat', 'lib-1', 'c1.json');
+    await writeFile(file, JSON.stringify({ version: 1, id: 'c1' }));
+    await expect(cs.update('c1', () => conv('c1', 'Overwritten', NOW))).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(JSON.parse(await readFile(file, 'utf8'))).toEqual({ version: 1, id: 'c1' });
+    expect(await readFile(`${file}.bad`, 'utf8')).toBe(JSON.stringify({ version: 1, id: 'c1' }));
   });
 });

@@ -10,6 +10,10 @@ import { SecretsSection } from './SecretsSection';
 const AiSection = lazyView(() => import('./AiSection').then((m) => ({ default: m.AiSection })), ['aiSettings']);
 // Likewise the MCP server settings (and the log of its calls).
 const McpSection = lazyView(() => import('./McpSection').then((m) => ({ default: m.McpSection })), ['mcp']);
+// Backup and restore, maintenance, and the shortcuts editor (phase 8) load with the page, as their own chunks.
+const BackupSection = lazyView(() => import('./BackupSection').then((m) => ({ default: m.BackupSection })), ['backup']);
+const MaintenanceSection = lazyView(() => import('./MaintenanceSection').then((m) => ({ default: m.MaintenanceSection })), ['backup']);
+const ShortcutsSection = lazyView(() => import('./ShortcutsSection').then((m) => ({ default: m.ShortcutsSection })), ['shortcuts']);
 
 /** All settings in one scrollable page. */
 export function Settings({ onNewLibrary }: { onNewLibrary: () => void }) {
@@ -28,6 +32,15 @@ export function Settings({ onNewLibrary }: { onNewLibrary: () => void }) {
         <McpSection />
       </Lazy>
       <SecretsSection />
+      <Lazy>
+        <BackupSection />
+      </Lazy>
+      <Lazy>
+        <ShortcutsSection />
+      </Lazy>
+      <Lazy>
+        <MaintenanceSection />
+      </Lazy>
     </div>
   );
 }

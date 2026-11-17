@@ -27,6 +27,8 @@ const ReaderView = lazyView(() => import('./views/reader/ReaderView').then((m) =
 const InboxView = lazyView(() => import('./views/inbox/InboxView').then((m) => ({ default: m.InboxView })), ['inbox']);
 const DiscoverView = lazyView(() => import('./views/discover/DiscoverView').then((m) => ({ default: m.DiscoverView })), ['discover']);
 const NetworkView = lazyView(() => import('./views/network/NetworkView').then((m) => ({ default: m.NetworkView })), ['network']);
+// The welcome card of the first open after the wizard (D-262).
+const WelcomeCard = lazyView(() => import('./views/guide/WelcomeCard').then((m) => ({ default: m.WelcomeCard })), ['guide']);
 const Wizard = lazyView(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })), ['settings-wizard', 'wizard']);
 
 export function App() {
@@ -122,6 +124,7 @@ function Root() {
     setSection('library');
   };
 
+  const showWelcome = hasLibraries && !showWizard && app.settings !== null && app.settings.firstRunDone && !app.settings.guide?.welcomeSeen;
   const readerOpen = reader.target !== null && section === 'library' && app.activeProfile !== null && !showWizard;
 
   return (
@@ -161,6 +164,11 @@ function Root() {
           </Lazy>
         )}
       </Shell>
+      {showWelcome && (
+        <Lazy>
+          <WelcomeCard />
+        </Lazy>
+      )}
       {showWizard && (
         <Lazy>
           <Wizard key={wizardOpen ? 'new' : 'first'} onFinished={() => void finished()} onCancel={hasLibraries ? () => setWizardOpen(false) : undefined} />

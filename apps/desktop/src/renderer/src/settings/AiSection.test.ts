@@ -169,3 +169,52 @@ describe('AiSection', () => {
     expect(await screen.findByText('Nothing has been sent yet.')).toBeTruthy();
   });
 });
+
+describe('AiSection: Claude Code program and root entries', () => {
+  it('shows where the Claude Code program was found, lets the user choose one and go back to automatic', async () => {
+    setup();
+    const row = await screen.findByTestId('ai-exe');
+    expect(screen.getByTestId('ai-exe-path').textContent).toBe('bin/claude');
+    expect(screen.getByTestId('ai-exe-source').textContent).toContain('PATH');
+    expect((screen.getByTestId('ai-exe-auto') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(within(row).getByTestId('ai-exe-choose'));
+    await waitFor(() => expect(screen.getByTestId('ai-exe-path').textContent).toBe('bin/chosen-claude'));
+    expect(callsTo('ai:chooseExecutable')).toHaveLength(1);
+    expect(screen.getByTestId('ai-exe-source').textContent).toContain('chosen by you');
+    fireEvent.click(screen.getByTestId('ai-exe-auto'));
+    await waitFor(() => expect(screen.getByTestId('ai-exe-path').textContent).toBe('bin/claude'));
+    expect(callsTo('ai:clearExecutable')).toHaveLength(1);
+  });
+
+  it('keeps the program when the dialog is cancelled, and says when none is found', async () => {
+    setup({}, (ai) => {
+      ai.state.claudeCode = { path: null, source: 'none' };
+      ai.state.dialogPath = null;
+    });
+    await screen.findByTestId('ai-exe');
+    expect(screen.getByTestId('ai-exe-path').textContent).toBe('Not found');
+    fireEvent.click(screen.getByTestId('ai-exe-choose'));
+    await waitFor(() => expect(callsTo('ai:chooseExecutable')).toHaveLength(1));
+    expect(screen.getByTestId('ai-exe-path').textContent).toBe('Not found');
+  });
+
+  it('offers the whole library and the files of the root above the folders, and saves them', async () => {
+    setup();
+    const tree = await screen.findByTestId('config-ai-tree');
+    await within(tree).findByRole('checkbox', { name: /alpha/ });
+    fireEvent.click(screen.getByTestId('ai-root-files'));
+    fireEvent.click(screen.getByTestId('ai-save'));
+    await waitFor(() => expect(callsTo('library:setConfig')).toHaveLength(1));
+    expect(callsTo('library:setConfig')[0].patch.aiEnabledFolders).toEqual(['.']);
+    await screen.findByText('Saved');
+
+    fireEvent.click(screen.getByTestId('ai-root-all'));
+    expect((screen.getByTestId('ai-root-files') as HTMLInputElement).disabled).toBe(true);
+    expect((within(tree).getByRole('checkbox', { name: /alpha/ }) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByTestId('ai-save'));
+    await waitFor(() => expect(callsTo('library:setConfig')).toHaveLength(2));
+    expect(callsTo('library:setConfig')[1].patch.aiEnabledFolders).toEqual(['']);
+    await screen.findByText('Saved');
+    expect(screen.getByTestId('ai-folders-summary').textContent).toContain('1 folder enabled');
+  });
+});

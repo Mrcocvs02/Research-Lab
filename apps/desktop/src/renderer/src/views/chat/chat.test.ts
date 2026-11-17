@@ -541,3 +541,132 @@ describe('command palette', () => {
     expect(items[0]!.textContent).toBe('Descrivi questo articolo');
   });
 });
+
+describe('chat: a turn running while the view changes (review 13)', () => {
+  const seedOld = (ai: ReturnType<typeof memoryAi>) => {
+    ai.state.conversations.set('c-old', {
+      id: 'c-old',
+      title: 'Old one',
+      updatedAt: '2026-11-10T10:00:00.000Z',
+      turns: [
+        { id: 'u1', role: 'user', text: 'Earlier question', at: '2026-11-10T10:00:00.000Z', cards: [], contextDocIds: [] },
+        { id: 'a1', role: 'assistant', text: 'Earlier answer', at: '2026-11-10T10:00:01.000Z', cards: [], contextDocIds: [] },
+      ],
+    });
+  };
+  const openConv = async (id: string) => {
+    fireEvent.click(screen.getByTestId('chat-history-toggle'));
+    const items = await screen.findAllByTestId('history-item');
+    fireEvent.click(within(items.find((i) => i.getAttribute('data-conversation-id') === id)!).getByTestId('history-open'));
+  };
+
+  it('keeps the stream in its own conversation when another is opened, and shows it again on return', async () => {
+    const ai = setup({ tweak: (a) => ((a.state.manual = true), (a.state.oneTurn = true), seedOld(a)) });
+    await ready();
+    await sendText('stream me');
+    await waitFor(() => expect(callsTo('chat:send')).toHaveLength(1));
+    act(() => ai.emit('conv-1', 'turn-1', { type: 'text-delta', text: 'Part one ' }));
+    await waitFor(() => expect(aiTurns()[0]!.textContent).toContain('Part one'));
+
+    // Switch to another conversation mid-stream: the old one is shown, not the stream.
+    await openConv('c-old');
+    await waitFor(() => expect(aiTurns()[0]?.textContent).toContain('Earlier answer'));
+    expect(aiTurns()).toHaveLength(1);
+    expect(screen.queryByText(/Part one/)).toBeNull();
+    expect(screen.getByTestId('chat-busy-other')).toBeTruthy();
+    expect((screen.getByTestId('chat-new') as HTMLButtonElement).disabled).toBe(false);
+    act(() => ai.emit('conv-1', 'turn-1', { type: 'text-delta', text: 'Part two' }));
+    expect(screen.queryByText(/Part two/)).toBeNull();
+    // Sending from here is refused with a clear message, nothing is added to the view.
+    type('too early');
+    fireEvent.submit(input().closest('form')!);
+    expect(screen.queryByTestId('chat-banner')).toBeNull(); // the send button is disabled: no attempt
+    expect(sendButton().disabled).toBe(true);
+    expect(aiTurns()).toHaveLength(1);
+
+    // Back to the streaming conversation: its question and the answer so far (not duplicated).
+    await openConv('conv-1');
+    await waitFor(() => expect(aiTurns()[0]?.textContent).toContain('Part one Part two'));
+    expect(screen.getAllByTestId('chat-turn-user')).toHaveLength(1);
+    act(() => ai.emit('conv-1', 'turn-1', { type: 'done' }));
+    await waitFor(() => expect(screen.queryByTestId('chat-cancel')).toBeNull());
+    expect(aiTurns()[0]!.textContent).toContain('Part one Part two');
+  });
+
+  it('a new conversation mid-stream is usable at once, and the stream does not leak into it', async () => {
+    const ai = setup({ tweak: (a) => ((a.state.manual = true), (a.state.oneTurn = true)) });
+    await ready();
+    await sendText('first');
+    await waitFor(() => expect(callsTo('chat:send')).toHaveLength(1));
+    fireEvent.click(screen.getByTestId('chat-new'));
+    expect(screen.getByTestId('chat-empty')).toBeTruthy();
+    expect(screen.getByTestId('chat-busy-other')).toBeTruthy();
+    act(() => ai.emit('conv-1', 'turn-1', { type: 'text-delta', text: 'Hidden' }));
+    expect(screen.queryByText(/Hidden/)).toBeNull();
+    act(() => ai.emit('conv-1', 'turn-1', { type: 'done' }));
+    await waitFor(() => expect(screen.queryByTestId('chat-busy-other')).toBeNull());
+    // Not stuck: the new view sends a new conversation (no conversationId).
+    ai.state.manual = false;
+    await sendText('second');
+    await waitFor(() => expect(callsTo('chat:send')).toHaveLength(2));
+    expect(callsTo('chat:send')[1].conversationId).toBeUndefined();
+    await waitFor(() => expect(aiTurns()[0]!.textContent).toContain('Hello world'));
+  });
+
+  it('cancel keeps the panel busy until the terminal event, then a resend works', async () => {
+    const ai = setup({ tweak: (a) => ((a.state.manual = true), (a.state.cancelEmits = false), (a.state.oneTurn = true)) });
+    await ready();
+    await sendText('long one');
+    await waitFor(() => expect(screen.getByTestId('chat-cancel')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('chat-cancel'));
+    await waitFor(() => expect(callsTo('chat:cancel')).toHaveLength(1));
+    await waitFor(() => expect(screen.getByTestId('turn-error').getAttribute('data-code')).toBe('CANCELLED'));
+    // Main has not ended the turn yet: still sending, no new send possible.
+    expect(screen.queryByTestId('chat-cancel')).toBeTruthy();
+    type('again');
+    expect(sendButton().disabled).toBe(true);
+    act(() => ai.emit('conv-1', 'turn-1', { type: 'error', code: 'CANCELLED', message: 'cancelled' }));
+    await waitFor(() => expect(screen.queryByTestId('chat-cancel')).toBeNull());
+    expect(sendButton().disabled).toBe(false);
+    ai.state.manual = false;
+    fireEvent.click(sendButton());
+    await waitFor(() => expect(callsTo('chat:send')).toHaveLength(2));
+    expect(screen.queryByTestId('chat-banner')).toBeNull();
+    await waitFor(() => expect(aiTurns().at(-1)!.textContent).toContain('Hello world'));
+  });
+
+  it('shows the turn-running refusal of main as a clear wait message', async () => {
+    setup({ tweak: (a) => (a.state.sendError = new AppError('CONFLICT', 'Another answer is still being written', { reason: 'turn-running' })) });
+    await ready();
+    await sendText('hello');
+    const banner = await screen.findByTestId('chat-banner');
+    expect(banner.getAttribute('data-kind')).toBe('turnRunning');
+    expect(banner.textContent).toContain('Wait for it to finish');
+    expect(banner.textContent).not.toContain('Another answer is still being written');
+    expect(input().value).toBe('hello');
+  });
+});
+
+describe('chat: one confirmation per conversation (D-227)', () => {
+  it('shows the model and the folders the agent may read at the first send, resends confirmed, then does not ask again', async () => {
+    setup({ folders: ['alpha', 'beta'], tweak: (a) => (a.state.confirmNew = true) });
+    await ready();
+    await sendText('no documents here');
+    const dialog = await screen.findByTestId('send-preview');
+    expect(within(dialog).getByTestId('preview-intro').textContent).toContain('Haiku');
+    expect(within(dialog).getByTestId('preview-folders').textContent).toContain('alpha, beta');
+    expect(within(dialog).getByTestId('preview-folders').textContent).toContain('may read');
+    expect(callsTo('chat:send')[0]).toMatchObject({ confirmed: false });
+    expect(input().value).toBe('no documents here');
+    fireEvent.click(within(dialog).getByTestId('preview-confirm'));
+    await waitFor(() => expect(callsTo('chat:send')).toHaveLength(2));
+    expect(callsTo('chat:send')[1]).toMatchObject({ confirmed: true });
+    await waitFor(() => expect(aiTurns()[0]!.textContent).toContain('Hello world'));
+    await waitFor(() => expect(screen.queryByTestId('chat-cancel')).toBeNull());
+    // Same conversation: sent at once.
+    await sendText('and again');
+    await waitFor(() => expect(callsTo('chat:send')).toHaveLength(3));
+    expect(screen.queryByTestId('send-preview')).toBeNull();
+    expect(callsTo('chat:send')[2]).toMatchObject({ conversationId: 'conv-1', confirmed: false });
+  });
+});

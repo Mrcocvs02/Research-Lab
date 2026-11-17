@@ -36,6 +36,9 @@ interface AiUiValue {
   /** Documents selected in the library list. */
   selection: readonly string[];
   publishSelection(ids: readonly string[]): void;
+  /** An answer of the chat is being written (only one at a time): the advanced search cannot start meanwhile. */
+  chatBusy: boolean;
+  setChatBusy(busy: boolean): void;
   /** The document and page open in the reader, or null. */
   reader: ReaderContext | null;
   publishReader(ctx: ReaderContext | null): void;
@@ -61,6 +64,8 @@ const NONE: AiUiValue = {
   setPaletteOpen() {},
   selection: [],
   publishSelection() {},
+  chatBusy: false,
+  setChatBusy() {},
   reader: null,
   publishReader() {},
   prefill: null,
@@ -83,6 +88,7 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   const [chatOpen, setChatOpen] = useLocalFlag('rl.chatOpen', false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [selection, setSelection] = useState<readonly string[]>([]);
+  const [chatBusy, setChatBusy] = useState(false);
   const [reader, setReader] = useState<ReaderContext | null>(null);
   const [prefill, setPrefill] = useState<AiUiValue['prefill']>(null);
   const [searchRequest, setSearchRequest] = useState<SearchRequest | null>(null);
@@ -122,8 +128,8 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   }, [chatOpen, setChatOpen]);
 
   const value = useMemo(
-    () => ({ chatOpen, setChatOpen, paletteOpen, setPaletteOpen, selection, publishSelection, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview }),
-    [chatOpen, setChatOpen, paletteOpen, selection, publishSelection, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview],
+    () => ({ chatOpen, setChatOpen, paletteOpen, setPaletteOpen, selection, publishSelection, chatBusy, setChatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview }),
+    [chatOpen, setChatOpen, paletteOpen, selection, publishSelection, chatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -30,7 +30,9 @@ function ContextChip({ docId, onRemove }: { docId: string; onRemove(): void }) {
 function BannerView({ banner, onSettings }: { banner: NonNullable<Banner>; onSettings(): void }) {
   const { t } = useTranslation();
   const text =
-    banner.kind === 'overCap'
+    banner.kind === 'turnRunning'
+      ? t('chat.errors.turnRunning')
+      : banner.kind === 'overCap'
       ? t('chat.errors.cap')
       : banner.kind === 'noAccess'
         ? t('chat.errors.noAccess')
@@ -129,6 +131,13 @@ export function ChatPanel() {
     if (el && typeof el.scrollTo === 'function') el.scrollTo({ top: el.scrollHeight });
   }, [chat.turns]);
 
+  // The advanced search dialog needs to know that an answer is being written.
+  const { setChatBusy } = ui;
+  useEffect(() => {
+    setChatBusy(chat.sending);
+    return () => setChatBusy(false);
+  }, [chat.sending, setChatBusy]);
+
   const unavailable = chat.status !== null && !chat.status.available;
   const canSend = input.trim() !== '' && !chat.sending && !unavailable && effectiveModel !== '';
 
@@ -153,7 +162,7 @@ export function ChatPanel() {
   return (
     <div className="chat-panel" data-testid="chat-content">
       <div className="chat-toolbar">
-        <button type="button" onClick={() => { chat.newConversation(); setView('chat'); }} disabled={chat.sending} data-testid="chat-new">
+        <button type="button" onClick={() => { chat.newConversation(); setView('chat'); }} data-testid="chat-new">
           {t('chat.new')}
         </button>
         <button type="button" onClick={() => (view === 'history' ? setView('chat') : showHistory())} aria-pressed={view === 'history'} data-testid="chat-history-toggle">
@@ -249,6 +258,12 @@ export function ChatPanel() {
             </div>
           )}
 
+          {chat.busyElsewhere && (
+            <p className="hint" role="status" data-testid="chat-busy-other">
+              {t('chat.busyOther')}
+            </p>
+          )}
+
           <form className="chat-form" onSubmit={submit}>
             <label htmlFor={ids.text} className="sr-only">
               {t('chat.input')}
@@ -300,7 +315,7 @@ export function ChatPanel() {
         </>
       )}
 
-      {chat.held && <PreviewDialog preview={chat.held.preview} models={models} busy={chat.sending} onConfirm={() => void chat.confirmHeld()} onCancel={chat.dismissHeld} />}
+      {chat.held && <PreviewDialog agent preview={chat.held.preview} models={models} busy={chat.sending} onConfirm={() => void chat.confirmHeld()} onCancel={chat.dismissHeld} />}
     </div>
   );
 }

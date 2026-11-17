@@ -1,4 +1,5 @@
 import { abortAllJobs } from '../../ai/jobs.js';
+import { abortChatTurnsAndWait } from '../../ai/service.js';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
@@ -31,12 +32,15 @@ export const libraryHandlers = (s: MainServices): Omit<DomainHandlers<'library'>
   'library:setActive': async ({ libraryId }) => {
     // Jobs of the library being left stop (they also check the active library before each document).
     abortAllJobs();
+    // A running chat turn stops and writes its log entry in its own library before the switch.
+    await abortChatTurnsAndWait();
     const activeLibraryId = await s.libraries.setActive(libraryId);
     await s.runtime.sync({ autoScan: true });
     return { activeLibraryId };
   },
   'library:forget': async ({ libraryId }) => {
     abortAllJobs();
+    await abortChatTurnsAndWait();
     const activeLibraryId = await s.libraries.forget(libraryId);
     await s.runtime.sync({ autoScan: true });
     return { activeLibraryId };

@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LibraryProfile } from '@rl/core';
+import { AppError, type LibraryProfile } from '@rl/core';
 import i18n from '../../i18n';
 import { AiUiProvider, useAiUi } from '../../lib/aiUi';
 import { AppProvider } from '../../state/app-context';
@@ -22,6 +22,7 @@ function Host({ text }: { text: string }) {
     'div',
     null,
     createElement('span', { 'data-testid': 'chat-open' }, String(ui.chatOpen)),
+    createElement('button', { 'data-testid': 'fake-busy', onClick: () => ui.setChatBusy(true) }),
     open ? createElement(AdvancedSearchDialog, { initialText: text, onClose: () => setOpen(false) }) : createElement('span', { 'data-testid': 'dialog-closed' }),
     ui.chatOpen ? createElement(ChatPanel) : null,
   );
@@ -120,5 +121,32 @@ describe('advanced search dialog', () => {
     setup();
     expect(screen.getByTestId('adv-search-go').textContent).toBe('Cerca');
     await i18n.changeLanguage('en');
+  });
+});
+
+describe('advanced search dialog: D-227 and a running answer', () => {
+  it('shows the model, the estimate and the folders Claude may read while searching', async () => {
+    const ai = setup({ folders: ['alpha', 'beta'] });
+    await waitFor(() => expect(screen.getByTestId('adv-search-folders').textContent).toContain('alpha, beta'));
+    expect(screen.getByTestId('adv-search-model-line').textContent).toContain('Haiku');
+    expect(screen.getByTestId('adv-search-estimate').textContent).toContain('About');
+    expect(ai.state.previews.at(-1)).toMatchObject({ purpose: 'search' });
+  });
+
+  it('says to wait while the chat is writing an answer, and does not search', async () => {
+    setup();
+    await waitFor(() => expect((screen.getByTestId('adv-search-go') as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('fake-busy'));
+    expect((await screen.findByTestId('adv-search-busy')).textContent).toContain('Wait for it to finish');
+    expect((screen.getByTestId('adv-search-go') as HTMLButtonElement).disabled).toBe(true);
+    expect(callsTo('chat:send')).toHaveLength(0);
+  });
+
+  it('a search refused by main with turn-running shows the wait message in the chat panel', async () => {
+    setup({ tweak: (a) => (a.state.sendError = new AppError('CONFLICT', 'Another answer is still being written', { reason: 'turn-running' })) });
+    await waitFor(() => expect((screen.getByTestId('adv-search-go') as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('adv-search-go'));
+    const banner = await screen.findByTestId('chat-banner');
+    expect(banner.getAttribute('data-kind')).toBe('turnRunning');
   });
 });

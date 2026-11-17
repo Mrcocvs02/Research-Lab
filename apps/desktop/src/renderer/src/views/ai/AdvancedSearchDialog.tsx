@@ -7,6 +7,7 @@ import { useAiUi } from '../../lib/aiUi';
 import { rl } from '../../lib/rl';
 import { useApp } from '../../state/app-context';
 import { formatTokens, formatUsd } from '../chat/format';
+import { safeText } from '../library/safeText';
 import { aiErrorText } from './aiErrors';
 import { useAiAvailability } from './useAiAvailability';
 
@@ -55,7 +56,8 @@ export function AdvancedSearchDialog({ initialText, onClose }: { initialText: st
     return () => clearTimeout(timer);
   }, [unavailable, availability.loading, trimmed, model]);
 
-  const canSearch = !availability.loading && unavailable === null && trimmed !== '' && model !== '' && !preview?.overCap;
+  const busy = ui.chatBusy;
+  const canSearch = !busy && !availability.loading && unavailable === null && trimmed !== '' && model !== '' && !preview?.overCap;
   const go = () => {
     if (!canSearch) return;
     ui.startSearch({ text: trimmed, model, reasoning });
@@ -82,6 +84,11 @@ export function AdvancedSearchDialog({ initialText, onClose }: { initialText: st
                 {t('chat.openSettings')}
               </button>
             )}
+          </div>
+        )}
+        {busy && (
+          <div className="callout" role="status" data-testid="adv-search-busy">
+            <p>{t('chat.errors.turnRunning')}</p>
           </div>
         )}
         <div className="field">
@@ -118,6 +125,12 @@ export function AdvancedSearchDialog({ initialText, onClose }: { initialText: st
                   {t('chat.preview.tokens', { tokens: formatTokens(preview.approxInputTokens) })} ·{' '}
                   {preview.estimatedUsd === null ? t('chat.preview.noPrice') : t('chat.preview.cost', { usd: formatUsd(preview.estimatedUsd) })}
                 </p>
+                <p data-testid="adv-search-model-line">{t('advSearch.sentTo', { model: models.find((m) => m.id === preview.model)?.label || preview.model })}</p>
+                {preview.folders.length > 0 && (
+                  <p data-testid="adv-search-folders">
+                    {t('advSearch.folders')} {preview.folders.map((f) => safeText(f || '/')).join(', ')}
+                  </p>
+                )}
                 <p className="hint">{t('advSearch.estimateNote')}</p>
                 {preview.overCap && <ErrorNote testId="adv-search-over-cap">{t('chat.errors.cap')}</ErrorNote>}
               </>

@@ -10,6 +10,7 @@ export function aiErrorText(error: unknown, t: TFunction): string {
     if (reason === 'no-access') return t('chat.errors.noAccess');
     if (reason === 'offline') return t('chat.errors.offline');
   }
+  if (err.code === 'CONFLICT' && err.details?.reason === 'turn-running') return t('chat.errors.turnRunning');
   if (err.code === 'AI_BUDGET_EXCEEDED') return t('chat.errors.cap');
   if (err.code === 'FOLDER_NOT_AI_ENABLED') return t('errors.FOLDER_NOT_AI_ENABLED');
   return errorMessage(error, t);

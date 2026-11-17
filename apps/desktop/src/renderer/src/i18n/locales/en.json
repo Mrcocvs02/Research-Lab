@@ -119,8 +119,10 @@
       "cap": "The monthly usage cap has been reached, so nothing was sent. Raise the cap in the settings or wait for next month.",
       "noAccess": "No access to Claude. Sign in with Claude Code or store an API key in the settings.",
       "offline": "Claude cannot be reached: check the internet connection and try again.",
-      "generic": "Claude could not answer. Try again in a moment."
+      "generic": "Claude could not answer. Try again in a moment.",
+      "turnRunning": "Claude is still writing an answer. Wait for it to finish, or stop it, before sending another message."
     },
+    "busyOther": "An answer is still being written in another conversation. Wait for it or stop it to send here.",
     "turnUsage": "{{input}} tokens in, {{output}} out",
     "withDocs_one": "With {{count}} document as context",
     "withDocs_other": "With {{count}} documents as context",
@@ -177,6 +179,8 @@
       "reason_missing": "the file is missing",
       "reason_unknown": "the document is not in the library",
       "folders": "Folders:",
+      "introAgent": "Your message will be sent to the model {{model}}. While it answers, Claude may read documents of the folders below with its tools; each read is recorded in the log. You confirm once for this conversation.",
+      "agentFolders": "Claude may read documents in these folders:",
       "tokens": "About {{tokens}} input tokens",
       "noPrice": "cost not estimated",
       "cost": "estimated cost {{usd}}",
@@ -264,6 +268,8 @@
     "needText": "Write your request to see the estimate.",
     "estimateNote": "Approximate: it covers your request and the instructions. The pages Claude reads add to it. No document is sent with the request itself.",
     "go": "Search",
+    "sentTo": "Your request goes to the model {{model}}.",
+    "folders": "While searching, Claude may read documents in these folders:",
     "fix_no-folders": "Enable at least one folder for the AI in the library settings. The normal search works as usual."
   },
   "search": {

@@ -34,6 +34,8 @@ export const CONTEXT_DOC_CHARS = CONTEXT_META_CHARS + CONTEXT_PAGES_CHARS;
 const CONTEXT_PAGE_CHARS = 4000;
 /** Turns of the conversation sent back as history, at most. */
 const HISTORY_TURNS = 20;
+/** Text deltas of a turn are sent to the renderer in batches of this many milliseconds. */
+export const DELTA_COALESCE_MS = 30;
 
 export interface AiCtx {
   rt: LibraryRuntime;
@@ -107,6 +109,8 @@ export interface PreviewInput {
   model: string;
   docIds: readonly string[];
   promptChars: number;
+  /** Chat only: the conversation this send belongs to was already confirmed (D-227), so the agent's own reads need no new preview. */
+  conversationConfirmed?: boolean;
 }
 
 /** What a send would include and cost, with the confirmation and cap rules of the library. Spends and sends nothing. */
@@ -116,9 +120,13 @@ export async function computePreview(s: MainServices, ctx: AiCtx, input: Preview
   const est = estimateCostFromModels(ctx.cfg.ai.models, { model: input.model, promptChars: chars });
   const monthUsd = (await monthUsage(ctx.rt, monthOf(new Date()))).usd;
   const cap = ctx.cfg.ai.usageCap;
-  const bulk = input.purpose !== 'chat';
+  // An agent conversation (chat or advanced search) may read the enabled folders with its tools: D-227 asks one confirmation
+  // per conversation even without context documents, and the preview lists those folders.
+  const agent = input.purpose === 'chat' || input.purpose === 'search';
+  const bulk = !agent;
+  const agentReads = agent && input.conversationConfirmed !== true;
   const needsConfirmation =
-    (ctx.cfg.ai.confirmBeforeSend && docs.allowed.length > 0) || (bulk && est.usd !== null && est.usd > cap.confirmBatchAboveUsd);
+    (ctx.cfg.ai.confirmBeforeSend && (docs.allowed.length > 0 || agentReads)) || (bulk && est.usd !== null && est.usd > cap.confirmBatchAboveUsd);
   const overCap = cap.monthlyUsd !== null && monthUsd + (est.usd ?? 0) > cap.monthlyUsd;
   void s;
   return {
@@ -128,7 +136,7 @@ export async function computePreview(s: MainServices, ctx: AiCtx, input: Preview
       model: input.model,
       allowed: docs.allowed.map((d) => d.id),
       refused: docs.refused.map((r) => ({ docId: r.docId, reason: r.reason })),
-      folders: [...new Set(docs.allowed.map((d) => folderOf(d.path)))],
+      folders: [...new Set([...docs.allowed.map((d) => folderOf(d.path)), ...(agent ? ctx.cfg.aiEnabledFolders : [])])],
       approxInputTokens: est.inputTokens,
       estimatedUsd: est.usd,
       needsConfirmation,
@@ -180,12 +188,44 @@ interface RunningTurn {
   controller: AbortController;
   /** The conversation was deleted while the turn ran: nothing is written back. */
   discard: boolean;
+  /** Resolves when the turn left the map (its log entry is written). */
+  settled: Promise<void>;
+  release(): void;
 }
 const running = new Map<string, RunningTurn>();
+
+function reserveTurn(turnId: string, conversationId: string, controller: AbortController): RunningTurn {
+  let release!: () => void;
+  const settled = new Promise<void>((r) => (release = r));
+  const t: RunningTurn = { conversationId, controller, discard: false, settled, release };
+  running.set(turnId, t);
+  return t;
+}
+
+function releaseTurn(turnId: string): void {
+  const t = running.get(turnId);
+  running.delete(turnId);
+  t?.release();
+}
 
 /** Aborts every running turn (app quit): their Claude Code processes end with them. */
 export function abortAllChatTurns(): void {
   for (const t of running.values()) t.controller.abort();
+}
+
+/**
+ * Aborts every running turn and waits (a few seconds at most) until each has written its log entry: used before the active
+ * library changes, so the turn finishes against its own library and the next one can start in the new library.
+ */
+export async function abortChatTurnsAndWait(timeoutMs = 5000): Promise<void> {
+  const all = [...running.values()];
+  if (all.length === 0) return;
+  for (const t of all) t.controller.abort();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([Promise.all(all.map((t) => t.settled)), new Promise<void>((r) => (timer = setTimeout(r, timeoutMs)))]);
+  clearTimeout(timer);
+  // A turn that did not settle in time must not block the new library.
+  running.clear();
 }
 
 export function cancelTurn(turnId: string): boolean {
@@ -219,12 +259,63 @@ export interface SendInput {
 export const SEARCH_INSTRUCTION =
   'ADVANCED SEARCH. Reformulate the request below into 2-4 keyword searches of the library (search_library, with OR between synonyms) and run them. Read pages (read_pages) only when needed to judge relevance. Answer in at most 7 lines with the most relevant documents: each with a lab://doc/<id>?page=N link (with the page) and one line on why it matches. If nothing relevant is found, say so plainly.';
 
+/**
+ * Earlier turns of a conversation as history for the model. A turn whose context documents (or the documents its answer
+ * touched) are no longer all in enabled folders is dropped together with its answer: the history must not replay text
+ * derived from documents the library no longer allows.
+ */
+export async function allowedHistory(rt: LibraryRuntime, cfg: LibraryConfig, turns: readonly ChatTurn[]): Promise<ChatMessage[]> {
+  const verdict = new Map<string, boolean>();
+  const allowedDoc = async (id: string): Promise<boolean> => {
+    let ok = verdict.get(id);
+    if (ok === undefined) {
+      const rec = documentIdSchema.safeParse(id).success ? await rt.store.documents.get(id as DocumentId).catch(() => null) : null;
+      ok = rec !== null && inEnabledFolder(rec.path, cfg.aiEnabledFolders);
+      verdict.set(id, ok);
+    }
+    return ok;
+  };
+  const idsOf = (t: ChatTurn) => [...t.contextDocIds, ...t.cards.flatMap((c) => c.docIds)];
+  // An exchange is a user turn with the assistant turns that follow it.
+  const kept: ChatTurn[] = [];
+  let group: ChatTurn[] = [];
+  const flush = async () => {
+    let ok = true;
+    for (const t of group) for (const id of idsOf(t)) ok = ok && (await allowedDoc(id));
+    if (ok) kept.push(...group);
+    group = [];
+  };
+  for (const t of turns) {
+    if (t.role === 'user' && group.length > 0) await flush();
+    group.push(t);
+  }
+  await flush();
+  return kept
+    .filter((t) => t.text.trim() !== '')
+    .slice(-HISTORY_TURNS)
+    .map((t) => ({ role: t.role, content: t.text }));
+}
+
 /** Validates and starts a turn; returns at once, the turn streams `chat:event`s. */
 export async function startChatTurn(s: MainServices, input: SendInput): Promise<{ conversationId: string; turnId: string }> {
   const ctx = await loadCtx(s);
-  const { rt, cfg, provider } = ctx;
-  if (!cfg.ai.models.some((m) => m.id === input.model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
+  if (!ctx.cfg.ai.models.some((m) => m.id === input.model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
   if (running.size > 0) throw new AppError('CONFLICT', 'Another answer is still being written', { reason: 'turn-running' });
+  // The one-turn slot is taken here, with no await between the check and the reservation; every early exit gives it back.
+  const turnId = randomUUID();
+  const controller = new AbortController();
+  const slot = reserveTurn(turnId, '', controller);
+  try {
+    return await prepareTurn(s, ctx, input, turnId, slot);
+  } catch (e) {
+    releaseTurn(turnId);
+    throw e;
+  }
+}
+
+async function prepareTurn(s: MainServices, ctx: AiCtx, input: SendInput, turnId: string, slot: RunningTurn): Promise<{ conversationId: string; turnId: string }> {
+  const { rt, cfg, provider } = ctx;
+  const controller = slot.controller;
   const store = new ChatStore(s.localDataDir, rt.libraryId);
   let conversationId = input.conversationId;
   let existing = null;
@@ -234,6 +325,7 @@ export async function startChatTurn(s: MainServices, input: SendInput): Promise<
     existing = await store.get(conversationId);
     if (!existing) throw new AppError('NOT_FOUND', 'Unknown conversation');
   } else conversationId = randomUUID();
+  slot.conversationId = conversationId;
 
   // 1. Monthly cap, before anything else.
   const monthUsd = (await monthUsage(rt, monthOf(new Date()))).usd;
@@ -243,17 +335,17 @@ export async function startChatTurn(s: MainServices, input: SendInput): Promise<
   const av = await availability(s, provider);
   if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
   // 3. Context documents: only from enabled folders. A refusal stops the whole send (nothing partial goes).
-  const { preview, docs } = await computePreview(s, ctx, { purpose: 'chat', model: input.model, docIds: input.contextDocIds, promptChars: input.text.length });
+  const wasConfirmed = existing?.confirmed === true;
+  const { preview, docs } = await computePreview(s, ctx, { purpose: mode === 'search' ? 'search' : 'chat', model: input.model, docIds: input.contextDocIds, promptChars: input.text.length, conversationConfirmed: wasConfirmed });
   const notEnabled = docs.refused.filter((r) => r.reason === 'folder-not-enabled').map((r) => r.docId);
   if (notEnabled.length > 0) throw new AppError('FOLDER_NOT_AI_ENABLED', 'Some documents are in folders not enabled for AI', { docIds: notEnabled });
   if (docs.refused.length > 0) throw new AppError('NOT_FOUND', 'Some context documents are unknown or missing', { docIds: docs.refused.map((r) => r.docId) });
   if (cap !== null && preview.overCap) throw new AppError('AI_BUDGET_EXCEEDED', 'This send would go over the monthly AI spending cap', { monthUsd, capUsd: cap, estimatedUsd: preview.estimatedUsd });
-  // 4. Confirmation, when documents go and the library asks for it.
+  // 4. Confirmation (D-227): documents go, or the conversation was never confirmed and the agent may read the enabled folders.
   if (preview.needsConfirmation && !input.confirmed) throw new AppError('CONFLICT', 'The send needs the confirmation of the user', { reason: 'needs-confirmation', preview });
+  // What the user confirmed, truthfully: this send, or an earlier one of the same conversation.
+  const confirmed = input.confirmed || wasConfirmed;
 
-  const turnId = randomUUID();
-  const controller = new AbortController();
-  running.set(turnId, { conversationId, controller, discard: false });
   const now = new Date().toISOString();
   const userTurn: ChatTurn = {
     id: randomUUID(),
@@ -266,27 +358,22 @@ export async function startChatTurn(s: MainServices, input: SendInput): Promise<
     contextDocIds: docs.allowed.map((d) => d.id),
   };
   const convoId = conversationId;
-  try {
-    await store.update(convoId, (cur) => ({
-      version: 1,
-      id: convoId,
-      title: cur?.title ?? (mode === 'search' ? `Search: ${titleFrom(input.text)}` : titleFrom(input.text)),
-      mode: cur?.mode ?? mode,
-      createdAt: cur?.createdAt ?? now,
-      updatedAt: now,
-      turns: [...(cur?.turns ?? []), userTurn],
-    }));
-  } catch (e) {
-    running.delete(turnId);
-    throw e;
-  }
-  const history: ChatMessage[] = (existing?.turns ?? [])
-    .filter((t) => t.text.trim() !== '')
-    .slice(-HISTORY_TURNS)
-    .map((t) => ({ role: t.role, content: t.text }));
-  void runTurn({ s, ctx, provider, store, conversationId: convoId, turnId, controller, input, docs: docs.allowed, history, confirmed: input.confirmed }).catch((e: unknown) => {
+  await store.update(convoId, (cur) => ({
+    version: 1,
+    id: convoId,
+    title: cur?.title ?? (mode === 'search' ? `Search: ${titleFrom(input.text)}` : titleFrom(input.text)),
+    mode: cur?.mode ?? mode,
+    confirmed: confirmed || cur?.confirmed === true,
+    createdAt: cur?.createdAt ?? now,
+    updatedAt: now,
+    turns: [...(cur?.turns ?? []), userTurn],
+  }));
+  const history = await allowedHistory(rt, cfg, existing?.turns ?? []);
+  // A library switch or quit while preparing: the turn never starts.
+  if (controller.signal.aborted) throw new AppError('CONFLICT', 'The library changed before the answer started', { reason: 'turn-aborted' });
+  void runTurn({ s, ctx, provider, store, conversationId: convoId, turnId, controller, input, docs: docs.allowed, history, confirmed }).catch((e: unknown) => {
     s.log.error('chat turn crashed', { error: e });
-    running.delete(turnId);
+    releaseTurn(turnId);
   });
   return { conversationId: convoId, turnId };
 }
@@ -308,8 +395,27 @@ interface RunArgs {
 async function runTurn(a: RunArgs): Promise<void> {
   const { s, ctx, provider, store, conversationId, turnId, controller, input } = a;
   const { rt, cfg } = ctx;
-  const emit = (event: { type: 'text-delta'; text: string } | { type: 'card'; card: Card } | { type: 'usage'; usage: { inputTokens: number; outputTokens: number; usd: number | null } } | { type: 'done' } | { type: 'error'; code: string; message: string }) =>
+  type Ev = { type: 'text-delta'; text: string } | { type: 'card'; card: Card } | { type: 'usage'; usage: { inputTokens: number; outputTokens: number; usd: number | null } } | { type: 'done' } | { type: 'error'; code: string; message: string };
+  // Text deltas are merged for about 30 ms: one IPC message per token would flood the renderer. Any other event flushes first.
+  let pending = '';
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const flush = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    if (pending === '') return;
+    const text = pending;
+    pending = '';
+    s.emit('chat:event', { conversationId, turnId, event: { type: 'text-delta', text } });
+  };
+  const emit = (event: Ev) => {
+    if (event.type === 'text-delta') {
+      pending += event.text;
+      timer ??= setTimeout(flush, DELTA_COALESCE_MS);
+      return;
+    }
+    flush();
     s.emit('chat:event', { conversationId, turnId, event });
+  };
   const turn: ChatTurn = { id: turnId, role: 'assistant', text: '', at: new Date().toISOString(), model: input.model, reasoning: input.reasoning, cards: [], contextDocIds: [] };
   let usage: TokenUsageWithCost | null = null;
   let terminal: { type: 'done' } | { type: 'error'; code: string; message: string } | null = null;
@@ -386,14 +492,8 @@ async function runTurn(a: RunArgs): Promise<void> {
   turn.usage = view;
   if (terminal.type === 'error') turn.error = { code: terminal.code, message: terminal.message };
   const discard = running.get(turnId)?.discard ?? false;
+  // The record of the send comes first and in its own try: a failing chat store must never lose it from the log.
   try {
-    if (!discard) {
-      await store.update(conversationId, (cur) => {
-        const at = new Date().toISOString();
-        const base = cur ?? { version: 1 as const, id: conversationId, title: titleFrom(input.text), mode: input.mode ?? ('chat' as const), createdAt: at, updatedAt: at, turns: [] };
-        return { ...base, updatedAt: at, turns: [...base.turns, turn] };
-      });
-    }
     // One record of the send for the turn itself (what went and what it cost); the tool reads logged their own sizes.
     await rt.store.appendLog({
       type: 'ai-send',
@@ -410,9 +510,20 @@ async function runTurn(a: RunArgs): Promise<void> {
       confirmed: a.confirmed,
     });
   } catch (e) {
-    s.log.error('could not save the chat turn or its log entry', { error: e });
+    s.log.error('could not write the AI-send log entry of a chat turn', { error: e });
+  }
+  try {
+    if (!discard) {
+      await store.update(conversationId, (cur) => {
+        const at = new Date().toISOString();
+        const base = cur ?? { version: 1 as const, id: conversationId, title: titleFrom(input.text), mode: input.mode ?? ('chat' as const), confirmed: a.confirmed, createdAt: at, updatedAt: at, turns: [] };
+        return { ...base, updatedAt: at, turns: [...base.turns, turn] };
+      });
+    }
+  } catch (e) {
+    s.log.error('could not save the chat turn', { error: e });
   } finally {
-    running.delete(turnId);
+    releaseTurn(turnId);
   }
   emit(terminal);
 }

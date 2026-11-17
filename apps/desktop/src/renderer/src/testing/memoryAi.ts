@@ -63,6 +63,12 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
     overCap: false,
     /** Ask for a confirmation on a send with documents (what `ai.confirmBeforeSend` does in main). */
     confirm: true,
+    /** D-227: a conversation never confirmed asks at its first send even without documents (the agent may read the folders). */
+    confirmNew: false,
+    confirmedConversations: new Set<string>(),
+    /** One answer at a time, as main enforces: a send while one is being written fails with CONFLICT turn-running. */
+    oneTurn: false,
+    activeTurn: null as string | null,
     log: [] as FakeSend[],
     conversations: new Map<string, FakeConversation>(),
     sends: [] as any[],
@@ -85,6 +91,7 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
   const enabled = (path: string) => state.config.aiEnabledFolders.some((f) => dirOf(path) === f || dirOf(path).startsWith(`${f}/`));
 
   const preview = (p: any) => {
+    const agent = p.purpose === 'chat' || p.purpose === 'search';
     const allowed: string[] = [];
     const refused: Array<{ docId: string; reason: 'folder-not-enabled' | 'missing' | 'unknown' }> = [];
     const folders = new Set<string>();
@@ -98,10 +105,10 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
       model: p.model,
       allowed,
       refused,
-      folders: [...folders],
+      folders: [...new Set([...folders, ...(agent ? state.config.aiEnabledFolders : [])])],
       approxInputTokens: allowed.length * 1000 + Math.ceil((p.promptChars ?? 0) / 4),
       estimatedUsd: allowed.length * 0.002,
-      needsConfirmation: state.confirm && allowed.length > 0,
+      needsConfirmation: state.confirm && (allowed.length > 0 || (state.confirmNew && agent && !p.confirmedConversation)),
       overCap: state.overCap,
     };
   };
@@ -119,6 +126,7 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
   /** Delivers one event of a turn, as the main process would. */
   const emit = (conversationId: string, turnId: string, event: StreamEvent) => {
     record(turnId, event);
+    if ((event.type === 'done' || event.type === 'error') && state.activeTurn === turnId) state.activeTurn = null;
     emitEvent('chat:event', { conversationId, turnId, event });
   };
 
@@ -168,9 +176,13 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
       if (p.mode === 'search' && p.conversationId) throw new AppError('INVALID_REQUEST', 'search starts a new conversation');
       if (!state.available) throw new AppError('AI_PROVIDER_ERROR', 'no access', { reason: state.reason ?? 'no-access' });
       if (state.overCap) throw new AppError('AI_BUDGET_EXCEEDED', 'cap');
-      if (state.confirm && p.contextDocIds?.length > 0 && !p.confirmed) throw new AppError('CONFLICT', 'confirmation needed', { reason: 'needs-confirmation' });
+      if (state.oneTurn && state.activeTurn) throw new AppError('CONFLICT', 'Another answer is still being written', { reason: 'turn-running' });
+      const wasConfirmed = Boolean(p.conversationId && state.confirmedConversations.has(p.conversationId));
+      const pv = preview({ purpose: p.mode === 'search' ? 'search' : 'chat', model: p.model, docIds: p.contextDocIds ?? [], promptChars: String(p.text).length, confirmedConversation: wasConfirmed });
+      if (pv.needsConfirmation && !p.confirmed) throw new AppError('CONFLICT', 'confirmation needed', { reason: 'needs-confirmation', preview: pv });
       const n = state.counter++;
       const conversationId = p.conversationId ?? `conv-${n}`;
+      if (p.confirmed) state.confirmedConversations.add(conversationId);
       const turnId = `turn-${n}`;
       const at = new Date(Date.UTC(2026, 10, 16, 10, n)).toISOString();
       const conv: FakeConversation = state.conversations.get(conversationId) ?? { id: conversationId, title: p.mode === 'search' ? `Search: ${String(p.text).slice(0, 53)}` : String(p.text).slice(0, 60), mode: p.mode === 'search' ? 'search' : 'chat', updatedAt: at, turns: [] };
@@ -188,6 +200,7 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
         approxInputTokens: 100,
         confirmed: Boolean(p.confirmed),
       });
+      if (state.oneTurn) state.activeTurn = turnId;
       const events = state.script(p);
       if (!state.manual) {
         if (state.earlyEvents) for (const ev of events) emit(conversationId, turnId, ev);
@@ -210,7 +223,8 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
     'chat:get': (p) => {
       const c = state.conversations.get(p.conversationId);
       if (!c) throw new AppError('NOT_FOUND', 'conversation');
-      return { id: c.id, title: c.title, turns: structuredClone(c.turns) };
+      // Main writes the answer only when the turn ends: a turn still running has only its question in the file.
+      return { id: c.id, title: c.title, turns: structuredClone(c.turns.filter((t) => t.id !== state.activeTurn)) };
     },
     'chat:delete': (p) => ({ deleted: state.conversations.delete(p.conversationId) }),
   };

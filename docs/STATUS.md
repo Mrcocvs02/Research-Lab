@@ -1,5 +1,7 @@
 # Stato
 
+> Passaggio di consegne: vedi `docs/HANDOFF.md`.
+
 - **Fase:** 6 e 7 complete nel codice (revisioni e correzioni unite), senza tag: `phase-6` aspetta l'e2e della rete (serve RAM libera), `phase-7` la suite e2e completa e la prova con Claude Code vero. Fasi 4 e 5 complete nel codice ma senza tag: i criteri su dati reali aspettano l'utente.
 - **Onda:** chiusura delle fasi 6 e 7 (verifiche); poi fase 8
 - **Fatto:**

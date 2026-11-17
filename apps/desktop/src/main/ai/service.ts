@@ -433,8 +433,9 @@ async function runTurn(a: RunArgs): Promise<void> {
       blocks.push(buildDataBlock(d, texts.filter((p) => p.page !== extra), extra ? texts.find((p) => p.page === extra) : undefined));
     }
     const readingNote = input.contextPage !== undefined && a.docs[0] ? `(The user is reading page ${input.contextPage} of document ${a.docs[0].id}.)\n` : '';
-    const request = input.mode === 'search' ? `${SEARCH_INSTRUCTION}\n\nUser request (answer in the language of this request):\n${input.text}` : input.text;
-    const content = blocks.length ? `${blocks.join('\n')}\n${readingNote}\nUser request (answer in the language of this request):\n${input.text}` : request;
+    // The search instruction stays in front of the request also when documents go with the turn.
+    const labelled = `${input.mode === 'search' ? `${SEARCH_INSTRUCTION}\n\n` : ''}User request (answer in the language of this request):\n${input.text}`;
+    const content = blocks.length ? `${blocks.join('\n')}\n${readingNote}\n${labelled}` : input.mode === 'search' ? labelled : input.text;
     promptChars = system.length + content.length + a.history.reduce((n, m) => n + m.content.length, 0);
 
     // Tools: the library tools, wrapped to remember which documents each call touched (for the links of the cards).

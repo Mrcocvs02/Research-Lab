@@ -17,6 +17,11 @@ export interface RuntimeConfig {
   metadataFile: string | null;
   /** Tests: keep the window hidden (still rendered, not throttled) so test runs do not pop up on screen. */
   hiddenWindow: boolean;
+  /**
+   * Tests: the machine counts as offline (`isOnline()` false) — the e2e offline switch cuts the session's network,
+   * which `net.isOnline()` does not see.
+   */
+  offline: boolean;
   /** Tests and development: `'mock'` makes the AI layer use the deterministic mock provider (never a real Claude call). */
   aiProvider: 'mock' | null;
   /** Origin (`http://localhost:<port>`) of the Vite dev server, or null: load the built renderer. */
@@ -53,7 +58,7 @@ export function resolveRuntimeConfig(env: NodeJS.ProcessEnv, isPackaged: boolean
   const present = HOOK_VARIABLES.filter((k) => env[k] !== undefined && env[k] !== '');
   if (isPackaged) {
     if (present.length) warnings.push(`Ignored development/test variables in the installed app: ${present.join(', ')}`);
-    return { userDataDir: null, localDataDir: null, dialogPath: null, metadataFile: null, hiddenWindow: false, aiProvider: null, rendererDevUrl: null, warnings };
+    return { userDataDir: null, localDataDir: null, dialogPath: null, metadataFile: null, hiddenWindow: false, offline: false, aiProvider: null, rendererDevUrl: null, warnings };
   }
   const rendererDevUrl = parseDevServerUrl(env.ELECTRON_RENDERER_URL);
   if (env.ELECTRON_RENDERER_URL && !rendererDevUrl) {
@@ -67,13 +72,14 @@ export function resolveRuntimeConfig(env: NodeJS.ProcessEnv, isPackaged: boolean
     dialogPath: env.RL_E2E === '1' ? absolute(env.RL_E2E_DIALOG_PATH) : null,
     metadataFile: env.RL_E2E === '1' ? absolute(env.RL_E2E_METADATA) : null,
     hiddenWindow: env.RL_E2E_HIDDEN === '1',
+    offline: env.RL_E2E_OFFLINE === '1',
     aiProvider: env.RL_AI_PROVIDER === 'mock' ? 'mock' : null,
     rendererDevUrl,
     warnings,
   };
 }
 
-let current: RuntimeConfig = { userDataDir: null, localDataDir: null, dialogPath: null, metadataFile: null, hiddenWindow: false, aiProvider: null, rendererDevUrl: null, warnings: [] };
+let current: RuntimeConfig = { userDataDir: null, localDataDir: null, dialogPath: null, metadataFile: null, hiddenWindow: false, offline: false, aiProvider: null, rendererDevUrl: null, warnings: [] };
 
 /** Called once, first thing in the main entry point. */
 export function configureRuntime(config: RuntimeConfig): RuntimeConfig {

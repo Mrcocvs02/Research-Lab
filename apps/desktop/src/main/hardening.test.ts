@@ -38,7 +38,7 @@ describe('runtime switches are development-only', () => {
 
   it('an installed app (isPackaged) ignores every one of them and says so', () => {
     const rt = resolveRuntimeConfig(hostile, true);
-    expect(rt).toMatchObject({ userDataDir: null, localDataDir: null, dialogPath: null, hiddenWindow: false, rendererDevUrl: null });
+    expect(rt).toMatchObject({ userDataDir: null, localDataDir: null, dialogPath: null, hiddenWindow: false, offline: false, rendererDevUrl: null });
     for (const name of Object.keys(hostile)) expect(rt.warnings.join(' ')).toContain(name);
     expect(resolveRuntimeConfig({}, true).warnings).toEqual([]);
   });

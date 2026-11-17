@@ -160,7 +160,8 @@ describe('CitationsPanel', () => {
 
   it('works in Italian too', async () => {
     await mount(createElement(CitationsPanel, { docId: 'd1' }), {}, memoryCitations(), 'it');
-    expect((await screen.findByTestId('citations-empty')).textContent).toContain('solo su richiesta');
+    // The Italian part of the view strings loads asynchronously: wait for the text, not only for the element.
+    await waitFor(() => expect(screen.getByTestId('citations-empty').textContent).toContain('solo su richiesta'));
     expect(screen.getByTestId('citations-refresh').textContent).toBe('Aggiorna');
   });
 });

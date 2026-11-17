@@ -17,8 +17,10 @@ import { clickRow } from './helpers/ui';
  *    `initialize`, `tools/list`, `search_library`, `get_document` and `similar_documents` with the token: a document in a
  *    folder that is not enabled for AI never appears; a wrong token is refused; a rotated token replaces the old one.
  *
- * Run it alone, after `npm run build` (it launches the built app). The export folder is written inside the synthetic
- * library root (the folder dialog override returns the root), so it is excluded from the "originals untouched" check.
+ * Run it alone, after `npm run build` (it launches the built app). The export goes to a temporary folder OUTSIDE the
+ * library root (D-252: an export destination inside the library is refused): the folder dialog override returns the
+ * library root for the library wizard and `RL_E2E_EXPORT_DIALOG_PATH` for the export destination only. The library
+ * must stay exactly as it was, and a destination inside it must be refused.
  */
 
 const OA = 'https://api.openalex.org';
@@ -92,8 +94,9 @@ test('export a project as a second brain, answer control questions from the fold
   const dir = await mkdtemp(path.join(os.tmpdir(), 'rl-net-'));
   const fixtures = path.join(dir, 'net.json');
   await writeFile(fixtures, '{}');
+  const exportRoot = await mkdtemp(path.join(os.tmpdir(), 'rl-brain-'));
   try {
-    ctx = await launchApp({ library: 'papers', dialogPath: true, env: { RL_E2E_NET_FIXTURES: fixtures } });
+    ctx = await launchApp({ library: 'papers', dialogPath: true, env: { RL_E2E_NET_FIXTURES: fixtures, RL_E2E_EXPORT_DIALOG_PATH: exportRoot } });
     const { window } = ctx;
     const root = ctx.library!.root;
     const papers = ctx.library!.manifest!.files.filter((f) => f.format === 'pdf' && f.title && f.doi);
@@ -142,7 +145,8 @@ test('export a project as a second brain, answer control questions from the fold
     await expect(dialog.getByTestId('est-documents')).toHaveText('2', { timeout: 30_000 });
     await expect(dialog.getByTestId('export-run')).toBeDisabled(); // no destination yet
 
-    // The destination only through the folder dialog (the test override returns the library root); a sanitized name.
+    await dialog.getByTestId('export-folder-name').fill(EXPORT_DIR);
+    // The destination only through the folder dialog (the test override returns the temporary folder); a sanitized name.
     await dialog.getByTestId('export-choose').click();
     await expect(dialog.getByTestId('export-dest-path')).toBeVisible();
     await dialog.getByTestId('export-folder-name').fill(EXPORT_DIR);
@@ -156,7 +160,8 @@ test('export a project as a second brain, answer control questions from the fold
     await expect(dialog).toHaveCount(0);
 
     // ---- on disk ----
-    const out = path.join(root, EXPORT_DIR);
+    const out = path.join(exportRoot, EXPORT_DIR);
+    expect(await exists(path.join(root, EXPORT_DIR))).toBe(false);
     const files = await walk(out);
     for (const f of ['CLAUDE.md', 'INDEX.md', 'graph.json']) expect(files, f).toContain(f);
     expect(files.some((f) => f.startsWith('.claude/commands/'))).toBe(true);
@@ -222,10 +227,11 @@ test('export a project as a second brain, answer control questions from the fold
     expect(await walk(out)).toEqual(before); // the same citekeys and files: stable names
     expect(await brokenLinks(out)).toEqual([]);
 
-    await ctx.verifyLibraryUntouched([EXPORT_DIR]);
+    await ctx.verifyLibraryUntouched();
   } finally {
     await ctx?.close();
     await rm(dir, { recursive: true, force: true }).catch(() => {});
+    await rm(exportRoot, { recursive: true, force: true }).catch(() => {});
   }
 });
 
@@ -303,6 +309,9 @@ test('MCP server from the settings: configuration from the clipboard, tools over
     expect(allowed && closed).toBeTruthy();
     // Only `papers` is enabled for AI; the other folder holds a document with the same title.
     await ipcData(window, 'library:setConfig', { patch: { aiEnabledFolders: ['papers'] } });
+    // The settings read the library configuration when the app state loads: reload so that "mcp-sees" shows the new value.
+    await window.reload();
+    await window.getByTestId('nav-settings').waitFor({ timeout: 60_000 });
     const query = allowedFile!.title!;
 
     // Settings: off by default, then enabled through the interface.
@@ -344,11 +353,12 @@ test('MCP server from the settings: configuration from the clipboard, tools over
     const card = await tool(url, token, 'get_document', { docId: allowed });
     expect(card).toMatchObject({ isError: false, body: { id: allowed } });
     const refused = await tool(url, token, 'get_document', { docId: closed });
-    expect(refused).toMatchObject({ isError: true, body: { code: 'FOLDER_NOT_AI_ENABLED' } });
+    // Outside the enabled folders a document does not exist for the client: the same answer as for an unknown id (D-253).
+    expect(refused).toMatchObject({ isError: true, body: { code: 'NOT_FOUND' } });
     const near = await tool(url, token, 'similar_documents', { docId: allowed, limit: 10 });
     expect(near.isError).toBe(false);
     expect(JSON.stringify(near.body)).not.toContain(closed);
-    expect((await tool(url, token, 'similar_documents', { docId: closed })).body.code).toBe('FOLDER_NOT_AI_ENABLED');
+    expect((await tool(url, token, 'similar_documents', { docId: closed })).body.code).toBe('NOT_FOUND');
 
     // A wrong or missing token is refused.
     expect((await rpc(url, 'not-the-token-value', 'tools/list')).status).toBe(401);
@@ -358,7 +368,7 @@ test('MCP server from the settings: configuration from the clipboard, tools over
     const rows = section.getByTestId('mcp-log-row');
     await expect.poll(() => rows.count(), { timeout: 30_000 }).toBeGreaterThan(3);
     await expect(section.getByTestId('mcp-log')).toContainText('get_document');
-    await expect(section.getByTestId('mcp-log')).toContainText('FOLDER_NOT_AI_ENABLED');
+    await expect(section.getByTestId('mcp-log')).toContainText(/NOT_FOUND|FOLDER_NOT_AI_ENABLED/);
     expect(await section.getByTestId('mcp-log').innerText()).not.toContain(query);
 
     // Writing: only proposals, after an explicit confirmation; the tool list then has it.

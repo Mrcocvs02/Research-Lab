@@ -3,4 +3,4 @@ export * from './citekeys.js';
 export * from './manifest.js';
 export * from './markers.js';
 export * from './render.js';
-export { approxTokens, foldAscii, sha256, slugify } from './text.js';
+export { approxTokens, foldAscii, mdText, safeLine, sha256, slugify, toLf } from './text.js';

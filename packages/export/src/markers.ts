@@ -1,4 +1,4 @@
-import { sha256, stripMarkers } from './text.js';
+import { sha256, stripMarkers, toLf } from './text.js';
 
 /**
  * Generated parts of a file sit between marker lines; whatever is outside them belongs to the user and is never touched.
@@ -16,6 +16,7 @@ export interface Part {
 const begin = (p: Part) => (p.style === 'yaml' ? `# rl:begin ${p.name}` : `<!-- rl:begin ${p.name} -->`);
 const end = (p: Part) => (p.style === 'yaml' ? `# rl:end ${p.name}` : `<!-- rl:end ${p.name} -->`);
 const trimEnd = (s: string) => s.replace(/\n+$/, '');
+const lf = toLf;
 
 /** The block of a part as written in a file. */
 export const renderPart = (p: Part): string => `${begin(p)}\n${trimEnd(p.body)}\n${end(p)}`;
@@ -36,11 +37,13 @@ function find(text: string, p: Part): Found | null {
   for (;;) {
     let nl = text.indexOf('\n', at);
     if (nl < 0) nl = text.length;
-    const line = text.slice(at, nl).replace(/\r$/, '');
+    // A byte order mark an editor put at the top of the file must not hide the first marker.
+    const raw = text.slice(at, nl).replace(/\r$/, '');
+    const line = at === 0 ? raw.replace(/^\uFEFF/, '') : raw;
     if (innerStart < 0) {
       if (line === b && nl < text.length) innerStart = nl + 1;
     } else if (line === e) {
-      return { innerStart, innerStop: Math.max(innerStart, at - 1) };
+      return { innerStart, innerStop: Math.max(innerStart, at - (text[at - 2] === '\r' ? 2 : 1)) };
     }
     if (nl >= text.length) return null;
     at = nl + 1;
@@ -50,7 +53,7 @@ function find(text: string, p: Part): Found | null {
 /** Current content of a part in `text` (null when its markers are missing). */
 export function readPart(text: string, p: Pick<Part, 'name' | 'style'>): string | null {
   const f = find(text, { ...p, body: '' });
-  return f === null ? null : text.slice(f.innerStart, f.innerStop).replace(/\r\n/g, '\n');
+  return f === null ? null : lf(text.slice(f.innerStart, f.innerStop));
 }
 
 export type MergeStatus = 'new' | 'unchanged' | 'updated' | 'kept-edited';
@@ -88,10 +91,10 @@ export function mergeParts(
         text = `${text.replace(/\n*$/, '\n\n')}${renderPart(p)}\n`;
         hashes[p.name] = partHash(p.body);
         changed = true;
-      }
+      } else hashes[p.name] = known[p.name] as string; // deleted by the user: stays deleted, and stays known
       continue;
     }
-    const current = text.slice(f.innerStart, f.innerStop).replace(/\r\n/g, '\n');
+    const current = lf(text.slice(f.innerStart, f.innerStop));
     const knownHash = known[p.name];
     if (knownHash === undefined || partHash(current) !== knownHash) return { status: 'kept-edited', text: existing, hashes: { ...known } };
     const next = partHash(p.body);
@@ -102,6 +105,18 @@ export function mergeParts(
     }
   }
   return { status: changed ? 'updated' : 'unchanged', text: changed ? text : existing, hashes };
+}
+
+/**
+ * A file that exists with no recorded hashes. It is ours all the same when an export wrote it and stopped before the
+ * manifest was saved: then every generated part reads exactly as it would be generated now. Returns that merge result
+ * (status `unchanged`, hashes to record), or null when the file is someone else's (every part must be there).
+ */
+export function adoptParts(existing: string, parts: readonly Part[], fresh: (parts: readonly Part[]) => string): MergeResult | null {
+  if (parts.some((p) => readPart(existing, p) === null)) return null; // a part missing: not a file of ours as written
+  const known = Object.fromEntries(parts.map((p) => [p.name, partHash(stripMarkers(p.body))]));
+  const r = mergeParts(existing, parts, known, fresh);
+  return r.status === 'unchanged' ? r : null;
 }
 
 /** Lays parts out one after the other, separated by a blank line. */

@@ -36,7 +36,7 @@ export const emptyDraft = (): Draft => ({
   docIds: [],
   includeCited: false,
   citedDepth: 1,
-  sources: 'paths',
+  sources: 'none',
   includeNotes: true,
   includeAnnotations: true,
 });

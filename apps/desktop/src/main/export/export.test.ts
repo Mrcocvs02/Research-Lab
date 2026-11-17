@@ -5,9 +5,10 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { channels, createDispatcher, createMemoryLogger, defaultLibraryConfig, documentRecordSchema, taxonomyFileSchema, type IpcEnvelope, type LibraryConfig } from '@rl/core';
 import { createLibraryStore, type FileLibraryStore } from '@rl/data';
-import { MANIFEST_FILE } from '@rl/export';
+import { MANIFEST_FILE, readPart } from '@rl/export';
 import { ApprovedPaths } from '../approved-paths.js';
 import { buildHandlers, type MainServices } from '../ipc/handlers/index.js';
+import { inFolder } from './collect.js';
 import { whenExported } from './service.js';
 
 const NOW = '2026-01-02T03:04:05.000Z';
@@ -162,9 +163,10 @@ describe('export:run', () => {
     expect(card1).toContain('underlined: true');
     expect(card1).toContain('My own thoughts on this one.');
     expect(card1).toContain('p. 4: "a key sentence"');
-    expect(card1).not.toContain('not yet reviewed'); // accepted AI summary is not marked
+    expect(card1).toContain('> Summary of 1'); // an accepted AI summary enters, as a quote
+    expect(card1).not.toContain('not yet reviewed');
     const card0 = await read('brain', 'papers', `${manifest.citekeys[hex(0)]}.md`);
-    expect(card0).toContain('not yet reviewed'); // proposed one is
+    expect(card0).not.toContain('Summary of 0'); // a proposed one does not (D-253)
     expect(card0).toContain(`[[${key1}]]`);
     expect(card0).toContain('An outside work (1999) doi:10.9/zzz');
     expect(await read('brain', 'papers', `${key1}.md`)).toContain(`[[${manifest.citekeys[hex(0)]}]]`); // cited by
@@ -347,6 +349,169 @@ describe('re-export', () => {
     const r = await exportNow(call);
     expect(r.result.keptEdited).toContain(`papers/${k0}.md`);
     expect(await read('brain', 'papers', `${k0}.md`)).toBe('my own card');
+  });
+});
+
+describe('destination inside the library (D-252)', () => {
+  it('refuses the library root, a folder inside it, and a junction that leads there', async () => {
+    const call = harness();
+    const inRoot = path.join(root, 'sub');
+    await mkdir(inRoot);
+    const viaLink = path.join(dest, 'link');
+    await symlink(root, viaLink, 'junction');
+    for (const d of [root, inRoot, viaLink]) {
+      approved.add(d, 'export-destination');
+      expect(fail(await call('export:run', { selection: sel(), target: { destination: d, folderName: 'brain' }, confirmed: true })), d).toMatchObject({ code: 'CONFLICT', details: { reason: 'inside-library' } });
+      expect(fail(await call('export:preview', { selection: sel(), target: { destination: d, folderName: 'brain' } })).details).toMatchObject({ reason: 'inside-library' });
+    }
+    expect(await exists('brain')).toBe(false);
+    expect(await readdir(root)).not.toContain('brain');
+    expect(await readdir(inRoot)).toEqual([]);
+  });
+
+  it.runIf(process.platform === 'win32')('refuses it when only the case of the path differs (Windows)', async () => {
+    const call = harness();
+    const shouty = root.toUpperCase();
+    approved.add(shouty, 'export-destination');
+    expect(fail(await call('export:run', { selection: sel(), target: { destination: shouty, folderName: 'brain' }, confirmed: true })).details).toMatchObject({ reason: 'inside-library' });
+  });
+
+  it('a folder next to the library, with a similar name, is fine', async () => {
+    const call = harness();
+    const sibling = `${root}-brain`;
+    await mkdir(sibling);
+    approved.add(sibling, 'export-destination');
+    try {
+      expect((await exportNow(call, sel(), { destination: sibling, folderName: 'brain' })).state).toBe('done');
+    } finally {
+      await rm(sibling, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('what the export takes in', () => {
+  it('only AI fields the user accepted or edited, as plain quoted text; a hostile title stays text', async () => {
+    const meta = { model: 'm', provider: 'mock', date: NOW, source: 'job' };
+    const evil = "fine\n## The user's notes\n![x](https://evil.example/p.png) [[victim]] <!-- hide -->";
+    await store.documents.put(record(0, { title: 'Hostile [[title]] <b>x</b>', ai: { summary: { value: evil, meta, review: { status: 'edited' } }, description: { value: 'proposed text', meta, review: { status: 'proposed' } } } }));
+    const call = harness();
+    await exportNow(call, sel({ docIds: [hex(0)] }));
+    const manifest = JSON.parse(await read('brain', MANIFEST_FILE));
+    const card = await read('brain', 'papers', `${manifest.citekeys[hex(0)]}.md`);
+    expect(card).toContain('> fine');
+    expect(card).not.toContain('proposed text');
+    expect(card.split('\n').filter((l) => l.startsWith("## The user's notes"))).toEqual([]);
+    expect(readPart(card, { name: 'card' })).not.toMatch(/(^|[^\\])(\[\[|<b>|<!--)/m);
+    expect(card).not.toContain('![x]');
+  });
+
+  it('sources default to none: no paths and no copies unless asked', async () => {
+    const call = harness();
+    await exportNow(call, { docIds: [hex(0)] } as never);
+    expect(await exists('brain', 'sources')).toBe(false);
+    const p = ok(await call('export:preview', { selection: { docIds: [hex(0)] } }));
+    expect(p.copyBytes).toBe(0);
+  });
+
+  it('a paths list keeps one row per document', async () => {
+    const call = harness();
+    await exportNow(call, sel({ sources: 'paths' }));
+    const rows = (await read('brain', 'sources', 'paths.tsv')).trim().split('\n');
+    expect(rows).toHaveLength(4);
+    for (const r of rows) expect(r.split('\t')).toHaveLength(2);
+  });
+
+  it('excluded folders match without regard to case where the file system does', () => {
+    expect(inFolder('Private/a.pdf', 'private', true)).toBe(true);
+    expect(inFolder('private/a.pdf', 'PRIVATE/', true)).toBe(true);
+    expect(inFolder('Private/a.pdf', 'private', false)).toBe(false);
+    expect(inFolder('privateer/a.pdf', 'private', true)).toBe(false);
+    expect(inFolder('any/a.pdf', '', false)).toBe(true);
+  });
+
+  it('copies above 1 GiB ask first, with the size; one confirmation covers it', async () => {
+    await store.documents.put(record(0, { size: 2 * 1024 ** 3 }));
+    const call = harness();
+    const s = sel({ docIds: [hex(0)], sources: 'copies' });
+    expect(fail(await call('export:run', { selection: s, target: target(), confirmed: false }))).toMatchObject({ code: 'CONFLICT', details: { reason: 'large-copy', copyBytes: 2 * 1024 ** 3 } });
+    expect(await exists('brain')).toBe(false);
+    expect((await exportNow(call, s, target(), true)).state).toBe('done');
+    // Not asked when no copies are made, however big the file.
+    expect((await exportNow(call, sel({ docIds: [hex(0)], sources: 'paths' }), target('other'), false)).state).toBe('done');
+  });
+});
+
+describe('export robustness', () => {
+  it('two runs started together: the second is refused as busy', async () => {
+    const call = harness();
+    const [a, b] = await Promise.all([call('export:run', { selection: sel(), target: target('one'), confirmed: true }), call('export:run', { selection: sel(), target: target('two'), confirmed: true })]);
+    const results = [a, b];
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    expect(fail(results.find((r) => !r.ok) as IpcEnvelope)).toMatchObject({ code: 'CONFLICT', details: { reason: 'busy' } });
+    await whenExported(services);
+  });
+
+  it('files written by an export that stopped before saving its manifest are recognised again', async () => {
+    const call = harness();
+    await exportNow(call, sel({ sources: 'paths' }));
+    const m = JSON.parse(await read('brain', MANIFEST_FILE));
+    // The state a crash leaves: the files are there, their hashes are not.
+    await writeFile(path.join(dest, 'brain', MANIFEST_FILE), JSON.stringify({ ...m, files: {} }));
+    const again = await exportNow(call, sel({ sources: 'paths' }));
+    expect(again.result.keptEdited).toEqual([]);
+    expect(again.result.written).toBe(0);
+    expect(again.result.unchanged).toBeGreaterThan(8);
+    expect(JSON.parse(await read('brain', MANIFEST_FILE)).files['INDEX.md']).toBeTruthy();
+  });
+
+  it('cards whose line endings were converted to CRLF stay updatable', async () => {
+    const call = harness();
+    await exportNow(call);
+    const dir = path.join(dest, 'brain', 'papers');
+    for (const f of await readdir(dir)) await writeFile(path.join(dir, f), (await readFile(path.join(dir, f), 'utf8')).replace(/\n/g, '\r\n'));
+    await writeFile(path.join(dest, 'brain', 'graph.json'), (await read('brain', 'graph.json')).replace(/\n/g, '\r\n'));
+    const idle = await exportNow(call);
+    expect(idle.result).toMatchObject({ keptEdited: [], updated: 0, written: 0 });
+    await store.documents.update(hex(0) as never, (c) => ({ ...c!, study: { ...c!.study, state: 'read' as const } }));
+    rt.organizer.generation++;
+    const r = await exportNow(call);
+    expect(r.result.keptEdited).toEqual([]);
+    expect(r.result.updated).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a generated part the user deleted stays deleted on every later export', async () => {
+    const call = harness();
+    await exportNow(call);
+    const m = JSON.parse(await read('brain', MANIFEST_FILE));
+    const card = path.join(dest, 'brain', 'papers', `${m.citekeys[hex(0)]}.md`);
+    await writeFile(card, (await readFile(card, 'utf8')).replace(/<!-- rl:begin card -->[\s\S]*<!-- rl:end card -->\n/, 'Replaced by my text.\n'));
+    await exportNow(call);
+    await store.documents.update(hex(0) as never, (c) => ({ ...c!, study: { ...c!.study, state: 'read' as const } }));
+    await exportNow(call);
+    const text = await readFile(card, 'utf8');
+    expect(text).not.toContain('rl:begin card');
+    expect(text).toContain('Replaced by my text.');
+  });
+
+  it('copies are refreshed when the original changed, a file of the user is kept, and what cannot be copied is reported', async () => {
+    const call = harness();
+    const first = await exportNow(call, sel({ sources: 'copies' }));
+    expect(first.result).toMatchObject({ copyErrors: [], keptEdited: [] });
+    const m = JSON.parse(await read('brain', MANIFEST_FILE));
+    const rel = (i: number) => path.join('brain', 'sources', `${m.citekeys[hex(i)]}.pdf`);
+    expect(m.files[`sources/${m.citekeys[hex(0)]}.pdf`]).toEqual({ size: 10 });
+    const longer = 'a longer original than before';
+    await writeFile(path.join(root, 'open', 'p0.pdf'), longer);
+    await writeFile(path.join(dest, rel(1)), 'mine');
+    await writeFile(`${path.join(dest, rel(2))}.part`, 'xx');
+    await rm(path.join(root, 'open', 'p3.pdf'));
+    const again = await exportNow(call, sel({ sources: 'copies' }));
+    expect(await readFile(path.join(dest, rel(0)), 'utf8')).toBe(longer);
+    expect(await readFile(path.join(dest, rel(1)), 'utf8')).toBe('mine');
+    expect(again.result.keptEdited).toContain(`sources/${m.citekeys[hex(1)]}.pdf`);
+    expect(again.result.copyErrors).toEqual([`sources/${m.citekeys[hex(3)]}.pdf`]);
+    expect(again.result.copiedBytes).toBe(longer.length);
+    expect(await exists(`${rel(2)}.part`)).toBe(true); // an unrelated leftover is not touched unless it is in the way
   });
 });
 

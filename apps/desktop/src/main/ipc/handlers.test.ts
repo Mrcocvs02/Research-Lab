@@ -349,4 +349,14 @@ describe('e2e dialog override', () => {
     expect(e2eDialogOverride({ RL_E2E: '1', RL_E2E_DIALOG_PATH: 'relative/dir' }, false)).toBeNull();
     expect(e2eDialogOverride({ RL_E2E: '1' }, false)).toBeNull();
   });
+
+  it('a separate path for the export destination, with the same guards', () => {
+    const abs = path.join(tmp, 'picked');
+    const out = path.join(tmp, 'export-out');
+    const env = { RL_E2E: '1', RL_E2E_DIALOG_PATH: abs, RL_E2E_EXPORT_DIALOG_PATH: out };
+    expect(e2eDialogOverride(env, false, 'export-destination')).toBe(out);
+    expect(e2eDialogOverride(env, false, 'library-root')).toBe(abs);
+    expect(e2eDialogOverride({ RL_E2E_EXPORT_DIALOG_PATH: out }, false, 'export-destination')).toBeNull();
+    expect(e2eDialogOverride(env, true, 'export-destination')).toBeNull();
+  });
 });

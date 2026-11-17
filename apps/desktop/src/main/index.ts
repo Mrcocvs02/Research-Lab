@@ -111,7 +111,7 @@ async function main(): Promise<void> {
     shell: { openPath: (p) => shell.openPath(p), showItemInFolder: (p) => shell.showItemInFolder(p), openExternal: (u) => shell.openExternal(u) },
     async pickFolder(purpose, title) {
       // Test hook: only in a development run with RL_E2E=1 (see runtime.ts, dialog-override.ts).
-      const override = e2eDialogOverride(process.env, app.isPackaged);
+      const override = e2eDialogOverride(process.env, app.isPackaged, purpose);
       if (override) return override;
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
       const options: Electron.OpenDialogOptions = {

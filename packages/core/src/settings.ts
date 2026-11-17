@@ -186,7 +186,7 @@ export const exportPresetSchema = z.object({
   name: z.string().min(1),
   includeCited: z.boolean().default(false),
   citedDepth: z.number().int().min(0).max(3).default(1),
-  sources: z.enum(['none', 'paths', 'copies']).default('paths'),
+  sources: z.enum(['none', 'paths', 'copies']).default('none'),
   includeNotes: z.boolean().default(true),
   includeAnnotations: z.boolean().default(true),
 });

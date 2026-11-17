@@ -33,7 +33,8 @@ export const sha256 = (s: string | Uint8Array): string => createHash('sha256').u
 export function yamlScalar(v: string | number | boolean): string {
   if (typeof v !== 'string') return String(v);
   const plain = /^[A-Za-z][A-Za-z0-9 _.,()/+-]*$/.test(v) && !/^(true|false|null|yes|no|on|off)$/i.test(v) && !v.endsWith(' ');
-  return plain ? v : JSON.stringify(v);
+  // JSON allows U+2028/2029 raw; YAML 1.1 reads them as line breaks.
+  return plain ? v : JSON.stringify(v).replace(/[\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16)}`);
 }
 
 /** Single-line text for a list item. */
@@ -41,6 +42,24 @@ export const oneLine = (s: string, max = 300): string => {
   const t = s.replace(/\s+/g, ' ').trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 };
+
+/**
+ * Text taken from a PDF, a web page or an AI, rendered as plain Markdown text: no link, image, wikilink, HTML tag or
+ * comment (a backslash escapes the characters \ [ ] < and the backtick), and no heading, quote, list, rule or front
+ * matter at the start of a line. A reader or an agent sees the characters, never the structure the text tried to forge.
+ */
+export const mdText = (s: string): string =>
+  s
+    .replace(/[\\[\]<`]/g, (c) => `\\${c}`)
+    .split('\n')
+    .map((l) => l.replace(/^(\s*)([#>+=|~-]|\d+[.)])/, '$1\\$2'))
+    .join('\n');
+
+/** `oneLine` of untrusted text, neutralised (cut first, so an escape is never split). */
+export const safeLine = (s: string, max = 300): string => mdText(oneLine(s, max));
+
+/** Line endings an editor or git may have rewritten (CRLF, lone CR), back to `\n`. */
+export const toLf = (s: string): string => s.replace(/\r\n?/g, '\n');
 
 /** Removes what could close or fake one of our markers inside user or document text. */
 export const stripMarkers = (s: string): string => s.replace(/rl:(begin|end)/g, 'rl-$1');

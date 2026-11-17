@@ -14,7 +14,7 @@ import { MAX_NET_NODES, Network } from './forceSim';
 import { boundsOf, fitView, PointGrid, placeLabels, toScreenX, toWorldX, zoomAt } from './geometry';
 import { NetworkView } from './NetworkView';
 import { parentFromPath, pushBack } from './exploreNav';
-import { clusterText, prepareMap, type MapResponse } from './mapModel';
+import { clusterText, pointsInView, prepareMap, stepPoint, type MapResponse } from './mapModel';
 
 vi.mock('../../lib/rl', async () => (await import('../../testing/mockRl')).rlModule);
 
@@ -147,6 +147,7 @@ describe('map model', () => {
     ],
     seed: 7,
     builtAt: '2026-01-01T00:00:00.000Z',
+    omitted: 0,
   };
 
   it('groups points by cluster per level and labels clusters', () => {
@@ -158,6 +159,43 @@ describe('map model', () => {
     expect(clusterText(m.levels[0]![0]!)).toEqual({ text: 'alpha, beta, gamma', ai: false });
     expect(clusterText(m.levels[0]![1]!)).toEqual({ text: 'Omega things', ai: true });
     expect(m.grid.nearest(5.1, 5, 0.5)).toBe(2);
+  });
+});
+
+describe('keyboard walk over the map', () => {
+  const resp: MapResponse = {
+    points: [
+      { docId: 'a'.repeat(16), x: 0, y: 0, clusters: ['c0'] },
+      { docId: 'b'.repeat(16), x: 1, y: 1, clusters: ['c1'] },
+      { docId: 'c'.repeat(16), x: 2, y: 2, clusters: ['c0'] },
+      { docId: 'd'.repeat(16), x: 500, y: 500, clusters: ['c1'] },
+    ],
+    clusters: [
+      { id: 'c0', parent: null, level: 0, size: 2, topTerms: ['x'], aiLabel: null, centroid: { x: 1, y: 1 } },
+      { id: 'c1', parent: null, level: 0, size: 2, topTerms: ['y'], aiLabel: null, centroid: { x: 250, y: 250 } },
+    ],
+    seed: 1,
+    builtAt: '2026-01-01T00:00:00.000Z',
+    omitted: 0,
+  };
+
+  it('lists the points in view cluster by cluster and leaves out the ones off screen', () => {
+    const m = prepareMap(resp);
+    const inView = pointsInView(m, 0, { cx: 1, cy: 1, k: 50 }, 400, 300);
+    // Cluster c0 (points 0 and 2), then c1 (point 1); point 3 is far away.
+    expect(inView).toEqual([0, 2, 1]);
+    expect(pointsInView(m, 0, { cx: 500, cy: 500, k: 50 }, 400, 300)).toEqual([3]);
+  });
+
+  it('steps forward and back through them, wrapping, and starts at the first (or last) from nowhere', () => {
+    const list = [4, 7, 9];
+    expect(stepPoint(list, -1, true)).toBe(4);
+    expect(stepPoint(list, -1, false)).toBe(9);
+    expect(stepPoint(list, 4, true)).toBe(7);
+    expect(stepPoint(list, 9, true)).toBe(4);
+    expect(stepPoint(list, 4, false)).toBe(9);
+    expect(stepPoint(list, 5, true)).toBe(4); // a point that went out of view
+    expect(stepPoint([], 3, true)).toBe(-1);
   });
 });
 
@@ -181,9 +219,9 @@ describe('NetworkView', () => {
   it('shows the empty state, builds with progress and reloads when the build ends', async () => {
     let state: 'none' | 'ready' = 'none';
     await mount(createElement(NetworkView), {
-      'graph:status': () => ({ state, documents: 3, builtAt: state === 'ready' ? '2026-01-01T10:00:00.000Z' : null, seed: state === 'ready' ? 5 : null, pending: 0 }),
+      'graph:status': () => ({ state, documents: 3, builtAt: state === 'ready' ? '2026-01-01T10:00:00.000Z' : null, seed: state === 'ready' ? 5 : null, pending: 0, removed: 0 }),
       'graph:build': () => ({ jobId: 'job1' }),
-      'graph:map': () => ({ points: [], clusters: [], seed: 5, builtAt: '2026-01-01T10:00:00.000Z' }),
+      'graph:map': () => ({ points: [], clusters: [], seed: 5, builtAt: '2026-01-01T10:00:00.000Z', omitted: 0 }),
     });
     expect(screen.getByTestId('graph-empty')).toBeTruthy();
     fireEvent.change(screen.getByTestId('graph-seed'), { target: { value: '5' } });
@@ -203,12 +241,63 @@ describe('NetworkView', () => {
 
   it('keeps the map usable when stale and shows how many documents are pending', async () => {
     await mount(createElement(NetworkView), {
-      'graph:status': () => ({ state: 'stale', documents: 4, builtAt: '2026-01-01T10:00:00.000Z', seed: 5, pending: 2 }),
-      'graph:map': () => ({ points: [], clusters: [], seed: 5, builtAt: '2026-01-01T10:00:00.000Z' }),
+      'graph:status': () => ({ state: 'stale', documents: 4, builtAt: '2026-01-01T10:00:00.000Z', seed: 5, pending: 2, removed: 0 }),
+      'graph:map': () => ({ points: [], clusters: [], seed: 5, builtAt: '2026-01-01T10:00:00.000Z', omitted: 0 }),
     });
     expect(screen.getByTestId('graph-status-text').textContent).toContain('2 documents');
     expect(screen.getByTestId('graph-build').textContent).toBe('Rebuild');
     expect(callsTo('graph:map').length).toBeGreaterThan(0);
+  });
+});
+
+describe('NetworkView limits and messages', () => {
+  const base = { 'graph:map': () => ({ points: [], clusters: [], seed: 5, builtAt: '2026-01-01T10:00:00.000Z', omitted: 0 }) };
+
+  it('says how many documents were removed since the build, alone or with the changed ones', async () => {
+    await mount(createElement(NetworkView), { ...base, 'graph:status': () => ({ state: 'stale', documents: 4, builtAt: '2026-01-01T10:00:00.000Z', seed: 5, pending: 0, removed: 2 }) });
+    expect(screen.getByTestId('graph-status-text').textContent).toContain('2 documents were removed');
+    cleanup();
+    await mount(createElement(NetworkView), { ...base, 'graph:status': () => ({ state: 'stale', documents: 4, builtAt: '2026-01-01T10:00:00.000Z', seed: 5, pending: 3, removed: 1 }) });
+    expect(screen.getByTestId('graph-status-text').textContent).toContain('3 documents were added or changed');
+    expect(screen.getByTestId('graph-status-text').textContent).toContain('removed: 1');
+  });
+
+  it.each([
+    ['too-large', 'more than 60,000 documents'],
+    ['timeout', 'took too long'],
+    ['memory', 'ran out of memory'],
+  ])('tells why a build failed (%s)', async (reason, text) => {
+    await mount(createElement(NetworkView), {
+      ...base,
+      'graph:status': () => ({ state: 'none', documents: 3, builtAt: null, seed: null, pending: 0, removed: 0 }),
+      'graph:build': () => ({ jobId: 'job1' }),
+    });
+    fireEvent.click(screen.getByTestId('graph-build-empty'));
+    await settle();
+    act(() => emitEvent('graph:progress', { jobId: 'job1', phase: 'failed', done: 0, total: 0, reason }));
+    await settle();
+    expect(screen.getByTestId('graph-failed').textContent).toContain(text);
+  });
+
+  it('tells how many documents had their citation list cut when a build ends', async () => {
+    await mount(createElement(NetworkView), {
+      ...base,
+      'graph:status': () => ({ state: 'none', documents: 3, builtAt: null, seed: null, pending: 0, removed: 0 }),
+      'graph:build': () => ({ jobId: 'job1' }),
+    });
+    fireEvent.click(screen.getByTestId('graph-build-empty'));
+    await settle();
+    act(() => emitEvent('graph:progress', { jobId: 'job1', phase: 'done', done: 3, total: 3, trimmedCitations: 2 }));
+    await settle();
+    expect(screen.getByTestId('graph-trimmed').textContent).toContain('2 documents list more cited works');
+  });
+
+  it('says when the map leaves documents off', async () => {
+    await mount(createElement(NetworkView), {
+      'graph:status': () => ({ state: 'ready', documents: 4, builtAt: '2026-01-01T10:00:00.000Z', seed: 5, pending: 0, removed: 0 }),
+      'graph:map': () => ({ points: [{ docId: 'a'.repeat(16), x: 0, y: 0, clusters: [] }], clusters: [], seed: 5, builtAt: '2026-01-01T10:00:00.000Z', omitted: 7 }),
+    });
+    await waitFor(() => expect(screen.getByTestId('map-omitted').textContent).toContain('7 more documents are not shown'));
   });
 });
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { GRAPH_LIMITS } from '@rl/core';
 import { useTranslation } from 'react-i18next';
 import { ErrorNote, ProgressBar } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
@@ -64,7 +65,7 @@ function DocDetail({ docId, onClose, onNetwork, tagLabel, onOpenDoc }: { docId: 
  * (view, selection, level) is still there when the user comes back.
  */
 export function NetworkView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const model = useGraphModel();
   const scopes = useScopeOptions();
   const [tab, setTab] = useState<Tab>('map');
@@ -94,7 +95,7 @@ export function NetworkView() {
         <div className="net-status" data-testid="graph-status" data-state={status?.state ?? 'unknown'} data-pending={status?.pending ?? 0} aria-live="polite">
           {status && !building && (
             <span data-testid="graph-status-text">
-              {status.state === 'none' ? t('network.status.none') : status.state === 'stale' ? t('network.status.stale', { count: status.pending }) : t('network.status.ready', { count: status.documents })}
+              {status.state === 'none' ? t('network.status.none') : status.state === 'stale' ? (status.pending > 0 ? t('network.status.stale', { count: status.pending }) + (status.removed > 0 ? ` · ${t('network.status.alsoRemoved', { count: status.removed })}` : '') : t('network.status.removed', { count: status.removed })) : t('network.status.ready', { count: status.documents })}
               {status.builtAt && status.state !== 'none' ? ` · ${t('network.status.builtAt', { date: status.builtAt.slice(0, 16).replace('T', ' ') })}` : ''}
             </span>
           )}
@@ -128,7 +129,12 @@ export function NetworkView() {
         </div>
       </header>
       {model.error ? <ErrorNote testId="graph-error">{errorMessage(model.error, t)}</ErrorNote> : null}
-      {model.failed && <ErrorNote testId="graph-failed">{t('network.buildFailed')}</ErrorNote>}
+      {model.failed && <ErrorNote testId="graph-failed">{t(model.failReason ? `network.buildFailed_${model.failReason}` : 'network.buildFailed', { limit: GRAPH_LIMITS.buildDocuments.toLocaleString(i18n.language) })}</ErrorNote>}
+      {model.trimmed > 0 && !building && (
+        <p className="note" role="status" data-testid="graph-trimmed">
+          {t('network.citationsTrimmed', { count: model.trimmed, max: GRAPH_LIMITS.citationKeys })}
+        </p>
+      )}
       <div role="tablist" aria-label={t('network.tabs')} className="tabs">
         {TABS.map((id) => (
           <button key={id} type="button" role="tab" id={`net-tab-${id}`} aria-selected={tab === id} aria-controls={`net-panel-${id}`} className={tab === id ? 'tab on' : 'tab'} onClick={() => show(id)} data-testid={`net-tab-${id}`}>

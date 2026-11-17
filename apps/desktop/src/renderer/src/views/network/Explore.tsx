@@ -188,18 +188,11 @@ export function Explore({ selectedDoc, onOpenDoc }: Props) {
     go({ dim: rel.to, parentId: parentFromPath(n.path, n.id), selected: n.id });
   };
 
-  useEffect(() => {
-    if (!rel) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setRel(null);
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [rel]);
-
   const topBack = back[back.length - 1];
   const others = DIMS.filter((d) => d !== loc.dim);
 
   return (
-    <div className="net-tab explore-tab" data-testid="explore-panel" data-dim={loc.dim} data-depth={ready ? data.path.length : 0}>
+    <div className="net-tab explore-tab" onKeyDown={(e) => e.key === 'Escape' && rel && setRel(null)} data-testid="explore-panel" data-dim={loc.dim} data-depth={ready ? data.path.length : 0}>
       <div className="net-toolbar">
         <div role="tablist" aria-label={t('network.explore.dimension')} className="seg">
           {DIMS.map((d) => (

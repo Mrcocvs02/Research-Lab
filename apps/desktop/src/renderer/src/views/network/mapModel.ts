@@ -1,5 +1,5 @@
 import type { Channels, ResponseOf } from '@rl/core';
-import { boundsOf, PointGrid, type Bounds } from './geometry';
+import { boundsOf, PointGrid, toScreenX, toScreenY, type Bounds, type View } from './geometry';
 
 export type MapResponse = ResponseOf<Channels, 'graph:map'>;
 export type ClusterView = MapResponse['clusters'][number];
@@ -20,6 +20,8 @@ export interface PreparedMap {
   groups: Array<{ order: Uint32Array; starts: Uint32Array }>;
   seed: number;
   builtAt: string;
+  /** Documents left off because the library has more than the map can carry. */
+  omitted: number;
 }
 
 export function prepareMap(r: MapResponse): PreparedMap {
@@ -61,11 +63,32 @@ export function prepareMap(r: MapResponse): PreparedMap {
     return { order, starts };
   });
   const bounds = boundsOf(xs, ys, n);
-  return { n, ids, xs, ys, bounds, grid: new PointGrid(xs, ys, n, bounds), indexOf, levels, clusterById, groups, seed: r.seed, builtAt: r.builtAt };
+  return { n, ids, xs, ys, bounds, grid: new PointGrid(xs, ys, n, bounds), indexOf, levels, clusterById, groups, seed: r.seed, builtAt: r.builtAt, omitted: r.omitted };
 }
 
 /** The text a cluster is shown with: Claude's label when there is one, else its most characteristic terms. */
 export function clusterText(c: ClusterView, terms = 3): { text: string; ai: boolean } {
   if (c.aiLabel) return { text: c.aiLabel.text, ai: true };
   return { text: c.topTerms.slice(0, terms).join(', '), ai: false };
+}
+
+/** Points inside the view, in drawing order (cluster by cluster at `level`): what the keyboard walks through. */
+export function pointsInView(map: PreparedMap, level: number, v: View, w: number, h: number): number[] {
+  const g = map.groups[level];
+  const out: number[] = [];
+  for (let j = 0; j < map.n; j++) {
+    const i = g ? g.order[j]! : j;
+    const sx = toScreenX(v, map.xs[i]!, w);
+    const sy = toScreenY(v, map.ys[i]!, h);
+    if (sx >= 0 && sy >= 0 && sx <= w && sy <= h) out.push(i);
+  }
+  return out;
+}
+
+/** The point after (or before) `current` in `list`, wrapping; with no current point (or one out of view) the first (or the last). */
+export function stepPoint(list: readonly number[], current: number, forward: boolean): number {
+  if (list.length === 0) return -1;
+  const at = list.indexOf(current);
+  if (at < 0) return list[forward ? 0 : list.length - 1]!;
+  return list[(at + (forward ? 1 : list.length - 1)) % list.length]!;
 }

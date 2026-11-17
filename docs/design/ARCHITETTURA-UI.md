@@ -1,6 +1,6 @@
 # Architettura dell'interfaccia e sistema visivo (riprogettazione)
 
-Stato: **finale (giro 3)**, 2026-11-17, ramo `design-arch`. Il giro 3 integra l'audit completo (ramo `design-audit` 8c0d950, italiano e inglese) e due richieste nuove dell'utente (composizione moderna e minimale; mappa bella e giocabile): §0.3-§0.5, §1.1, §4.14-§4.20, §8.1.2, §8.3 rivisto, §14 riordinato, decisioni D-345 … D-367. In caso di dubbio vale questo documento. Primo giro scritto dal codice, dai documenti e dalle richieste dell'utente (D-310 … D-324); secondo giro rivisto con l'audit del designer avversario (`docs/design/AUDIT.md` sul ramo `design-audit`, parziale, 138 schermate misurate) e con nuove verifiche nel codice (D-325 … D-344). Le quattro domande del primo giro hanno ora una risposta **provvisoria, da confermare con l'utente** (§15): nessuna blocca il lavoro.
+Stato: **finale (giro 3)**, giro 3 chiuso con la critica del progetto finale (§16, D-368 … D-382), 2026-11-17, ramo `design-arch`. Il giro 3 integra l'audit completo (ramo `design-audit` 8c0d950, italiano e inglese) e due richieste nuove dell'utente (composizione moderna e minimale; mappa bella e giocabile): §0.3-§0.5, §1.1, §4.14-§4.20, §8.1.2, §8.3 rivisto, §14 riordinato, decisioni D-345 … D-367. In caso di dubbio vale questo documento. Primo giro scritto dal codice, dai documenti e dalle richieste dell'utente (D-310 … D-324); secondo giro rivisto con l'audit del designer avversario (`docs/design/AUDIT.md` sul ramo `design-audit`, parziale, 138 schermate misurate) e con nuove verifiche nel codice (D-325 … D-344). Le quattro domande del primo giro hanno ora una risposta **provvisoria, da confermare con l'utente** (§15): nessuna blocca il lavoro.
 
 Le richieste dell'utente a cui risponde questo documento:
 
@@ -35,7 +35,7 @@ Ogni riscontro dell'audit (problemi numerati 1-15 della sintesi e risultati per 
 | A6 | Badge "Arrivi" senza tooltip, conta solo i file, stesso documento in due posti (alto) | sezione "Da rivedere", badge = decisioni in attesa, tooltip con il dettaglio, i file della scansione spiegati come "Già nella libreria" | §7.1, §4.4, D-338 |
 | A7 | Scansione nascosta, barra che si sposta, nessuna voce nella tavolozza (alto) | chip Attività sempre visibile, popover Scansione con l'ultimo esito, passo nella procedura guidata, "Scansiona ora" nella tavolozza; "Ricostruisci indice" in Avanzate | §9, §4.9 |
 | A8 | Evidenziazioni non nel PDF e l'app non lo dice; "Sottolineato" ambiguo (alto) | le annotazioni si scrivono nel PDF (D-316), chip "PDF:" con lo stato, consenso prima della prima scrittura (D-348); la casella diventa "Annotato" nella scheda Info | §8.3, §4.3, §11.1 |
-| A9 | Lettore: 200 px di barre su 800, a 1024×700 l'area del PDF è 405×389 (alto) | una sola barra da 44 px, stato di studio in un menu, tasti nel pulsante [?], pannello a 3 schede; a 1024×700 area utile ≥ 600×600 (criterio) | §4.3 |
+| A9 | Lettore: 200 px di barre su 800, a 1024×700 l'area del PDF è 405×389 (alto) | una sola barra da 48 px, barra laterale compressa nel lettore, stato di studio in un menu, tasti nel pulsante [?], pannello a 3 schede; area delle pagine ≥ 960×640 a 1024×700 (pannello chiuso) e ≥ 880×740 a 1280×800 (pannello aperto) (D-370) | §4.3 |
 | A10 | Barra di stato usata come area di notifica, alta fino a 100 px (alto) | barra di stato tolta; chip Attività + popover (centro notifiche), toast solo per azioni dell'utente, banner nel flusso | §7, §4.10 |
 | A11 | Con la chat aperta la Libreria si rompe; due "Cronologia" (alto) | disposizione adattiva con `@container`, pannello Claude sovrapposto sotto 1180 px, Cartelle/Tag in cassetto; "Conversazioni" | §3.2, §4.1, D-335, D-334 |
 | A12 | Scheda del documento con un secondo clic non scoperto; doppio clic contraddice la guida (medio) | clic = selezione + scheda nel pannello; doppio clic/Invio = lettore; Ctrl+Invio = programma esterno; guida aggiornata | §3.2, D-333 |
@@ -151,7 +151,7 @@ L'attacco è stato scritto contro 5d56f8b (documento ancora al primo giro); ogni
 | --- | --- | --- | --- |
 | Problema 0: documento e decisioni in disaccordo | già risolto (documento riscritto al giro 2) | il documento è la fonte; le decisioni lo riassumono | — |
 | B.1 `@layer` non basta; arrotondamento DPR; riparazione N1 | `@layer` + rinomine; DPR provato in F4; nessuna riparazione | foglio filtrato e prefissato, e2e `leakedRules`, altezza dalla larghezza, riparazione | §8.1, D-346, D-347 |
-| B.2.1 consenso | banner dopo la prima scrittura | dialogo **prima** della prima scrittura per libreria; riga nella procedura guidata | §8.3.7, D-348 |
+| B.2.1 consenso | banner dopo la prima scrittura | banner non modale nel lettore **prima** della prima scrittura per libreria, dialogo solo alla chiusura senza risposta (D-374); riga nel corpo del Riepilogo della procedura guidata | §8.3.7, D-348 |
 | B.2.2 lotti ogni 4 s in cartella sincronizzata | lotti ogni 4 s, copia + rinomina | scrittura alla chiusura, al cambio, dopo 120 s senza modifiche (max una ogni 10 min), oltre 50 MB solo alla chiusura; prova dell'aggiunta in coda | §8.3.3, D-349 |
 | B.2.3 due computer, annotazioni "non allineate" | regola del prefisso + `own` | classificazione della revisione aggiunta per contenuto | §8.3.6, D-350 |
 | B.2.4 cifrati con password vuota | rifiuto | supporto in G4c se ≥ 2% sulla libreria di prova; permessi rispettati | §8.3.5, D-351 |
@@ -198,7 +198,7 @@ L'attacco è stato scritto contro 5d56f8b (documento ancora al primo giro); ogni
 
 Richiesta dell'utente: "moderna, minimale ma completa". Regole valide per **ogni** vista, dialogo e pannello; ogni compito le verifica nella sua vista.
 
-1. **Intestazione di vista uguale ovunque:** titolo a sinistra (`--fs-title`), conteggio o sottotitolo accanto in `--text-muted`; **un solo primario a destra**; accanto al primario al massimo due secondari e poi `⋯` con tutto il resto. Sotto, se servono, le schede (`Tabs`), poi **una riga di filtri** (chip), mai due.
+1. **Intestazione di vista uguale ovunque:** titolo a sinistra (`--fs-title`), conteggio o sottotitolo accanto in `--text-muted`; **un solo primario a destra**; accanto al primario al massimo due secondari e poi `⋯` con tutto il resto; i pulsanti che aprono o chiudono un pannello (◫) non sono azioni e stanno dopo il `⋯` (D-377). Sotto, se servono, le schede (`Tabs`), poi **una riga di filtri** (chip), mai due.
 2. **Una sola azione primaria per vista** (e per dialogo: nel piede, a destra). Tutto il resto è secondario (contorno) o terziario (testo); le azioni distruttive sono `danger` solo nel dialogo di conferma.
 3. **Azioni contestuali dove serve, quando serve:** la barra di selezione compare **al posto** della riga dei filtri quando c'è una selezione multipla (stessa posizione in Libreria, Da rivedere, Progetti, Scopri); le azioni di un elemento stanno sull'elemento attivo (riga, nodo, annotazione) o nel suo menu ⋯; un popover compare accanto all'oggetto, mai in fondo alla finestra.
 4. **Posizioni fisse:** navigazione a sinistra; dettagli a destra (scheda, progetto, nodo); Claude a destra del tutto; Attività, Annulla, Cronologia e Comandi nella barra in alto; conferme e risultati nel piede dei dialoghi; toast in basso a destra.
@@ -212,7 +212,7 @@ Richiesta dell'utente: "moderna, minimale ma completa". Regole valide per **ogni
 | Vista | Primario (destra dell'intestazione o piede) | Secondari visibili | Nel ⋯ della vista | Contestuali (selezione o elemento) | Spostati da dove sono oggi |
 | --- | --- | --- | --- | --- | --- |
 | Guscio | — | ‹ ›, ricerca, ↶ ↷ 🕘, Comandi, Attività (barra in alto) | — | — | lingua → Impostazioni › Generale; barra di stato → Attività/pannello Claude; Annulla/Cronologia dalle viste → barra in alto |
-| Libreria | + Aggiungi PDF | Elenco/Griglia, Ordina, ◫ scheda | Mostra i file mancanti, Gestisci tag, Esporta come secondo cervello…, Scansiona ora | barra di selezione: Tag, Progetto, ✦ Claude, ⋯ (Aggiorna citazioni, Esporta…, Apri con il programma predefinito); riga attiva: Leggi, Scheda, ⋯ | "Chiedi a Claude" → ✦ "Cerca con Claude" nel campo di ricerca; Scansiona/Ricostruisci → Attività/Avanzate; Tassonomia → Gestisci tag |
+| Libreria | + Aggiungi PDF | Vista ▾ (Elenco/Griglia e ordinamento), poi ◫ scheda dopo il ⋯ | Gestisci tag, Esporta come secondo cervello…, Scansiona ora | riga dei filtri con tutti i facet e "Mostra i file mancanti" (D-369); barra di selezione: Tag, Progetto, ✦ Claude, ⋯ (Aggiorna citazioni, Esporta…, Apri con il programma predefinito); riga attiva: Leggi, Scheda, ⋯ | "Chiedi a Claude" → ✦ "Cerca con Claude" nel campo di ricerca; Scansiona/Ricostruisci → Attività/Avanzate; Tassonomia → Gestisci tag; scheda "Filtri" → riga dei filtri |
 | Scheda del documento | Leggi | ✦ Chiedi a Claude | Apri con il programma predefinito, Mostra nella cartella, Proponi con Claude…, Aggiorna citazioni, Esporta… | Modifica i dati (sezione), Aggiorna (Citazioni) | modulo di modifica → "Modifica i dati" chiuso |
 | Lettore | — (la lettura è l'azione) | strumenti, colori, pagine, zoom, ricerca, PDF, Studio, ◫ | Apri con il programma predefinito, Mostra nella cartella, Tasti del lettore, Esporta copia annotata… | popover dell'annotazione; mini popover della selezione | barra di studio → menu Studio; scorciatoie → [?]/⋯; barra di annotazione in fondo → popover |
 | Da rivedere · Nuovi file | + Aggiungi PDF… | Modello e Ragionamento (chip) | Segna tutti come visti | riga: Conferma, Ignora, Modifica; selezione: Conferma i selezionati | Modello/Ragionamento dalla testa della vista → chip spiegati |
@@ -386,7 +386,7 @@ Convenzioni: misure in px CSS; colori e misure con i token di §5; `[Testo]` pul
 |  ▣ Libreria          +--------------------------------------------------------------------+                           |
 |  ⇩ Da rivedere   15  |                                                                    |                           |
 |  ▤ Progetti          |                      CONTENUTO DELLA VISTA (.view)                  |                           |
-|  ✦ Scopri         4  |                                                                    |                           |
+|  ◈ Scopri         4  |                                                                    |                           |
 |  ◎ Mappa             |                                                                    |                           |
 |                      |                                                                    |                           |
 |  ──────────────      |                                                                    | [Chiedi a Claude…      ]  |
@@ -426,8 +426,8 @@ Barra in alto (48 px, `--surface`, padding 0 16, gap 8):
 
 ```
 +--------------------------------------------------------------------------------------------------------------+
-| Libreria  214 documenti                                          [≡ Elenco|▦ Griglia]  [Ordina: Titolo ▾]  [[+ Aggiungi PDF]] [◫] |  56
-| [Stato ▾] [Tipo ▾] [Anno ▾] [Rivista ▾] [Tag ▾]   (× Da leggere) (× Ottica)   (Pulisci)        □ Mostra mancanti |  40
+| Libreria  214 documenti                                                     [Vista: Elenco · Titolo ▾]  [[+ Aggiungi PDF]]  [⋯]  [◫] |  56
+| [Stato ▾] [Tipo ▾] [Anno ▾] [Rivista ▾] [Autori ▾] [Tag ▾]  (× Da leggere) (⊘ Bozze) (Pulisci)  □ Mostra i file mancanti |  40
 +--------------------+---------------------------------------------------------+---------------------------------+
 | [Cartelle | Tag ]  |  ☐ ▤ Titolo del primo paper                Autore A · 2021 |  Scheda                    [×] |
 | ---------------    |       Rivista · Capitolo 1/paper-1.pdf          ● In lettura |  Titolo del paper               |
@@ -482,7 +482,7 @@ Nel lettore la barra in alto del guscio **diventa** la barra del lettore (D-360)
 | Studio | menu `Studio ▾` (`reader-study-menu`, voci `reader-study-*`) | 88 | nel ⋯ |
 | Fine | Annulla, Cronologia (le stesse della barra del guscio), `[◫]` pannello (`reader-side`), `[⋯]` (Apri con il programma predefinito, Mostra nella cartella, Tasti del lettore, Esporta copia annotata…, voci ridotte) | 4×32 | uguale |
 
-A 1024 px tutta la barra sta in una riga (verificato sul totale: 1024 − 16 di margini ≥ somma dei gruppi ridotti, 948 px). Ricerca globale, Comandi e chip Attività del guscio restano raggiungibili con Ctrl+L, Ctrl+K e dalla voce "Attività" della tavolozza; il chip Attività compare nella barra del lettore solo quando c'è un errore o una scrittura in attesa.
+Nel lettore la barra laterale si comprime a 56 px ("modo lettura") e torna com'era all'uscita (D-370). A 1024 px tutta la barra sta in una riga: spazio 1024 − 56 − 16 = 952 px; sotto 1100 px anche Pagine si riduce (campo senza "/ 38", totale nel tooltip); somma dei gruppi ridotti ≤ 880 px con gli spazi, margine ≥ 72 px. Ricerca globale, Comandi e chip Attività del guscio restano raggiungibili con Ctrl+L, Ctrl+K e dalla voce "Attività" della tavolozza; il chip Attività compare nella barra del lettore solo quando c'è un errore o una scrittura in attesa.
 
 **Indicazione dello strumento vicino al lavoro** (attacco B.5): cursore della forma dello strumento con il pallino del colore; bordo superiore di 2 px dell'area delle pagine nel colore del tratto (`--ann-*-stroke`) quando lo strumento non è Seleziona; se il fuoco esce dalla regione del lettore il bordo diventa `--border` e i pulsanti degli strumenti si attenuano (opacità .6), così si vede che le lettere non agiscono.
 
@@ -492,7 +492,7 @@ A 1024 px tutta la barra sta in una riga (verificato sul totale: 1024 − 16 di 
 
 **Popover dell'annotazione:** ancorato al primo rettangolo (sopra, sotto se manca spazio), 8 px, `--e-2`, `--r-md`, 40 px: colori · tipo · 💬 · 🗑; Tab ci entra, Esc lo chiude.
 
-**Area utile misurata** (criterio di F4): a 1024×700 con il pannello chiuso almeno 1000×640; a 1280×800 con il pannello aperto almeno 900×740 (oggi 405×389 e 661×557).
+**Area utile misurata** (criterio di F4, D-370; barra laterale compressa a 56 px): a 1024×700 con il pannello chiuso almeno 960×640; a 1280×800 con il pannello aperto (340 px) almeno 880×740 (oggi 405×389 e 661×557).
 
 ### 4.4 Da rivedere — Nuovi file
 
@@ -743,6 +743,7 @@ Dialogo 880 × max 90% della finestra: intestazione fissa (titolo, ×), corpo sc
 | Note di pagina, del file, tutte | scheda Note del lettore con `Segmented` Pagina · File · Tutte |
 | Icone di riga Leggi / Apri il file / Mostra nella cartella | riga attiva: [Leggi] [Scheda] [⋯]; ⋯ = Apri con il programma predefinito, Mostra nella cartella, Aggiungi al progetto…, Proponi con Claude… |
 | Barra di stato: indice, cartelle abilitate, lingua dei documenti | "Indice: 214 documenti · aggiornato 14:32" nella sezione Scansione del popover Attività; cartelle abilitate nell'intestazione del pannello Claude; lingua dei documenti in Impostazioni › Libreria e nella scheda |
+| Scheda "Filtri" con sette facet e conteggi (Tag, Autori, Tipi, Riviste, Stato di studio, Anni, Cartelle); tag inclusi con "tutti / almeno uno" ed esclusi (`FilterBar.tsx`) | riga dei filtri `Stato ▾ Tipo ▾ Anno ▾ Rivista ▾ Autori ▾ Tag ▾` con i conteggi in ogni menu e ricerca interna; Tag con tre stati per voce (nessuno → includi ✓ → escludi ⊘) e "Tutti / Almeno uno"; Cartelle nel pannello di sinistra; sotto 1280 px Rivista e Autori in "⋯ Altri filtri" (D-369) |
 | Includi sottocartelle | casella in fondo al pannello Cartelle |
 | Esportazione da un cluster della mappa | menu ⋯ del cluster |
 | Modello e ragionamento nella cartella di arrivo | due chip nella barra di Da rivedere: "Modello per le proposte sui file nuovi" (N22) |
@@ -776,8 +777,9 @@ Schede (D-362): **Argomenti** (la mappa dei punti), **Citazioni** (la rete espan
 
 ```
 +--------------------------------------------------------------------------------------------------------------+
-| Mappa   214 documenti · 9 argomenti          [⌕ Vai a un documento…]   [Anni 2015 ━━●━━━●━ 2024] [Tag ▾]  [[Aggiorna la mappa]] [⋯] |
-| ( Argomenti | Citazioni | Esplora | Vicini inattesi )                    (✧ Mescola) (✦ Sorprendimi) (⤢ Adatta) |
+| Mappa  214 documenti · 9 argomenti                                                        [[Aggiorna la mappa]]  [⋯] |
+| ( Argomenti | Citazioni | Esplora | Vicini inattesi )                                                                  |
+| [⌕ Vai a un documento…]  [Anni 2015 ━━●━━━●━ 2024]  [Tag ▾]                                       [✧] [✦?] [⤢]  |   ← una riga: filtri a sinistra, Mescola · Sorprendimi · Adatta come IconButton (D-377)
 +----------------------------------------------------------------------------------------------+---------------+
 |            ╭─ Ottica ────────╮                    ╭─ Reti neurali ──────╮                      | Scheda del    |
 |           ·  ●   ●·  ●        ·                 ·   ◉ ←hover            ·                     | nodo (360)    |
@@ -823,7 +825,7 @@ Schede (D-362): **Argomenti** (la mappa dei punti), **Citazioni** (la rete espan
 
 **Stati:** modello non costruito → `EmptyState` "Costruisci la mappa dei tuoi documenti" con [[Costruisci la mappa]] e la stima del tempo; Citazioni senza un punto di partenza → "Scegli un documento da cui partire" con il campo "Vai a un documento" e i 5 documenti più citati come chip; meno di 3 documenti → spiegazione con [+ Aggiungi PDF]; costruzione in corso → avanzamento per fasi nel corpo e nel chip Attività.
 
-**Peso:** +10-14 KiB nel chunk pigro della vista Mappa (quadtree e Barnes-Hut ~2, archi curvi e assottigliati ~1, involucri e Chaikin ~1, livello di dettaglio delle etichette ~1, camera con inerzia e volo ~1,5, minimappa ~1,5, cartellino, filtri animati e azioni ~3, tastiera ~1); nessun peso nella prima schermata.
+**Peso:** +12-16 KiB (con le aggiunte di D-379) nel chunk pigro della vista Mappa (quadtree e Barnes-Hut ~2, archi curvi e assottigliati ~1, involucri e Chaikin ~1, livello di dettaglio delle etichette ~1, camera con inerzia e volo ~1,5, minimappa ~1,5, cartellino, filtri animati e azioni ~3, tastiera ~1); nessun peso nella prima schermata.
 
 ---
 
@@ -837,8 +839,8 @@ Nessun font remoto (CSP). Pila: `"Segoe UI Variable Text", "Segoe UI", system-ui
 
 | Token | Dimensione / interlinea | Peso | Spaziatura | Uso |
 | --- | --- | --- | --- | --- |
-| `--fs-display` | 24 / 32 px | 600 | -0,01em | titolo della procedura guidata, stati vuoti grandi |
-| `--fs-title` | 20 / 28 px | 600 | -0,005em | titolo di vista (uno per vista) |
+| `--fs-display` | 32 / 40 px | 600 | -0,015em | titolo della procedura guidata, stati vuoti grandi |
+| `--fs-title` | 26 / 32 px | 600 | -0,015em | titolo di vista (uno per vista) |
 | `--fs-heading` | 16 / 24 px | 600 | 0 | titolo di sezione, pannello, dialogo, scheda |
 | `--fs-body` | 14 / 21 px | 400 (500 nei pulsanti e nelle etichette) | 0 | testo, campi, pulsanti |
 | `--fs-small` | 13 / 19 px | 400 | 0 | righe dense, metadati, tooltip, aiuti |
@@ -863,11 +865,11 @@ Tutti i valori sono token su `:root`; il tema scuro vale per `[data-theme="dark"
 | `--text` | `#1B1C1F` | `#ECECEF` | testo principale |
 | `--text-muted` | `#555963` | `#A9ACB5` | testo secondario |
 | `--text-subtle` | = `--text-muted` | = `--text-muted` | alias tenuto per compatibilità (D-361): un solo grigio secondario; il terzo livello si fa con `--fs-small` o `--fs-caption`, non con un altro grigio |
-| `--accent` | `#2B50C8` | `#8CA4FF` | pulsante primario, barra della voce attiva, anelli di selezione |
-| `--on-accent` | `#FFFFFF` | `#0E1330` | testo e icone su `--accent` |
-| `--accent-text` | `#2446B5` | `#9DB1FF` | link, testo accentato, icona dello strumento attivo |
-| `--accent-soft` | `#E8EDFC` | `#212A48` | riga attiva, voce attiva, filtro attivo |
-| `--focus` | `#2B50C8` | `#9DB1FF` | anello di fuoco 2 px a 2 px di distanza |
+| `--accent` (petrolio, provvisorio D-378) | `#0F6E78` | `#5CC6CF` | pulsante primario, barra della voce attiva, anelli di selezione |
+| `--on-accent` | `#FFFFFF` | `#062328` | testo e icone su `--accent` |
+| `--accent-text` | `#0B5F68` | `#6FD0D8` | link, testo accentato, icona dello strumento attivo |
+| `--accent-soft` | `#E3F1F2` | `#15302F` | riga attiva, voce attiva, filtro attivo |
+| `--focus` | `#0B5F68` | `#6FD0D8` | anello di fuoco 2 px a 2 px di distanza |
 | `--danger` / `--danger-soft` | `#B42318` / `#FCEBE9` | `#FF8B80` / `#3A1D1B` | errori, azioni distruttive |
 | `--warning` / `--warning-soft` | `#8A5300` / `#FCF1DD` | `#F2B755` / `#33280F` | avvisi |
 | `--success` / `--success-soft` | `#1B6E38` / `#E6F3EA` | `#6BD394` / `#15301F` | esito positivo |
@@ -882,11 +884,13 @@ Contrasti misurati (minimo sui fondi ammessi `--bg`, `--surface`, `--surface-2`,
 | `--text` | 13,3:1 | 12,0:1 | 4,5 |
 | `--text-muted` | 5,5:1 | 6,2:1 | 4,5 |
 | `--text-subtle` (alias) | 5,5:1 | 6,2:1 | 4,5 |
-| `--accent-text` | 6,2:1 | 6,8:1 | 4,5 |
+| `--accent-text` | 5,7:1 | 7,8:1 | 4,5 |
 | `--danger` / `--warning` / `--success` / `--info` / `--ai` | 5,1 / 4,9 / 4,9 / 5,0 / 5,3 | 6,2 / 7,8 / 7,6 / 6,5 / 6,9 | 4,5 |
 | stato sul proprio `-soft` (danger, warning, success, info, ai) | 5,7 / 5,7 / 5,5 / 5,6 / 5,9 | 6,7 / 8,0 / 7,7 / 7,0 / 7,4 | 4,5 |
-| `--on-accent` su `--accent` | 6,8:1 | 7,7:1 | 4,5 |
-| `--accent` su `--bg` (non testo) | 6,2:1 | 7,8:1 | 3 |
+| `--on-accent` su `--accent` | 6,0:1 | 8,2:1 | 4,5 |
+| `--accent` su `--bg` (non testo) | 4,6:1 | 7,0:1 | 3 |
+
+Alternativa mostrata nel prototipo P0 (D-378): indaco `#3D4EDB` / `#9AA6FF`. Se l'utente la sceglie, i valori e i contrasti si ricalcolano con lo stesso test prima di A1. Gli altri token del giro 2 (`--info` blu) restano: con l'accento petrolio informazione e azione non si confondono più.
 | `--border-strong` su `--surface` / `--bg` / `--surface-2` | 3,8 / 3,4 / 3,2 | 3,3 / 3,6 / 3,1 | 3 |
 
 Regole: il colore non è mai l'unico segnale (icona o testo accanto); `--accent` solo per **un** primario per area e per la selezione; `--ai` mai decorativo; i fondi `-soft` solo con il testo del loro stato o `--text`; `--text-subtle` non va su `--surface-3` in chiaro sotto i 13 px.
@@ -924,12 +928,12 @@ Sottolineatura a schermo: spessore `max(1.5px, 0.08 × altezza del rettangolo)`,
 ### 5.3 Spaziatura, misure, raggi, elevazione, movimento
 
 - **Spaziatura** (griglia da 4 px): `--sp-1: 2px`, `--sp-2: 4px`, `--sp-3: 8px`, `--sp-4: 12px`, `--sp-5: 16px`, `--sp-6: 20px`, `--sp-7: 24px`, `--sp-8: 32px`, `--sp-9: 48px`. Uso: dentro un controllo 4-8; tra controlli di un gruppo 8; tra righe di un modulo 12; tra gruppi 24; padding delle viste 24 (orizzontale 32 sopra 1280 px). Le vecchie `--space-1..6` restano alias fino alla fine dell'onda 5.
-- **Altezze dei controlli:** `--h-sm: 28px` (chip, righe dense, pulsanti delle righe), `--h-md: 32px` (pulsanti, campi), `--h-lg: 40px` (primario della procedura guidata, selettore di libreria). Barra in alto 48, barra del lettore 44, barra strumenti 40, voci della barra laterale 36.
+- **Altezze dei controlli:** `--h-sm: 28px` (chip, righe dense, pulsanti delle righe), `--h-md: 32px` (pulsanti, campi), `--h-lg: 40px` (primario della procedura guidata, selettore di libreria). Barra in alto 48, barra del lettore 48 (la sostituisce), voci della barra laterale 36.
 - **Raggi:** `--r-xs: 4px` (badge, `Kbd`), `--r-sm: 6px` (pulsanti, campi, chip quadrati), `--r-md: 10px` (schede, popover, barra strumenti, miniature), `--r-lg: 14px` (dialoghi, cassetti), `--r-pill: 999px` (chip filtro, badge numerici, barre di avanzamento).
 - **Elevazione** (chiaro / scuro):
   - `--e-0`: nessuna; si separa con `--border` o con lo spazio.
   - `--e-1`: `0 1px 2px rgb(20 22 28 / .06), 0 1px 1px rgb(20 22 28 / .04)` / `0 1px 2px rgb(0 0 0 / .5)` — schede (`Card`), riga attiva trascinata.
-  - `--e-2`: `0 4px 16px rgb(20 22 28 / .12), 0 1px 3px rgb(20 22 28 / .08)` / `0 6px 20px rgb(0 0 0 / .55)` — popover, menu, toast, barra strumenti del lettore.
+  - `--e-2`: `0 4px 16px rgb(20 22 28 / .12), 0 1px 3px rgb(20 22 28 / .08)` / `0 6px 20px rgb(0 0 0 / .55)` — popover, menu, toast, cartellino della Mappa.
   - `--e-3`: `0 12px 40px rgb(20 22 28 / .20)` / `0 16px 48px rgb(0 0 0 / .65)` — dialoghi, tavolozza, cassetti sovrapposti.
   - In scuro i livelli si distinguono anche per il fondo: popover e dialoghi usano `--surface` con bordo 1 px `--border`.
 - **Movimento:** `--dur-fast: 120ms` (hover, pressione, dissolvenze), `--dur: 180ms` (popover, toast, cambio di scheda), `--dur-slow: 240ms` (cassetti, dialoghi); `--ease: cubic-bezier(.2, 0, 0, 1)` (entrata), `--ease-exit: cubic-bezier(.4, 0, 1, 1)` (uscita). Solo `opacity` e `transform` (popover: da `translateY(-4px)` e opacità 0; cassetti: `translateX(16px)`; toast: dal basso 8 px). Niente animazioni di larghezza o altezza. Con `prefers-reduced-motion: reduce` tutte le durate a 0 (la regola esiste già).
@@ -944,7 +948,7 @@ Sottolineatura a schermo: spessore `max(1.5px, 0.08 × altezza del rettangolo)`,
 
 ### 5.5 Componenti
 
-In `components/ui.tsx` (campi, già esiste) e `components/*.tsx`; ognuno ha stati hover, premuto, fuoco (`:focus-visible`, anello `--focus`), disabilitato (opacità .45, `cursor: not-allowed`, nessun hover).
+In `components/ui.tsx` (campi, già esiste) e `components/*.tsx`; ognuno ha stati hover, premuto, fuoco (`:focus-visible`, anello `--focus`), disabilitato (`cursor: not-allowed`, nessun hover; colori della tabella di §5.5.1, unica regola).
 
 | Componente | Varianti e misure | Note |
 | --- | --- | --- |
@@ -1094,7 +1098,7 @@ Un solo comportamento: ogni controllo salva da solo. Interruttori, scelte e menu
 
 | Mezzo | Quando | Esempi | Regole |
 | --- | --- | --- | --- |
-| **Badge numerico** sulla voce di navigazione | ci sono elementi che **aspettano una decisione dell'utente** | Da rivedere: file da confermare + documenti con proposte di Claude; Scopri: opere nuove non ancora viste | numero esatto fino a 99, poi "99+"; tooltip e `aria-label` con il dettaglio; mai per avanzamento o errori; sparisce quando il numero è 0 |
+| **Badge numerico** sulla voce di navigazione | ci sono elementi che **aspettano una decisione dell'utente** | Da rivedere: solo i file nuovi (le proposte di Claude danno un punto, D-358); Scopri: opere nuove non ancora viste | numero esatto fino a 99, poi "99+"; tooltip e `aria-label` con il dettaglio; mai per avanzamento o errori; sparisce quando il numero è 0 |
 | **Chip Attività** (barra in alto) | lavoro in corso o appena finito | scansione 45%, 3 proposte in preparazione, backup in corso, scrittura PDF in attesa | un solo chip; puntino se c'è un risultato non visto; rosso se c'è un errore; clic apre il popover con tutte le attività e l'ultimo esito |
 | **Toast** | conferma di un'azione appena fatta, con eventuale Annulla | "Tag aggiunto a 3 documenti · Annulla", "Copia creata in Capitolo 2" | 6 s, al massimo 3; gli errori di un'azione restano finché chiusi; mai per eventi non causati dall'utente |
 | **Banner** nel flusso (sopra il contenuto) | condizione persistente che richiede attenzione o blocca | impostazioni ripristinate o in sola lettura, backup automatico fallito, ultimo backup > 30 giorni, libreria non raggiungibile, scrittura nel PDF impossibile (file bloccato da più di 10 minuti); tabella completa in §7.4 | al massimo 2 visibili, ordinati per gravità; ognuno con una sola azione primaria e (se non bloccante) "Chiudi" che lo nasconde fino al prossimo cambiamento |
@@ -1151,7 +1155,7 @@ Ogni evento esistente ha un mezzo e uno solo per tipo di informazione; nessun co
 | Export | — | Recenti con [Mostra la cartella] | — | — | — | il dialogo stesso (§4.15) |
 | Server MCP: avvio, errore di porta | — | Da guardare se errore | — | — | — | — |
 | Scrittura nel PDF in attesa > 10 min / rifiutata | puntino | Da guardare [Riprova] / riga informativa una volta per documento | — | — | nel lettore, se il documento è aperto | — |
-| Prima scrittura nel PDF di una libreria | — | — | — | — | — | consenso (§8.3.7) |
+| Prima scrittura nel PDF di una libreria | — | — | — | — | banner nel lettore (consenso, §8.3.7) | solo se alla chiusura del documento non c'è risposta |
 | Annotazioni riposizionate (§8.1.2) | — | — | — | "3 evidenziazioni riposizionate · Annulla" (nel lettore) | — | — |
 | Azione dell'utente con Annulla (tag, proposta accettata, eliminazione) | — | — | — | sì, legato alla vista | — | — |
 | Impostazioni ripristinate o in sola lettura; libreria non raggiungibile | — | — | — | — | sì | — |
@@ -1410,7 +1414,8 @@ Molte cose dipendono dall'hash del contenuto: id del documento (D-006, stabile),
 - **Regola della scansione** quando dimensione o `mtime` cambiano (D-350: si classifica **il contenuto** della revisione aggiunta, non chi l'ha scritta):
   1. scorciatoia: nuovo hash in `expectedWrites` (in memoria) o in `pdfWrite.own` → scrittura nostra: aggiorna `hash`, nessun "cambiato", nessuna estrazione;
   2. altrimenti, file **cresciuto** e SHA-256 dei primi `vecchia dimensione` byte = vecchio `hash` (o dei primi `base.size` byte = `base.hash`) → aggiornamento incrementale. Il worker legge **solo le sezioni aggiunte** (dal vecchio `startxref` in avanti) e le classifica: se contengono soltanto oggetti `/Annot`, XObject di modulo puntati da `/AP` di quelle annotazioni, array `/Annots`, pagine il cui dizionario differisce dalla versione precedente solo in `/Annots`, il dizionario `/Info` e lo stream `/Metadata`, è **"solo annotazioni"**: `pdfWrite.base` = vecchio contenuto se mancava, `hash` aggiornato, nessuna estrazione, le annotazioni restano allineate, le miniature non cambiano (vale per l'altro computer prima che arrivi il record sincronizzato, per Acrobat e per ogni altro programma); se contiene altro (stream di contenuto, font, pagine nuove o tolte, campi di modulo), si rilegge il testo e, se differisce dalla cache, si tratta come contenuto cambiato;
-  3. altrimenti contenuto cambiato davvero (logica di oggi: `previousHashes`, annotazioni non allineate, `pdfWrite` azzerato; la copia di sicurezza resta finché l'utente non la toglie).
+  3. **salvataggio completo** (prefisso cambiato) con testo estratto uguale alla cache: "solo annotazioni" anche così (D-371): `pdfWrite.base` passa al nuovo file (la copia di sicurezza vecchia resta), le nostre annotazioni si riagganciano per `/NM (rl-…)` (o, se `/NM` è stato tolto, per sottotipo e `/QuadPoints` entro 1 pt) aggiornando numero e generazione, mai riaggiunte; quelle che mancano vanno in "Da controllare";
+  4. altrimenti contenuto cambiato davvero (logica di oggi: `previousHashes`, annotazioni non allineate, `pdfWrite` azzerato; la copia di sicurezza resta finché l'utente non la toglie).
   Costo: un hash del prefisso e la lettura delle sole sezioni aggiunte (pochi KiB), solo per i file cambiati. Il classificatore (`pdf-annot/classify.ts`) sta nello stesso chunk pigro dello scrittore.
 - Criterio della fase 3: con `writeToPdf` spento l'hash resta identico; acceso, i byte originali sono un prefisso esatto e `contentHashOf` non cambia (`study-data.spec.ts`, `check-nondestructive.mjs --allow-pdf-append`: accetta solo file cresciuti con prefisso identico e un `/NM (rl-…)` registrato).
 
@@ -1425,8 +1430,9 @@ Molte cose dipendono dall'hash del contenuto: id del documento (D-006, stabile),
 | uguale | uguale | nulla |
 | cambiata | uguale | scrivi la nuova versione |
 | uguale | cambiata (colore o commento cambiati in un altro programma) | **adotta** nell'app (l'utente l'ha cambiata altrove); riga in Attività "1 annotazione aggiornata da un altro programma" |
-| uguale | sparita dal PDF | **adotta** l'eliminazione nell'app, recuperabile: riga in Attività con [Ripristina] (la riscrive) |
-| cambiata | cambiata o sparita | vince l'app (modifica più recente fatta qui); riga in Attività |
+| uguale | sparita dal PDF | **mai adottata in automatico** (D-371): l'annotazione va in "Da controllare" e in Attività con [Riscrivi nel PDF] [Elimina anche qui]; nessuna scrittura finché l'utente non sceglie |
+| cambiata | cambiata | vince l'app (modifica più recente fatta qui); riga in Attività |
+| cambiata | sparita | "Da controllare" come sopra |
 | eliminata nell'app | presente | togli il riferimento |
 | presente, senza `pdf` | assente | aggiungi |
 
@@ -1434,20 +1440,14 @@ Molte cose dipendono dall'hash del contenuto: id del documento (D-006, stabile),
 - **Doppio disegno** delle nostre annotazioni già scritte (tela di pdf.js + sovrapposizione dell'app): la prova S2 sceglie tra (a) nasconderle dalla tela con l'`annotationStorage` di pdf.js per i riferimenti noti, (b) disegnare la tela con `annotationMode` che salta gli oggetti `/NM (rl-…)` (filtro sugli `annotationId` restituiti da `getAnnotations()`), (c) non sovrapporre le annotazioni scritte e usare la sovrapposizione solo per il clic e per quelle in attesa, ridisegnando la pagina dopo ogni scrittura. Criterio: nessun doppio disegno visibile, anche mentre una modifica aspetta la scrittura successiva.
 - **Migrazione delle annotazioni già fatte:** mai in silenzio. Nel lettore il chip dice "PDF: 12 solo nell'app ▾ · Scrivile nel PDF"; in Impostazioni › Libreria › Annotazioni nel PDF "Scrivile nei PDF…" con dialogo (numero di file, spazio stimato delle copie, documenti saltati perché hanno annotazioni da controllare, §8.1.2) e avanzamento in Attività (annullabile, un file alla volta). Le annotazioni non allineate (`staleIds`) e quelle senza `geom: 2` non si scrivono mai.
 - **Consenso prima della prima scrittura, per libreria** (D-348). Il predefinito resta acceso (scelta dell'utente), ma nessun PDF di una libreria si modifica finché `annotations.writeToPdfConfirmedAt` è vuoto.
-  - Librerie esistenti: alla **prima** creazione o modifica di un'annotazione nella libreria (l'annotazione intanto è già salvata nell'app), prima di qualunque scrittura, il dialogo:
+  - Librerie esistenti (D-374): alla **prima** creazione o modifica di un'annotazione nella libreria compare nel `banner-slot` del lettore un **banner non modale**, che non prende il fuoco e non interrompe il gesto (Spazio e i tasti degli strumenti continuano a funzionare):
     ```
-    +------------------------------------------------------------------+
-    | Salvare le evidenziazioni anche dentro i PDF?                    |
-    | Research Lab può aggiungere evidenziazioni e sottolineature ai    |
-    | file PDF di questa libreria, così le vedi anche in Chrome, Edge   |
-    | e negli altri lettori. Il testo del PDF non cambia, si scrive     |
-    | quando chiudi il documento, e puoi sempre togliere le             |
-    | evidenziazioni dal file. (Come funziona)                          |
-    |                              [Solo nell'app]  [[Sì, anche nel PDF]] |
-    +------------------------------------------------------------------+
+    ┃ Salvare le evidenziazioni anche dentro i PDF?  Così le vedi anche in Chrome, Edge e negli altri lettori;    ┃
+    ┃ il testo non cambia, si scrive quando chiudi il documento e puoi sempre toglierle.  (Come funziona)          ┃
+    ┃                                                              [Solo nell'app]  [[Sì, anche nel PDF]]       ┃
     ```
-    "Sì" scrive `writeToPdfConfirmedAt`; "Solo nell'app" mette `writeToPdf = false` (si cambia in Impostazioni › Libreria). Chiudere il dialogo senza scegliere = nessuna scrittura, il dialogo torna alla prossima annotazione. Il valore è nel `library.json` sincronizzato: la scelta vale su ogni computer.
-  - Librerie nuove: nel Riepilogo della procedura guidata una riga con interruttore acceso "Salva le evidenziazioni anche dentro i PDF (le vedi in Chrome e negli altri lettori; il testo non cambia)"; completare la procedura con l'interruttore acceso scrive `writeToPdfConfirmedAt`.
+    La scrittura aspetta la risposta. Se alla chiusura del documento non c'è risposta, compare **allora**, una volta, un dialogo con lo stesso testo e le stesse due scelte; chiuderlo senza scegliere = nessuna scrittura e il banner torna alla prossima annotazione. "Sì" scrive `writeToPdfConfirmedAt`; "Solo nell'app" mette `writeToPdf = false` (si cambia in Impostazioni › Libreria). Il valore è nel `library.json` sincronizzato: la scelta vale su ogni computer.
+  - Librerie nuove: nel **corpo** del Riepilogo della procedura guidata, visibile senza scorrere, una riga con interruttore acceso "Salva le evidenziazioni anche dentro i PDF (le vedi in Chrome e negli altri lettori; il testo non cambia)"; il pulsante finale "Crea la libreria" ha sotto la frase "Le evidenziazioni si salveranno anche dentro i PDF" (o "solo nell'app"); completare con l'interruttore acceso scrive `writeToPdfConfirmedAt`.
   - Il banner "primo uso" del giro 2 non c'è più: l'informazione arriva prima, non dopo.
 
 #### 8.3.8 Ripristino
@@ -1518,7 +1518,7 @@ Errori: `PERMISSION_DENIED` con `details.reason` per i rifiuti, `CONFLICT` (`cha
 | `saveDocument()` di pdf.js (già presente) | 0 | sì | scartato come motore: crea solo `/Highlight` (non `/Underline`), formato degli editor interno e instabile, carica il documento intero; resta come **verificatore** |
 | muhammara, qpdf (nativo o wasm) | 2-10 MB | sì | scartati: peso, binari, superficie d'attacco |
 
-**Budget del main** (somma dei `.js` di `out/main`, worker compreso): oggi 1009/1010 KiB. Aggiunte: scrittore 34-42 con il classificatore delle revisioni (2-3, stesso chunk), account Claude 4-6, rapporto di scansione e `ai:usageAll` 2-3 → **1052-1060**; con G4c (PDF cifrati con password vuota: gestore standard R2-R6 con `node:crypto`, nessuna dipendenza) +6-8 → 1060-1068. Tetto **1060**, **1070** solo se G4c si fa (D-365): funzione chiesta esplicitamente dall'utente, nessuna dipendenza, codice non minificato per diagnosi leggibili (D-177). Lo scrittore è un chunk separato caricato con `import()` nel worker alla prima scrittura: avvio, memoria a riposo e primo contenuto invariati. Se la prova S2 misura più di 46 KiB, il compito G4a si ferma e lo riporta prima di proseguire.
+**Budget del main** (somma dei `.js` di `out/main`, worker compreso): oggi 1009/1010 KiB. Aggiunte: scrittore 34-42 con il classificatore delle revisioni (2-3, stesso chunk), account Claude 4-6, rapporto di scansione e `ai:usageAll` 2-3 → **1052-1060**; con G4c (PDF cifrati con password vuota: gestore standard R2-R6 con `node:crypto`, nessuna dipendenza) +6-8 → 1060-1068. Con il riuso di `classify.ts` (G4b) lo scrittore di G4a pesa 32-40 KiB; G4c si fa sempre (D-375). Totale per compito in D-380: main **1060-1076, tetto 1080**: funzione chiesta esplicitamente dall'utente, nessuna dipendenza, codice non minificato per diagnosi leggibili (D-177). Lo scrittore è un chunk separato caricato con `import()` nel worker alla prima scrittura: avvio, memoria a riposo e primo contenuto invariati. Se la prova S2 misura più di 44 KiB per lo scrittore, il compito G4a si ferma e lo riporta prima di proseguire.
 
 #### 8.3.12 Sicurezza (revisione security dedicata)
 
@@ -1749,11 +1749,11 @@ Correzioni aggiunte dal giro 3 (audit finale, D-362):
 
 | Voce | Oggi | Stima dopo | Note |
 | --- | --- | --- | --- |
-| JS iniziale renderer | 379,5 / 391 KiB | 386-390 KiB | guscio, `nav.tsx`, icone della prima schermata, `Popover`/`Menu`/`Drawer`, chip Attività; −barra di stato, −selettore lingua. Popover Attività, Cronologia e **indice delle impostazioni** (`settingsIndex.ts`, caricato con la tavolozza, mai dal guscio) sono chunk pigri. Se si supera 391: anche `Drawer` diventa pigro |
-| JS totale renderer | 1574 / 1600 KiB | 1622-1650 KiB | impostazioni e Account (+10), lettore a strumenti (+8), riparazione delle annotazioni (+3), componenti e icone (+6), scheda in lettura (+2), Da rivedere (+2), Attività (+3), dialoghi (+1), **Mappa nuova (+10-14, chunk pigro)**. **Tetto 1655** (D-322 + D-367) |
+| JS iniziale renderer | 379,5 / 391 KiB | 385,5-389 KiB | H0 0, A1 +3-5, A2 +3-5 netti (−2 barra di stato e lingua); `Drawer`, popover del selettore di libreria, popover Attività, Cronologia e indice delle impostazioni pigri **da subito** (D-380); controllo per compito "iniziale ≤ 388" dopo A2 |
+| JS totale renderer | 1574 / 1600 KiB | 1620-1643 KiB | per compito (D-380): H0 2-3, A1 5-7, A2 4-6, C2 10-12, D3 3-5, F4 6-9, E3 1-3, G4a 1-2, M4 12-16, I5 2-4, H5 0-2. **Tetto 1655** |
 | CSS | tutto nel primo caricamento | ~35% nel primo | divisione per vista: riduce il CSS **del primo avvio**, non la memoria dopo che le viste sono state aperte (non conta come risparmio di memoria) |
 | Risorse del lettore | tetto 2760 KiB | −150 KiB circa | foglio di pdf.js filtrato (§8.1.1) |
-| JS main (con worker) | 1009 / 1010 KiB | 1052-1060 KiB; 1060-1068 con G4c | scrittore + classificatore 36-45 (chunk pigro del worker), account 4-6, rapporto di scansione e uso 2-3; G4c (cifrati con password vuota) +6-8. **Tetto 1060; 1070 solo con G4c** |
+| JS main (con worker) | 1009 / 1010 KiB | 1060-1076 KiB | per compito (D-380): B1 7-10, R0 2-3, G4b 4-6 (classificatore, solo qui), G4a 32-40 (riusa `classify.ts`), G4c 6-8 (sempre). **Tetto 1080** |
 | Preload | ≤ 8 KiB | invariato | canali nuovi dal ponte generico |
 | Memoria a riposo | tetto 501 MB | invariata | nessun processo nuovo; scrittore caricato alla prima scrittura nel worker esistente; pdf.js per la verifica solo alla prima scrittura di un file |
 | Primo contenuto | tetto 530 ms | invariato | nessuna richiesta nuova all'avvio |
@@ -1781,6 +1781,8 @@ Regole comuni a tutti i compiti:
 | **H0** | PDF stirato, CSS di pdf.js isolato, riparazione delle annotazioni (§8.1, §8.1.1, §8.1.2) — **unito subito, da solo** | `styles.css` (solo i selettori delle classi rinominate e la regola `.page`), i `className` delle classi in collisione in `App.tsx`, `shell/**`, `settings/Settings.tsx`, `components/Dialog.tsx`, `views/**/*.tsx` (solo quella riga), `views/reader/engine.ts`, nuovi `views/reader/pdfjs-viewer.css` (generato), `tools/vendor-pdfjs-css.mjs` (+test), `views/reader/repair.ts` (+test), `views/reader/ReaderView.tsx` (solo l'aggancio della riparazione e `--page-ratio`), `views/reader/AnnotationList*` (solo il gruppo "Da controllare"), parti i18n `reader` (solo le frasi nuove), nuova `e2e/reader-geometry.spec.ts`, `e2e/helpers/leaked-rules.ts` | rapporti pagina/MediaBox e tela/scatola entro 0,5% a 1024, 1280, 1920 px e DPR 1, 1,198, 1,5; nessuna regola del foglio del lettore fuori da `.reader-scroll`; barra laterale e dialoghi uguali prima e dopo il lettore; evidenziazione nuova a 1920 px sovrapposta ai glifi ≥ 95%; annotazioni storte sintetiche riparate (≥ 95%) e `geom: 2`; nuove annotazioni con `geom: 2` | `reader-geometry.spec.ts`, `study-ui.spec.ts`, `smoke.spec.ts` (una alla volta) | renderer +3 KiB (chunk del lettore); CSS del lettore −150 KiB |
 | S1 | Prova di `claude auth status --json`, `auth login`, `auth logout` (solo `status` e `--help`, nessun logout reale) e di un login con URL senza console | `docs/design/spike-auth.md` | uscite **anonimizzate**; decisione sul ripiego per ogni comando | nessuno | 0 |
 | S2 | Prototipo dello scrittore e del classificatore (§8.3.13) | `tools/spikes/pdf-annot/**` | rapporto con righe e KiB, tempi, rifiuti per motivo, quota di cifrati con password vuota e di dati dopo `%%EOF` sulla libreria di prova (solo conteggi), confronto `rename`/`append` con una cartella sincronizzata di prova, scelta per il doppio disegno; nessun PDF reale committato | Vitest nella cartella | 0 |
+| **R0** | Riparazione senza interfaccia delle annotazioni storte (D-373), dopo H0, da solo | `main/study/repair-job.ts` (nuovo), `main/library/worker-protocol.ts` e `worker-service.ts` (messaggio `repairAnnotations`), `packages/data/src/extract/pdf-geometry.ts` (nuovo: rettangoli dal testo con `getTextContent()`, +test), `main/ipc/handlers/study-handlers.ts` (solo l'avvio del lavoro), parti i18n `reader` (riga di Attività) | lavoro in Attività al primo avvio dopo l'aggiornamento, annullabile; sovrapposizione ≥ 90% con i glifi sulle annotazioni sintetiche storte; casi ambigui lasciati al lettore | Vitest con PDF sintetici; `reader-geometry.spec.ts` (caso del lavoro) | main +2-3 KiB |
+| **P0** | Prototipo visivo statico per l'approvazione dell'utente (D-382) — **fatto** in questo ramo | `docs/design/prototipo/index.html` | l'utente lo approva o chiede ritocchi ai token **prima dell'onda 1**; ogni ritocco si fa lì e poi nei token | a vista | 0 (fuori dall'app) |
 
 Prima di H0 l'agente principale aggiunge `geom` all'`annotationSchema`. Dopo l'onda 0 scrive i contratti di §7.1, §9, §10.3-§10.4, D-357 (`defaultAppSettings({ locale })`), lo scope `reader-tool` e gli id `nav.*`; decide G4c, `commitStrategy` e il doppio disegno con i rapporti di S1 e S2.
 
@@ -1808,13 +1810,13 @@ Prima di H0 l'agente principale aggiunge `geom` all'`annotationSchema`. Dopo l'o
 
 ### Onda 4 — scrittura nel PDF e Mappa (G4a ∥ M4, poi G4c se deciso)
 
-**G4a · Scrittore incrementale, sincronia, consenso** — **area sensibile** — File: `packages/data/src/pdf-annot/**` esclusa l'interfaccia di `classify.ts` (nuovi `objects.ts`, `serialize.ts`, `xref.ts`, `objstm.ts`, `pages.ts`, `geometry.ts`, `plan.ts`, `reconcile.ts`, `appearance.ts`, `verify.ts`, test e generatori), `apps/desktop/src/main/study/pdf-sync.ts` (nuovo: momenti di scrittura, coda, registro, `expectedWrites`, copia, rinomina, togli dal PDF, troncamento, migrazione, consenso), `main/ipc/handlers/study-handlers.ts` (solo i canali nuovi), `main/library/worker-protocol.ts` e `worker-service.ts` (messaggi e import pigro), `views/reader/PdfWriteChip.tsx` e nuovo `views/reader/PdfConsentDialog.tsx` (F4 è unito), nuovo `settings/LibraryAnnotationsGroup.tsx` (montato da `LibraryConfigSection` con una riga), parti i18n `settings` (solo il gruppo) e `reader` (solo chip e consenso). Criteri: tutti i test di §8.3.13 tranne Identità e Classificazione (di G4b); prefisso intatto in ogni test; nessuna scrittura senza consenso e senza `geom: 2`; momenti di scrittura di D-349; `PDF_WRITE_ENABLED` resta `false` nel merge (i test lo accendono localmente); main ≤ 1060 (se lo scrittore supera 46 KiB: stop e rapporto). e2e (proprietà): nuova `pdf-annot.spec.ts`, poi da sola `security-hostile-scan.spec.ts`. Revisione: Sonnet indipendente **e security dedicata** (con G4b) prima di accendere `PDF_WRITE_ENABLED`. Budget: main +34-42 KiB.
+**G4a · Scrittore incrementale, sincronia, consenso** — **area sensibile** — File: `packages/data/src/pdf-annot/**` esclusa l'interfaccia di `classify.ts` (nuovi `objects.ts`, `serialize.ts`, `xref.ts`, `objstm.ts`, `pages.ts`, `geometry.ts`, `plan.ts`, `reconcile.ts`, `appearance.ts`, `verify.ts`, test e generatori), `apps/desktop/src/main/study/pdf-sync.ts` (nuovo: momenti di scrittura, coda, registro, `expectedWrites`, copia, rinomina, togli dal PDF, troncamento, migrazione, consenso), `main/ipc/handlers/study-handlers.ts` (solo i canali nuovi), `main/library/worker-protocol.ts` e `worker-service.ts` (messaggi e import pigro), `views/reader/PdfWriteChip.tsx` e nuovo `views/reader/PdfConsentDialog.tsx` (F4 è unito), nuovo `settings/LibraryAnnotationsGroup.tsx` (montato da `LibraryConfigSection` con una riga), parti i18n `settings` (solo il gruppo) e `reader` (solo chip e consenso). Criteri: tutti i test di §8.3.13 tranne Identità e Classificazione (di G4b); prefisso intatto in ogni test; nessuna scrittura senza consenso e senza `geom: 2`; momenti di scrittura di D-349; `PDF_WRITE_ENABLED` resta `false` nel merge (i test lo accendono localmente); main ≤ 1068 dopo G4a (riga di D-380; se lo scrittore supera 44 KiB: stop e rapporto); riusa `classify.ts` di G4b senza duplicarlo. e2e (proprietà): nuova `pdf-annot.spec.ts`, poi da sola `security-hostile-scan.spec.ts`. Revisione: Sonnet indipendente **e security dedicata** (con G4b) prima di accendere `PDF_WRITE_ENABLED`. Budget: main +32-40 KiB.
 
-**M4 · Mappa bella e giocabile** (D-367) — File: `views/network/**` (nuovi `camera.ts` con inerzia e volo, `quadtree.ts` + Barnes-Hut in `forceSim.ts`, `edges.ts` per archi curvi e assottigliati, `hulls.ts` con Chaikin, `labelsLod.ts`, `MiniMap.tsx`, `HoverCard.tsx`, `NodeSearch.tsx`, `playful.ts` per Mescola e Sorprendimi, `mapKeyboard.ts`; `MapCanvas.tsx`, `GraphNet.tsx`, `NetworkView.tsx`, `network.css`), i token `--cat-1..10` in un file della vista (`views/network/palette.css`, importato dalla vista; A1 li ha già previsti in `tokens.css` come nomi), parti i18n `network`. Criteri: tutto §4.20; schede rinominate; involucri, etichette con livello di dettaglio, cartellino, scheda al clic (usa il `DetailPanel` di D3), volo, percorso, filtri animati, minimappa, Mescola e Sorprendimi, tastiera con annunci, movimento ridotto, stati vuoti con azione; nessun `requestAnimationFrame` a riposo (test con un contatore); prestazioni: test Vitest con margine (passo Barnes-Hut 800 nodi ≤ 4 ms sulla macchina di CI, energia che scende e assestamento entro 400 passi; disegno di 20 000 punti in un canvas finto ≤ 16 ms), e2e con misura dei frame in panoramica (≥ 50 fps medi su 2 s con la libreria sintetica moltiplicata a 5000 punti). Test unitari: quadtree, Barnes-Hut contro somma esatta (errore < 5% con θ 0,9), inviluppo e Chaikin, scelta delle etichette senza sovrapposizioni, camera (inerzia che si ferma, volo che arriva), percorso BFS, colori della tavolozza ≥ 3:1 nei due temi. e2e (proprietà): `network.spec.ts` (aggiornata: schede, cartellino, volo, tastiera, movimento ridotto). Budget: +10-14 KiB nel chunk pigro, tetto totale 1655 (D-367).
+**M4 · Mappa bella e giocabile** (D-367) — File: `views/network/**` (nuovi `camera.ts` con inerzia e volo, `quadtree.ts` + Barnes-Hut in `forceSim.ts`, `edges.ts` per archi curvi e assottigliati, `hulls.ts` con Chaikin, `labelsLod.ts`, `MiniMap.tsx`, `HoverCard.tsx`, `NodeSearch.tsx`, `playful.ts` per Mescola e Sorprendimi, `mapKeyboard.ts`; `MapCanvas.tsx`, `GraphNet.tsx`, `NetworkView.tsx`, `network.css`), i token `--cat-1..10` in un file della vista (`views/network/palette.css`, importato dalla vista; A1 li ha già previsti in `tokens.css` come nomi), parti i18n `network`. Criteri: tutto §4.20; schede rinominate; involucri, etichette con livello di dettaglio, cartellino, scheda al clic (usa il `DetailPanel` di D3), volo, percorso, filtri animati, minimappa, Mescola e Sorprendimi, tastiera con annunci, movimento ridotto, stati vuoti con azione; nessun `requestAnimationFrame` a riposo (test con un contatore); prestazioni: test Vitest con margine (passo Barnes-Hut 800 nodi ≤ 4 ms sulla macchina di CI, energia che scende e assestamento entro 400 passi; disegno di 20 000 punti in un canvas finto ≤ 16 ms), e2e con misura dei frame in panoramica (≥ 50 fps medi su 2 s con la libreria sintetica moltiplicata a 5000 punti). Test unitari: quadtree, Barnes-Hut contro somma esatta (errore < 5% con θ 0,9), inviluppo e Chaikin, scelta delle etichette senza sovrapposizioni, camera (inerzia che si ferma, volo che arriva), percorso BFS, colori della tavolozza ≥ 3:1 nei due temi. e2e (proprietà): `network.spec.ts` (aggiornata: schede, cartellino, volo, tastiera, movimento ridotto). Budget: +12-16 KiB nel chunk pigro, tetto totale 1655 (D-380). Criteri aggiunti da D-379 (Argomenti giocabile, Citazioni mai vuota, grafi piccoli, tetto di 800 con stato, colori stabili, opacità del tema scuro, misura vera dei fps sotto `RL_HEAVY_TESTS=1` in `test:e2e:heavy`, revisione a vista prima del merge con il prototipo P0 come riferimento).
 
 **H5 · Progetti e Scopri** (onda 5) — File: `views/projects/**`, `views/discover/**`, i loro CSS e parti i18n. Criteri: §1.1 (tabella delle azioni), §4.13, D-344, Annulla/Cronologia tolti dalle barre. e2e (proprietà): `ui-projects.spec.ts`. Budget ±2 KiB.
 
-**G4c · PDF cifrati con password utente vuota** (solo se S2 misura ≥ 2%; dopo G4a, da solo) — File: nuovo `packages/data/src/pdf-annot/crypt.ts` (+test con RC4, AES-128, AES-256), una riga in `plan.ts` e `verify.ts`. Criteri: test di §8.3.13 sui cifrati; `/P` rispettato. Revisione security. Budget: main +6-8 KiB (tetto 1070, D-365).
+**G4c · PDF cifrati con password utente vuota** (sempre, D-375; dopo G4a, da solo, prima dell'accensione) — File: nuovo `packages/data/src/pdf-annot/crypt.ts` (+test con RC4, AES-128, AES-256), una riga in `plan.ts` e `verify.ts`. Criteri: test di §8.3.13 sui cifrati; `/P` rispettato. Revisione security. Budget: main +6-8 KiB (tetto 1080, D-380).
 
 ### Onda 5 — chat, export, viste secondarie, facoltativi (I5 ∥ H5, poi J5)
 
@@ -1877,3 +1879,91 @@ Rischi aperti (per l'agente principale):
 5. Classificazione delle revisioni: un programma che cambia anche il contenuto della pagina in una revisione "di annotazioni" fa rileggere il testo (corretto ma più lento); un programma che riscrive il file per intero (salvataggio completo) fa perdere `base` e torna alla logica di "contenuto cambiato".
 6. Budget: JS iniziale 1-5 KiB di margine; main 0-8 KiB di margine nel tetto 1060.
 7. Doppio disegno delle annotazioni scritte: dipende dalla prova S2.
+
+---
+
+## 16. Chiusura del giro 3: la critica del progetto finale (D-368 … D-382)
+
+La critica dell'auditor (`AUDIT.md`, sezione "Critica del progetto finale (giro 3)") ha trovato 3 problemi bloccanti, 18 importanti e 13 minori. Tutti sono accolti; le sezioni indicate sono già state corrette nel testo (questa tabella è il riscontro, non un'aggiunta da applicare dopo). Nessun punto respinto; la scelta dell'accento passa all'utente nel prototipo P0.
+
+| Punto | Gravità | Soluzione | Dove |
+| --- | --- | --- | --- |
+| C.2.1 Autori, conteggi, includi/escludi e "tutti / almeno uno" persi | bloccante | riga dei filtri con tutti i facet, conteggi, tre stati per tag, modo; "Altri filtri" sotto 1280 px; e2e | §4.2, §4.18, D-369 |
+| C.1 criteri di area del lettore impossibili | bloccante | barra laterale compressa nel lettore; ≥ 960×640 a 1024×700 e ≥ 880×740 a 1280×800 con il pannello; barra a 48 px; somma ricalcolata con 56 px | §0.1, §4.3, §5.3, D-370 |
+| C.5.1 annotazioni cancellate o duplicate da altri programmi | bloccante | mai eliminazioni adottate in automatico ("Da controllare" con Riscrivi/Elimina); salvataggio completo a testo invariato = solo annotazioni, riaggancio per `/NM` o per geometria, mai riaggiunta | §8.3.6, §8.3.7, D-371 |
+| C.5.2 ricarica del lettore dopo la scrittura propria | importante | URL con `contentHashOf`, evento `own: true`, e2e | D-372, §16.2 |
+| C.5.3 riparazione che richiede di aprire ogni documento | importante | compito R0: riparazione nel worker con `getTextContent()`, lavoro in Attività | §14 (onda 0), D-373 |
+| C.5.5, C.5.8 consenso modale a metà gesto; riga sotto la piega | importante, minore | banner non modale; dialogo solo alla chiusura senza risposta; riga nel corpo del Riepilogo e frase sotto "Crea la libreria" | §8.3.7, §7.4, D-374 |
+| C.5.4 cifrati con password vuota senza via d'uscita | importante | G4c sempre, prima dell'accensione; anche "Esporta copia annotata" | §14, D-375 |
+| C.1, C.2.3 un clic = cassetto sopra l'elenco a 1180-1439 px | importante | sotto 1440 px il clic seleziona; scheda "fissata" aperta da Scheda, Maiusc+Invio o ◫; e2e | D-376, §16.2 |
+| C.2.2 intestazioni fuori regola (Libreria, Mappa) | importante | ◫ fuori dal conteggio delle azioni; Libreria con "Vista ▾"; Mappa con filtri e azioni giocose in una riga sotto le schede | §1.1, §4.2, §4.20, D-377 |
+| C.1 barra del lettore con 4 px di margine | importante | spazio 952 px, Pagine ridotto sotto 1100 px, margine ≥ 72 px | §4.3, D-370 |
+| C.3.1 Argomenti statica, Citazioni vuota | importante | zoom semantico che "apre" un argomento, trascinamento di argomenti, Citazioni sul documento più collegato | §16.3, D-379 |
+| C.3.2 colori instabili e ripetuti | importante | eredità per sovrapposizione, colorazione golosa degli adiacenti, contorno tratteggiato oltre 10 | §16.3, D-379 |
+| C.3.3 grafi piccoli | importante | simulazione sotto 30 documenti, cerchio e capsula per involucri degeneri, zoom massimo di Adatta | §16.3, D-379 |
+| C.3.4 tetto di 800 senza stato | importante | "+37 non mostrati (tetto 800)" e "800 di 1 240" | §16.3, D-379 |
+| C.3.5 tema scuro della mappa | importante | opacità per tema, aloni `lighter` in scuro, test di contrasto | §16.3, D-379 |
+| C.3.6 prove di prestazione che non provano | importante | fps misurati in Electron con un modello precalcolato (≥ 55 fps a 20 000 punti, ≥ 30 a 60 000) in `test:e2e:heavy` | §14 (M4), D-379 |
+| C.3.7 M4 senza verifica a vista | importante | prototipo P0 come riferimento; schermate a seme fisso rivedute dalla coppia di design prima del merge | §14 (M4), D-379, D-382 |
+| C.4.1 nessun prototipo | importante | **P0 fatto**: `docs/design/prototipo/index.html` | §16.4, D-382 |
+| C.4.2 tipografia piatta | importante | titoli 26/32, display 32/40 | §5.1, D-378 |
+| C.4.3 nessuna identità | importante | accento petrolio provvisorio (alternativa indaco nel prototipo), barra laterale senza pannello grigio, illustrazioni a tratto, logo con la tinta della libreria, microanimazioni con un significato | §5.2.1, §16.4, D-378 |
+| C.6.1-C.6.2 budget in contraddizione; iniziale al limite | importante | tabella per compito; main 1060-1076 su 1080; totale 1620-1643 su 1655; iniziale 385,5-389 su 391 con pigri da subito | §13, §14, D-380 |
+| C.6.3, C.5.7 prove mancanti; verifica a mano nei lettori esterni | importante, minore | e2e di Spazio, nessuna ricarica, PDFium automatico, facet Autori ed esclusione, clic sotto 1440 px | §16.2, D-381 |
+| C.1 righe 44/48 e badge nella tabella di §7 | minore | 48 ovunque; riga del badge aggiornata | §5.3, §7 |
+| C.2.4 ✦ per Scopri | minore | bussola ◈ | §4.1, D-377 |
+| C.2.5 "Mostra i file mancanti" in due posti | minore | solo nella riga dei filtri | §1.1, §4.2 |
+| C.2.6 barra in alto a 1024 px | minore | sotto 1100 px solo l'ultimo segmento delle briciole e Cronologia nel ⋯ | D-377 |
+| C.3.8 accessibilità della tela | minore | `L` apre l'elenco; l'annuncio dice sempre l'argomento | D-379 |
+| C.3.9 Mescola e puntine | minore | le puntine restano; "Libera tutti" nel ⋯ | D-379 |
+| C.4.4 incoerenze dei token | minore | una regola per il disattivato; `--cat-*` solo in `tokens.css`; `--e-2` senza barra flottante | §5.3, §5.5, D-378 |
+| C.5.6 colori e `/RC` adottati da altri programmi | minore | colore più vicino in OKLab con l'originale conservato; `/RC` se più recente | D-371 |
+| C.6.4-C.6.6 coppie, prove pesanti, V3 | minore | dati finti in E3; prove pesanti di M4 in `test:e2e:heavy`; copia della libreria fuori dal repository e rapporti solo con conteggi | D-381 |
+
+### 16.1 Filtri della Libreria (D-369)
+
+```
+[Stato ▾] [Tipo ▾] [Anno ▾] [Rivista ▾] [Autori ▾] [Tag ▾]   (× In lettura) (✓ Ottica) (⊘ Bozze)  (Pulisci)   □ Mostra i file mancanti
+                                                   ┌ Tag ─────────────────────── 300 ┐
+                                                   │ [⌕ Cerca un tag…            ]   │
+                                                   │ Inclusi: ( Tutti | Almeno uno ) │
+                                                   │ ✓ Ottica                   42   │  clic: nessuno → ✓ includi → ⊘ escludi → nessuno
+                                                   │ ⊘ Bozze                     6   │
+                                                   │   Laser                    17   │
+                                                   │   Serie temporali          11   │
+                                                   └─────────────────────────────────┘
+```
+
+Ogni menu: valori ordinati per conteggio, conteggi con cifre tabellari a destra (gli stessi di oggi, calcolati sul risultato corrente), ricerca interna sopra 8 valori, più valori con la casella nei facet a scelta multipla (Tipo, Rivista, Autori, Stato) e cursore a due maniglie per Anno. I chip attivi mostrano ✓ per gli inclusi e ⊘ per gli esclusi. Sotto 1280 px di vista "⋯ Altri filtri" raccoglie Rivista e Autori con lo stesso contenuto.
+
+### 16.2 Prove aggiunte (D-372, D-376, D-381)
+
+| Prova | Dove | Criterio |
+| --- | --- | --- |
+| Spazio reale nel lettore | `study-ui.spec.ts` (F4) | Spazio alterna Seleziona ↔ Evidenzia; nei campi scrive uno spazio; Maiusc+Spazio scorre indietro; nessuno scambio durante un trascinamento |
+| Nessuna ricarica dopo una scrittura propria | `pdf-annot.spec.ts` (G4a) | a documento aperto una scrittura dopo 120 s: stessa pagina, stesso `scrollTop`, nessuna nuova richiesta `rl-doc` |
+| Visibile in un lettore PDF standard | `pdf-annot.spec.ts` (G4a), anche in V3 | `BrowserWindow` nascosta con `plugins: true` sul PDF scritto, screenshot: pixel gialli nel rettangolo dell'evidenziazione, tratto scuro sotto la riga della sottolineatura |
+| Altri programmi | `pdf-annot.spec.ts` (G4a) | riscrittura completa da pdf-lib con gli stessi `/NM` → nessun doppione, nessuna annotazione persa; file "ripulito" → "Da controllare", nulla eliminato |
+| Facet Autori ed esclusione dei tag | `ui-library.spec.ts` (D3) | filtra per un autore; esclude un tag; "Almeno uno" con due tag |
+| Clic sotto 1440 px | `ui-library.spec.ts` (D3) | a 1280 px un clic seleziona senza aprire il cassetto; [Scheda] lo apre e resta aperto cambiando riga |
+| Riparazione di massa | R0 (Vitest) e `reader-geometry.spec.ts` | ≥ 90% di sovrapposizione senza aprire il lettore |
+
+### 16.3 Mappa: integrazioni (D-379)
+
+- **Argomenti giocabile:** doppio clic su un involucro = l'argomento si "apre": i suoi punti si allargano con una simulazione locale (collisione + richiamo verso la posizione originale, `alpha` 0,6 → 0) e si trascinano come nella scheda Citazioni; Esc o doppio clic sul vuoto lo richiudono. Trascinare l'etichetta di un argomento sposta l'intero involucro e gli altri si scostano (collisione tra cerchi che approssimano gli involucri: decine di corpi).
+- **Citazioni mai vuota:** si apre sul documento più collegato della libreria (o sull'ultimo letto, se ha collegamenti) già espanso di un passo.
+- **Grafi piccoli** (< 30 documenti): anche Argomenti usa la simulazione, con una forza verso il baricentro dell'argomento; involucro di 1 punto = cerchio di 24 px, di 2 = capsula; "Adatta" non ingrandisce oltre un nodo di 40 px.
+- **Tetto di 800 nodi:** "Espandi" aggiunge i vicini più pesanti fino al tetto; cartellino "+37 non mostrati (tetto 800) · Mostra solo questi" (sostituisce la rete con il nodo e i suoi vicini); sottotitolo "800 di 1 240".
+- **Colori stabili:** all'aggiornamento della mappa ogni argomento nuovo eredita la tinta dell'argomento vecchio con cui condivide più documenti (assegnazione golosa per sovrapposizione decrescente); i rimanenti per hash dei tre termini principali; argomenti con involucri che si toccano mai con la stessa tinta (colorazione golosa del grafo di adiacenza con 10 tinte); oltre 10 argomenti adiacenti tra loro: tinta ripetuta con contorno tratteggiato.
+- **Tema scuro:** involucri 12% di riempimento e 35% di contorno, archi con opacità ≥ 0,22, aloni con `globalCompositeOperation = 'lighter'` (in chiaro `source-over`); test che misura il contrasto medio arco/fondo nei due temi (≥ 1,6:1 per gli archi leggeri).
+- **Misura vera:** modello di 20 000 e 60 000 punti precalcolato in una fixture generata da script (nessun calcolo nel main), e2e in Electron sotto `RL_HEAVY_TESTS=1` che registra i frame di 3 s di panoramica (≥ 55 e ≥ 30 fps medi); il vecchio test con canvas finto si chiama "tempo di preparazione dei percorsi".
+- **Revisione a vista prima del merge:** schermate a seme fisso (1024×700, 1280×800, 1920×1080 × chiaro/scuro × vuoto, 8 nodi, 200, 5000) rivedute dalla coppia di design con il prototipo P0 accanto; al massimo due giri di ritocchi dei soli parametri (spessori, opacità, tempi).
+- **Accessibilità e puntine:** `L` dalla tela apre l'elenco Esplora; l'annuncio e il cartellino dicono sempre l'argomento; Mescola lascia le puntine, "Libera tutti" nel ⋯.
+
+### 16.4 Identità visiva e prototipo P0 (D-378, D-382)
+
+- **Accento:** petrolio (provvisorio) o indaco: l'utente sceglie nel prototipo con l'interruttore "Accento"; i valori sono in §5.2.1.
+- **Barra laterale leggera:** stesso fondo `--bg` della vista, nessun bordo; voce attiva = pillola `--surface` con `--e-1` e testo `--accent-text`; selettore di libreria con il quadratino della tinta e il logo da 20 px nella stessa tinta.
+- **Stati vuoti illustrati:** sei disegni a tratto 1,75 px in `--text-muted` con un dettaglio nella tinta dell'accento, 96×72 px, SVG in linea ≤ 1 KiB l'uno, in `components/illustrations.tsx` (pigro con le viste): libreria vuota (scaffale con un foglio che entra), tutto fatto (vassoio vuoto con una spunta), mappa da costruire (tre punti che si collegano), nessun risultato (lente su un foglio bianco), nessun backup (scatola aperta), offline (nuvola con una linea interrotta).
+- **Microanimazioni con un significato** (`--dur`, mai con `prefers-reduced-motion`): riga confermata in Da rivedere che scivola a destra e svanisce; chip Attività il cui anello si chiude a fine scansione; pallino del colore che "salta" (scala 1 → 1,25 → 1) sul pennello scelto.
+- **Prototipo:** `docs/design/prototipo/index.html`, un solo file (CSS e JS in linea, nessuna rete, dati sintetici, nessun nome reale), con i token di §5 e gli interruttori Tema e Accento; schermate: guscio con chip Attività, Libreria (filtri, elenco, barra di selezione), Lettore (barra unica in modo strumento), Impostazioni (sezioni, Avanzate), Account Claude, Mappa dal vivo (~40 nodi, forze, trascinamento con puntina, cartellino, Mescola, Sorprendimi). L'utente lo approva prima dell'onda 1; i ritocchi ai token si fanno prima nel prototipo, poi in `tokens.css` (A1).

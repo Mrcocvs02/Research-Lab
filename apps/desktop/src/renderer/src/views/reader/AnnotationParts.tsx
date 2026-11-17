@@ -28,7 +28,7 @@ export function AnnotationLayers({ layers, annotations, selectedId, staleIds }: 
                 a.rects.map((r, i) => (
                   <div
                     key={`${a.id}:${i}`}
-                    className={`ann ann-${a.kind} ann-${colorOf(a.color)}${a.id === selectedId ? ' selected' : ''}${staleIds.has(a.id) ? ' ann-stale' : ''}`}
+                    className={`ann ann-${a.kind} ann-${colorOf(a.color)}${a.id === selectedId ? ' is-selected' : ''}${staleIds.has(a.id) ? ' ann-stale' : ''}`}
                     title={staleIds.has(a.id) ? t('reader.ann.stale') : undefined}
                     data-stale={staleIds.has(a.id) ? 'true' : undefined}
                     style={{ left: pct(r.x), top: pct(r.y), width: pct(r.w), height: pct(r.h) }}

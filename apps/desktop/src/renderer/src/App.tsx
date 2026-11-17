@@ -184,7 +184,7 @@ function Placeholder({ section }: { section: Exclude<SectionId, 'settings'> }) {
   const { t } = useTranslation();
   const app = useApp();
   return (
-    <div className="page" data-testid={`section-${section}`}>
+    <div className="view" data-testid={`section-${section}`}>
       <h1>{t(`sections.${section}`)}</h1>
       {section === 'library' && !app.activeProfile ? <p data-testid="shell-empty">{t('shell.empty')}</p> : <p>{t(`placeholders.${section}`)}</p>}
       {section === 'library' && app.activeProfile && (

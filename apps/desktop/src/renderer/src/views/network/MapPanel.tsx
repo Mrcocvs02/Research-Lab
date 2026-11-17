@@ -150,7 +150,7 @@ export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMap
               return (
                 <li key={c.id}>
                   <button type="button" className="legend-item" onClick={() => handle.current?.focusCluster(c.id)} data-testid="cluster-item" data-cluster={c.id} data-ai={txt.ai ? 'true' : 'false'}>
-                    <span className="swatch" style={{ background: groupColor(i, dark) }} aria-hidden="true" />
+                    <span className="rl-swatch" style={{ background: groupColor(i, dark) }} aria-hidden="true" />
                     <span className="legend-text">{safeText(txt.text || c.id)}</span>
                     {txt.ai && <span className="ai-badge">{t('ai.badge')}</span>}
                     <span className="hint">{c.size}</span>

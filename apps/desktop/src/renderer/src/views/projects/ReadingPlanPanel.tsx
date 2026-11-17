@@ -60,7 +60,7 @@ export function ReadingPlanPanel({ detail, onChange, onStudyState }: Props) {
         {items.map((it, i) => (
           <li
             key={it.docId}
-            className={['plan-item', dragFrom === i ? 'dragging' : '', overIndex === i && dragFrom !== null && dragFrom !== i ? 'drop-over' : ''].filter(Boolean).join(' ')}
+            className={['plan-item', dragFrom === i ? 'is-dragging' : '', overIndex === i && dragFrom !== null && dragFrom !== i ? 'drop-over' : ''].filter(Boolean).join(' ')}
             tabIndex={0}
             draggable
             data-testid="plan-item"

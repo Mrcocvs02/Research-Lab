@@ -53,7 +53,7 @@ export function DiscoverView() {
   }, [activeLibraryId, reload]);
 
   return (
-    <div className="page discover-page" data-testid="section-discover">
+    <div className="view discover-page" data-testid="section-discover">
       <header className="library-head">
         <h1>{t('discover.title')}</h1>
       </header>

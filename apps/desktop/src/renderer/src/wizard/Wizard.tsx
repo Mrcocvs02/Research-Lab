@@ -353,11 +353,11 @@ export function Wizard({ onFinished, onCancel }: Props) {
           {importLegacy && <p className="hint">{t('wizard.taxonomy.fromImport')}</p>}
           <fieldset disabled={importLegacy}>
             <legend>{t('wizard.taxonomy.legend')}</legend>
-            <div className="radio">
+            <div className="rl-radio">
               <input type="radio" id="tax-empty" name="taxonomy" checked={taxonomy === 'empty'} onChange={() => setTaxonomy('empty')} data-testid="wizard-taxonomy-empty" />
               <label htmlFor="tax-empty">{t('wizard.taxonomy.empty')}</label>
             </div>
-            <div className="radio">
+            <div className="rl-radio">
               <input type="radio" id="tax-file" name="taxonomy" checked={taxonomy === 'file'} onChange={() => setTaxonomy('file')} data-testid="wizard-taxonomy-file" />
               <label htmlFor="tax-file">{t('wizard.taxonomy.file')}</label>
             </div>
@@ -369,7 +369,7 @@ export function Wizard({ onFinished, onCancel }: Props) {
                 {taxonomyFile && <span className="path">{taxonomyFile.name}</span>}
               </div>
             )}
-            <div className="radio">
+            <div className="rl-radio">
               <input type="radio" id="tax-claude" name="taxonomy" disabled checked={taxonomy === 'claude'} readOnly />
               <label htmlFor="tax-claude">{t('wizard.taxonomy.claude')}</label>
               <p className="hint">{t('wizard.taxonomy.claudeNote')}</p>

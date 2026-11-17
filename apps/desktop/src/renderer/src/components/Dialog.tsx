@@ -19,7 +19,7 @@ export function Dialog({ title, onClose, children, testId }: { title: string; on
     <div className="dialog-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         ref={box}
-        className="dialog"
+        className="rl-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

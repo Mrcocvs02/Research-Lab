@@ -103,7 +103,7 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
   const authors = safeText(row.authors.slice(0, 3).join(', ')) + (row.authors.length > 3 ? ' …' : '');
   const meta = [authors, row.year, row.type === null ? null : safeText(row.type)].filter((x) => x !== '' && x !== null && x !== undefined);
   const readable = canRead(row.path, row.missing);
-  const cls = ['doc', view === 'grid' ? 'doc-card' : 'doc-row', selected ? 'selected' : '', active ? 'active' : '', row.missing ? 'missing' : ''].filter(Boolean).join(' ');
+  const cls = ['doc', view === 'grid' ? 'doc-card' : 'doc-row', selected ? 'is-selected' : '', active ? 'active' : '', row.missing ? 'missing' : ''].filter(Boolean).join(' ');
   return (
     <div
       id={`doc-${row.docId}`}

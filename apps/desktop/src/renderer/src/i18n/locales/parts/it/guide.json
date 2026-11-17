@@ -1,0 +1,53 @@
+{
+  "guide": {
+    "title": "Guida",
+    "intro": "Una guida breve, per compiti. Aprila quando vuoi con F1 o dalla tavolozza dei comandi.",
+    "shortcutsTitle": "Scorciatoie da tastiera",
+    "editShortcuts": "Cambia le scorciatoie nelle impostazioni",
+    "tasks": {
+      "addDocs": {
+        "title": "Aggiungere documenti",
+        "body": "Apri la sezione Arrivi e trascina nella finestra file PDF o una cartella, oppure sceglili con il pulsante. L'app legge titoli e metadati, li archivia nella libreria e ti mostra ciò che ha trovato da confermare. I tuoi originali non vengono mai modificati."
+      },
+      "tags": {
+        "title": "Organizzare con tag e progetti",
+        "body": "Seleziona dei documenti nella Libreria e assegna loro i tag della tua tassonomia, oppure aggiungili a un progetto. Ogni modifica si può annullare con Annulla. La casella di ricerca trova testo, titoli e autori; la ricerca avanzata può anche interrogare Claude."
+      },
+      "read": {
+        "title": "Leggere e annotare",
+        "body": "Fai doppio clic su un documento per aprirlo nel lettore. Seleziona il testo per evidenziarlo, sottolinearlo e aggiungere una nota. Note, evidenziazioni e citazioni sono salvate nella cartella della libreria e viaggiano con essa."
+      },
+      "chat": {
+        "title": "Chiedere a Claude",
+        "body": "Apri il pannello della chat e usa la tavolozza dei comandi per le richieste già pronte. Claude vede solo i documenti delle cartelle che hai abilitato, e prima di inviare puoi vedere in anteprima che cosa viene inviato."
+      },
+      "network": {
+        "title": "Esplorare la rete",
+        "body": "La sezione Rete disegna documenti, autori e temi come mappa e come grafo, così trovi gruppi e lavori collegati. Si costruisce dalla tua libreria e si ricostruisce quando serve."
+      },
+      "export": {
+        "title": "Esportare e collegare altri strumenti",
+        "body": "Esporta un progetto o una selezione come second brain (note con collegamenti) dalla tavolozza dei comandi. Nelle impostazioni puoi anche avviare un server MCP locale perché altri strumenti leggano la tua libreria."
+      },
+      "backup": {
+        "title": "Fare il backup della libreria",
+        "body": "Nelle impostazioni scegli una cartella di destinazione e premi Esegui il backup ora, oppure attiva il backup automatico. Un backup si può verificare e ripristinare come nuova libreria in qualsiasi momento. I segreti come le chiavi API non vengono mai salvati in un backup."
+      }
+    },
+    "welcome": {
+      "title": "Benvenuto in Research Lab",
+      "body": "La tua libreria è pronta. La guida spiega in poche righe i compiti principali.",
+      "tips": "Suggerimenti",
+      "hide": "Nascondi",
+      "hideTip": "Nascondi questo suggerimento per sempre",
+      "open": "Apri la guida",
+      "gotIt": "Ho capito",
+      "saveFailed": "Non è stato possibile salvare questa scelta."
+    },
+    "tips": {
+      "palette": "Premi {{palette}} per la tavolozza dei comandi: vai ovunque, fai il backup, chiedi a Claude.",
+      "search": "Premi {{search}} per andare alla casella di ricerca.",
+      "backup": "Imposta un backup nelle impostazioni, così le tue note non si perdono mai."
+    }
+  }
+}

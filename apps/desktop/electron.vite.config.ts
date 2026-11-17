@@ -48,6 +48,9 @@ const workspacePackages = ['@rl/core', '@rl/data', '@rl/search', '@rl/ai', '@rl/
 
 export default defineConfig({
   main: {
+    // True only in the test build of the packaged app (`npm run dist:test-dir`, RL_PACKAGED_TEST=1 at build time): the
+    // one build that accepts a remote debugging port and `--user-data-dir` (D-296). Any other build refuses them.
+    define: { __RL_PACKAGED_TEST__: JSON.stringify(process.env.RL_PACKAGED_TEST === '1') },
     build: {
       // Main and worker stay unminified (dead code is still dropped) so that stack traces in the logs stay readable:
       // diagnostics come before ~250 KB on disk, which cost about 1 MB and a few ms at start (D-177).

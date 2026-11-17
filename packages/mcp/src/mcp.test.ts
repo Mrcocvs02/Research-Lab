@@ -89,6 +89,7 @@ function raw(s: RunningMcpServer, o: { method?: string; headers?: Record<string,
     req.end(o.body);
   });
 }
+const rpcMsg = (id: number) => ({ jsonrpc: '2.0', id, method: 'ping' });
 const rpc = (method: string, params: unknown = {}, id: number | undefined = 1) => JSON.stringify({ jsonrpc: '2.0', ...(id === undefined ? {} : { id }), method, params });
 
 describe('interop with the official client', () => {
@@ -205,6 +206,76 @@ describe('request security', () => {
     expect((await raw(t, { body: call.replace('slow', 'slow') })).status).toBe(504);
   });
 
+  it('counts every message of a batch in the concurrency cap and refuses an oversize batch with an error', async () => {
+    let live = 0;
+    let peak = 0;
+    const probe: McpTool = {
+      name: 'probe',
+      description: 'counts overlap',
+      inputSchema: { type: 'object' },
+      readOnly: true,
+      run: async () => {
+        peak = Math.max(peak, ++live);
+        await new Promise((r) => setTimeout(r, 20));
+        live--;
+        return { text: '{}', docIds: [] };
+      },
+    };
+    const s = await start({ extra: [probe], concurrent: 2 });
+    const one = (id: number) => ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'probe', arguments: {} } });
+    // Two requests of ten messages each (2 x 10 = 20 messages): never more than 2 tools at the same time.
+    const batch = (from: number) => JSON.stringify(Array.from({ length: 10 }, (_, i) => one(from + i)));
+    const [a, b] = await Promise.all([raw(s, { body: batch(0) }), raw(s, { body: batch(100) })]);
+    expect([a.status, b.status]).toEqual([200, 200]);
+    expect(JSON.parse(a.body)).toHaveLength(10);
+    expect(JSON.parse(b.body)).toHaveLength(10);
+    expect(peak).toBeLessThanOrEqual(2);
+    expect(peak).toBe(2);
+
+    // Over the limit: an error, nothing is run, nothing is cut silently.
+    const before = calls.length;
+    const big = await raw(s, { body: JSON.stringify(Array.from({ length: MCP_LIMITS.batchMax + 1 }, (_, i) => one(i))) });
+    expect(big.status).toBe(400);
+    expect(JSON.parse(big.body).error).toMatchObject({ code: -32600 });
+    expect(JSON.parse(big.body).error.message).toContain(String(MCP_LIMITS.batchMax));
+    expect(calls.length).toBe(before);
+    const ok = await raw(s, { body: JSON.stringify(Array.from({ length: MCP_LIMITS.batchMax }, (_, i) => rpcMsg(i))) });
+    expect(JSON.parse(ok.body)).toHaveLength(MCP_LIMITS.batchMax);
+  });
+
+  it('a refusal ends the connection without reading the rest of an unbounded body', async () => {
+    const s = await start();
+    /** Sends only the headers of a huge body (and the body too when `flood`); resolves with the answer and whether the server closed. */
+    const attempt = (headers: string[], flood: boolean) =>
+      new Promise<{ head: string; closed: boolean }>((resolve) => {
+        const sock = net.createConnection({ host: '127.0.0.1', port: s.port });
+        let head = '';
+        let sent = 0;
+        const feed = flood
+          ? setInterval(() => {
+              if (sock.destroyed) return;
+              sent += 64 * 1024;
+              sock.write(Buffer.alloc(64 * 1024, 97));
+              if (sent > 64 * 1024 * 5000) (clearInterval(feed ?? undefined), sock.destroy(), resolve({ head, closed: false }));
+            }, 1)
+          : null;
+        sock.on('data', (d) => (head += d.toString('latin1')));
+        sock.on('error', () => {});
+        sock.on('close', () => ((feed ? clearInterval(feed) : undefined), resolve({ head, closed: true })));
+        sock.write(['POST /mcp HTTP/1.1', `Host: 127.0.0.1:${s.port}`, ...headers, 'Content-Type: application/json', 'Content-Length: 2000000000', '', ''].join('\r\n'));
+      });
+    const noAuth = await attempt([], false);
+    expect(noAuth.head).toMatch(/^HTTP\/1.1 401/);
+    expect(noAuth.head.toLowerCase()).toContain('connection: close');
+    expect(noAuth.closed).toBe(true);
+    const oversize = await attempt([`Authorization: Bearer ${TOKEN}`], false);
+    expect(oversize.head).toMatch(/^HTTP\/1.1 413/);
+    expect(oversize.closed).toBe(true);
+    // A client that streams the body anyway is cut: the server never drains it.
+    expect((await attempt([], true)).closed).toBe(true);
+    expect((await attempt([`Authorization: Bearer ${TOKEN}`], true)).closed).toBe(true);
+  });
+
   it('listens on loopback only', async () => {
     const s = await start();
     const external = Object.values(os.networkInterfaces()).flat().find((n) => n && n.family === 'IPv4' && !n.internal);
@@ -245,7 +316,7 @@ describe('helpers', () => {
     const name = serverNameFor('My Lab: Série 2');
     expect(name).toBe('research-lab-my-lab-serie-2');
     expect(serverNameFor('###')).toBe('research-lab');
-    expect(cliConfig(name, 'http://127.0.0.1:5000/mcp', 'T')).toBe('claude mcp add --transport http research-lab-my-lab-serie-2 http://127.0.0.1:5000/mcp --header "Authorization: Bearer T"');
+    expect(cliConfig(name, 'http://127.0.0.1:5000/mcp', 'T')).toBe('claude mcp add --transport http --scope local research-lab-my-lab-serie-2 http://127.0.0.1:5000/mcp --header "Authorization: Bearer T"');
     expect(JSON.parse(jsonConfig(name, 'http://127.0.0.1:5000/mcp', 'T'))).toEqual({ mcpServers: { [name]: { type: 'http', url: 'http://127.0.0.1:5000/mcp', headers: { Authorization: 'Bearer T' } } } });
   });
   it('the call log is bounded, newest first, and restores only well-formed entries', () => {

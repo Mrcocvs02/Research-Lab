@@ -7,8 +7,10 @@ export const MCP_LIMITS = {
   logKept: 500,
   /** Largest request body accepted by the server. */
   bodyBytes: 1_048_576,
-  /** Requests handled at the same time; more get HTTP 429. */
+  /** Requests handled at the same time (more get HTTP 429) and messages run at the same time, batches included. */
   concurrent: 4,
+  /** Most messages of one JSON-RPC batch; a larger batch is refused with an error, never cut. */
+  batchMax: 20,
 } as const;
 
 /**

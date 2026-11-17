@@ -67,7 +67,7 @@ export function ReviewView() {
     if (!data || data.items.length === 0) return;
     setBusy(true);
     await decideMany(
-      data.items.map((i) => ({ docId: i.docId, field: i.field })),
+      data.items.map((i) => ({ docId: i.docId, field: i.field, metaDate: i.meta.date })),
       decision,
     );
     setBusy(false);

@@ -43,7 +43,7 @@ export function useDecide() {
   );
 
   const decideMany = useCallback(
-    async (items: Array<{ docId: string; field: ReviewField }>, decision: 'accept' | 'reject'): Promise<boolean> => {
+    async (items: Array<{ docId: string; field: ReviewField; metaDate?: string }>, decision: 'accept' | 'reject'): Promise<boolean> => {
       try {
         const r = await rl.invoke('review:decideMany', { items, decision });
         invalidate('documents');

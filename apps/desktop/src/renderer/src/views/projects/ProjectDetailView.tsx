@@ -1,5 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { Lazy, lazyRetry } from '../../components/Lazy';
+import { Lazy, lazyRetry, lazyView } from '../../components/Lazy';
 import { useTranslation } from 'react-i18next';
 import type { ProjectDetail, StudyState } from '@rl/core';
 import { Button } from '../../components/Button';
@@ -19,7 +19,9 @@ import { useNav } from '../../lib/nav';
 import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
 import { safeText } from '../library/safeText';
+import { BibBanner } from './BibBanner';
 import { ProjectMoreMenu } from './ProjectMoreMenu';
+import { useBibStatus } from './useBibStatus';
 import { ReadingPlanPanel } from './ReadingPlanPanel';
 import { ViewHead } from './ViewHead';
 import { toRequestItems, type PlanItemView } from './readingPlan';
@@ -33,6 +35,7 @@ const STATES: StudyState[] = ['to-read', 'reading', 'read'];
 // The Markdown renderer is loaded when the preview is first shown; the add-documents dialog when it is first asked for.
 const Markdown = lazyRetry(() => import('../../lib/markdown').then((m) => ({ default: m.Markdown })));
 const AddDocuments = lazyRetry(() => import('./AddDocumentsDialog'));
+const LinkBibDialog = lazyView(() => import('../import/LinkBibDialog'), ['import']);
 
 /** Notes in Markdown: a plain text box, a preview next to it (rendered without any raw HTML), saved on demand or on leaving the box. */
 function NotesEditor({ detail, onSave }: { detail: ProjectDetail; onSave(notes: string): Promise<void> }) {
@@ -153,6 +156,8 @@ export function ProjectDetailView({ id }: { id: string }) {
   const { invalidate } = useLibraryEvents();
   const { info, reportError } = useNotify();
   const { openExport } = useAiUi();
+  const bib = useBibStatus(id);
+  const [linking, setLinking] = useState(false);
   const nav = useNav();
   const setNavTitle = nav.setTitle;
   const [detail, setDetailState] = useState<ProjectDetail | null>(null);
@@ -264,6 +269,14 @@ export function ProjectDetailView({ id }: { id: string }) {
     const ok = await run(() => rl.invoke('projects:removeMembers', { projectId: id, docIds }));
     if (ok) info(t('projects.removed', { count: docIds.length }));
   };
+  const copyBib = async () => {
+    try {
+      const r = await rl.invoke('bib:copy', { projectId: id });
+      info(t('projects.bib.copied', { count: r.count }));
+    } catch (e) {
+      reportError(e);
+    }
+  };
   const toggleArchive = async () => {
     try {
       await rl.invoke(detailRef.current?.project.status === 'archived' ? 'projects:restore' : 'projects:delete', { id });
@@ -307,8 +320,14 @@ export function ProjectDetailView({ id }: { id: string }) {
         }
       >
         {addButton('primary', 'project-add-docs')}
-        <ProjectMoreMenu archived={archived} testId="project-more" label={t('projects.more')} onExport={() => openExport({ projectId: id, name: p.name })} onRename={() => setRenaming(true)} onToggleArchive={() => void toggleArchive()} />
+        <ProjectMoreMenu archived={archived} testId="project-more" label={t('projects.more')} onExport={() => openExport({ projectId: id, name: p.name })} onRename={() => setRenaming(true)} onToggleArchive={() => void toggleArchive()} onLinkBib={() => setLinking(true)} onCopyBib={() => void copyBib()} bibTitle={bib?.linked ? t('projects.bib.linkedTo', { file: bib.file, time: new Date(bib.at ?? 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }) : undefined} />
       </ViewHead>
+      <BibBanner projectId={id} status={bib} />
+      {linking && (
+        <Lazy>
+          <LinkBibDialog projectId={id} projectName={p.name} status={bib} onClose={() => setLinking(false)} onDone={() => invalidate('projects')} />
+        </Lazy>
+      )}
       {p.description && (
         <p className="project-description" data-testid="project-description-text">
           {safeText(p.description)}

@@ -1,0 +1,55 @@
+{
+  "import": {
+    "title": "Da Zotero o BibTeX",
+    "steps": "Passi",
+    "step": {
+      "file": "File",
+      "match": "Abbinamento",
+      "summary": "Riepilogo"
+    },
+    "chooseTitle": "Scegli un file di Zotero o BibTeX",
+    "fileHint": "BibTeX o BibLaTeX (.bib), CSL JSON (.json), RDF di Zotero (.rdf) oppure il database di Zotero (zotero.sqlite). Il file viene solo letto.",
+    "choose": "Scegli il file…",
+    "counts": "{{withFile}} con file da aggiungere · {{noFile}} senza file · {{inLibrary}} già in libreria",
+    "matchHint": "{{count}} voci lette. I PDF sono abbinati per percorso o contenuto; le altre voci per DOI, arXiv o titolo.",
+    "next": "Avanti",
+    "optTags": "Importa i tag ({{count}})",
+    "optCollections": "Collezioni ({{count}})",
+    "colProjects": "Crea progetti",
+    "colTags": "Usa come tag",
+    "colIgnore": "Non importare",
+    "optNotes": "Note sul file ({{count}})",
+    "optQueue": "Aggiungi in Arrivi i PDF trovati ({{count}})",
+    "optQueueHint": "Si copiano nella libreria solo dopo la tua conferma.",
+    "originals": "Gli originali non vengono spostati né modificati. Ogni modifica si può annullare.",
+    "run": "Importa",
+    "result": "Aggiornati {{updated}} documenti, {{tagged}} tag, {{projects}} progetti, {{notes}} note; {{queued}} PDF in Arrivi.",
+    "undone": "Importazione annullata.",
+    "undo": "Annulla l'importazione",
+    "notImported": "Non importate ({{count}})",
+    "reason": {
+      "no-file": "nessun file",
+      "not-queued": "file non aggiunto",
+      "empty": "voce vuota",
+      "not-pdf": "non è un PDF",
+      "too-large": "troppo grande",
+      "not-found": "file non trovato",
+      "in-library": "già in libreria",
+      "other": "altro motivo"
+    },
+    "linkTitle": "Collega un file .bib",
+    "linkHint": "L'app riscrive il file a ogni cambiamento del progetto, ma solo se nessuno l'ha modificato fuori dall'app. La prima riga è un avviso: le modifiche a mano vengono sovrascritte.",
+    "linkCurrent": "Collegato a {{file}}.",
+    "linkChoose": "Scegli la cartella…",
+    "linkFolderTitle": "Cartella del file .bib",
+    "linkName": "Nome del file",
+    "link": "Collega",
+    "unlink": "Scollega",
+    "linkNeedsFolder": "Scegli prima la cartella",
+    "linkError": {
+      "not-ours": "Esiste già un file con questo nome che non è stato scritto dall'app: scegli un altro nome.",
+      "inside-library": "Il file non può stare dentro la cartella della libreria.",
+      "invalid-name": "Nome del file non valido."
+    }
+  }
+}

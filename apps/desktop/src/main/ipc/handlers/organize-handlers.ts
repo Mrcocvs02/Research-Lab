@@ -3,6 +3,7 @@ import { AppError, type DocumentId } from '@rl/core';
 import { resolveInRoot } from '@rl/core/node';
 import type { LibraryRuntime } from '../../library/library-runtime.js';
 import type { DomainHandlers } from '../types.js';
+import { syncLinkedBib } from './bib-handlers.js';
 import { openVerdict } from './open-policy.js';
 import type { MainServices } from './services.js';
 
@@ -61,7 +62,10 @@ export const historyHandlers = (s: MainServices): DomainHandlers<'history'> => {
 export const projectsHandlers = (s: MainServices): DomainHandlers<'projects'> => {
   const org = async () => (await s.runtime.require()).organizer;
   const changed = (r: { changeId: string | null }, projectId: string) => {
-    if (r.changeId !== null) s.emit('library:changed', { kind: 'projects', ids: [projectId] });
+    if (r.changeId !== null) {
+      s.emit('library:changed', { kind: 'projects', ids: [projectId] });
+      void syncLinkedBib(s, projectId);
+    }
   };
   return {
     'projects:list': async (q) => ({ items: await (await org()).listProjects(q) }),

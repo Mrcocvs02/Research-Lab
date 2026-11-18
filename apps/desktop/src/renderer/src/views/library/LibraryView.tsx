@@ -2,15 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Lazy, lazyView } from '../../components/Lazy';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../../components/Button';
+import { AddMenu } from './AddMenu';
 import { EmptyState } from '../../components/EmptyState';
 import { IconLibrary } from '../../components/icons-shell';
-import { IconPlus } from '../../components/icons';
 import { Tabs, tabIds } from '../../components/Tabs';
 import { ErrorNote } from '../../components/ui';
 import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
 import { useChangeVersion } from '../../lib/events';
-import { useInbox } from '../../lib/inbox';
 import { setSearchText, useSearchText } from '../../lib/librarySearch';
 import { takeLibraryIntent } from '../../lib/libraryIntent';
 import { useLocalChoice } from '../../lib/useLocalString';
@@ -56,7 +55,6 @@ function LibraryInner() {
   const { t } = useTranslation();
   const app = useApp();
   const { info } = useNotify();
-  const inbox = useInbox();
   const { status, start, cancel } = useScanStatus();
   const docsVersion = useChangeVersion('documents');
   const text = useSearchText();
@@ -250,11 +248,7 @@ function LibraryInner() {
                     <EmptyState
                       icon={<IconLibrary size={24} />}
                       title={t('library.emptyTitle')}
-                      action={
-                        <Button variant="primary" icon={<IconPlus size={16} />} onClick={() => void inbox.choose()}>
-                          {t('library.addPdf')}
-                        </Button>
-                      }
+                      action={<AddMenu />}
                     >
                       {t('search.emptyLibrary')}
                     </EmptyState>

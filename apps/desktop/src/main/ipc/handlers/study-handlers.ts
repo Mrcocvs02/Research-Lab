@@ -184,7 +184,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
         const file = await rt.store.annotations.update(docId as DocumentId, (current) => {
           const base = current ?? annotationFileSchema.parse({ docId });
           const list = [...base.annotations];
-          const { id, ...fields } = annotation;
+          const { id, geom, ...fields } = annotation;
           if (id !== undefined) {
             const i = list.findIndex((a) => a.id === id);
             const old = list[i];
@@ -197,10 +197,11 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
               rects: fields.rects,
               ...(fields.text !== undefined ? { text: fields.text } : {}),
               ...(fields.color !== undefined ? { color: fields.color } : {}),
-              ...(fields.geom !== undefined ? { geom: fields.geom } : {}),
+              ...(geom === 2 ? { geom } : {}),
               forHash: rec.hash,
               updatedAt: now,
             };
+            if (geom === null) delete saved.geom;
             if (fields.comment === undefined) delete saved.comment;
             else saved.comment = fields.comment;
             list[i] = saved;
@@ -208,7 +209,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
             if (list.length >= STUDY_LIMITS.annotationsPerDoc) {
               throw new AppError('INVALID_REQUEST', 'Too many annotations on this document', { reason: 'annotations-limit', limit: STUDY_LIMITS.annotationsPerDoc });
             }
-            saved = { ...fields, text: fields.text ?? '', color: fields.color ?? 'yellow', forHash: rec.hash, id: `a-${randomUUID().replace(/-/g, '').slice(0, 20)}`, createdAt: now, updatedAt: now } as Annotation;
+            saved = { ...fields, ...(geom === 2 ? { geom } : {}), text: fields.text ?? '', color: fields.color ?? 'yellow', forHash: rec.hash, id: `a-${randomUUID().replace(/-/g, '').slice(0, 20)}`, createdAt: now, updatedAt: now } as Annotation;
             list.push(saved);
           }
           // The file-level hash stays as first written; each annotation carries its own.

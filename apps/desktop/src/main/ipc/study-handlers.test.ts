@@ -258,6 +258,17 @@ describe('annotations', () => {
     expect(fail(await call('annotations:save', { docId: hex(1), annotation: ann({ geom: 1 }) })).code).toBe('INVALID_REQUEST');
   });
 
+  it('clears the geom marker on update with null and ignores null on create', async () => {
+    const call = await harness();
+    const a = ok(await call('annotations:save', { docId: hex(1), annotation: ann({ geom: 2 }) })).annotation;
+    const cleared = ok(await call('annotations:save', { docId: hex(1), annotation: ann({ id: a.id, geom: null }) })).annotation;
+    expect('geom' in cleared).toBe(false);
+    const listed = ok(await call('annotations:list', { docId: hex(1) })).annotations.find((x) => x.id === a.id);
+    expect(listed && 'geom' in listed).toBe(false);
+    const created = ok(await call('annotations:save', { docId: hex(1), annotation: ann({ geom: null }) })).annotation;
+    expect('geom' in created).toBe(false);
+  });
+
   it('creates, updates by id, lists and removes', async () => {
     const call = await harness();
     expect(ok(await call('annotations:list', { docId: hex(1) }))).toEqual({ annotations: [], stale: false, staleIds: [] });

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { centerY, compactOf, findQuote, locateInTextLayer, overlapRatio, pickNearest } from './repair';
+import { centerY, compactOf, findQuote, locateInTextLayer, overlapRatio, pickNearest, undoInputOf } from './repair';
 
 describe('findQuote', () => {
   it('finds one occurrence regardless of spaces, case and a line-end hyphen', () => {
@@ -104,5 +104,15 @@ describe('locateInTextLayer', () => {
     const el = layer(['word word']);
     expect(locateInTextLayer(el, 1, FRAME, 'word', 0.1, 0.02, measure).status).toBe('ambiguous');
     expect(locateInTextLayer(layer(['abc']), 1, FRAME, 'zzz', 0.1, 0.02, measure).status).toBe('none');
+  });
+});
+
+describe('undoInputOf', () => {
+  it('restores the old rectangles and clears geom', () => {
+    const old = { id: 'a-1', kind: 'highlight', page: 2, rects: [{ x: 0.1, y: 0.2, w: 0.3, h: 0.02 }], text: 'quote', color: 'yellow', geom: undefined, createdAt: '', updatedAt: '' } as never;
+    const input = undoInputOf(old);
+    expect(input.geom).toBeNull();
+    expect(input.rects).toEqual([{ x: 0.1, y: 0.2, w: 0.3, h: 0.02 }]);
+    expect(input.id).toBe('a-1');
   });
 });

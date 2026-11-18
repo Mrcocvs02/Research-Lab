@@ -77,6 +77,17 @@
       "empty": "No notes on this document yet.",
       "file": "Whole file",
       "page": "Page {{page}}"
+    },
+    "repair": {
+      "heading": "To check",
+      "hint": "These highlights could not be placed again after a reader fix. Select the text again or keep them as they are.",
+      "reposition": "Reposition",
+      "accept": "Keep as is",
+      "apply": "Move to this selection",
+      "samePage": "Select the text on the same page as the annotation.",
+      "done_one": "{{count}} highlight repositioned after a reader fix",
+      "done_other": "{{count}} highlights repositioned after a reader fix",
+      "undo": "Undo"
     }
   }
 }

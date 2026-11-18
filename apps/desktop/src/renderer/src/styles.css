@@ -241,13 +241,13 @@ button.icon-button {
   grid-column: 2;
   margin-top: 0;
 }
-.radio {
+.rl-radio {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0 var(--space-2);
   margin-bottom: var(--space-3);
 }
-.radio .hint {
+.rl-radio .hint {
   grid-column: 2;
 }
 fieldset {
@@ -386,7 +386,7 @@ legend {
   left: var(--space-2);
   top: var(--space-2);
 }
-.sidebar {
+.app-sidebar {
   grid-area: sidebar;
   display: flex;
   flex-direction: column;
@@ -413,17 +413,17 @@ legend {
 .switcher select {
   margin-bottom: var(--space-1);
 }
-.sidebar nav {
+.app-sidebar nav {
   flex: 1;
   display: flex;
 }
-.sidebar nav ul {
+.app-sidebar nav ul {
   display: flex;
   flex-direction: column;
   gap: 2px;
   flex: 1;
 }
-.sidebar .push-down {
+.app-sidebar .push-down {
   margin-top: auto;
 }
 .nav-item {
@@ -448,7 +448,7 @@ legend {
   overflow-y: auto;
   outline: none;
 }
-.page {
+.view {
   max-width: 860px;
   padding: var(--space-5) var(--space-6) var(--space-6);
 }
@@ -853,7 +853,7 @@ legend {
 .main:has(.library-page) {
   overflow: hidden;
 }
-.page.library-page {
+.view.library-page {
   max-width: none;
   height: 100%;
   display: flex;
@@ -984,7 +984,7 @@ button.toggle.on {
 .tree-item:hover {
   background: var(--surface-2);
 }
-.tree-item.selected {
+.tree-item.is-selected {
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -1018,7 +1018,7 @@ button.toggle.on {
 .tree-toggle {
   padding: 0 4px;
 }
-.swatch {
+.rl-swatch {
   display: inline-block;
   flex: none;
   width: 10px;
@@ -1202,7 +1202,7 @@ button.toggle.on {
 .doc:hover {
   background: var(--surface-2);
 }
-.doc.selected {
+.doc.is-selected {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
@@ -1273,7 +1273,7 @@ button.toggle.on {
   background: var(--surface);
   height: calc(100% - 4px);
 }
-.doc-card.selected {
+.doc-card.is-selected {
   background: var(--accent-soft);
 }
 .doc-card .doc-side {
@@ -1517,7 +1517,7 @@ button.toggle.on {
   border-radius: 50%;
   background: var(--swatch);
 }
-.swatch-button.selected {
+.swatch-button.is-selected {
   outline: 2px solid var(--text);
   outline-offset: 2px;
 }
@@ -1576,7 +1576,7 @@ button.toggle.on {
   place-items: center;
   background: rgb(0 0 0 / 0.4);
 }
-.dialog {
+.rl-dialog {
   width: min(520px, 92vw);
   max-height: 86vh;
   overflow-y: auto;
@@ -1652,7 +1652,7 @@ button.toggle.on {
 }
 
 /* projects */
-.page.projects-page {
+.view.projects-page {
   max-width: 1000px;
 }
 .project-list {
@@ -1749,7 +1749,7 @@ button.toggle.on {
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
-.plan-item.dragging {
+.plan-item.is-dragging {
   opacity: 0.5;
 }
 .plan-item.drop-over {
@@ -1839,7 +1839,7 @@ button.toggle.on {
   margin: 0 0 var(--space-3);
 }
 /* The detail pane needs room: in a narrow window it replaces the folder/tag pane instead of squeezing the list. */
-.page.library-page {
+.view.library-page {
   container-type: inline-size;
 }
 @container (max-width: 1100px) {
@@ -1944,6 +1944,13 @@ button.toggle.on {
 }
 .reader-scroll[hidden] {
   display: none;
+}
+/* pdf.js pages: never narrowed or padded by an app rule (the stretched-page defect, §8.1), and rounded to whole pixels so a fractional devicePixelRatio cannot skew the box. */
+.reader-scroll .pdfViewer .page {
+  max-width: none;
+  padding: 0;
+  --scale-round-x: 1px !important;
+  --scale-round-y: 1px !important;
 }
 .reader-find {
   position: relative;
@@ -2074,7 +2081,7 @@ button.toggle.on {
 .ann-underline {
   border-bottom: 2px solid var(--ann);
 }
-.ann.selected {
+.ann.is-selected {
   outline: 2px solid var(--focus);
 }
 .ann-stale {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { documentIdFromHash } from '../common.js';
 import { dataPath } from '../data-paths.js';
 import { aiFieldSchema } from './ai-field.js';
+import { annotationSchema } from './annotation.js';
 import { documentRecordSchema } from './document.js';
 import { legacyFileRecordSchema, legacyTaxonomySchema } from './legacy-index.js';
 import { logEntrySchema } from './log-entry.js';
@@ -124,5 +125,14 @@ describe('watch seen items', () => {
     const base = { sourceId: 'src-1', externalId: 'W1', firstSeenAt: '2026-11-17T00:00:00.000Z' };
     expect(watchSeenSchema.safeParse({ ...base, publishedOn: '2026-11-03' }).success).toBe(true);
     for (const bad of ['dddd-dd-dd', '2026-1-3', '2026-11-03T00:00:00Z']) expect(watchSeenSchema.safeParse({ ...base, publishedOn: bad }).success).toBe(false);
+  });
+});
+
+describe('annotation geom marker', () => {
+  const base = { id: 'a1', kind: 'highlight', page: 1, rects: [{ x: 0.1, y: 0.1, w: 0.2, h: 0.02 }], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
+  it('accepts geom 2 and no geom, rejects other values', () => {
+    expect(annotationSchema.safeParse({ ...base, geom: 2 }).success).toBe(true);
+    expect(annotationSchema.safeParse(base).success).toBe(true);
+    expect(annotationSchema.safeParse({ ...base, geom: 1 }).success).toBe(false);
   });
 });

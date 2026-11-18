@@ -77,7 +77,7 @@ class Audit {
       // the focus: when the focus was lost, close it with its own close button.
       await this.page.keyboard.press('Escape').catch(() => {});
       for (let i = 0; i < 3; i++) {
-        const close = this.page.locator('.dialog .dialog-head button.icon-button').last();
+        const close = this.page.locator('.rl-dialog .dialog-head button.icon-button').last();
         if (!(await close.isVisible().catch(() => false))) break;
         this.facts[`dialog-left-open-after-${name}`] = true;
         await close.click({ timeout: 2_000 }).catch(() => {});
@@ -335,7 +335,7 @@ function styleProbe() {
     const r = el.getBoundingClientRect();
     return { w: Math.round(r.width), h: Math.round(r.height), borderRadius: s.borderRadius, boxShadow: s.boxShadow.slice(0, 80), padding: s.padding, border: s.border.slice(0, 60), background: s.backgroundColor, inset: `${s.top} ${s.left}`, position: s.position, margin: s.margin };
   };
-  return { sidebar: pick(document.querySelector('.sidebar')), dialog: pick(document.querySelector('.dialog')) };
+  return { sidebar: pick(document.querySelector('.app-sidebar')), dialog: pick(document.querySelector('.rl-dialog')) };
 }
 
 /** Rules of the lazily loaded reader stylesheet (pdf.js' pdf_viewer.css) that hit app elements outside the PDF area,

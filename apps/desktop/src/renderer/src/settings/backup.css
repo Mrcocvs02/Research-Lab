@@ -3,7 +3,7 @@
   display: grid;
   gap: var(--space-3);
 }
-.dialog:has(.backup-dialog) {
+.rl-dialog:has(.backup-dialog) {
   width: min(640px, 94vw);
 }
 .backup-dialog .callout.warn,

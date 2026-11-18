@@ -109,7 +109,7 @@ function NodeEditor({ node, onGone, onSelect }: { node: TaxonomyNodeView; onGone
             <button
               key={c}
               type="button"
-              className={node.color?.toLowerCase() === c ? 'swatch-button selected' : 'swatch-button'}
+              className={node.color?.toLowerCase() === c ? 'swatch-button is-selected' : 'swatch-button'}
               style={{ '--swatch': c } as CSSProperties}
               aria-label={t('tax.colorValue', { color: c })}
               aria-pressed={node.color?.toLowerCase() === c}
@@ -455,7 +455,7 @@ export function TaxonomyManager({ onBack }: { onBack(): void }) {
               const n = model.byId.get(r.id)!;
               return (
                 <>
-                  <span className="swatch" style={n.color ? ({ background: n.color } as CSSProperties) : undefined} aria-hidden="true" />
+                  <span className="rl-swatch" style={n.color ? ({ background: n.color } as CSSProperties) : undefined} aria-hidden="true" />
                   <span className={n.status === 'deprecated' ? 'tree-name deprecated' : 'tree-name'}>{safeText(n.label)}</span>
                   {n.parents.length > 1 && <span className="badge" title={t('tax.multiParent')}>{n.parents.length}↑</span>}
                   <span className="facet-count" title={t('tags.countHint')} data-testid="tax-count">

@@ -152,7 +152,7 @@ export function TagTreePane({ include, exclude, onInclude, onExclude, onManage }
             const off = exclude.includes(i.id);
             return (
               <>
-                <span className="swatch" style={node.color ? ({ background: node.color } as CSSProperties) : undefined} aria-hidden="true" />
+                <span className="rl-swatch" style={node.color ? ({ background: node.color } as CSSProperties) : undefined} aria-hidden="true" />
                 <span className={on ? 'tree-name filter-on' : off ? 'tree-name filter-off' : 'tree-name'}>{safeText(node.label)}</span>
                 <span className="facet-count" title={t('tags.countHint')}>
                   {node.counts.subtree}

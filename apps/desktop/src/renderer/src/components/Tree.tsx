@@ -125,7 +125,7 @@ export function Tree<T extends TreeItem>({ items, selectedKey, onSelect, onToggl
             tabIndex={(index < 0 ? i === 0 : item.key === current) ? 0 : -1}
             data-tree-key={item.key}
             data-key={dataKey?.(item)}
-            className={['tree-item', selected ? 'selected' : '', overKey === item.key ? 'drop-over' : ''].filter(Boolean).join(' ')}
+            className={['tree-item', selected ? 'is-selected' : '', overKey === item.key ? 'drop-over' : ''].filter(Boolean).join(' ')}
             style={{ paddingLeft: 6 + item.depth * 16 }}
             draggable={draggable || undefined}
             onClick={(e) => {

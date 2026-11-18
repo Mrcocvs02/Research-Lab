@@ -163,7 +163,7 @@ export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaL
             {o.kind === 'tag' ? (
               <>
                 <span className="tag-option-main">
-                  <span className="swatch" style={model.byId.get(o.s.id)?.color ? ({ background: model.byId.get(o.s.id)?.color } as CSSProperties) : undefined} aria-hidden="true" />
+                  <span className="rl-swatch" style={model.byId.get(o.s.id)?.color ? ({ background: model.byId.get(o.s.id)?.color } as CSSProperties) : undefined} aria-hidden="true" />
                   {safeText(o.s.label)}
                   {o.s.viaAlias !== undefined && <span className="tag-alias"> {t('tags.viaAlias', { alias: safeText(o.s.viaAlias) })}</span>}
                 </span>

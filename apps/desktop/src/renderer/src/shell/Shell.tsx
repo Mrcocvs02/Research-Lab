@@ -52,7 +52,7 @@ export function Shell({ section, onSection, onNewLibrary, banner, children }: Pr
       <a className="skip-link" href="#main">
         {t('shell.skip')}
       </a>
-      <aside className="sidebar" aria-label={t('shell.sidebar')}>
+      <aside className="app-sidebar" aria-label={t('shell.sidebar')}>
         <div className="brand" data-testid="app-title">
           {t('app.title')}
         </div>

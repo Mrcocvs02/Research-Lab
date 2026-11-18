@@ -24,7 +24,7 @@ export function InboxView({ tab, onTab }: { tab: Tab; onTab(t: Tab): void }) {
   const { t } = useTranslation();
   return (
     <TaxonomyProvider>
-      <div className="page inbox-page" data-testid="section-inbox">
+      <div className="view inbox-page" data-testid="section-inbox">
         <header className="library-head">
           <h1>{t('sections.inbox')}</h1>
         </header>

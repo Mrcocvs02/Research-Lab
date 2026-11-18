@@ -149,14 +149,14 @@ export function ProjectsView() {
 
   if (openId) {
     return (
-      <div className="page projects-page" data-testid="section-projects">
+      <div className="view projects-page" data-testid="section-projects">
         <ProjectDetailView key={openId} id={openId} onBack={() => setOpenId(null)} />
       </div>
     );
   }
 
   return (
-    <div className="page projects-page" data-testid="section-projects">
+    <div className="view projects-page" data-testid="section-projects">
       <header className="library-head">
         <h1>{t('sections.projects')}</h1>
         <HistoryControls />

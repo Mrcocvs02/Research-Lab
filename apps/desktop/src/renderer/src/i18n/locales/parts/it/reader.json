@@ -77,6 +77,17 @@
       "empty": "Ancora nessuna nota su questo documento.",
       "file": "Intero file",
       "page": "Pagina {{page}}"
+    },
+    "repair": {
+      "heading": "Da controllare",
+      "hint": "Queste evidenziazioni non si sono potute riposizionare dopo una correzione del lettore. Riseleziona il testo oppure lasciale come sono.",
+      "reposition": "Riposiziona",
+      "accept": "Va bene così",
+      "apply": "Sposta su questa selezione",
+      "samePage": "Seleziona il testo nella stessa pagina dell'annotazione.",
+      "done_one": "{{count}} evidenziazione riposizionata dopo una correzione del lettore",
+      "done_other": "{{count}} evidenziazioni riposizionate dopo una correzione del lettore",
+      "undo": "Annulla"
     }
   }
 }

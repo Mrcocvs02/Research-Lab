@@ -19,7 +19,7 @@ const ShortcutsSection = lazyView(() => import('./ShortcutsSection').then((m) =>
 export function Settings({ onNewLibrary }: { onNewLibrary: () => void }) {
   const { t } = useTranslation();
   return (
-    <div className="page" data-testid="settings-page">
+    <div className="view" data-testid="settings-page">
       <h1>{t('sections.settings')}</h1>
       <ProfileSection />
       <LibrariesSection onNew={onNewLibrary} />

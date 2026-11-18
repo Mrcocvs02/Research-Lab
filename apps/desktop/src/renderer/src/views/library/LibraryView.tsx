@@ -137,7 +137,7 @@ function LibraryInner() {
   }, [info, t]);
 
   return (
-    <div className="page library-page" data-testid="section-library">
+    <div className="view library-page" data-testid="section-library">
       <header className="library-head">
         <h1>{t('sections.library')}</h1>
         <div className="search-bar" role="search">

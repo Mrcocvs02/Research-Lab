@@ -1945,6 +1945,13 @@ button.toggle.on {
 .reader-scroll[hidden] {
   display: none;
 }
+/* pdf.js pages: never narrowed or padded by an app rule (the stretched-page defect, §8.1), and rounded to whole pixels so a fractional devicePixelRatio cannot skew the box. */
+.reader-scroll .pdfViewer .page {
+  max-width: none;
+  padding: 0;
+  --scale-round-x: 1px !important;
+  --scale-round-y: 1px !important;
+}
 .reader-find {
   position: relative;
   z-index: 5;

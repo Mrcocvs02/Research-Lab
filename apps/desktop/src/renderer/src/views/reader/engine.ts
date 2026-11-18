@@ -1,5 +1,5 @@
 import { loadPdfjs, pdfDocumentParams } from '../../lib/pdfjs';
-import 'pdfjs-dist/web/pdf_viewer.css';
+import './pdfjs-viewer.css';
 import { readFindMatch, readRange, type SelectionRead } from './selection';
 
 export type { SelectionPiece, SelectionRead } from './selection';

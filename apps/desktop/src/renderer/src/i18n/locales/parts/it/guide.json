@@ -7,31 +7,43 @@
     "tasks": {
       "addDocs": {
         "title": "Aggiungere documenti",
-        "body": "Trascina nella finestra file PDF o una cartella, oppure usa Aggiungi PDF nella Libreria o in Da rivedere (Alt+2). L'app legge titoli e metadati, li archivia nella libreria e ti mostra ciò che ha trovato da confermare. Il chip Attività, in alto a destra, segue la scansione: Vedi il rapporto elenca file nuovi, cambiati, spostati e mancanti. I tuoi originali non vengono mai modificati."
+        "body": "Trascina nella finestra file PDF o una cartella, oppure usa Aggiungi PDF nella Libreria o in Da rivedere (Alt+2): ogni file trascinato o scelto da fuori viene copiato nella cartella della libreria che confermi. I file già dentro le cartelle della libreria li trova la scansione. Il chip Attività, in alto a destra, segue la scansione: Vedi il rapporto elenca file nuovi, cambiati, spostati e mancanti. Research Lab non sposta, non rinomina e non cancella i tuoi file."
+      },
+      "review": {
+        "title": "Controllare in Da rivedere",
+        "body": "Da rivedere (Alt+2) ha due schede. Nuovi file: i file trascinati o trovati dalla scansione. Per ognuno controlli i dati trovati (online, da DOI o arXiv, oppure letti dal file), la cartella e i tag; Conferma lo aggiunge alla libreria, Ignora lo dimentica senza toccare l'originale. Segna tutti come visti chiude in blocco i file trovati dalla scansione. Una copia in conflitto nasce da una sincronizzazione tra computer e di solito si ignora. I chip Modello e Ragionamento scelgono come Claude propone i tag dei file nuovi. Proposte di Claude: per ogni documento e campo accetti (✓) o rifiuti (✗) la proposta, o la modifichi; nulla cambia finché non accetti, e Accettate finora ti dice quante proposte hai accettato."
       },
       "tags": {
         "title": "Organizzare con tag e progetti",
-        "body": "Nella Libreria seleziona dei documenti (con la casella a sinistra di ogni riga): la barra al posto dei filtri offre Tag, Progetto e Claude. I tag si gestiscono da Gestisci tag, nel menu ⋯ della Libreria. Ogni modifica si può annullare con Annulla, in alto, o con Ctrl+Z; Ripeti è Ctrl+Y, nella Cronologia e nella tavolozza dei comandi. La casella di ricerca in alto trova testo, titoli e autori (? mostra la sintassi); il pulsante con la scintilla cerca con Claude."
+        "body": "Nella Libreria seleziona dei documenti (con la casella a sinistra di ogni riga): la barra al posto dei filtri offre Tag, Progetto e Claude. I tag si gestiscono da Gestisci tag, nel menu ⋯ della Libreria. Ogni modifica si può annullare con Annulla, in alto, o con Ctrl+Z; Ripeti è Ctrl+Y, nella Cronologia e nella tavolozza dei comandi. La casella di ricerca in alto (Ctrl+L) trova testo, titoli e autori (? mostra la sintassi); il pulsante con la scintilla cerca con Claude."
       },
       "read": {
         "title": "Leggere e annotare",
-        "body": "Fai doppio clic su un documento (o premi Invio) per aprirlo nel lettore; Maiusc+Invio ne apre la scheda. Seleziona il testo per evidenziarlo, sottolinearlo e aggiungere una nota. Note, evidenziazioni e citazioni sono salvate nella cartella della libreria e viaggiano con essa. Per ora le evidenziazioni restano solo nell'app: la scrittura dentro i PDF non è ancora attiva. Gli strumenti del lettore usano tasti singoli. Al primo avvio dopo l'aggiornamento Research Lab ricontrolla in background le evidenziazioni salvate storte, senza aprire i documenti; quelle che non riesce a posizionare restano nel gruppo Da controllare del lettore."
+        "body": "Fai doppio clic su un documento (o premi Invio) per aprirlo nel lettore; Maiusc+Invio ne apre la scheda e Ctrl+Invio il programma predefinito. In alto, nel lettore, c'è una sola barra: prima scegli lo strumento (Seleziona, Evidenzia, Sottolinea, Gomma; Ritaglia arriverà in una versione successiva), poi agisci sul testo. Spazio passa dallo strumento in uso al precedente; i tasti da 1 a 5 cambiano colore. La Gomma elimina al passaggio, ma se tocca più di 3 annotazioni chiede conferma. Mentre leggi la barra laterale si riduce, per lasciare spazio alla pagina; Esc non chiude il lettore (per chiuderlo: Alt+← o Ctrl+W). Note, evidenziazioni e citazioni sono salvate nella cartella della libreria e viaggiano con essa. Per ora le evidenziazioni restano solo nell'app: nel menu Studio il PDF risulta «Solo nell'app» perché la scrittura dentro i PDF non è ancora attiva. Quando lo sarà, si aggiungeranno al PDF solo se lo scegli e potrai toglierle. Al primo avvio dopo l'aggiornamento Research Lab ricontrolla in background le evidenziazioni salvate storte, senza aprire i documenti; quelle che non riesce a posizionare restano nel gruppo Da controllare del lettore."
       },
       "chat": {
         "title": "Chiedere a Claude",
-        "body": "Apri Claude dalla barra laterale (Ctrl+J) e usa la tavolozza dei comandi per le richieste già pronte. Claude vede solo i documenti delle cartelle che hai abilitato, e prima di inviare puoi vedere in anteprima che cosa viene inviato. Puoi scegliere se usare l'accesso di Claude Code o una chiave API. Prova la connessione costa circa 0,001 $ e non invia documenti. Cambia account apre una finestra di Claude Code; poi torna qui e premi Ho finito, verifica. Uscire da Claude Code vale anche nel terminale."
+        "body": "Apri Claude dalla barra laterale (Ctrl+J) e usa la tavolozza dei comandi (Ctrl+K) per le richieste già pronte. Claude vede solo i documenti delle cartelle che hai abilitato. Al primo invio di una conversazione vedi in anteprima che cosa viene inviato e confermi; dopo, sopra il campo resta una riga con ciò che partirà e Invia è la conferma. Se aggiungi un documento nuovo, o cambi modello, la conferma torna. Mentre risponde, Claude mostra gli strumenti che usa (per esempio Ricerca nella libreria), con i dettagli tecnici chiusi. Per più documenti insieme: seleziona i documenti e scegli Proponi con Claude…; scegli i campi, il modello e il ragionamento, guarda la stima e conferma. Le proposte arrivano in Da rivedere. Puoi usare l'accesso di Claude Code o una chiave API (Impostazioni › Claude). Prova la connessione costa circa 0,001 $ e non invia documenti. Cambia account apre una finestra di Claude Code; poi torna qui e premi Ho finito, verifica."
+      },
+      "projects": {
+        "title": "Lavorare per progetti",
+        "body": "Un progetto raccoglie documenti di qualsiasi cartella, con note e un piano di lettura. Creane uno da Progetti (Alt+3); aggiungi i documenti dalla Libreria con Progetto, nella barra di selezione. Nel progetto cambi lo stato di studio di ogni documento (da leggere, in lettura, letto)."
+      },
+      "discover": {
+        "title": "Scoprire altre opere",
+        "body": "Scopri (Alt+4) propone opere collegate alla tua libreria. Da leggere dopo elenca le opere citate da più dei tuoi documenti che non hai ancora: è calcolato su questo computer, senza AI e senza rete. Novità cerca opere nuove nelle fonti che segui e Pubblicati cerca le versioni pubblicate dei tuoi preprint. Nulla viene controllato in background: i controlli partono quando li chiedi, e non cambia nulla finché non confermi."
       },
       "network": {
         "title": "Esplorare la mappa",
-        "body": "La sezione Mappa (Alt+5) disegna documenti, autori e temi come mappa e come grafo, così trovi gruppi e lavori collegati. Si costruisce dalla tua libreria e si ricostruisce quando serve."
+        "body": "La sezione Mappa (Alt+5) mostra la libreria in quattro modi: Panorama, Collegamenti, Esplora e Vicini inattesi. Documenti, tag, argomenti e autori diventano nodi e collegamenti, così trovi gruppi e lavori vicini. Si costruisce dalla tua libreria e si ricostruisce quando serve; servono almeno 3 documenti."
       },
       "export": {
         "title": "Esportare e collegare altri strumenti",
-        "body": "Esporta un progetto o una selezione come secondo cervello (note con collegamenti) dalla tavolozza dei comandi. Nelle impostazioni puoi anche avviare un server MCP locale perché altri strumenti leggano la tua libreria."
+        "body": "Esporta un progetto o una selezione come secondo cervello (note con collegamenti) dalla tavolozza dei comandi o dal progetto. Scegli la cartella di destinazione, il nome e le opzioni, controlla la stima e premi Esporta. I documenti di cartelle non abilitate a Claude si esportano solo dopo una tua conferma. L'esportazione è locale e non invia nulla. In Impostazioni › Avanzate puoi anche avviare un server MCP locale perché altri strumenti, come Claude Code, leggano la tua libreria."
       },
       "backup": {
         "title": "Fare il backup della libreria",
-        "body": "Nelle impostazioni scegli una cartella di destinazione e premi Esegui il backup ora, oppure attiva il backup automatico. Un backup si può verificare e ripristinare come nuova libreria in qualsiasi momento. I segreti come le chiavi API non vengono mai salvati in un backup. Le impostazioni si salvano da sole: cercale dalla casella in alto a sinistra (Ctrl+,). Le opzioni tecniche sono in Sviluppatore / Avanzate. La prima volta l'app parte nella lingua del sistema (italiano o inglese); le librerie si gestiscono con Gestisci le librerie…"
+        "body": "Nelle impostazioni (Ctrl+,) scegli una cartella di destinazione e premi Esegui il backup ora, oppure attiva il backup automatico. Un backup si può verificare e ripristinare come nuova libreria in qualsiasi momento. I segreti come le chiavi API non vengono mai salvati in un backup. Le impostazioni si salvano da sole: cercale dalla casella in alto a sinistra. Le opzioni tecniche sono in Avanzate. La prima volta l'app parte nella lingua del sistema (italiano o inglese); le librerie si gestiscono con Gestisci librerie…"
       }
     },
     "welcome": {

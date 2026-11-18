@@ -9,7 +9,7 @@
       "synonyms": "Synonyms"
     },
     "dialog": {
-      "title": "Propose with AI",
+      "title": "Suggest with Claude",
       "intro_one": "Claude will propose values for {{count}} document. Nothing is applied until you review it.",
       "intro_other": "Claude will propose values for {{count}} documents. Nothing is applied until you review it.",
       "fields": "What to propose",

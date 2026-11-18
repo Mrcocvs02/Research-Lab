@@ -9,7 +9,7 @@
       "synonyms": "Sinonimi"
     },
     "dialog": {
-      "title": "Proponi con l’AI",
+      "title": "Proponi con Claude",
       "intro_one": "Claude proporrà dei valori per {{count}} documento. Nulla viene applicato finché non lo riesamini.",
       "intro_other": "Claude proporrà dei valori per {{count}} documenti. Nulla viene applicato finché non li riesamini.",
       "fields": "Cosa proporre",

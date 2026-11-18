@@ -113,7 +113,7 @@ test('shell with a library: sidebar order and Alt+1..5, Back/Forward, Activity c
   const before = await stored();
   await w.keyboard.press('Control+k');
   await w.getByTestId('palette-input').fill(before === 'en' ? 'Italiano' : 'English');
-  await w.getByTestId('palette-item').first().click();
+  await w.locator('[data-testid="palette-item"][data-command="app-switchLanguage"]').click();
   // The UI updates before settings:set is persisted, so poll the stored value instead of reading it once.
   await expect.poll(stored, { timeout: 10_000 }).toBe(before === 'en' ? 'it' : 'en');
   await expect(w.getByTestId('nav-library')).toHaveAccessibleName(before === 'en' ? 'Libreria' : 'Library');

@@ -1,7 +1,7 @@
 import { _electron as electron, expect, test } from '@playwright/test';
 import { DESKTOP_DIR, launchApp, type LaunchedApp } from './helpers/launch';
 import { createLibraryViaWizard, skipUnlessChannels, waitForScan } from './helpers/phase1';
-import { enableAiFolder, waitClaudeReady } from './helpers/settings';
+import { enableAiFolder, openSettings, waitClaudeReady } from './helpers/settings';
 import { clickRow } from './helpers/ui';
 
 /**
@@ -85,7 +85,9 @@ test('enable a folder, preview and confirm, streamed answer with card and chip, 
     await window.getByTestId('reader-close').click();
 
     // The log viewer lists the send, with the confirmed document.
-    await window.getByTestId('nav-settings').click();
+    await openSettings(window, 'claude');
+    const fold = window.getByTestId('settings-fold-aiLog');
+    if ((await fold.getAttribute('open')) === null) await fold.locator('summary').click();
     await expect(window.getByTestId('log-row').first()).toBeVisible({ timeout: 30_000 });
 
     // 5. Restart on the same data: the conversation is in the history.

@@ -1,22 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ErrorBoundary, Lazy, lazyView } from './components/Lazy';
-import { NoticeBanner } from './components/NoticeBanner';
 import { ErrorNote } from './components/ui';
 import { errorMessage } from './lib/errors';
 import { installWindowGuard } from './lib/dirtyEditors';
 import { AiUiProvider, useAiUi } from './lib/aiUi';
 import { LibraryEventsProvider } from './lib/events';
 import { KeymapProvider } from './lib/keymap';
+import { NavProvider, useNav } from './lib/nav';
 import { CitationJobsProvider } from './lib/citationJobs';
 import { HistoryProvider } from './lib/history';
-import { InboxProvider } from './lib/inbox';
+import { InboxProvider, useInbox } from './lib/inbox';
 import { JobsProvider } from './lib/jobs';
 import { NotifyProvider } from './lib/notify';
 import { ReaderProvider, useReader } from './lib/reader';
 import { WatchProvider } from './lib/watch';
 import { LibraryView } from './views/library/LibraryView';
 import { Shell, type SectionId } from './shell/Shell';
+import { useReviewDocs } from './shell/useReviewDocs';
 import { AppProvider, useApp } from './state/app-context';
 
 // Only the Library view is part of the first screen; the others load when they are opened (docs/RULES.md, lightness).
@@ -36,6 +37,7 @@ export function App() {
     <ErrorBoundary>
       <AppProvider>
         <KeymapProvider>
+        <NavProvider>
         <LibraryEventsProvider>
           <NotifyProvider>
             <HistoryProvider>
@@ -55,6 +57,7 @@ export function App() {
             </HistoryProvider>
           </NotifyProvider>
         </LibraryEventsProvider>
+        </NavProvider>
         </KeymapProvider>
       </AppProvider>
     </ErrorBoundary>
@@ -64,36 +67,73 @@ export function App() {
 function Root() {
   const { t } = useTranslation();
   const app = useApp();
-  const [section, setSection] = useState<SectionId>('library');
+  const nav = useNav();
   const [wizardOpen, setWizardOpen] = useState(false);
   const reader = useReader();
   const { navigation } = useAiUi();
-  const [inboxTab, setInboxTab] = useState<'arrivals' | 'proposals'>('arrivals');
-  // A document id belongs to one library: the reader does not outlive a switch. The unsaved notes were already saved
-  // before the switch (`setActiveLibrary`, the library list, the wizard), so by now there is nothing left to wait for.
+  const inbox = useInbox();
+  const proposals = useReviewDocs();
+  // A document id belongs to one library: the reader does not outlive a switch, and the places of the history either.
+  // The unsaved notes were already saved before the switch (`setActiveLibrary`, the library list, the wizard), so by now
+  // there is nothing left to wait for.
   const libraryId = app.activeLibraryId;
-  const { closeReader, dropReader } = reader;
-  useEffect(() => dropReader(), [libraryId, dropReader]);
-  // A link of the chat to a project or to the settings, and a document opened from anywhere (the chat, say), show their section.
+  const { closeReader, dropReader, openReader } = reader;
+  const { navigate, reset } = nav;
+  const first = useRef(true);
+  useEffect(() => {
+    dropReader();
+    if (first.current) first.current = false;
+    else reset();
+  }, [libraryId, dropReader, reset]);
+
+  // "To review" opens on the tab that has something to decide: new files first.
+  const reviewTab = inbox.count > 0 || proposals === 0 ? 'files' : 'proposals';
+  const section = nav.view;
+  const go = (v: SectionId) => navigate(v === 'review' ? { view: 'review', tab: reviewTab } : { view: v });
+
+  // A link of the chat to a project or to the settings, and a request of the palette or a shortcut, move the window here.
   const navNonce = navigation?.nonce;
   useEffect(() => {
     if (!navigation) return;
-    closeReader();
     if (navigation.to === 'newLibrary') {
       setWizardOpen(true);
       return;
     }
-    if (navigation.to === 'inbox' || navigation.to === 'review') setInboxTab(navigation.to === 'review' ? 'proposals' : 'arrivals');
-    setSection(navigation.to === 'settings' ? 'settings' : navigation.to === 'project' || navigation.to === 'projects' ? 'projects' : navigation.to === 'library' ? 'library' : navigation.to === 'network' ? 'network' : navigation.to === 'discover' ? 'discover' : 'inbox');
+    const to = navigation.to;
+    navigate(
+      to === 'settings'
+        ? { view: 'settings' }
+        : to === 'project' || to === 'projects'
+          ? { view: 'projects', ...(navigation.projectId ? { projectId: navigation.projectId } : {}) }
+          : to === 'network' || to === 'map'
+            ? { view: 'map' }
+            : to === 'discover'
+              ? { view: 'discover' }
+              : to === 'library'
+                ? { view: 'library' }
+                : { view: 'review', tab: to === 'inbox' ? 'files' : (navigation.tab ?? reviewTab) },
+    );
     // The focus target exists once the view is drawn.
     if (navigation.focus === 'search') setTimeout(() => document.querySelector<HTMLInputElement>('[data-testid="search-input"]')?.focus(), 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navNonce]);
+
+  // The reader and the history. A document opened from anywhere is a place (`reader`); Back and Forward reopen or close the
+  // reader to match the place they land on. Only a change of place moves the reader, so opening it never closes it.
   const readerNonce = reader.target?.nonce;
   useEffect(() => {
-    if (reader.target) setSection('library');
+    const target = reader.target;
+    if (target) navigate({ view: 'reader', docId: target.docId, ...(target.page !== undefined ? { page: target.page } : {}) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readerNonce]);
+  const placeKey = JSON.stringify(nav.loc);
+  useEffect(() => {
+    const loc = nav.loc;
+    if (loc.view === 'reader' && loc.docId) {
+      if (reader.target?.docId !== loc.docId) openReader(loc.docId, loc.page);
+    } else if (reader.target) closeReader();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeKey]);
   // Closing the window waits for unsaved notes (only while there are any).
   useEffect(() => installWindowGuard(), []);
 
@@ -121,7 +161,7 @@ function Root() {
   const finished = async () => {
     await app.refresh();
     setWizardOpen(false);
-    setSection('library');
+    navigate({ view: 'library' });
   };
 
   const showWelcome = hasLibraries && !showWizard && app.settings !== null && app.settings.firstRunDone && !app.settings.guide?.welcomeSeen;
@@ -129,14 +169,11 @@ function Root() {
 
   return (
     <>
-      <NoticeBanner />
       <Shell
         section={section}
-        onSection={(s) => {
-          closeReader();
-          setSection(s);
-        }}
+        onSection={go}
         onNewLibrary={() => setWizardOpen(true)}
+        reviewDocs={proposals}
         banner={
           showWelcome && !wizardOpen ? (
             <Lazy>
@@ -157,17 +194,17 @@ function Root() {
           <ProjectsView key={app.activeProfile.id} />
         ) : section === 'discover' && app.activeProfile && !showWizard ? (
           <DiscoverView key={app.activeProfile.id} />
-        ) : section === 'network' && app.activeProfile && !showWizard ? (
+        ) : section === 'map' && app.activeProfile && !showWizard ? (
           <NetworkView key={app.activeProfile.id} />
-        ) : section === 'inbox' && app.activeProfile && !showWizard ? (
-          <InboxView key={app.activeProfile.id} tab={inboxTab} onTab={setInboxTab} />
+        ) : section === 'review' && app.activeProfile && !showWizard ? (
+          <InboxView key={app.activeProfile.id} tab={nav.loc.tab === 'proposals' ? 'proposals' : 'arrivals'} onTab={(tab) => navigate({ view: 'review', tab: tab === 'proposals' ? 'proposals' : 'files' }, { replace: true })} />
         ) : (
           <Placeholder section={section} />
         )}
         </Lazy>
         {readerOpen && reader.target && (
           <Lazy>
-            <ReaderView key={reader.target.docId} target={reader.target} onClose={closeReader} />
+            <ReaderView key={reader.target.docId} target={reader.target} onClose={() => navigate({ view: 'library' })} />
           </Lazy>
         )}
       </Shell>
@@ -186,7 +223,7 @@ function Placeholder({ section }: { section: Exclude<SectionId, 'settings'> }) {
   return (
     <div className="view" data-testid={`section-${section}`}>
       <h1>{t(`sections.${section}`)}</h1>
-      {section === 'library' && !app.activeProfile ? <p data-testid="shell-empty">{t('shell.empty')}</p> : <p>{t(`placeholders.${section}`)}</p>}
+      {section === 'library' && !app.activeProfile ? <p data-testid="shell-empty">{t('shell.empty')}</p> : <p>{t(`placeholders.${section === 'review' ? 'inbox' : section === 'map' ? 'network' : section}`)}</p>}
       {section === 'library' && app.activeProfile && (
         <p className="callout" data-testid="active-library-note">
           {t('placeholders.libraryActive', { name: app.activeProfile.name })}

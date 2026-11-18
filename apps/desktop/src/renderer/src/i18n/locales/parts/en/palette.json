@@ -1,6 +1,6 @@
 {
   "chat": {
-    "paletteSearch": "Search commands",
+    "paletteSearch": "Search for a command or a document",
     "paletteCustom": "yours",
     "paletteNone": "No command matches.",
     "paletteHint": "Choosing a command fills the message box. Nothing is sent until you press Send.",
@@ -46,14 +46,8 @@
       "goProjects": {
         "label": "Go to Projects"
       },
-      "goNetwork": {
-        "label": "Go to Network"
-      },
-      "goInbox": {
-        "label": "Go to Inbox"
-      },
       "goReview": {
-        "label": "Go to AI proposals to review"
+        "label": "Go to To review"
       },
       "goSettings": {
         "label": "Open settings"
@@ -62,7 +56,7 @@
         "label": "New library…"
       },
       "backupNow": {
-        "label": "Back up now"
+        "label": "Run a backup now"
       },
       "openGuide": {
         "label": "Open the guide"
@@ -72,7 +66,39 @@
       },
       "switchLanguage": {
         "label": "Switch language to {{language}}"
+      },
+      "goDiscover": {
+        "label": "Go to Discover"
+      },
+      "goMap": {
+        "label": "Go to Map"
+      },
+      "openActivity": {
+        "label": "Open Activity"
+      },
+      "scanNow": {
+        "label": "Scan now"
+      },
+      "addPdf": {
+        "label": "Add PDF…"
+      },
+      "undo": {
+        "label": "Undo the last change"
+      },
+      "redo": {
+        "label": "Redo the undone change"
+      },
+      "theme": {
+        "label": "Change theme (light or dark)"
       }
-    }
+    },
+    "paletteGroups": {
+      "recent": "Recent",
+      "docs": "Documents",
+      "goto": "Go to",
+      "actions": "Actions",
+      "claude": "Ask Claude"
+    },
+    "paletteNoLibrary": "Open a library first"
   }
 }

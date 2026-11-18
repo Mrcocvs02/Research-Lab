@@ -26,7 +26,10 @@ export interface SearchRequest {
   nonce: number;
 }
 export interface Navigation {
-  to: 'settings' | 'project' | 'inbox' | 'review' | 'library' | 'projects' | 'network' | 'discover' | 'newLibrary';
+  /** `inbox` (new files) and `network` are the old names of `review` (files tab) and `map`, still accepted. */
+  to: 'settings' | 'project' | 'inbox' | 'review' | 'library' | 'projects' | 'network' | 'map' | 'discover' | 'newLibrary';
+  /** `review`: the tab to show; without it the window picks the one that has something to decide. */
+  tab?: 'files' | 'proposals';
   projectId?: string;
   /** Where to put the focus once the view is shown (`search`: the library search box; `backup`: the backup section of the settings). */
   focus?: 'search' | 'backup';
@@ -77,7 +80,10 @@ interface AiUiValue {
   openInbox(): void;
   openReview(): void;
   /** Any view, optionally with a focus target or an action to start (palette, shortcuts). */
-  goTo(to: Navigation['to'], extra?: Pick<Navigation, 'focus' | 'run'>): void;
+  goTo(to: Navigation['to'], extra?: Pick<Navigation, 'focus' | 'run' | 'tab'>): void;
+  /** The Activity popover of the top bar (scan, AI jobs, citations...), opened by its chip, the palette or a toast. */
+  activityOpen: boolean;
+  setActivityOpen(open: boolean): void;
   /** The in-app guide (F1) or the list of shortcuts (Ctrl+/), a lazy dialog in the Shell; null when closed. */
   guide: GuideKind | null;
   openGuide(kind?: GuideKind): void;
@@ -110,6 +116,8 @@ const NONE: AiUiValue = {
   openInbox() {},
   openReview() {},
   goTo() {},
+  activityOpen: false,
+  setActivityOpen() {},
   guide: null,
   openGuide() {},
   closeGuide() {},
@@ -131,6 +139,7 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   const [prefill, setPrefill] = useState<AiUiValue['prefill']>(null);
   const [searchRequest, setSearchRequest] = useState<SearchRequest | null>(null);
   const [navigation, setNavigation] = useState<Navigation | null>(null);
+  const [activityOpen, setActivityOpen] = useState(false);
   const [guide, setGuide] = useState<GuideKind | null>(null);
   const openGuide = useCallback((kind: GuideKind = 'guide') => setGuide(kind), []);
   const closeGuide = useCallback(() => setGuide(null), []);
@@ -153,7 +162,7 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   const openSettings = useCallback(() => setNavigation((cur) => ({ to: 'settings', nonce: (cur?.nonce ?? 0) + 1 })), []);
 
   const openInbox = useCallback(() => setNavigation((cur) => ({ to: 'inbox', nonce: (cur?.nonce ?? 0) + 1 })), []);
-  const openReview = useCallback(() => setNavigation((cur) => ({ to: 'review', nonce: (cur?.nonce ?? 0) + 1 })), []);
+  const openReview = useCallback(() => setNavigation((cur) => ({ to: 'review', tab: 'proposals', nonce: (cur?.nonce ?? 0) + 1 })), []);
 
   const goTo = useCallback<AiUiValue['goTo']>((to, extra = {}) => setNavigation((cur) => ({ to, ...extra, nonce: (cur?.nonce ?? 0) + 1 })), []);
 
@@ -161,9 +170,8 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   useShortcut('palette.open', () => setPaletteOpen(true));
   useShortcut('search.focus', () => goTo('library', { focus: 'search' }));
   useShortcut('nav.library', () => goTo('library'));
-  // TODO(A2): the shell is rebuilt with the new sidebar order; until then the new ids reach the old views.
   useShortcut('nav.projects', () => goTo('projects'));
-  useShortcut('nav.map', () => goTo('network'));
+  useShortcut('nav.map', () => goTo('map'));
   useShortcut('nav.discover', () => goTo('discover'));
   useShortcut('nav.review', () => goTo('review'));
   useShortcut('nav.settings', () => goTo('settings'));
@@ -171,8 +179,8 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   useShortcut('shortcuts.show', () => openGuide('shortcuts'), { inModal: true });
 
   const value = useMemo(
-    () => ({ chatOpen, setChatOpen, paletteOpen, setPaletteOpen, selection, publishSelection, chatBusy, setChatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview, goTo, guide, openGuide, closeGuide, exportInit, openExport, closeExport }),
-    [chatOpen, setChatOpen, paletteOpen, selection, publishSelection, chatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview, goTo, guide, openGuide, closeGuide, exportInit, openExport, closeExport],
+    () => ({ chatOpen, setChatOpen, paletteOpen, setPaletteOpen, selection, publishSelection, chatBusy, setChatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview, goTo, activityOpen, setActivityOpen, guide, openGuide, closeGuide, exportInit, openExport, closeExport }),
+    [chatOpen, setChatOpen, paletteOpen, selection, publishSelection, chatBusy, reader, publishReader, prefill, fillPrompt, searchRequest, startSearch, takeSearch, navigation, openProject, openSettings, openInbox, openReview, goTo, activityOpen, setActivityOpen, guide, openGuide, closeGuide, exportInit, openExport, closeExport],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

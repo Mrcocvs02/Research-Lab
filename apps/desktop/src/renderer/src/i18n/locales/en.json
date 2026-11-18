@@ -79,10 +79,12 @@
   "sections": {
     "library": "Library",
     "projects": "Projects",
-    "network": "Network",
-    "inbox": "Inbox",
+    "network": "Map",
+    "inbox": "To review",
     "settings": "Settings",
-    "discover": "Discover"
+    "discover": "Discover",
+    "review": "To review",
+    "map": "Map"
   },
   "placeholders": {
     "library": "Browse and search your documents here. This section arrives in a later phase.",
@@ -99,10 +101,29 @@
     "activeLibrary": "Active library",
     "noLibrary": "No library",
     "language": "Interface language",
-    "empty": "No library is open. Create one to get started."
+    "empty": "No library is open. Create one to get started.",
+    "expand": "Expand the sidebar",
+    "collapse": "Collapse the sidebar",
+    "help": "Help",
+    "documents_one": "{{count}} document",
+    "documents_other": "{{count}} documents",
+    "manageLibraries": "Manage libraries…",
+    "badgeFiles_one": "{{count}} new file",
+    "badgeFiles_other": "{{count}} new files",
+    "badgeDocs_one": "Claude's proposals for {{count}} document",
+    "badgeDocs_other": "Claude's proposals for {{count}} documents",
+    "back": "Back",
+    "forward": "Forward",
+    "nothingBack": "there is no earlier page",
+    "nothingForward": "there is no later page",
+    "crumbs": "Path",
+    "crumbReader": "Reader",
+    "crumbFiles": "New files",
+    "crumbProposals": "Claude's proposals",
+    "searchLibrary": "Search the library…"
   },
   "chat": {
-    "title": "Chat",
+    "title": "Claude",
     "collapse": "Collapse chat panel",
     "expand": "Expand chat panel",
     "loading": "Loading the chat…",
@@ -289,7 +310,13 @@
     "redone": "Redone: {{summary}}",
     "nothingToUndo": "There is nothing to undo.",
     "nothingToRedo": "There is nothing to redo.",
-    "partialRefused": "This change cannot be undone: the log is very large and only part of it could be read, so the change may be incomplete."
+    "partialRefused": "This change cannot be undone: the log is very large and only part of it could be read, so the change may be incomplete.",
+    "actions": {
+      "tags_update": "Tags changed on {{documents}} documents",
+      "taxonomy_update": "Taxonomy changed ({{tags}} items)",
+      "document_fields": "Document details edited",
+      "project_update": "Project changed"
+    }
   },
   "docs": {
     "sizeTitle": "{{bytes}} bytes",
@@ -412,7 +439,7 @@
     "bulk": "Refresh citations",
     "bulkHint": "Fetches references and citing works of the selected documents from the online sources.",
     "tooMany": "At most {{limit}} documents can be refreshed at once; {{n}} are selected.",
-    "started": "Citation refresh started. Follow it in the status bar.",
+    "started": "Citation refresh started.",
     "alreadyRunning": "A citation refresh is already running. Wait for it to end or cancel it first.",
     "job": {
       "label": "Citations refresh",
@@ -432,5 +459,12 @@
     "button": "Export second brain…",
     "clusterButton": "Export",
     "clusterAria": "Export the cluster “{{name}}” as a second brain"
+  },
+  "activity": {
+    "title": "Activity",
+    "idle": "Nothing running",
+    "attention_one": "{{count}} to check",
+    "attention_other": "{{count}} to check",
+    "see": "See in Activity"
   }
 }

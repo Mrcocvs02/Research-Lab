@@ -7,11 +7,11 @@
     "tasks": {
       "addDocs": {
         "title": "Add documents",
-        "body": "Open the Arrivals section and drop PDF files or a folder into the window, or choose them with the button. The app reads titles and metadata, files them in your library and shows what it found for you to confirm. Your originals are never changed."
+        "body": "Drop PDF files or a folder into the window, or use Add PDF in To review (Alt+2). The app reads titles and metadata, files them in your library and shows what it found for you to confirm. Your originals are never changed."
       },
       "tags": {
         "title": "Organize with tags and projects",
-        "body": "Select documents in the Library and give them tags from your taxonomy, or add them to a project. You can undo any change with Undo. The search box finds text, titles and authors; the advanced search can also ask Claude."
+        "body": "Select documents in the Library and give them tags from your taxonomy, or add them to a project. You can undo any change with Undo, in the top bar. The search box finds text, titles and authors; the advanced search can also ask Claude."
       },
       "read": {
         "title": "Read and annotate",
@@ -19,11 +19,11 @@
       },
       "chat": {
         "title": "Ask Claude",
-        "body": "Open the chat panel and use the command palette for ready-made requests. Claude only sees documents in folders you have enabled for it, and you can preview exactly what is sent before you send."
+        "body": "Open Claude from the sidebar (Ctrl+J) and use the command palette for ready-made requests. Claude only sees documents in folders you have enabled for it, and you can preview exactly what is sent before you send."
       },
       "network": {
-        "title": "Explore the network",
-        "body": "The Network section draws documents, authors and topics as a map and as a graph, so you can find clusters and related work. It is built from your own library and rebuilt when needed."
+        "title": "Explore the map",
+        "body": "The Map section (Alt+5) draws documents, authors and topics as a map and as a graph, so you can find clusters and related work. It is built from your own library and rebuilt when needed."
       },
       "export": {
         "title": "Export and connect other tools",

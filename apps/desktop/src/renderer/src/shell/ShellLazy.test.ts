@@ -49,7 +49,6 @@ describe('AI interface loads on demand', () => {
     setup();
     await screen.findByTestId('status-library');
     expect(screen.queryByTestId('chat-content')).toBeNull();
-    expect(screen.queryByTestId('palette-open')).toBeNull();
     expect(AI_CHANNELS.flatMap((c) => callsTo(c))).toHaveLength(0);
 
     fireEvent.click(screen.getByTestId('chat-toggle'));

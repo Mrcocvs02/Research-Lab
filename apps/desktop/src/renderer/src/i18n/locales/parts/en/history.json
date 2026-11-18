@@ -11,12 +11,6 @@
       "change": "change",
       "undo": "undo",
       "redo": "redo"
-    },
-    "actions": {
-      "tags_update": "Tags changed on {{documents}} documents",
-      "taxonomy_update": "Taxonomy changed ({{tags}} items)",
-      "document_fields": "Document details edited",
-      "project_update": "Project changed"
     }
   }
 }

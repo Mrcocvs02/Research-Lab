@@ -1,0 +1,16 @@
+{
+  "activity": {
+    "attention_title": "To check",
+    "running": "In progress",
+    "recent": "Recent",
+    "showAll": "Show all",
+    "none": "Nothing in progress. Recent results appear here.",
+    "scan": "Scan",
+    "retry": "Try again",
+    "lastScan": "Last scan · {{when}}",
+    "noScan": "No scan in this session",
+    "scanSummary": "+{{added}} new · {{changed}} changed · {{missing}} missing",
+    "scanRunning": "A scan is already running",
+    "needsLibrary": "Open a library first"
+  }
+}

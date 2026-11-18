@@ -12,6 +12,7 @@ type Dictionary = Record<string, unknown>;
  * Keys never change: a part only holds a share of the same dictionary. A part used by several views loads once.
  */
 export type StringPart =
+  | 'activity'
   | 'addToProject'
   | 'advSearch'
   | 'aiSettings'

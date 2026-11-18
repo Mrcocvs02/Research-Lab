@@ -1,15 +1,19 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Lazy, lazyView } from '../components/Lazy';
+import { NoticeBanner } from '../components/NoticeBanner';
+import { IconButton } from '../components/IconButton';
 import { useAiUi } from '../lib/aiUi';
-import { CitationIndicator } from '../lib/citationJobs';
+import { InShellContext } from '../lib/history';
 import { useInbox } from '../lib/inbox';
-import { JobIndicator } from '../lib/jobs';
+import type { NavView } from '../lib/nav';
 import { useNotify } from '../lib/notify';
-import { useWatchCount } from '../lib/watch';
+import { useLocalFlag } from '../lib/useLocalFlag';
 import { useApp } from '../state/app-context';
-import { scanText } from '../views/library/ScanStatusText';
 import { useScanStatus } from '../views/library/useScanStatus';
+import { Sidebar } from './Sidebar';
+import { Topbar } from './Topbar';
+import { Icon } from './shellIcons';
 
 // The chat and the command palette (and all the AI code with them) load the first time they are shown.
 const ChatPanel = lazyView(() => import('../views/chat/ChatPanel').then((m) => ({ default: m.ChatPanel })), ['chat', 'chat-preview']);
@@ -20,188 +24,133 @@ const ExportDialog = lazyView(() => import('../views/export/ExportDialog').then(
 // The usage guide and the shortcut list (F1, Ctrl+/) load when first opened.
 const GuideDialog = lazyView(() => import('../views/guide/GuideDialog').then((m) => ({ default: m.GuideDialog })), ['guide', 'shortcuts']);
 
-export const SECTIONS = ['library', 'projects', 'discover', 'network', 'inbox', 'settings'] as const;
-export type SectionId = (typeof SECTIONS)[number];
+/** The main views of the sidebar, in its order, then Settings (the order of Alt+1..5 and Ctrl+,). */
+export const SECTIONS = ['library', 'review', 'projects', 'discover', 'map', 'settings'] as const satisfies readonly NavView[];
+export type SectionId = NavView;
 
 interface Props {
   section: SectionId;
   onSection(s: SectionId): void;
   onNewLibrary(): void;
+  /** Documents with a proposal of Claude waiting: the dot of "To review". */
+  reviewDocs?: number;
+  /** The reader is open: the sidebar shrinks to its icons to give it room (the prototype does the same). */
+  reading?: boolean;
   /** Optional block above the main area (in the layout flow, never over other controls). */
   banner?: ReactNode;
   children: ReactNode;
 }
 
-/** Window layout: sidebar, main area, collapsible chat panel, status bar. */
-export function Shell({ section, onSection, onNewLibrary, banner, children }: Props) {
+/** `true` while the window is narrow enough for the Claude panel to float over the content (below 1180 px, D-335). */
+const floating = () => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 1179px)').matches === true;
+
+/** Window layout (4.1): sidebar, top bar, banners, the view, and the Claude panel (no space when closed). */
+export function Shell({ section, onSection, onNewLibrary, reviewDocs = 0, reading = false, banner, children }: Props) {
   const { t } = useTranslation();
   const { chatOpen, setChatOpen, paletteOpen, setPaletteOpen, exportInit, closeExport, guide, closeGuide } = useAiUi();
   const app = useApp();
-  const chatCollapsed = !chatOpen;
+  const notify = useNotify();
   const chatId = useId();
   const inbox = useInbox();
-  const discoverCount = useWatchCount();
-  // The chat is mounted the first time the panel opens and then kept (hidden when collapsed), so a running answer goes on.
+  const scan = useScanStatus();
+  const [collapsed, setCollapsed] = useLocalFlag('rl.sidebarCollapsed', false);
+  const panel = useRef<HTMLElement>(null);
+  // The chat is mounted the first time the panel opens and then kept (hidden when closed), so a running answer goes on.
   const [chatLoaded, setChatLoaded] = useState(chatOpen);
   useEffect(() => {
     if (chatOpen) setChatLoaded(true);
   }, [chatOpen]);
+  // Toasts belong to the view that made them.
+  useEffect(() => notify.setView(section), [notify, section]);
 
-  return (
-    <div className="shell" data-testid="shell">
-      <a className="skip-link" href="#main">
-        {t('shell.skip')}
-      </a>
-      <aside className="app-sidebar" aria-label={t('shell.sidebar')}>
-        <div className="brand" data-testid="app-title">
-          {t('app.title')}
-        </div>
-        <LibrarySwitcher onNewLibrary={onNewLibrary} />
-        <nav aria-label={t('shell.navigation')}>
-          <ul>
-            {SECTIONS.map((id) => (
-              <li key={id} className={id === 'settings' ? 'push-down' : undefined}>
-                <button type="button" className="nav-item" aria-current={section === id ? 'page' : undefined} onClick={() => onSection(id)} data-testid={`nav-${id}`}>
-                  {t(`sections.${id}`)}
-                  {id === 'inbox' && inbox.count > 0 && (
-                    <span className="nav-badge" data-testid="inbox-badge" aria-label={t('inbox.badge', { count: inbox.count })}>
-                      {inbox.count}
-                    </span>
-                  )}
-                  {id === 'discover' && discoverCount > 0 && (
-                    <span className="nav-badge" data-testid="discover-badge" aria-label={t('discover.badge', { count: discoverCount })}>
-                      {discoverCount}
-                    </span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <SidebarLanguage />
-      </aside>
+  // Floating Claude panel: Escape or a click outside closes it and the focus goes back to its button.
+  useEffect(() => {
+    if (!chatOpen) return;
+    const close = () => {
+      setChatOpen(false);
+      document.querySelector<HTMLElement>('[data-testid="chat-toggle"]')?.focus();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented && floating() && panel.current?.contains(document.activeElement) && !document.querySelector('[role="dialog"][aria-modal="true"]')) close();
+    };
+    const onDown = (e: MouseEvent) => {
+      const el = e.target as Element | null;
+      if (floating() && el && !panel.current?.contains(el) && !el.closest('[data-testid="chat-toggle"], [role="dialog"], .rl-popover, [data-testid="palette-open"]')) close();
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onDown);
+    };
+  }, [chatOpen, setChatOpen]);
 
-      {banner && <div className="main-banner">{banner}</div>}
-      <main id="main" className="main" tabIndex={-1}>
-        {children}
-      </main>
-
-      <aside className={chatCollapsed ? 'chat collapsed' : 'chat'} aria-label={t('chat.title')} data-testid="chat-panel">
-        <div className="chat-head">
-          {!chatCollapsed && <h2>{t('chat.title')}</h2>}
-          {!chatCollapsed && (
-            <button type="button" className="link chat-palette-button" onClick={() => setPaletteOpen(true)} title={t('chat.paletteShortcut')} data-testid="palette-open">
-              {t('chat.palette')}
-            </button>
-          )}
-          <button
-            type="button"
-            className="icon-button"
-            aria-expanded={!chatCollapsed}
-            aria-controls={chatId}
-            aria-label={chatCollapsed ? t('chat.expand') : t('chat.collapse')}
-            title={chatCollapsed ? t('chat.expand') : t('chat.collapse')}
-            onClick={() => setChatOpen(!chatOpen)}
-            data-testid="chat-toggle"
-          >
-            <span aria-hidden="true">{chatCollapsed ? '‹' : '›'}</span>
-          </button>
-        </div>
-        <div id={chatId} className="chat-body" hidden={chatCollapsed}>
-          {chatLoaded && app.activeProfile ? (
-            <Lazy>
-              <ChatPanel key={app.activeProfile.id} />
-            </Lazy>
-          ) : (
-            <p className="hint">{app.activeProfile ? t('chat.loading') : t('chat.needsLibrary')}</p>
-          )}
-        </div>
-      </aside>
-      {paletteOpen && (
-        <Lazy>
-          <Palette onClose={() => setPaletteOpen(false)} />
-        </Lazy>
-      )}
-
-      {guide && (
-        <Lazy>
-          <GuideDialog kind={guide} onClose={closeGuide} />
-        </Lazy>
-      )}
-
-      {exportInit && app.activeProfile && (
-        <Lazy>
-          <ExportDialog key={app.activeProfile.id} init={exportInit} onClose={closeExport} />
-        </Lazy>
-      )}
-
-      {inbox.dragging && (
-        <div className="drop-hint" data-testid="drop-hint" role="status">
-          <p>{t('inbox.dropHint')}</p>
-        </div>
-      )}
-      <StatusBar />
-    </div>
-  );
-}
-
-function SidebarLanguage() {
-  const { t } = useTranslation();
-  const app = useApp();
-  const id = useId();
-  return (
-    <div className="switcher">
-      <label htmlFor={id}>{t('shell.language')}</label>
-      <select id={id} value={app.settings?.uiLanguage ?? 'it'} onChange={(e) => void app.setUiLanguage(e.target.value as 'it' | 'en')} data-testid="language-select">
-        <option value="it">{t('languages.it')}</option>
-        <option value="en">{t('languages.en')}</option>
-      </select>
-    </div>
-  );
-}
-
-function LibrarySwitcher({ onNewLibrary }: { onNewLibrary(): void }) {
-  const { t } = useTranslation();
-  const app = useApp();
-  const { reportError } = useNotify();
-  const id = useId();
-  return (
-    <div className="switcher">
-      <label htmlFor={id}>{t('shell.activeLibrary')}</label>
-      <select id={id} value={app.activeLibraryId ?? ''} onChange={(e) => e.target.value && void app.setActiveLibrary(e.target.value).catch(reportError)} data-testid="library-switcher">
-        {app.profiles.length === 0 && <option value="">{t('shell.noLibrary')}</option>}
-        {app.profiles.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-      <button type="button" className="link" onClick={onNewLibrary}>
-        {t('library.new')}
-      </button>
-    </div>
-  );
-}
-
-function StatusBar() {
-  const { t } = useTranslation();
-  const app = useApp();
   const aiCount = app.config?.aiEnabledFolders.length ?? 0;
-  const { status: scan } = useScanStatus();
   return (
-    <footer className="statusbar" data-testid="statusbar">
-      <span data-testid="status-library">{app.activeProfile ? t('status.library', { name: app.activeProfile.name }) : t('status.noLibrary')}</span>
-      {app.config && <span>{t('status.docLanguage', { language: t(`languages.${app.config.language}`) })}</span>}
-      {app.config && <span data-testid="status-ai">{aiCount === 0 ? t('status.aiNone') : t('status.aiFolders', { count: aiCount })}</span>}
-      {scan && (
-        <span data-testid="scan-status" data-state={scan.state} data-phase={scan.phase} role="status" aria-label={t('scan.label')}>
-          {scanText(scan, t)}
-        </span>
-      )}
-      <JobIndicator />
-      <CitationIndicator />
-      <span className="spacer" />
-      {app.version && <span>{t('status.version', { version: app.version })}</span>}
-    </footer>
+    <InShellContext.Provider value={true}>
+      <div className="shell" data-testid="shell" data-collapsed={collapsed || reading ? 'true' : undefined} data-chat={chatOpen ? 'open' : 'closed'}>
+        <a className="skip-link" href="#main">
+          {t('shell.skip')}
+        </a>
+        <Sidebar view={section} onSection={onSection} onNewLibrary={onNewLibrary} proposals={reviewDocs} documents={scan.status && app.activeProfile ? scan.status.indexed : null} collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} chatId={chatId} />
+        <Topbar scan={scan} />
+        <div className="banner-slot" data-testid="banner-slot">
+          <NoticeBanner />
+          {banner}
+        </div>
+        <main id="main" className="main" tabIndex={-1}>
+          {children}
+        </main>
+
+        <aside ref={panel} id={chatId} className="claude-panel" aria-label={t('chat.title')} data-testid="chat-panel" hidden={!chatOpen}>
+          <div className="chat-head">
+            <span className="chat-head__title">
+              <Icon name="claude" className="chat-head__ai" />
+              <h2>{t('chat.title')}</h2>
+            </span>
+            {app.config && (
+              <span className="chat-head__status" data-testid="status-ai">
+                {aiCount === 0 ? t('status.aiNone') : t('status.aiFolders', { count: aiCount })}
+              </span>
+            )}
+            <IconButton label={t('chat.collapse')} keys="Ctrl+J" size="sm" onClick={() => setChatOpen(false)} data-testid="chat-close">
+              <Icon name="close" size={16} />
+            </IconButton>
+          </div>
+          <div className="chat-body">
+            {chatLoaded && app.activeProfile ? (
+              <Lazy>
+                <ChatPanel key={app.activeProfile.id} />
+              </Lazy>
+            ) : (
+              <p className="hint">{app.activeProfile ? t('chat.loading') : t('chat.needsLibrary')}</p>
+            )}
+          </div>
+        </aside>
+        {paletteOpen && (
+          <Lazy>
+            <Palette onClose={() => setPaletteOpen(false)} />
+          </Lazy>
+        )}
+
+        {guide && (
+          <Lazy>
+            <GuideDialog kind={guide} onClose={closeGuide} />
+          </Lazy>
+        )}
+
+        {exportInit && app.activeProfile && (
+          <Lazy>
+            <ExportDialog key={app.activeProfile.id} init={exportInit} onClose={closeExport} />
+          </Lazy>
+        )}
+
+        {inbox.dragging && (
+          <div className="drop-hint" data-testid="drop-hint" role="status">
+            <p>{t('inbox.dropHint')}</p>
+          </div>
+        )}
+      </div>
+    </InShellContext.Provider>
   );
 }

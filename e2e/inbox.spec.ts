@@ -51,7 +51,7 @@ test('a dropped PDF gets its metadata, a proposed name and folder, and is copied
     await expect(window.getByTestId('scan-status')).toHaveAttribute('data-state', 'done', { timeout: 180_000 });
 
     // 1. The file arrives (what the drop handler does with `rlBridge.pathForFile`).
-    await window.getByTestId('nav-inbox').click();
+    await window.getByTestId('nav-review').click();
     await expect(window.getByTestId('inbox-view')).toBeVisible({ timeout: 30_000 });
     const started = Date.now();
     const added = await ipcData<AddResult>(window, 'inbox:add', { paths: [source] });

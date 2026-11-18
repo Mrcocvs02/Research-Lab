@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useTranslation } from 'react-i18next';
 import type { EventPayload, Events } from '@rl/core';
 import { useApp } from '../state/app-context';
+import { useAiUi } from './aiUi';
 import { useNotify } from './notify';
 import { rl } from './rl';
 
@@ -26,16 +27,17 @@ export const useCitationJob = () => useContext(Ctx);
 /** `citations:refreshMany` accepts at most this many documents (`CITATION_LIMITS.refreshMany`; a test keeps the two equal). */
 export const REFRESH_MANY_MAX = 2000;
 
-const live = (j: CitationJob) => j.state === 'queued' || j.state === 'running';
+export const live = (j: CitationJob) => j.state === 'queued' || j.state === 'running';
 
 /**
- * Follows `citations:progress` for the status bar indicator. Nothing is fetched here: a job exists only after the user
+ * Follows `citations:progress` for the Activity chip and popover. Nothing is fetched here: a job exists only after the user
  * asked for one, and the event is ignored until then (a job of an earlier session is not shown).
  */
 export function CitationJobsProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { activeLibraryId } = useApp();
   const { info, fail, reportError } = useNotify();
+  const { setActivityOpen } = useAiUi();
   const [job, setJob] = useState<CitationJob | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const jobId = useRef<string | null>(null);
@@ -81,7 +83,7 @@ export function CitationJobsProvider({ children }: { children: ReactNode }) {
         jobId.current = r.jobId;
         setJob(seen.current.get(r.jobId) ?? null);
         setDismissed(null);
-        info(t('citations.started'));
+        info(t('citations.started'), { label: t('activity.see'), run: () => setActivityOpen(true) });
         return true;
       } catch (e) {
         reportError(e);
@@ -90,7 +92,7 @@ export function CitationJobsProvider({ children }: { children: ReactNode }) {
         starting.current = false;
       }
     },
-    [fail, info, reportError, t],
+    [fail, info, reportError, setActivityOpen, t],
   );
   const cancel = useCallback(async () => {
     if (!jobId.current) return;
@@ -105,30 +107,4 @@ export function CitationJobsProvider({ children }: { children: ReactNode }) {
   const busy = job !== null && live(job);
   const value = useMemo(() => ({ job: shown, busy, version, start, cancel, dismiss }), [shown, busy, version, start, cancel, dismiss]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
-}
-
-/** Status bar piece: progress of the running citation refresh, cancel, and hide when it ends. */
-export function CitationIndicator() {
-  const { t } = useTranslation();
-  const { job, cancel, dismiss } = useCitationJob();
-  if (!job) return null;
-  const running = live(job);
-  const text = running
-    ? t('citations.job.running', { done: job.done, total: job.total })
-    : t(`citations.job.ended_${job.state}`, { done: job.done, total: job.total, failed: job.failed, skipped: job.skipped, notFound: job.notFound });
-  return (
-    <span className="job-indicator" data-testid="citations-indicator" data-state={job.state} role="status" aria-label={t('citations.job.label')}>
-      <span data-testid="citations-text">{text}</span>
-      {job.state === 'failed' && job.error && <span data-testid="citations-error">{t(`errors.${job.error.code}`, { defaultValue: t('errors.INTERNAL') })}</span>}
-      {running ? (
-        <button type="button" className="link" onClick={() => void cancel()} data-testid="citations-cancel">
-          {t('citations.job.cancel')}
-        </button>
-      ) : (
-        <button type="button" className="link" onClick={dismiss} data-testid="citations-dismiss">
-          {t('citations.job.dismiss')}
-        </button>
-      )}
-    </span>
-  );
 }

@@ -5,6 +5,7 @@ import { PDF_WRITE_LIMITS as LIM } from '@rl/core';
 import { Ref } from './objects.js';
 import { fileSource, getPage, loadDoc, resolve, setDeadline, tick } from './doc.js';
 import { readAnnot, revOf } from './annot.js';
+import { unlock } from './refuse.js';
 import type { PageExpect } from './plan.js';
 import { loadPdfjs } from '../extract/pdf.js';
 
@@ -42,11 +43,12 @@ function hashes(path: string, oldSize: number): { prefix: string; all: string; s
 }
 
 /** The structural check: every touched page has exactly the expected references (the others untouched and in order) and our objects read back with the expected content. */
-function structural(path: string, req: VerifyRequest): string | null {
+async function structural(path: string, req: VerifyRequest): Promise<string | null> {
   const src = fileSource(path);
   setDeadline(LIM.workerTimeoutMs);
   try {
     const doc = loadDoc(src);
+    if (doc.trailer.has('Encrypt') && !(await unlock(doc)).ok) return 'unreadable';
     for (const e of req.expect) {
       tick();
       const page = getPage(doc, e.page);
@@ -103,7 +105,7 @@ export async function verifyFile(req: VerifyRequest): Promise<VerifyResult> {
     const h = hashes(req.path, req.oldSize);
     if (h.size <= req.oldSize) return { ok: false, detail: 'not-grown' };
     if (h.prefix !== req.oldHash) return { ok: false, detail: 'prefix-changed' };
-    const bad = structural(req.path, req) ?? (req.deep ? await deepCheck(req.path, req) : null);
+    const bad = (await structural(req.path, req)) ?? (req.deep ? await deepCheck(req.path, req) : null);
     return bad ? { ok: false, detail: bad } : { ok: true, size: h.size, sha256: h.all };
   } catch {
     return { ok: false, detail: 'error' };

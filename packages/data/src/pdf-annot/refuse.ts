@@ -1,63 +1,50 @@
-// Can this file be annotated by an incremental update, and if not why (ARCHITETTURA-UI §8.3.5)? Encrypted files are recognised (empty user password included) and refused until G4c.
-import { createCipheriv, createHash } from 'node:crypto';
+// Can this file be annotated by an incremental update, and if not why (ARCHITETTURA-UI §8.3.5)? Encrypted files open with the empty user password only (G4c).
 import { PDF_WRITE_LIMITS as LIM } from '@rl/core';
-import { PdfError, Str, asDict, asNum, nameOf, type Dict, type Val } from './objects.js';
-import { dictOf, getPage, loadDoc, resolve, type Doc, type SyncSource } from './doc.js';
+import { PdfError, Ref, Str, asDict, asNum, nameOf, type Dict, type Val } from './objects.js';
+import { dictOf, getPage, loadDoc, resolve, type CryptMethod, type CryptParams, type Doc, type SyncSource } from './doc.js';
 
 export type Reason = 'encrypted' | 'permission' | 'signed' | 'xfa' | 'damaged' | 'too-many-revisions';
 export type Classification =
   | { ok: true; doc: Doc; trailingBytes: number; revisions: number; hybrid: boolean; kind: 'table' | 'stream' }
   | { ok: false; reason: Reason; detail: string; emptyPassword?: boolean; trailingBytes?: number };
 
-const PAD = Buffer.from('28bf4e5e4e758a4164004e56fffa01082e2e00b6d0683e802f0ca9fe6453697a', 'hex');
-const md5 = (...b: Buffer[]) => b.reduce((h, x) => h.update(x), createHash('md5')).digest();
-
-function rc4(key: Buffer, data: Buffer): Buffer {
-  const s = Array.from({ length: 256 }, (_, i) => i);
-  for (let i = 0, j = 0; i < 256; i++) { j = (j + s[i]! + key[i % key.length]!) & 255; [s[i], s[j]] = [s[j]!, s[i]!]; }
-  const out = Buffer.alloc(data.length);
-  for (let k = 0, i = 0, j = 0; k < data.length; k++) {
-    i = (i + 1) & 255; j = (j + s[i]!) & 255; [s[i], s[j]] = [s[j]!, s[i]!];
-    out[k] = data[k]! ^ s[(s[i]! + s[j]!) & 255]!;
-  }
-  return out;
-}
-
-function hash2B(salt: Buffer, udata: Buffer): Buffer {
-  let k = createHash('sha256').update(salt).update(udata).digest();
-  for (let i = 0; ; i++) {
-    const k1 = Buffer.concat(Array<Buffer>(64).fill(Buffer.concat([k, udata])));
-    const c = createCipheriv('aes-128-cbc', k.subarray(0, 16), k.subarray(16, 32)).setAutoPadding(false);
-    const e = Buffer.concat([c.update(k1), c.final()]);
-    let sum = 0;
-    for (let j = 0; j < 16; j++) sum += e[j]!;
-    k = createHash(['sha256', 'sha384', 'sha512'][sum % 3]!).update(e).digest();
-    if (i >= 63 && e[e.length - 1]! <= i - 32) return k.subarray(0, 32);
-  }
-}
-
-/** Standard security handler: does the empty user password open the file? (R2-R6; no decryption of content.) */
-export function emptyUserPassword(enc: Dict, id0: Buffer, doc: Doc): boolean {
-  const R = asNum(resolve(doc, enc.get('R'))) ?? 0, P = asNum(resolve(doc, enc.get('P'))) ?? 0;
+/**
+ * An encrypted file: does the empty user password open it, may annotations be added (`/P` bit 6) and is the handler one we know?
+ * Yes: `doc.crypt` is set (crypt.ts, a lazy chunk loaded only here) and every read decrypts, every write encrypts.
+ */
+export async function unlock(doc: Doc): Promise<{ ok: true } | { ok: false; reason: Reason; detail: string; emptyPassword: boolean }> {
+  const t = doc.trailer;
+  const enc = dictOf(doc, t.get('Encrypt'));
+  const no = (reason: Reason, detail: string, emptyPassword = false) => ({ ok: false as const, reason, detail, emptyPassword });
+  if (!enc || nameOf(resolve(doc, enc.get('Filter'))) !== 'Standard') return no('encrypted', 'handler');
+  const num = (k: string) => asNum(resolve(doc, enc.get(k)));
   const bytes = (k: string) => { const v = resolve(doc, enc.get(k)); return v instanceof Str ? v.b : Buffer.alloc(0); };
-  const U = bytes('U'), O = bytes('O');
-  if (R >= 5) {
-    const vsalt = U.subarray(32, 40);
-    const h = R === 5 ? createHash('sha256').update(vsalt).digest() : hash2B(vsalt, Buffer.alloc(0));
-    return U.length >= 48 && h.equals(U.subarray(0, 32));
-  }
-  if (R < 2 || R > 4 || O.length < 32) return false;
-  const n = R === 2 ? 5 : Math.min(16, (asNum(resolve(doc, enc.get('Length'))) ?? 40) / 8);
-  const pb = Buffer.alloc(4);
-  pb.writeInt32LE(P | 0);
-  const noMeta = R >= 4 && resolve(doc, enc.get('EncryptMetadata')) === false;
-  let key = md5(PAD, O.subarray(0, 32), pb, id0, noMeta ? Buffer.alloc(4, 255) : Buffer.alloc(0));
-  if (R >= 3) for (let i = 0; i < 50; i++) key = md5(key.subarray(0, n));
-  key = key.subarray(0, n);
-  if (R === 2) return rc4(key, PAD).equals(U.subarray(0, 32));
-  let x = rc4(key, md5(PAD, id0));
-  for (let i = 1; i < 20; i++) x = rc4(Buffer.from(key.map((b) => b ^ i)), x);
-  return x.equals(U.subarray(0, 16));
+  const ids = resolve(doc, t.get('ID'));
+  const V = num('V') ?? 0, R = num('R') ?? 0;
+  let stm: CryptMethod = 'rc4', str: CryptMethod = 'rc4', n = 5;
+  if (V === 4 || V === 5) {
+    // Crypt filters: V4 allows RC4, AESV2 and none; V5 AESV3 and none.
+    const cf = asDict(resolve(doc, enc.get('CF')));
+    const method = (k: string): CryptMethod | undefined => {
+      const name = nameOf(resolve(doc, enc.get(k))) ?? 'Identity';
+      const m = name === 'Identity' ? 'None' : nameOf(resolve(doc, asDict(resolve(doc, cf?.get(name)))?.get('CFM')));
+      return m === 'None' ? 'none' : V === 4 ? (m === 'V2' ? 'rc4' : m === 'AESV2' ? 'aes128' : undefined) : m === 'AESV3' ? 'aes256' : undefined;
+    };
+    const a = method('StmF'), b = method('StrF');
+    if (!a || !b || (V === 4 ? R !== 4 : R !== 5 && R !== 6)) return no('encrypted', 'handler');
+    [stm, str, n] = [a, b, V === 4 ? 16 : 32];
+  } else if (V === 1 || V === 2) {
+    if (V === 1 ? R !== 2 : R !== 3) return no('encrypted', 'handler');
+    n = V === 1 ? 5 : Math.min(16, Math.max(5, Math.floor((num('Length') ?? 40) / 8)));
+  } else return no('encrypted', 'handler');
+  const P = (num('P') ?? 0) | 0;
+  const params: CryptParams = { R, P, n, stm, str, O: bytes('O'), U: bytes('U'), UE: bytes('UE'), id0: Array.isArray(ids) && ids[0] instanceof Str ? ids[0].b : Buffer.alloc(0), noMetadata: R >= 4 && resolve(doc, enc.get('EncryptMetadata')) === false };
+  const ref = t.get('Encrypt');
+  const c = (await import('./crypt.js')).openCrypt(params, ref instanceof Ref ? ref.n : undefined);
+  if (c === 'password') return no('encrypted', 'password');
+  if ((P & 32) === 0) return no('permission', 'no-annotate-bit', true);
+  doc.crypt = c;
+  return { ok: true };
 }
 
 function hasSignature(doc: Doc, root: Dict): boolean {
@@ -82,22 +69,16 @@ function hasSignature(doc: Doc, root: Dict): boolean {
   return form ? walk(form.get('Fields'), undefined, 0) : false;
 }
 
-export function analyze(src: SyncSource): Classification {
+export async function analyze(src: SyncSource): Promise<Classification> {
   let doc: Doc;
   try {
     doc = loadDoc(src);
     const t = doc.trailer;
-    const root = dictOf(doc, t.get('Root'));
     if (t.has('Encrypt')) {
-      const enc = dictOf(doc, t.get('Encrypt'));
-      const ids = resolve(doc, t.get('ID'));
-      const id0 = Array.isArray(ids) && ids[0] instanceof Str ? ids[0].b : Buffer.alloc(0);
-      if (!enc || nameOf(resolve(doc, enc.get('Filter'))) !== 'Standard') return { ok: false, reason: 'encrypted', detail: 'handler', emptyPassword: false, trailingBytes: doc.trailing };
-      if (!emptyUserPassword(enc, id0, doc)) return { ok: false, reason: 'encrypted', detail: 'password', emptyPassword: false, trailingBytes: doc.trailing };
-      const P = asNum(resolve(doc, enc.get('P'))) ?? 0;
-      if ((P & 32) === 0) return { ok: false, reason: 'permission', detail: 'no-annotate-bit', emptyPassword: true, trailingBytes: doc.trailing };
-      return { ok: false, reason: 'encrypted', detail: 'empty-password', emptyPassword: true, trailingBytes: doc.trailing };
+      const u = await unlock(doc);
+      if (!u.ok) return { ...u, trailingBytes: doc.trailing };
     }
+    const root = dictOf(doc, t.get('Root'));
     if (!root) return { ok: false, reason: 'damaged', detail: 'no-root' };
     if (asDict(resolve(doc, root.get('AcroForm')))?.has('XFA')) return { ok: false, reason: 'xfa', detail: 'xfa' };
     if (hasSignature(doc, root)) return { ok: false, reason: 'signed', detail: 'signature' };

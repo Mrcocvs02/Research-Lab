@@ -102,11 +102,11 @@ export function pageCountOf(doc: Doc): number {
 }
 
 /** Reads the file, reconciles and, when there is something to write, builds the update. Never throws for a bad file: the result says why. */
-export function planSync(req: SyncRequest): SyncResult {
+export async function planSync(req: SyncRequest): Promise<SyncResult> {
   const src = fileSource(req.path);
   setDeadline(LIM.workerTimeoutMs);
   try {
-    const a = analyze(src);
+    const a = await analyze(src);
     if (!a.ok) return { ok: false, reason: a.reason, detail: a.detail, emptyPassword: a.emptyPassword };
     const doc = a.doc;
     const total = pageCountOf(doc);
@@ -175,6 +175,9 @@ function buildUpdate(doc: Doc, v: Verdict, specs: Map<string, AnnotSpec>, found:
     parts.push(b);
     pos += b.length;
   };
+  const cr = doc.crypt;
+  const strSeal = (n: number, g: number) => (cr ? (b: Buffer) => cr.encStr(b, n, g) : undefined);
+  const sealFor = (n: number, g: number, ap: number) => (cr ? { str: strSeal(n, g)!, stream: (b: Buffer) => cr.encStream(b, ap, 0) } : undefined);
   const pageSet = new Set<number>([...v.add.map((a) => a.page), ...v.modify.map((m) => m.item.page), ...v.remove.map((r) => r.page)]);
   const expect: PageExpect[] = [];
   const marks: Mark[] = [];
@@ -193,7 +196,7 @@ function buildUpdate(doc: Doc, v: Verdict, specs: Map<string, AnnotSpec>, found:
       const ap = next++;
       const objNum = ref?.n ?? next++;
       const gen = ref?.g ?? 0;
-      const o = annotObjects(specs.get(item.id)!, page.ref, ap, now);
+      const o = annotObjects(specs.get(item.id)!, page.ref, ap, now, sealFor(objNum, gen, ap));
       emit(ap, 0, o.ap);
       emit(objNum, gen, o.dict);
       if (!ref) arr.push(new Ref(objNum, gen));
@@ -203,11 +206,11 @@ function buildUpdate(doc: Doc, v: Verdict, specs: Map<string, AnnotSpec>, found:
     for (const a of v.add.filter((x) => x.page === num)) place(undefined, a);
     for (const m of v.modify.filter((x) => x.item.page === num)) place(m.ref, m.item);
     const arrNum = arrRef?.n ?? next++;
-    emit(arrNum, arrRef?.g ?? 0, ser(arr));
+    emit(arrNum, arrRef?.g ?? 0, ser(arr, [], strSeal(arrNum, arrRef?.g ?? 0)));
     if (!arrRef) {
       const d: Dict = new Map(page.dict);
       d.set('Annots', new Ref(arrNum, 0));
-      emit(page.ref.n, page.ref.g, ser(d));
+      emit(page.ref.n, page.ref.g, ser(d, [], strSeal(page.ref.n, page.ref.g)));
     }
     expect.push({ page: num - 1, others, ours: [...ours].map(([id, rev]) => ({ id, rev })) });
   }
@@ -216,6 +219,7 @@ function buildUpdate(doc: Doc, v: Verdict, specs: Map<string, AnnotSpec>, found:
   const t = doc.trailer;
   const common: Array<[string, Val]> = [['Root', t.get('Root') ?? null]];
   if (t.has('Info')) common.push(['Info', t.get('Info') ?? null]);
+  if (t.has('Encrypt')) common.push(['Encrypt', t.get('Encrypt') ?? null]);
   const id = resolve(doc, t.get('ID'));
   if (Array.isArray(id) && id[0] instanceof Str) common.push(['ID', [id[0], new Str(randomBytes(16))]]);
   const entries = written.sort((a, b) => a.n - b.n);

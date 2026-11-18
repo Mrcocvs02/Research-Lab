@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { isoDateSchema, itemIdSchema, languageSchema, relativePathSchema, schemaVersionSchema } from './common.js';
 import { endsWithSpaceOrDot, isReservedWindowsName } from './fs-names.js';
-import { shortcutOverridesSchema } from './shortcuts.js';
+import { migrateShortcutOverrides, shortcutOverridesSchema } from './shortcuts.js';
 
 /* ------------------------------------------------------------------ */
 /* Shared AI configuration vocabulary                                  */
@@ -99,6 +99,10 @@ export type Theme = z.infer<typeof themeSchema>;
 export const backupAutoSchema = z.enum(['off', 'daily', 'weekly', 'monthly']);
 export type BackupAuto = z.infer<typeof backupAutoSchema>;
 
+/** Which credentials the Claude provider may use (§10.3): `auto` as before (API key first), or one of the two only. */
+export const aiAuthModeSchema = z.enum(['auto', 'claude-code', 'api-key']);
+export type AiAuthMode = z.infer<typeof aiAuthModeSchema>;
+
 export const appSettingsSchema = z.object({
   schemaVersion: schemaVersionSchema,
   /** Random id of this installation; used to name per-device log files. */
@@ -123,12 +127,14 @@ export const appSettingsSchema = z.object({
        * automatically (PATH, the user's local bin folder, then the copy bundled with the Agent SDK).
        */
       claudeCodePath: z.string().min(1).max(1024).nullable().default(null),
+      /** Changed only through `ai:setAuthMode` (never `settings:set`): it decides which secret the child process gets. */
+      authMode: aiAuthModeSchema.default('auto'),
     })
     .prefault({}),
   /** Look of the window (phase 8); 'system' follows the OS. */
   appearance: z.object({ theme: themeSchema.default('system') }).prefault({}),
   /** Overrides of the keyboard shortcuts (see shortcuts.ts); empty: all defaults. */
-  shortcuts: shortcutOverridesSchema.default([]),
+  shortcuts: z.preprocess(migrateShortcutOverrides, shortcutOverridesSchema).default([]),
   /** State of the usage guide (phase 8): the welcome card was shown, and the tips the user closed for good. */
   guide: z.object({ welcomeSeen: z.boolean().default(false), dismissedTips: z.array(z.string().max(64)).max(100).default([]) }).prefault({}),
   /**
@@ -161,8 +167,14 @@ export const appSettingsPatchSchema = z.object({
 });
 export type AppSettingsPatch = z.infer<typeof appSettingsPatchSchema>;
 
-export function defaultAppSettings(): AppSettings {
-  return appSettingsSchema.parse({});
+/**
+ * Settings of a first run. `locale` is what the system reports (`app.getLocale()`, e.g. `it-IT`): Italian when it starts
+ * with `it`, English otherwise (D-357); without it the default stays Italian, as the schema says.
+ */
+export function defaultAppSettings(opts: { locale?: string } = {}): AppSettings {
+  const s = appSettingsSchema.parse({});
+  if (opts.locale !== undefined) s.uiLanguage = /^it(?![a-z])/i.test(opts.locale.trim()) ? 'it' : 'en';
+  return s;
 }
 
 /* ------------------------------------------------------------------ */

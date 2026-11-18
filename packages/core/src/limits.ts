@@ -48,6 +48,12 @@ export const THUMB_LIMITS = {
   batch: 200,
 } as const;
 
+/** Upper bounds of the scan report (§9). */
+export const SCAN_LIMITS = {
+  /** Ids of each list of the report of the last scan (`scan:report`); beyond that `truncated` is true. */
+  reportIds: 500,
+} as const;
+
 /** Upper bounds of the AI layer (phase 4). */
 export const AI_LIMITS = {
   /** Characters of one chat message of the user. */

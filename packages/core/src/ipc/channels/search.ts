@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { documentIdSchema, itemIdSchema, relativePathSchema } from '../../common.js';
-import { SEARCH_LIMITS } from '../../limits.js';
+import { SCAN_LIMITS, SEARCH_LIMITS } from '../../limits.js';
 import { studyStateSchema } from '../../model/document.js';
 import { defineChannels } from '../registry.js';
 import { scanStatusSchema } from './scan.js';
@@ -25,6 +25,8 @@ export const searchFiltersSchema = z.object({
   /** Include documents whose file is missing (default false). */
   includeMissing: z.boolean().optional(),
   folders: z.array(relativePathSchema).max(SEARCH_LIMITS.filterValues).optional(),
+  /** Restrict the result to an explicit set of documents (the Library filtered on a scan report list, §9). */
+  docIds: z.array(documentIdSchema).max(SCAN_LIMITS.reportIds).optional(),
   folder: relativePathSchema.optional(),
   includeSubfolders: z.boolean().optional(),
   yearFrom: z.number().int().min(1000).max(3000).optional(),

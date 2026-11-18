@@ -3,7 +3,7 @@
  * (and optionally `defineEvents`), then add ONE import and ONE line to each merge below.
  */
 import { mergeRegistries } from '../registry.js';
-import { aiChannels } from './ai.js';
+import { aiChannels, aiEvents } from './ai.js';
 import { backupChannels, backupEvents } from './backup.js';
 import { annotationsChannels } from './annotations.js';
 import { appChannels, appEvents } from './app.js';
@@ -35,7 +35,7 @@ import { settingsChannels } from './settings.js';
 
 export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels, citationsChannels, recommendChannels, watchChannels, graphChannels, exploreChannels, exportChannels, mcpChannels, backupChannels, maintenanceChannels);
 
-export const events = mergeRegistries(appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, watchEvents, graphEvents, exportEvents, mcpEvents, backupEvents);
+export const events = mergeRegistries(aiEvents, appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, watchEvents, graphEvents, exportEvents, mcpEvents, backupEvents);
 
 export type Channels = typeof channels;
 export type Events = typeof events;
@@ -43,7 +43,7 @@ export type ChannelName = keyof Channels & string;
 export type EventName = keyof Events & string;
 
 export { appNoticeSchema, type AppNotice } from './app.js';
-export { scanStatusSchema, scanSummarySchema, type ScanStatus, type ScanSummary } from './scan.js';
+export { scanReportSchema, scanStatusSchema, scanSummarySchema, type ScanReport, type ScanStatus, type ScanSummary } from './scan.js';
 export { searchFiltersSchema, searchFacetsSchema, searchHitSchema, SEARCH_MARK_OPEN, SEARCH_MARK_CLOSE } from './search.js';
 export { documentSummarySchema, documentViewSchema } from './documents.js';
 export { documentPatchSchema, type DocumentPatch } from './documents.js';
@@ -54,7 +54,7 @@ export { projectDetailSchema, projectSummarySchema, projectMemberViewSchema, rea
 export { noteViewSchema, noteListItemSchema, type NoteView } from './notes.js';
 export { annotationColorSchema, annotationInputSchema, type AnnotationInput } from './annotations.js';
 export { thumbItemSchema } from './thumbs.js';
-export { aiAuthSchema, aiPreviewSchema, aiSendViewSchema, aiStatusSchema } from './ai.js';
+export { aiAccountSchema, aiAuthSchema, aiPreviewSchema, aiSendViewSchema, aiStatusSchema, type AiAccount } from './ai.js';
 export { chatCardSchema, chatConversationSummarySchema, chatTurnSchema, chatUsageSchema } from './chat.js';
 export { aiJobFieldSchema, aiJobRequestSchema, aiJobStatusSchema, type AiJobField, type AiJobStatus } from './jobs.js';
 export { reviewFieldSchema, reviewItemSchema, type ReviewField, type ReviewItem } from './review.js';

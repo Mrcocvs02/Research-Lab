@@ -91,11 +91,12 @@ export const inboxChannels = defineChannels('inbox', {
   /**
    * How many items wait (badge of the navigation), without reading a document or touching the network: the dropped
    * items of the local queue plus the number of flagged library files remembered from the last listing or recount.
+   * `count` is the badge number (`dropped + library`, capped); the parts feed the tooltip (§7.1).
    * `recount: true` counts the flagged records again (once a scan has finished); lookups never run from here.
    */
   count: {
     request: z.object({ recount: z.boolean().default(false) }),
-    response: z.object({ count: z.number().int().nonnegative() }),
+    response: z.object({ count: z.number().int().nonnegative(), dropped: z.number().int().nonnegative(), library: z.number().int().nonnegative() }),
   },
   list: {
     request: z.object({}),

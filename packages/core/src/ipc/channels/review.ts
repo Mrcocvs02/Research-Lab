@@ -115,6 +115,8 @@ export const reviewChannels = defineChannels('review', {
     request: z.object({}),
     response: z.object({
       pending: z.record(reviewFieldSchema, z.number().int().nonnegative()),
+      /** Documents with at least one proposal waiting (§7.1: the dot of the badge and the number of the Proposals tab). */
+      pendingDocs: z.number().int().nonnegative(),
       tags: z.object({ proposed: z.number().int().nonnegative(), accepted: z.number().int().nonnegative(), rate: z.number().min(0).max(1).nullable() }),
       newTags: z.object({ proposed: z.number().int().nonnegative(), accepted: z.number().int().nonnegative() }),
     }),

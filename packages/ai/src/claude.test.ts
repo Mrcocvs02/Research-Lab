@@ -289,3 +289,35 @@ describe('hardening of the child process and of error text', () => {
     expect(e2.details).toMatchObject({ sent: false });
   });
 });
+
+describe('authMode', () => {
+  const env = { PATH: '/bin', ANTHROPIC_API_KEY: 'env-key', CLAUDE_CODE_OAUTH_TOKEN: 'tok' };
+  it('claude-code: no API key reaches the child, the login token does', () => {
+    const o = buildQueryOptions({ ...base, apiKey: KEY, baseEnv: env, authMode: 'claude-code' });
+    expect(o.env?.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(o.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe('tok');
+  });
+  it('api-key: no login token reaches the child, the stored key does', () => {
+    const o = buildQueryOptions({ ...base, apiKey: KEY, baseEnv: env, authMode: 'api-key' });
+    expect(o.env?.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
+    expect(o.env?.ANTHROPIC_API_KEY).toBe(KEY);
+  });
+  it('auto keeps the environment as it is', () => {
+    const o = buildQueryOptions({ ...base, apiKey: null, baseEnv: env });
+    expect(o.env?.ANTHROPIC_API_KEY).toBe('env-key');
+    expect(o.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe('tok');
+  });
+  it('access follows the mode', () => {
+    const l = { apiKey: 'k', env: { CLAUDE_CODE_OAUTH_TOKEN: 't' }, home: '/h', exists: () => false };
+    expect(detectAccess({ ...l, authMode: 'claude-code' })).toEqual({ auth: 'claude-code' });
+    expect(detectAccess({ ...l, authMode: 'api-key' })).toEqual({ auth: 'api-key' });
+    expect(detectAccess({ ...l, apiKey: null, authMode: 'api-key' })).toEqual({ auth: 'none' });
+    expect(detectAccess({ apiKey: 'k', env: {}, home: '/h', exists: () => false, authMode: 'claude-code' })).toEqual({ auth: 'none' });
+  });
+  it('the provider does not read the stored key in claude-code mode', async () => {
+    let read = 0;
+    const p = createClaudeProvider({ workDir: '/w', getApiKey: async () => (read++, 'k'), getAuthMode: () => 'claude-code', env: { CLAUDE_CODE_OAUTH_TOKEN: 't' }, exists: () => false });
+    expect(await p.access()).toEqual({ auth: 'claude-code' });
+    expect(read).toBe(0);
+  });
+});

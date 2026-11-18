@@ -9,7 +9,7 @@
       "synonyms": "Sinonimi"
     },
     "dialog": {
-      "title": "Proponi con l’AI",
+      "title": "Proponi con Claude",
       "intro_one": "Claude proporrà dei valori per {{count}} documento. Nulla viene applicato finché non lo riesamini.",
       "intro_other": "Claude proporrà dei valori per {{count}} documenti. Nulla viene applicato finché non li riesamini.",
       "fields": "Cosa proporre",
@@ -31,6 +31,8 @@
       "nothing": "Con queste scelte non c’è nulla da inviare.",
       "note": "Di ogni documento viene inviato solo un estratto (dati e prime pagine) e ogni invio compare nel registro dell’AI.",
       "confirm": "Avvia"
-    }
+    },
+    "noFolders": "Claude non può leggere nessuna cartella: abilita prima almeno una cartella per l'AI.",
+    "enableFolders": "Abilita le cartelle"
   }
 }

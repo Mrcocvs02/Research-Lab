@@ -4,17 +4,37 @@ import { AI_LIMITS, type ReasoningLevel } from '@rl/core';
 import { ErrorNote } from '../../components/ui';
 import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
+import { rl } from '../../lib/rl';
 import { useApp } from '../../state/app-context';
 import { useCapActions } from '../ai/tokenCap';
 import { safeText } from '../library/safeText';
 import { TurnView } from './ChatParts';
 import { formatUsd } from './format';
 import { PreviewDialog } from './PreviewDialog';
-import { useChat, type Banner, type SendRequest } from './useChat';
+import { useChat, type AiPreview, type Banner, type SendRequest } from './useChat';
 import { useDocTitle } from './useLabels';
 import './chat.css';
 
 const REASONING: ReasoningLevel[] = ['low', 'medium', 'high'];
+
+function NewDocs({ ids }: { ids: string[] }) {
+  return (
+    <>
+      {ids.map((id, i) => (
+        <NewDoc key={id} id={id} last={i === ids.length - 1} />
+      ))}
+    </>
+  );
+}
+function NewDoc({ id, last }: { id: string; last: boolean }) {
+  const title = safeText(useDocTitle(id) ?? id.slice(0, 8));
+  return (
+    <>
+      <strong data-testid="inline-new-doc">{title}</strong>
+      {last ? '' : ', '}
+    </>
+  );
+}
 
 function ContextChip({ docId, onRemove }: { docId: string; onRemove(): void }) {
   const { t } = useTranslation();
@@ -97,7 +117,7 @@ export function ChatPanel() {
   const { t } = useTranslation();
   const app = useApp();
   const ui = useAiUi();
-  const ids = { text: useId(), model: useId(), reasoning: useId() };
+  const ids = { text: useId() };
   const [input, setInput] = useState('');
   const [view, setView] = useState<'chat' | 'history'>('chat');
   const [model, setModel] = useState<string | null>(null);
@@ -156,6 +176,33 @@ export function ChatPanel() {
     return () => setChatBusy(false);
   }, [chat.sending, setChatBusy]);
 
+  // After the first confirmation of the conversation the preview of the next turn sits above the field (D-339, D-364).
+  const inline = chat.confirmed;
+  const [pv, setPv] = useState<AiPreview | null>(null);
+  const [detail, setDetail] = useState(false);
+  const docKey = contextDocIds.join(',');
+  const sizeBucket = Math.ceil(input.length / 200);
+  useEffect(() => {
+    if (!inline) {
+      setPv(null);
+      return;
+    }
+    let live = true;
+    const id = setTimeout(() => {
+      rl.invoke('ai:preview', { purpose: 'chat', model: effectiveModel, docIds: docKey ? docKey.split(',') : [], promptChars: Math.max(input.length, 1) }).then(
+        (r) => live && setPv(r),
+        () => live && setPv(null),
+      );
+    }, 250);
+    return () => {
+      live = false;
+      clearTimeout(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inline, effectiveModel, docKey, sizeBucket]);
+  const newDocs = inline && pv ? pv.allowed.filter((id) => !inline.docs.has(id)) : [];
+  const asksAgain = inline !== null && pv !== null && (newDocs.length > 0 || inline.model !== effectiveModel || pv.refused.length > 0);
+
   const unavailable = chat.status !== null && !chat.status.available;
   const canSend = input.trim() !== '' && !chat.sending && !unavailable && effectiveModel !== '';
 
@@ -186,11 +233,6 @@ export function ChatPanel() {
         <button type="button" onClick={() => (view === 'history' ? setView('chat') : showHistory())} aria-pressed={view === 'history'} data-testid="chat-history-toggle">
           {t('chat.history')}
         </button>
-        {usageText && (
-          <span className="chat-usage-counter hint" data-testid="chat-usage" role="status">
-            {usageText}
-          </span>
-        )}
       </div>
 
       {chat.statusError ? <ErrorNote testId="ai-status-error">{errorMessage(chat.statusError, t)}</ErrorNote> : null}
@@ -300,39 +342,58 @@ export function ChatPanel() {
               }}
               data-testid="chat-input"
             />
-            <div className="chat-selectors">
-              <label htmlFor={ids.model}>{t('chat.model')}</label>
-              <select id={ids.model} value={effectiveModel} onChange={(e) => setModel(e.target.value)} data-testid="chat-model">
+            {inline && pv && (
+              <div className="chat-inline" role="status" data-testid="chat-inline-preview" data-asks={asksAgain || undefined}>
+                <span>
+                  {pv.allowed.length > 0 ? t('chat.inline.withDocs', { count: pv.allowed.length }) : t('chat.inline.only')} ·{' '}
+                  {pv.estimatedUsd === null ? t('chat.preview.noPrice') : t('chat.inline.cost', { usd: formatUsd(pv.estimatedUsd) })}
+                </span>
+                {newDocs.length > 0 && (
+                  <span data-testid="inline-new-docs">
+                    {' '}
+                    {t('chat.inline.newDocs')} <NewDocs ids={newDocs} />
+                  </span>
+                )}
+                {asksAgain && <span> {t('chat.inline.asksAgain')}</span>}{' '}
+                <button type="button" className="link" onClick={() => setDetail(true)} data-testid="inline-details">
+                  {t('chat.inline.details')}
+                </button>
+              </div>
+            )}
+            <div className="chat-composer-row">
+              {usageText && (
+                <span className="chat-usage-counter hint" data-testid="chat-usage" role="status">
+                  {usageText}
+                </span>
+              )}
+              <select className="chat-chip-select" aria-label={t('chat.model')} value={effectiveModel} onChange={(e) => setModel(e.target.value)} data-testid="chat-model">
                 {models.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.label}
                   </option>
                 ))}
               </select>
-              <label htmlFor={ids.reasoning}>{t('chat.reasoning')}</label>
-              <select id={ids.reasoning} value={effectiveReasoning} onChange={(e) => setReasoning(e.target.value as ReasoningLevel)} data-testid="chat-reasoning">
+              <select className="chat-chip-select" aria-label={t('chat.reasoning')} value={effectiveReasoning} onChange={(e) => setReasoning(e.target.value as ReasoningLevel)} data-testid="chat-reasoning">
                 {REASONING.map((r) => (
                   <option key={r} value={r}>
-                    {t(`settings.library.reasoning${r === 'low' ? 'Low' : r === 'medium' ? 'Medium' : 'High'}`)}
+                    {t('chat.reasoningChip', { level: t(`settings.library.reasoning${r === 'low' ? 'Low' : r === 'medium' ? 'Medium' : 'High'}`).toLowerCase() })}
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="actions">
               {chat.sending && (
                 <button type="button" onClick={() => void chat.cancel()} data-testid="chat-cancel">
                   {t('chat.cancel')}
                 </button>
               )}
-              <button type="submit" className="primary" disabled={!canSend} data-testid="chat-send">
-                {t('chat.send')}
+              <button type="submit" className="primary chat-send" disabled={!canSend} title={t('chat.sendTip')} aria-label={t('chat.send')} data-testid="chat-send">
+                <span aria-hidden="true">↑</span>
               </button>
             </div>
-            <p className="hint">{t('chat.shortcuts')}</p>
           </form>
         </>
       )}
 
+      {detail && pv && <PreviewDialog readOnly agent preview={pv} models={models} busy={false} onConfirm={() => setDetail(false)} onCancel={() => setDetail(false)} />}
       {chat.held && <PreviewDialog agent preview={chat.held.preview} models={models} busy={chat.sending} onConfirm={() => void chat.confirmHeld()} onCancel={chat.dismissHeld} />}
     </div>
   );

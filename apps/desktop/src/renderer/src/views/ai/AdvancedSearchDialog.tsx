@@ -8,6 +8,7 @@ import { rl } from '../../lib/rl';
 import { useApp } from '../../state/app-context';
 import { formatTokens, formatUsd } from '../chat/format';
 import { safeText } from '../library/safeText';
+import '../chat/dialogs.css';
 import { aiErrorText } from './aiErrors';
 import { useAiAvailability } from './useAiAvailability';
 
@@ -66,7 +67,7 @@ export function AdvancedSearchDialog({ initialText, onClose }: { initialText: st
 
   return (
     <Dialog title={t('advSearch.title')} onClose={onClose} testId="adv-search-dialog">
-      <div className="dialog-body">
+      <div className="dlg-scroll">
         <p>{t('advSearch.intro')}</p>
         {unavailable !== null && (
           <div className="callout" role="status" data-testid="adv-search-unavailable" data-reason={unavailable}>
@@ -142,7 +143,7 @@ export function AdvancedSearchDialog({ initialText, onClose }: { initialText: st
           </section>
         )}
       </div>
-      <div className="actions">
+      <div className="actions dlg-foot">
         <button type="button" onClick={onClose} data-testid="adv-search-cancel">
           {t('common.cancel')}
         </button>

@@ -7,31 +7,43 @@
     "tasks": {
       "addDocs": {
         "title": "Add documents",
-        "body": "Drop PDF files or a folder into the window, or use Add PDF in the Library or in To review (Alt+2). The app reads titles and metadata, files them in your library and shows what it found for you to confirm. The Activity chip, at the top right, follows the scan: See the report lists new, changed, moved and missing files. Your originals are never changed."
+        "body": "Drop PDF files or a folder into the window, or use Add PDF in the Library or in To review (Alt+2): every file dropped or picked from outside is copied into the library folder you confirm. Files already inside the library folders are found by the scan. The Activity chip, at the top right, follows the scan: See the report lists new, changed, moved and missing files. Research Lab does not move, rename or delete your files."
+      },
+      "review": {
+        "title": "Check in To review",
+        "body": "To review (Alt+2) has two tabs. New files: the files you dropped or the scan found. For each one you check the data found (online, from the DOI or arXiv, or read from the file), the folder and the tags; Confirm adds it to the library, Ignore forgets it without touching the original. Mark all as seen closes the files found by the scan in one go. A conflict copy comes from a sync between computers and is usually ignored. The Model and Reasoning chips choose how Claude proposes tags for new files. Claude's suggestions: for each document and field you accept (✓) or reject (✗) the suggestion, or edit it; nothing changes until you accept, and Accepted so far tells you how many suggestions you accepted."
       },
       "tags": {
         "title": "Organize with tags and projects",
-        "body": "In the Library select documents (with the box at the left of each row): the bar that replaces the filters offers Tags, Project and Claude. Tags are managed from Manage tags, in the Library ⋯ menu. You can undo any change with Undo, in the top bar, or Ctrl+Z; Redo is Ctrl+Y, in the History and in the command palette. The search box at the top finds text, titles and authors (? shows the syntax); the sparkle button searches with Claude."
+        "body": "In the Library select documents (with the box at the left of each row): the bar that replaces the filters offers Tags, Project and Claude. Tags are managed from Manage tags, in the Library ⋯ menu. You can undo any change with Undo, in the top bar, or Ctrl+Z; Redo is Ctrl+Y, in the History and in the command palette. The search box at the top (Ctrl+L) finds text, titles and authors (? shows the syntax); the sparkle button searches with Claude."
       },
       "read": {
         "title": "Read and annotate",
-        "body": "Double-click a document (or press Enter) to open it in the reader; Shift+Enter opens its card. Select text to highlight or underline it and to add a note. Notes, highlights and citations are saved in your library folder and travel with it. For now highlights stay in the app only: writing into the PDFs is not on yet. Reader tools use single keys. At the first start after the update Research Lab re-checks highlights that were saved misplaced, in the background and without opening the documents; those it cannot place stay in the reader's To check group."
+        "body": "Double-click a document (or press Enter) to open it in the reader; Shift+Enter opens its card and Ctrl+Enter the default program. The reader has a single bar at the top: first pick the tool (Select, Highlight, Underline, Eraser; Crop comes in a later version), then act on the text. Space switches between the tool in use and the previous one; keys 1 to 5 change the colour. The Eraser deletes as you pass, but asks first if it touches more than 3 annotations. While you read the sidebar shrinks to leave room for the page; Esc does not close the reader (to close it: Alt+← or Ctrl+W). Notes, highlights and citations are saved in your library folder and travel with it. For now highlights stay in the app only: in the Study menu the PDF shows as “App only” because writing into the PDFs is not on yet. When it is, they will be added to the PDF only if you choose so, and you will be able to remove them. At the first start after the update Research Lab re-checks highlights that were saved misplaced, in the background and without opening the documents; those it cannot place stay in the reader's To check group."
       },
       "chat": {
         "title": "Ask Claude",
-        "body": "Open Claude from the sidebar (Ctrl+J) and use the command palette for ready-made requests. Claude only sees documents in folders you have enabled for it, and you can preview exactly what is sent before you send. You can choose to use your Claude Code login or an API key. Test the connection costs about $0.001 and sends no documents. Change account opens a Claude Code window; then come back and press I'm done, check. Signing out of Claude Code also applies in the terminal."
+        "body": "Open Claude from the sidebar (Ctrl+J) and use the command palette (Ctrl+K) for ready-made requests. Claude only sees documents in folders you have enabled for it. At the first send of a conversation you preview what goes and confirm; after that, a line above the field shows what will be sent and Send is the confirmation. If you add a new document, or change the model, the confirmation comes back. While it answers, Claude shows the tools it uses (for example Library search), with the technical details closed. For several documents at once: select the documents and choose Suggest with Claude…; pick the fields, the model and the reasoning, look at the estimate and confirm. The suggestions arrive in To review. You can use your Claude Code login or an API key (Settings › Claude). Test the connection costs about $0.001 and sends no documents. Change account opens a Claude Code window; then come back and press I'm done, check."
+      },
+      "projects": {
+        "title": "Work in projects",
+        "body": "A project gathers documents from any folder, with notes and a reading plan. Create one from Projects (Alt+3); add documents from the Library with Project, in the selection bar. In the project you change the study state of each document (to read, reading, read)."
+      },
+      "discover": {
+        "title": "Discover more work",
+        "body": "Discover (Alt+4) suggests work related to your library. Read next lists the works cited by several of your documents that you do not have yet: it is computed on this computer, with no AI and no network. What's new looks for new work in the sources you follow and Published looks for the published versions of your preprints. Nothing is checked in the background: checks start when you ask, and nothing changes until you confirm."
       },
       "network": {
         "title": "Explore the map",
-        "body": "The Map section (Alt+5) draws documents, authors and topics as a map and as a graph, so you can find clusters and related work. It is built from your own library and rebuilt when needed."
+        "body": "The Map section (Alt+5) shows the library in four ways: Overview, Connections, Explore and Unexpected neighbours. Documents, tags, topics and authors become nodes and links, so you can find groups and close work. It is built from your own library and rebuilt when needed; it needs at least 3 documents."
       },
       "export": {
         "title": "Export and connect other tools",
-        "body": "Export a project or a selection as a second brain (notes with links) from the command palette. In the settings you can also start a local MCP server so other tools can read your library."
+        "body": "Export a project or a selection as a second brain (notes with links) from the command palette or from the project. Choose the destination folder, the name and the options, check the estimate and press Export. Documents in folders not enabled for Claude are exported only after you confirm. The export is local and sends nothing. In Settings › Advanced you can also start a local MCP server so other tools, such as Claude Code, can read your library."
       },
       "backup": {
         "title": "Back up your library",
-        "body": "In the settings choose a destination folder and press Back up now, or turn on the automatic backup. A backup can be verified and restored as a new library at any time. Secrets such as API keys are never saved in a backup. Settings save by themselves: search them from the box at the top left (Ctrl+,). Technical options are in Developer / Advanced. On first start the app uses the system language (Italian or English); libraries are managed with Manage libraries…"
+        "body": "In the settings (Ctrl+,) choose a destination folder and press Back up now, or turn on the automatic backup. A backup can be verified and restored as a new library at any time. Secrets such as API keys are never saved in a backup. Settings save by themselves: search them from the box at the top left. Technical options are in Advanced. On first start the app uses the system language (Italian or English); libraries are managed with Manage libraries…"
       }
     },
     "welcome": {

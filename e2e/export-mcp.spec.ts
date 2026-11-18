@@ -139,6 +139,7 @@ test('export a project as a second brain, answer control questions from the fold
     // The entry point on the project page; the dialog starts from the project and estimates before running.
     await window.getByTestId('nav-projects').click();
     await window.getByTestId('project-open').click();
+    await window.getByTestId('project-more').click();
     await window.getByTestId('project-export').click();
     const dialog = window.getByTestId('export-dialog');
     await expect(dialog).toBeVisible();
@@ -152,8 +153,12 @@ test('export a project as a second brain, answer control questions from the fold
     await expect(dialog.getByTestId('export-dest-path')).toBeVisible();
     await dialog.getByTestId('export-folder-name').fill(EXPORT_DIR);
     await expect(dialog.getByTestId('export-target-note')).toHaveAttribute('data-state', 'new', { timeout: 30_000 });
+    // The size for an AI assistant is a word with a rounded figure, and the buttons sit in the fixed footer (4.15).
+    await expect(dialog.getByTestId('est-size')).toContainText('tokens');
+    await expect(dialog.getByTestId('export-run')).toBeVisible();
     await dialog.getByTestId('export-run').click();
-    // The papers are in folders not enabled for AI: the export asks before writing them (D-241).
+    // The papers are in folders not enabled for AI: the export asks before writing them (D-241), in the footer, with the focus on the answer (N7).
+    await expect(dialog.getByTestId('export-confirm-yes')).toBeFocused();
     await dialog.getByTestId('export-confirm-yes').click();
     const result = dialog.getByTestId('export-result');
     await expect(result).toHaveAttribute('data-state', 'done', { timeout: 120_000 });
@@ -208,6 +213,7 @@ test('export a project as a second brain, answer control questions from the fold
     const before = await walk(out);
 
     // The earlier export is easy to find: it is listed at the top of the dialog and updates in place.
+    await window.getByTestId('project-more').click();
     await window.getByTestId('project-export').click();
     await expect(dialog).toBeVisible();
     const past = dialog.getByTestId('export-past-item');

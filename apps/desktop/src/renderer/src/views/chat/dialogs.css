@@ -1,0 +1,32 @@
+/* Long dialogs (D-339, 4.15): the Dialog header stays, the body scrolls, the footer with the buttons is always visible. */
+.rl-dialog:has(> .dlg-foot) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dlg-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-1) var(--space-1) 0;
+}
+.dlg-scroll > * {
+  margin: 0;
+}
+.actions.dlg-foot {
+  flex: none;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.dlg-foot .dlg-foot-text {
+  flex: 1 1 auto;
+  margin: 0;
+  min-width: 12em;
+}

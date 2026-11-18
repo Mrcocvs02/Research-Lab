@@ -1,12 +1,6 @@
 /* In-app guide and welcome card (lazy). */
-.dialog:has(.guide-dialog) {
+.rl-dialog:has(.guide-dialog) {
   width: min(720px, 94vw);
-}
-.guide-dialog {
-  display: grid;
-  gap: var(--space-3);
-  max-height: 70vh;
-  overflow-y: auto;
 }
 .guide-dialog h3 {
   margin: 0 0 var(--space-1);

@@ -7,7 +7,7 @@ import i18n from '../i18n';
 import { KeymapProvider } from '../lib/keymap';
 import { AppProvider } from '../state/app-context';
 import { callsTo, emitEvent, memoryBackend, setHandlers } from '../testing/mockRl';
-import { GuideDialog } from '../views/guide/GuideDialog';
+import { GUIDE_TASKS, GuideDialog } from '../views/guide/GuideDialog';
 import { WelcomeCard } from '../views/guide/WelcomeCard';
 import { BackupSection } from './BackupSection';
 import { MaintenanceSection } from './MaintenanceSection';
@@ -518,7 +518,7 @@ describe('guide', () => {
   it('lists the tasks and a shortcut table generated from the commands, with the overrides applied', async () => {
     setup(createElement(GuideDialog, { kind: 'guide', onClose: vi.fn() }), {}, { shortcuts: [{ id: 'palette.open', accelerator: 'Ctrl+P' }] });
     await screen.findByTestId('guide-dialog');
-    expect(screen.getAllByTestId('guide-task')).toHaveLength(7);
+    expect(screen.getAllByTestId('guide-task')).toHaveLength(GUIDE_TASKS.length);
     await waitFor(() => {
       const keys = screen.getAllByTestId('shortcut-list-key').map((k) => k.textContent);
       expect(keys).toContain('Ctrl+P');

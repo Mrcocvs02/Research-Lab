@@ -2,8 +2,9 @@
   display: grid;
   gap: var(--space-3);
 }
-.dialog:has(.export-dialog) {
-  width: min(680px, 94vw);
+.rl-dialog:has(.export-dialog) {
+  width: min(880px, 94vw);
+  max-height: 90vh;
 }
 .callout.warn {
   border-left-color: var(--warn);

@@ -73,14 +73,19 @@
       "documents": "Documents",
       "cited": "Cited works added",
       "files": "Files to write",
-      "tokens": "Size for an agent",
-      "tokensValue": "about {{tokens}} tokens (index {{index}})",
+      "tokens": "Size for an AI assistant",
+      "tokensValue": "{{size}} (about {{tokens}} tokens)",
       "copy": "Copied files",
       "missing": "Missing files",
       "missingValue_one": "{{count}} document has no file on disk (its card is written, the file is not copied)",
       "missingValue_other": "{{count}} documents have no file on disk (their cards are written, the files are not copied)",
       "aiDisabled_one": "{{count}} selected document is in a folder not enabled for AI. Exporting it will ask for your confirmation.",
-      "aiDisabled_other": "{{count}} selected documents are in folders not enabled for AI. Exporting them will ask for your confirmation."
+      "aiDisabled_other": "{{count}} selected documents are in folders not enabled for AI. Exporting them will ask for your confirmation.",
+      "size_small": "small",
+      "size_medium": "medium",
+      "size_large": "large",
+      "tokensTip": "How much text an AI assistant would read to read the whole export. It usually needs only part of it, starting from the index.",
+      "tokensIndex": "Index: {{index}} tokens."
     },
     "target": {
       "new": "{{name}} does not exist yet: it will be created.",
@@ -99,10 +104,10 @@
     },
     "confirm": {
       "title": "Please confirm",
-      "body_one": "{{count}} selected document is in a folder you did not enable for AI. Once exported, anyone who opens the export folder with an agent (such as Claude Code) can read it. Export it anyway?",
-      "body_other": "{{count}} selected documents are in folders you did not enable for AI. Once exported, anyone who opens the export folder with an agent (such as Claude Code) can read them. Export them anyway?",
       "bodyCopy": "The copies of the original files take about {{size}}. Make sure the destination has enough free space. Copy them anyway?",
-      "yes": "Export anyway"
+      "yes": "Export anyway",
+      "footer_one": "There is {{count}} document not enabled for Claude: once exported, anyone who opens the folder with an AI assistant can read it.",
+      "footer_other": "There are {{count}} documents not enabled for Claude: once exported, anyone who opens the folder with an AI assistant can read them."
     },
     "result": {
       "done": "The export is complete.",

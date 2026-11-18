@@ -6,6 +6,7 @@ import { formatTokens, formatUsd } from './format';
 import type { AiPreview } from './useChat';
 import { useDocTitle } from './useLabels';
 import './chat.css';
+import './dialogs.css';
 
 function DocLine({ docId, reason, label }: { docId: string; reason?: AiPreview['refused'][number]['reason']; label?: string | undefined }) {
   const { t } = useTranslation();
@@ -19,12 +20,12 @@ function DocLine({ docId, reason, label }: { docId: string; reason?: AiPreview['
 }
 
 /** What is about to be sent to which model, shown before the send and confirmed by the user (docs/RULES.md, rule 4). */
-export function PreviewDialog({ preview, models, onConfirm, onCancel, busy, labels, title, confirmLabel, agent }: { preview: AiPreview; models: ModelConfig[]; onConfirm(): void; onCancel(): void; busy: boolean; labels?: Record<string, string>; title?: string; confirmLabel?: string; /** A chat: the agent may also read the folders listed (D-227). */ agent?: boolean }) {
+export function PreviewDialog({ preview, models, onConfirm, onCancel, busy, labels, title, confirmLabel, agent, readOnly }: { preview: AiPreview; models: ModelConfig[]; onConfirm(): void; onCancel(): void; busy: boolean; labels?: Record<string, string>; title?: string; confirmLabel?: string; /** A chat: the agent may also read the folders listed (D-227). */ agent?: boolean; /** Only shows what goes (the inline preview of a conversation already confirmed): one button, Close. */ readOnly?: boolean }) {
   const { t } = useTranslation();
   const model = models.find((m) => m.id === preview.model)?.label ?? preview.model;
   return (
     <Dialog title={title ?? t('chat.preview.title')} onClose={onCancel} testId="send-preview">
-      <div className="dialog-body">
+      <div className="dlg-scroll">
         <p data-testid="preview-intro">{agent && preview.allowed.length === 0 ? t('chat.preview.introAgent', { model }) : t('chat.preview.intro', { model })}</p>
         {!(agent && preview.allowed.length === 0) && <h3>{t('chat.preview.allowed', { count: preview.allowed.length })}</h3>}
         {preview.allowed.length === 0 ? (
@@ -57,12 +58,14 @@ export function PreviewDialog({ preview, models, onConfirm, onCancel, busy, labe
         </p>
         <p className="hint">{t('chat.preview.note')}</p>
       </div>
-      <div className="actions">
-        <button type="button" onClick={onCancel} data-testid="preview-cancel">
-          {t('common.cancel')}
-        </button>
-        <button type="button" className="primary" onClick={onConfirm} disabled={busy} data-testid="preview-confirm">
-          {confirmLabel ?? t('chat.preview.send')}
+      <div className="actions dlg-foot">
+        {!readOnly && (
+          <button type="button" onClick={onCancel} data-testid="preview-cancel">
+            {t('common.cancel')}
+          </button>
+        )}
+        <button type="button" className="primary" onClick={readOnly ? onCancel : onConfirm} disabled={busy && !readOnly} data-testid="preview-confirm">
+          {readOnly ? t('common.close') : (confirmLabel ?? t('chat.preview.send'))}
         </button>
       </div>
     </Dialog>

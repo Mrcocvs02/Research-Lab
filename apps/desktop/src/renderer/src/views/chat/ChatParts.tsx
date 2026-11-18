@@ -60,15 +60,34 @@ export function DocChip({ docId }: { docId: string }) {
 
 const MAX_CARD_DOCS = 5;
 
+const TOOLS = ['search_library', 'get_document', 'read_pages', 'list_notes', 'read_note', 'write_ai_field'] as const;
+type Tool = (typeof TOOLS)[number];
+const TOOL_GLYPH: Record<Tool, string> = { search_library: '⌕', get_document: '▤', read_pages: '☰', list_notes: '✎', read_note: '✎', write_ai_field: '✦' };
+const isTool = (n: string): n is Tool => (TOOLS as readonly string[]).includes(n);
+
+/**
+ * A tool the assistant used (4.12): icon, translated label, a translated result built from the data of the card, and the
+ * technical text of the tool (in English, it wraps) in a closed section.
+ */
 export function CardView({ card }: { card: Card }) {
   const { t } = useTranslation();
+  const known = isTool(card.name);
+  const firstTitle = useDocTitle(card.docIds[0] ?? null);
+  const doc = safeText(firstTitle ?? '');
   return (
-    <li className="chat-card" data-testid="chat-card" data-status={card.status}>
+    <li className="chat-card" data-testid="chat-card" data-status={card.status} data-tool={card.name}>
       <div className="chat-card-head">
-        <span className="chat-card-name">{safeText(card.name)}</span>
+        <span className="chat-card-name">
+          {known && (
+            <span className="chat-card-icon" aria-hidden="true">
+              {TOOL_GLYPH[card.name as Tool]}
+            </span>
+          )}
+          {known ? t(`chat.tool.${card.name}`) : safeText(card.name)}
+        </span>
         <span className={`badge chat-card-status-${card.status}`}>{t(`chat.card.${card.status}`)}</span>
       </div>
-      <p className="chat-card-summary">{safeText(card.summary)}</p>
+      {known && card.status !== 'running' && <p className="chat-card-summary">{card.status === 'failed' ? t('chat.tool.failed') : t(`chat.tool.result.${card.name}`, { count: card.docIds.length, doc: doc || t('chat.tool.aDoc') })}</p>}
       {card.docIds.length > 0 && (
         <p className="chat-card-docs">
           {card.docIds.slice(0, MAX_CARD_DOCS).map((id) => (
@@ -77,6 +96,10 @@ export function CardView({ card }: { card: Card }) {
           {card.docIds.length > MAX_CARD_DOCS && <span className="hint">{t('chat.card.more', { count: card.docIds.length - MAX_CARD_DOCS })}</span>}
         </p>
       )}
+      <details className="chat-card-tech">
+        <summary>{t('chat.tool.details')}</summary>
+        <p>{safeText(card.summary)}</p>
+      </details>
     </li>
   );
 }

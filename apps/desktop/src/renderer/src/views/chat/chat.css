@@ -210,3 +210,80 @@
   max-height: 160px;
   overflow-y: auto;
 }
+.rl-dialog:has(.preview-docs) {
+  width: min(560px, 94vw);
+}
+.chat-card {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.chat-card-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.chat-card-icon {
+  color: var(--accent);
+}
+.chat-card-tech {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.chat-card-tech p {
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.lab-chip {
+  white-space: normal;
+  text-align: left;
+  line-height: 18px;
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.chat-md {
+  overflow-wrap: anywhere;
+}
+.chat-md pre,
+.chat-md code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chat-md table {
+  display: block;
+  overflow-x: auto;
+}
+.chat-inline {
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  font-size: var(--fs-caption, 12px);
+  overflow-wrap: anywhere;
+}
+.chat-inline[data-asks] {
+  border-left: 3px solid var(--warn);
+}
+.chat-composer-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.chat-composer-row .chat-usage-counter {
+  margin: 0 auto 0 0;
+  font-size: var(--fs-caption, 12px);
+}
+.chat-chip-select {
+  height: 28px;
+  max-width: 11em;
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  font-size: 12px;
+}
+.chat-send {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+}

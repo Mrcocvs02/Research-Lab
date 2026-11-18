@@ -4,6 +4,7 @@ import type { TFunction } from 'i18next';
 import type { Channels, ExportPreset, ResponseOf } from '@rl/core';
 import { Dialog } from '../../components/Dialog';
 import { FolderTree, type FolderEntry } from '../../components/FolderTree';
+import { Banner } from '../../components/Banner';
 import { CheckField, ErrorNote, ProgressBar, SelectField, TextField } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { useAiUi, type ExportInit } from '../../lib/aiUi';
@@ -13,7 +14,8 @@ import { useApp } from '../../state/app-context';
 import { safeText } from '../library/safeText';
 import { formatSize } from '../library/formatSize';
 import { useScopeOptions } from '../network/useScopes';
-import { applyPreset, emptyDraft, folderNameValid, fromSelection, hasSelection, loadPast, rememberExport, sanitizeFolderName, toSelection, type Draft, type PastExport } from './exportModel';
+import { applyPreset, emptyDraft, folderNameValid, fromSelection, hasSelection, loadPast, rememberExport, roundTokens, sanitizeFolderName, shortPath, sizeClass, toSelection, type Draft, type PastExport } from './exportModel';
+import '../chat/dialogs.css';
 import './export.css';
 
 type Estimate = ResponseOf<Channels, 'export:preview'>;
@@ -98,6 +100,20 @@ function TagPicker({ tags, value, onChange }: { tags: Array<{ id: string; label:
   );
 }
 
+/** "Size for an AI assistant: small (about 1,100 tokens)", with what it means in the tooltip; the index only in the diagnostics. */
+function AssistantSize({ tokens, indexTokens }: { tokens: number; indexTokens: number }) {
+  const { t, i18n } = useTranslation();
+  const n = (v: number) => v.toLocaleString(i18n.language);
+  return (
+    <>
+      <dt>{t('secondBrain.estimate.tokens')}</dt>
+      <dd data-testid="est-size" title={t('secondBrain.estimate.tokensTip') + (indexTokens > 0 ? ` ${t('secondBrain.estimate.tokensIndex', { index: n(indexTokens) })}` : '')}>
+        {t('secondBrain.estimate.tokensValue', { size: t(`secondBrain.estimate.size_${sizeClass(tokens)}`), tokens: n(roundTokens(tokens)) })}
+      </dd>
+    </>
+  );
+}
+
 function EstimateBlock({ est, loading, error }: { est: Estimate | null; loading: boolean; error: unknown }) {
   const { t, i18n } = useTranslation();
   const n = (v: number) => v.toLocaleString(i18n.language);
@@ -114,8 +130,7 @@ function EstimateBlock({ est, loading, error }: { est: Estimate | null; loading:
           <dd data-testid="est-cited">{n(est.citedAdded)}</dd>
           <dt>{t('secondBrain.estimate.files')}</dt>
           <dd data-testid="est-files">{n(est.files)}</dd>
-          <dt>{t('secondBrain.estimate.tokens')}</dt>
-          <dd>{t('secondBrain.estimate.tokensValue', { tokens: n(est.approxTokens), index: n(est.indexTokens) })}</dd>
+          <AssistantSize tokens={est.approxTokens} indexTokens={est.indexTokens} />
           {est.copyBytes > 0 && (
             <>
               <dt>{t('secondBrain.estimate.copy')}</dt>
@@ -131,9 +146,9 @@ function EstimateBlock({ est, loading, error }: { est: Estimate | null; loading:
         </dl>
       )}
       {est && est.aiDisabledDocuments > 0 && (
-        <p className="callout warn" role="status" data-testid="export-ai-warning">
-          {t('secondBrain.estimate.aiDisabled', { count: est.aiDisabledDocuments })}
-        </p>
+        <div data-testid="export-ai-warning">
+          <Banner tone="warning">{t('secondBrain.estimate.aiDisabled', { count: est.aiDisabledDocuments })}</Banner>
+        </div>
       )}
     </div>
   );
@@ -153,7 +168,7 @@ function TargetNote({ est, name }: { est: Estimate | null; name: string }) {
   );
 }
 
-function Summary({ status, onReveal }: { status: JobStatus; onReveal(): void }) {
+function Summary({ status, tokens }: { status: JobStatus; tokens: number | null }) {
   const { t, i18n } = useTranslation();
   const r = status.result;
   const n = (v: number) => v.toLocaleString(i18n.language);
@@ -190,6 +205,7 @@ function Summary({ status, onReveal }: { status: JobStatus; onReveal(): void }) 
                 <dd>{formatSize(r.copiedBytes)}</dd>
               </>
             )}
+            {tokens !== null && status.state === 'done' && <AssistantSize tokens={tokens} indexTokens={0} />}
           </dl>
           {r.keptEdited.length > 0 && (
             <details data-testid="res-kept-list">
@@ -216,13 +232,6 @@ function Summary({ status, onReveal }: { status: JobStatus; onReveal(): void }) 
             </details>
           )}
           {r.orphaned > 0 && <p className="hint">{t('secondBrain.result.orphanedHint')}</p>}
-          {status.state === 'done' && (
-            <p className="hint">
-              <button type="button" onClick={onReveal} data-testid="export-reveal">
-                {t('secondBrain.result.reveal')}
-              </button>
-            </p>
-          )}
         </>
       )}
     </div>
@@ -385,9 +394,22 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
   const canRun = valid && nameOk && dest !== null && !blocked && !estLoading;
   const finished = status !== null && TERMINAL.has(status.state);
 
+  // The button that was pressed often disappears with the step: the focus goes to the main button of the next one, so Esc
+  // (handled on the dialog) and the keyboard keep working.
+  const foot = useRef<HTMLDivElement>(null);
+  const phase = job ? (finished ? 'done' : 'run') : confirm ? 'confirm' : 'form';
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    foot.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+  }, [phase]);
+
   return (
     <Dialog title={t('secondBrain.title')} onClose={close} testId="export-dialog">
-      <div className="export-dialog">
+      <div className="dlg-scroll export-dialog">
         {job ? (
           <div data-testid="export-progress-panel">
             {!finished && (
@@ -399,32 +421,18 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
                     {status.done} / {status.total}
                   </p>
                 )}
-                <div className="actions">
-                  <button type="button" onClick={cancel} data-testid="export-cancel">
-                    {t('secondBrain.cancel')}
-                  </button>
-                </div>
               </>
             )}
             {finished && status && (
               <>
-                <Summary status={status} onReveal={() => void rl.invoke('export:reveal', { jobId: job.id }).catch((e: unknown) => setError(e))} />
+                <Summary status={status} tokens={est?.approxTokens ?? null} />
                 {error ? <ErrorNote>{errorMessage(error, t)}</ErrorNote> : null}
-                <div className="actions">
-                  <button type="button" onClick={() => setJob(null)} data-testid="export-again">
-                    {t('secondBrain.again')}
-                  </button>
-                  <button type="button" className="primary" onClick={close} data-testid="export-close">
-                    {t('common.close')}
-                  </button>
-                </div>
               </>
             )}
           </div>
         ) : (
           <>
             <p className="hint">{t('secondBrain.intro')}</p>
-
             {past.length > 0 && (
               <div className="group" data-testid="export-past">
                 <h3>{t('secondBrain.previous.title')}</h3>
@@ -516,7 +524,13 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
               <h3>{t('secondBrain.destination.title')}</h3>
               <p className="hint">{t('secondBrain.destination.hint')}</p>
               <p>
-                {dest ? <code data-testid="export-dest-path">{safeText(dest.path)}</code> : <span className="hint">{t('secondBrain.destination.none')}</span>}{' '}
+                {dest ? (
+                  <code data-testid="export-dest-path" title={safeText(`${dest.path}/${folderName.trim()}`)}>
+                    {safeText(shortPath(dest.path))}
+                  </code>
+                ) : (
+                  <span className="hint">{t('secondBrain.destination.none')}</span>
+                )}{' '}
                 <button type="button" onClick={() => void choose()} data-testid="export-choose">
                   {dest ? t('secondBrain.destination.change') : t('secondBrain.destination.choose')}
                 </button>
@@ -539,11 +553,6 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
                 onBlur={() => nameOk || setFolderName((n) => sanitizeFolderName(n) || 'second-brain')}
                 data-testid="export-folder-name"
               />
-              {dest && nameOk && (
-                <p className="hint">
-                  {t('secondBrain.destination.willWrite')} <code>{safeText(`${dest.path}/${folderName.trim()}`)}</code>
-                </p>
-              )}
             </div>
 
             {valid && <EstimateBlock est={est} loading={estLoading} error={estError} />}
@@ -553,33 +562,54 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
                 {t(`secondBrain.conflict.${KNOWN_CONFLICTS.has(conflict) ? conflict : 'busy'}`)}
               </p>
             )}
-            {confirm !== null && (
-              <div className="callout warn" role="alertdialog" aria-labelledby="export-confirm-title" data-testid="export-confirm">
-                <p id="export-confirm-title">
-                  <strong>{t('secondBrain.confirm.title')}</strong>
-                </p>
-                {confirm.docs > 0 && <p>{t('secondBrain.confirm.body', { count: confirm.docs })}</p>}
-                {confirm.bytes > 0 && <p data-testid="export-confirm-copy">{t('secondBrain.confirm.bodyCopy', { size: formatSize(confirm.bytes) })}</p>}
-                <div className="actions start">
-                  <button type="button" className="danger" onClick={() => void start(true)} data-testid="export-confirm-yes">
-                    {t('secondBrain.confirm.yes')}
-                  </button>
-                  <button type="button" onClick={() => setConfirm(null)} data-testid="export-confirm-no">
-                    {t('common.cancel')}
-                  </button>
-                </div>
-              </div>
-            )}
             {error ? <ErrorNote testId="export-error">{exportError(error, t)}</ErrorNote> : null}
-
-            <div className="actions">
-              <button type="button" onClick={close}>
-                {t('common.cancel')}
+          </>
+        )}
+      </div>
+      <div className="actions dlg-foot" ref={foot}>
+        {job && !finished && (
+          <button type="button" onClick={cancel} data-testid="export-cancel" data-autofocus>
+            {t('secondBrain.cancel')}
+          </button>
+        )}
+        {job && finished && status && (
+          <>
+            {status.state === 'done' && (
+              <button type="button" onClick={() => void rl.invoke('export:reveal', { jobId: job.id }).catch((e: unknown) => setError(e))} data-testid="export-reveal">
+                {t('secondBrain.result.reveal')}
               </button>
-              <button type="button" className="primary" disabled={!canRun || confirm !== null} onClick={() => void start(false)} data-testid="export-run">
-                {est?.target?.state === 'previous-export' ? t('secondBrain.runUpdate') : t('secondBrain.run')}
-              </button>
+            )}
+            <button type="button" onClick={() => setJob(null)} data-testid="export-again">
+              {t('secondBrain.again')}
+            </button>
+            <button type="button" className="primary" onClick={close} data-testid="export-close" data-autofocus>
+              {t('common.close')}
+            </button>
+          </>
+        )}
+        {!job && confirm !== null && (
+          <>
+            <div className="dlg-foot-text" role="alertdialog" aria-labelledby="export-confirm-title" data-testid="export-confirm">
+              <strong id="export-confirm-title">{t('secondBrain.confirm.title')}</strong>{' '}
+              {confirm.docs > 0 && <span>{t('secondBrain.confirm.footer', { count: confirm.docs })}</span>}{' '}
+              {confirm.bytes > 0 && <span data-testid="export-confirm-copy">{t('secondBrain.confirm.bodyCopy', { size: formatSize(confirm.bytes) })}</span>}
             </div>
+            <button type="button" onClick={() => setConfirm(null)} data-testid="export-confirm-no">
+              {t('common.cancel')}
+            </button>
+            <button type="button" className="primary" onClick={() => void start(true)} data-testid="export-confirm-yes" data-autofocus>
+              {t('secondBrain.confirm.yes')}
+            </button>
+          </>
+        )}
+        {!job && confirm === null && (
+          <>
+            <button type="button" onClick={close}>
+              {t('common.cancel')}
+            </button>
+            <button type="button" className="primary" disabled={!canRun} onClick={() => void start(false)} data-testid="export-run" data-autofocus>
+              {est?.target?.state === 'previous-export' ? t('secondBrain.runUpdate') : t('secondBrain.run')}
+            </button>
           </>
         )}
       </div>

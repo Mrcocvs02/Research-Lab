@@ -3,7 +3,7 @@
     "busyOther": "Una risposta è ancora in corso in un’altra conversazione. Aspetta o fermala per scrivere qui.",
     "removeContext": "Togli {{name}} dal contesto",
     "new": "Nuova conversazione",
-    "history": "Cronologia",
+    "history": "Conversazioni",
     "searchLabel": "ricerca",
     "historyEmpty": "Ancora nessuna conversazione.",
     "deleteTitle": "Elimina la conversazione",
@@ -22,8 +22,37 @@
     "inputPlaceholder": "Scrivi un messaggio…",
     "cancel": "Ferma",
     "send": "Invia",
-    "shortcuts": "Invio manda, Maiusc+Invio va a capo. Ctrl+J mostra o nasconde la chat, Ctrl+K apre i comandi.",
     "usage": "Questo mese: {{used}}",
-    "usageCap": "Questo mese: {{used}} su {{cap}}"
+    "usageCap": "Questo mese: {{used}} su {{cap}}",
+    "reasoningChip": "Ragionamento: {{level}}",
+    "sendTip": "Invia · Invio; a capo · Maiusc+Invio",
+    "tool": {
+      "search_library": "Ricerca nella libreria",
+      "get_document": "Apertura di un documento",
+      "read_pages": "Lettura di pagine",
+      "list_notes": "Elenco delle note",
+      "read_note": "Lettura di una nota",
+      "write_ai_field": "Proposta di un campo",
+      "failed": "Non è riuscito.",
+      "details": "Dettagli tecnici",
+      "aDoc": "un documento",
+      "result": {
+        "search_library": "Documenti trovati: {{count}}",
+        "get_document": "Ha aperto «{{doc}}»",
+        "read_pages": "Ha letto delle pagine di «{{doc}}»",
+        "list_notes": "Ha elencato le note di «{{doc}}»",
+        "read_note": "Ha letto una nota di «{{doc}}»",
+        "write_ai_field": "Ha scritto una proposta per «{{doc}}»: la decidi in Da rivedere."
+      }
+    },
+    "inline": {
+      "withDocs_one": "Partirà: la domanda + {{count}} documento",
+      "withDocs_other": "Partirà: la domanda + {{count}} documenti",
+      "only": "Partirà: la domanda",
+      "cost": "circa {{usd}}",
+      "newDocs": "Nuovi:",
+      "asksAgain": "Invia chiederà di nuovo la conferma.",
+      "details": "Dettagli"
+    }
   }
 }

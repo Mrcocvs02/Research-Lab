@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import type { ShortcutId } from '@rl/core';
-import { SHORTCUT_COMMANDS, SHORTCUT_IDS, effectiveShortcuts, normalizeAccelerator } from './shortcutDefs';
+import { SHORTCUT_COMMANDS, SHORTCUT_IDS, effectiveShortcuts, normalizeAccelerator, normalizeReaderToolKey } from './shortcutDefs';
 import { useApp } from '../state/app-context';
 
 /**
@@ -35,8 +35,9 @@ export function eventAccelerator(e: KeyLike): string | null {
 }
 
 /** Command of `scope` whose accelerator the key press matches (the first, in the order of `SHORTCUT_COMMANDS`). */
-export function resolveShortcut(e: KeyLike, effective: Record<ShortcutId, string | null>, scope: 'global' | 'reader'): ShortcutId | null {
-  const accel = eventAccelerator(e);
+export function resolveShortcut(e: KeyLike, effective: Record<ShortcutId, string | null>, scope: 'global' | 'reader' | 'reader-tool'): ShortcutId | null {
+  // Reader tools are single keys: a press with Ctrl, Alt or Meta is never one of them.
+  const accel = scope === 'reader-tool' ? (e.ctrlKey || e.altKey || e.metaKey || MODIFIER_KEYS.has(e.key) ? null : normalizeReaderToolKey(e.key === ' ' ? 'Space' : e.key)) : eventAccelerator(e);
   if (!accel) return null;
   return SHORTCUT_IDS.find((id) => SHORTCUT_COMMANDS[id].scope === scope && effective[id] === accel) ?? null;
 }

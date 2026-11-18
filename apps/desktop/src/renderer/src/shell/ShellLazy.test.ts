@@ -78,14 +78,14 @@ describe('AI interface loads on demand', () => {
   it('keeps the AI chunks out of the first screen: only dynamic imports reach them', () => {
     const root = path.resolve(import.meta.dirname, '..');
     const read = (rel: string) => readFileSync(path.join(root, rel), 'utf8');
-    const staticImport = /^\s*import\s[^;]*from\s+'[^']*(views\/chat\/|views\/export\/|\.\/AiSection|\.\/McpSection|settings\/AiSection|settings\/McpSection|\/AiLog)/m;
+    const staticImport = /^\s*import\s[^;]*from\s+'[^']*(views\/chat\/|views\/export\/|\.\/ClaudeSection|\.\/AdvancedSection|\.\/McpSection|settings\/ClaudeSection|settings\/AdvancedSection|settings\/McpSection|\/AiLog)/m;
     for (const file of ['App.tsx', 'main.tsx', 'shell/Shell.tsx', 'settings/Settings.tsx', 'lib/aiUi.tsx', 'views/library/LibraryView.tsx', 'views/reader/ReaderView.tsx', 'views/projects/ProjectsView.tsx', 'views/projects/ProjectDetailView.tsx', 'views/network/MapPanel.tsx']) {
       expect(staticImport.test(read(file)), file).toBe(false);
     }
     expect(read('shell/Shell.tsx')).toMatch(/import\('\.\.\/views\/chat\/ChatPanel'\)/);
     expect(read('shell/Shell.tsx')).toMatch(/import\('\.\.\/views\/chat\/Palette'\)/);
-    expect(read('settings/Settings.tsx')).toMatch(/import\('\.\/AiSection'\)/);
-    expect(read('settings/Settings.tsx')).toMatch(/import\('\.\/McpSection'\)/);
+    expect(read('settings/Settings.tsx')).toMatch(/import\('\.\/ClaudeSection'\)/);
+    expect(read('settings/Settings.tsx')).toMatch(/import\('\.\/AdvancedSection'\)/);
     expect(read('shell/Shell.tsx')).toMatch(/import\('\.\.\/views\/export\/ExportDialog'\)/);
     // The first-screen glue must not pull the schemas (zod) of the core in.
     expect(read('lib/aiUi.tsx')).not.toMatch(/from '@rl\/core'/);

@@ -97,7 +97,8 @@
       "docs": "Documents",
       "goto": "Go to",
       "actions": "Actions",
-      "claude": "Ask Claude"
+      "claude": "Ask Claude",
+      "settings": "Settings"
     },
     "paletteNoLibrary": "Open a library first"
   }

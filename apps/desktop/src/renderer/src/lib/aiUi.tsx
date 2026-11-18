@@ -32,7 +32,7 @@ export interface Navigation {
   tab?: 'files' | 'proposals';
   projectId?: string;
   /** Where to put the focus once the view is shown (`search`: the library search box; `backup`: the backup section of the settings). */
-  focus?: 'search' | 'backup';
+  focus?: string;
   /** Something to start once the view is shown (`backupNow`: the backup section starts a backup, once per nonce). */
   run?: 'backupNow';
   nonce: number;

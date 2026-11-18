@@ -55,7 +55,7 @@ export function orderByRecent<T extends { id: string }>(items: readonly T[], rec
 }
 
 /** The groups of the palette, in the order they are shown (3.4). */
-export const PALETTE_GROUPS = ['recent', 'docs', 'goto', 'actions', 'claude'] as const;
+export const PALETTE_GROUPS = ['recent', 'docs', 'goto', 'settings', 'actions', 'claude'] as const;
 export type PaletteGroup = (typeof PALETTE_GROUPS)[number];
 
 /** Palette actions that are not prompts: go to a view, do something. `shortcut` is the command whose key is shown. */

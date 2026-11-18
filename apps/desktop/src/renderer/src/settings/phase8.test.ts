@@ -524,7 +524,7 @@ describe('guide', () => {
       expect(keys).toContain('Ctrl+P');
       expect(keys).not.toContain('Ctrl+K');
     });
-    expect(screen.getAllByTestId('shortcut-list-key').length).toBe(17);
+    expect(screen.getAllByTestId('shortcut-list-key').length).toBe(30);
   });
 
   it('shows only the shortcut list for the shortcuts dialog, in Italian too', async () => {

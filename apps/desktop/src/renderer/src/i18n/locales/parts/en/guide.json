@@ -15,11 +15,11 @@
       },
       "read": {
         "title": "Read and annotate",
-        "body": "Double-click a document to open it in the reader. Select text to highlight or underline it and to add a note. Notes, highlights and citations are saved in your library folder and travel with it."
+        "body": "Double-click a document to open it in the reader. Select text to highlight or underline it and to add a note. Notes, highlights and citations are saved in your library folder and travel with it. Reader tools use single keys. At the first start after the update Research Lab re-checks highlights that were saved misplaced, in the background and without opening the documents; those it cannot place stay in the reader's To check group."
       },
       "chat": {
         "title": "Ask Claude",
-        "body": "Open Claude from the sidebar (Ctrl+J) and use the command palette for ready-made requests. Claude only sees documents in folders you have enabled for it, and you can preview exactly what is sent before you send."
+        "body": "Open Claude from the sidebar (Ctrl+J) and use the command palette for ready-made requests. Claude only sees documents in folders you have enabled for it, and you can preview exactly what is sent before you send. You can choose to use your Claude Code login or an API key. Test the connection costs about $0.001 and sends no documents. Change account opens a Claude Code window; then come back and press I'm done, check. Signing out of Claude Code also applies in the terminal."
       },
       "network": {
         "title": "Explore the map",
@@ -31,7 +31,7 @@
       },
       "backup": {
         "title": "Back up your library",
-        "body": "In the settings choose a destination folder and press Back up now, or turn on the automatic backup. A backup can be verified and restored as a new library at any time. Secrets such as API keys are never saved in a backup."
+        "body": "In the settings choose a destination folder and press Back up now, or turn on the automatic backup. A backup can be verified and restored as a new library at any time. Secrets such as API keys are never saved in a backup. Settings save by themselves: search them from the box at the top left (Ctrl+,). Technical options are in Developer / Advanced. On first start the app uses the system language (Italian or English); libraries are managed with Manage libraries…"
       }
     },
     "welcome": {

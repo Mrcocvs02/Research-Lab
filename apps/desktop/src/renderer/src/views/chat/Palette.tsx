@@ -11,6 +11,7 @@ import { canRead, useReader } from '../../lib/reader';
 import { rl } from '../../lib/rl';
 import { applyTheme, isDarkTheme } from '../../lib/theme';
 import { useApp } from '../../state/app-context';
+import { searchSettings } from '../../settings/settingsIndex';
 import { safeText } from '../library/safeText';
 import { ACTION_COMMANDS, PREDEFINED_COMMANDS } from './commands';
 import { PALETTE_ACTIONS, filterItems, groupItems, loadRecents, orderByRecent, rememberRecent, type PaletteActionId, type PaletteGroup } from './paletteModel';
@@ -25,6 +26,8 @@ interface Item {
   action?: (typeof ACTION_COMMANDS)[number];
   appAction?: PaletteActionId;
   docId?: string;
+  /** A setting of `settingsIndex.ts`: the id the settings page focuses. */
+  settingId?: string;
   openable?: boolean;
   shortcut?: ShortcutId;
   /** Shown instead of running when the item cannot be used now (never hidden: 17.1). */
@@ -112,7 +115,9 @@ export function Palette({ onClose }: { onClose(): void }) {
       ...ACTION_COMMANDS.map((id) => ({ id, label: t(`chat.commands.${id}.label`), prompt: '', custom: false, action: id, group: 'claude' as const })),
       ...custom,
     ];
-    return groupItems(filterItems(orderByRecent([...actions, ...prompts], recents), query), { query, recents, docs });
+    // Settings (3.4): any entry of the index whose label, synonyms, section or group matches (at most 5).
+    const settings: Item[] = searchSettings(query, (k) => t(k), 5).map((m) => ({ id: `set-${m.entry.id}`, label: `${m.label} · ${m.where}`, group: 'settings' as const, prompt: '', custom: false, settingId: m.entry.id }));
+    return groupItems(filterItems(orderByRecent([...actions, ...prompts], recents), query), { query, recents, docs: [...docs, ...settings] });
   }, [t, custom, docs, query, recents, app.settings?.uiLanguage, hasLibrary, noLibrary, history.canUndo, history.canRedo]);
 
   useEffect(() => setAt(0), [query]);
@@ -164,6 +169,11 @@ export function Palette({ onClose }: { onClose(): void }) {
 
   const choose = (item: Item | undefined) => {
     if (!item || item.disabledReason) return;
+    if (item.settingId) {
+      onClose();
+      goTo('settings', { focus: item.settingId });
+      return;
+    }
     if (item.docId) {
       onClose();
       if (item.openable) openReader(item.docId);

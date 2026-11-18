@@ -3,7 +3,7 @@ import { SHORTCUT_COMMANDS, SHORTCUT_IDS } from '@rl/core';
 import { useEffectiveShortcuts } from '../../lib/keymap';
 import '../../settings/shortcuts.css';
 
-const SCOPES = ['global', 'reader'] as const;
+const SCOPES = ['global', 'reader', 'reader-tool'] as const;
 
 /** The shortcuts in force, generated from `SHORTCUT_COMMANDS` (so the list can never drift from the keymap). */
 export function ShortcutList() {

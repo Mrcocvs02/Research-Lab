@@ -15,11 +15,11 @@
       },
       "read": {
         "title": "Leggere e annotare",
-        "body": "Fai doppio clic su un documento per aprirlo nel lettore. Seleziona il testo per evidenziarlo, sottolinearlo e aggiungere una nota. Note, evidenziazioni e citazioni sono salvate nella cartella della libreria e viaggiano con essa."
+        "body": "Fai doppio clic su un documento per aprirlo nel lettore. Seleziona il testo per evidenziarlo, sottolinearlo e aggiungere una nota. Note, evidenziazioni e citazioni sono salvate nella cartella della libreria e viaggiano con essa. Gli strumenti del lettore usano tasti singoli. Al primo avvio dopo l'aggiornamento Research Lab ricontrolla in background le evidenziazioni salvate storte, senza aprire i documenti; quelle che non riesce a posizionare restano nel gruppo Da controllare del lettore."
       },
       "chat": {
         "title": "Chiedere a Claude",
-        "body": "Apri Claude dalla barra laterale (Ctrl+J) e usa la tavolozza dei comandi per le richieste già pronte. Claude vede solo i documenti delle cartelle che hai abilitato, e prima di inviare puoi vedere in anteprima che cosa viene inviato."
+        "body": "Apri Claude dalla barra laterale (Ctrl+J) e usa la tavolozza dei comandi per le richieste già pronte. Claude vede solo i documenti delle cartelle che hai abilitato, e prima di inviare puoi vedere in anteprima che cosa viene inviato. Puoi scegliere se usare l'accesso di Claude Code o una chiave API. Prova la connessione costa circa 0,001 $ e non invia documenti. Cambia account apre una finestra di Claude Code; poi torna qui e premi Ho finito, verifica. Uscire da Claude Code vale anche nel terminale."
       },
       "network": {
         "title": "Esplorare la mappa",
@@ -31,7 +31,7 @@
       },
       "backup": {
         "title": "Fare il backup della libreria",
-        "body": "Nelle impostazioni scegli una cartella di destinazione e premi Esegui il backup ora, oppure attiva il backup automatico. Un backup si può verificare e ripristinare come nuova libreria in qualsiasi momento. I segreti come le chiavi API non vengono mai salvati in un backup."
+        "body": "Nelle impostazioni scegli una cartella di destinazione e premi Esegui il backup ora, oppure attiva il backup automatico. Un backup si può verificare e ripristinare come nuova libreria in qualsiasi momento. I segreti come le chiavi API non vengono mai salvati in un backup. Le impostazioni si salvano da sole: cercale dalla casella in alto a sinistra (Ctrl+,). Le opzioni tecniche sono in Sviluppatore / Avanzate. La prima volta l'app parte nella lingua del sistema (italiano o inglese); le librerie si gestiscono con Gestisci le librerie…"
       }
     },
     "welcome": {

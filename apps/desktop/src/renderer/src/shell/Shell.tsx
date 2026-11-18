@@ -17,7 +17,7 @@ import { Icon } from './shellIcons';
 
 // The chat and the command palette (and all the AI code with them) load the first time they are shown.
 const ChatPanel = lazyView(() => import('../views/chat/ChatPanel').then((m) => ({ default: m.ChatPanel })), ['chat', 'chat-preview']);
-const Palette = lazyView(() => import('../views/chat/Palette').then((m) => ({ default: m.Palette })), ['palette']);
+const Palette = lazyView(() => import('../views/chat/Palette').then((m) => ({ default: m.Palette })), ['palette', 'settings']);
 // The second-brain export dialog loads when an entry point (project, cluster, selection, palette) opens it.
 const ExportDialog = lazyView(() => import('../views/export/ExportDialog').then((m) => ({ default: m.ExportDialog })), ['export']);
 

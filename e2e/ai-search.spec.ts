@@ -1,6 +1,7 @@
 import { expect, test, type TestInfo } from '@playwright/test';
 import { launchApp, type LaunchedApp } from './helpers/launch';
 import { createLibraryViaWizard, skipUnlessChannels, waitForScan } from './helpers/phase1';
+import { enableAiWholeLibrary, waitClaudeReady } from './helpers/settings';
 import { rows } from './helpers/ui';
 
 /**
@@ -30,11 +31,8 @@ test('advanced search: estimate, then a streamed answer with cards and chips in 
     await openLibrary(ctx, testInfo);
     const word = ctx.library!.manifest!.files.find((f) => f.format === 'pdf' && f.title)!.title!.split(/\s+/).find((w) => w.length > 5)!;
 
-    await window.getByTestId('nav-settings').click();
-    await expect(window.getByTestId('ai-available')).toHaveText('Available', { timeout: 30_000 });
-    await window.getByTestId('ai-root-all').check();
-    await window.getByTestId('ai-save').click();
-    await expect(window.getByTestId('ai-settings').getByText('Saved')).toBeVisible();
+    await waitClaudeReady(window);
+    await enableAiWholeLibrary(window);
 
     await window.getByTestId('nav-library').click();
     await window.getByTestId('search-input').fill(word);

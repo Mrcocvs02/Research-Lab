@@ -97,7 +97,8 @@
       "docs": "Documenti",
       "goto": "Vai a",
       "actions": "Azioni",
-      "claude": "Chiedi a Claude"
+      "claude": "Chiedi a Claude",
+      "settings": "Impostazioni"
     },
     "paletteNoLibrary": "Apri prima una libreria"
   }

@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { writeSyntheticPdf } from '@rl/testkit';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -1293,4 +1293,397 @@ test('design audit tour, English UI on the English library', async () => {
   test.skip(!ENABLED, 'design audit: set RL_DESIGN_AUDIT=1');
   test.setTimeout(40 * 60_000);
   await runTour('en', process.env.RL_DESIGN_AUDIT_FULL_EN === '1');
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Wave 2 tour (audit round 5): the new shell (A2) and settings (C2), the Claude account card on a SIMULATED Claude Code
+// (RL_E2E_CLAUDE_SIM, as in ai-account.spec.ts: the real program and account are never touched), the library and the
+// reader (not yet migrated). The prototype P0 is compared by eye in a browser. Run on its own:
+//   RL_DESIGN_AUDIT=1 RL_DESIGN_AUDIT_OUT=run6-w2 npx playwright test -c e2e/playwright.config.ts design-audit -g "wave 2"
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Runs in the page: visible controls inside `sel` (minus those inside `not`), with labels, for the counts of §17.3. */
+function zoneControls([sel, not]: [string, string]) {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const root = document.querySelector(sel);
+  if (!root) return { found: false, n: 0, labels: [] as string[] };
+  const els = [...root.querySelectorAll('button, input, select, textarea, a[href], [role=button], [role=tab], [role=radio], [role=menuitem], [role=option], summary')].filter((el) => {
+    if (not && el.closest(not)) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1 || r.bottom <= 0 || r.right <= 0 || r.top >= vh || r.left >= vw) return false;
+    const s = getComputedStyle(el);
+    return s.visibility !== 'hidden' && s.display !== 'none' && parseFloat(s.opacity) > 0.05;
+  });
+  const labels = els.map((el) => (el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || (el as HTMLInputElement).placeholder || el.tagName).trim().replace(/\s+/g, ' ').slice(0, 32));
+  return { found: true, n: els.length, labels };
+}
+
+async function count(a: Audit, key: string, sel: string, not = ''): Promise<void> {
+  a.facts[`count-${key}-${a.theme}-${a.size}`] = await a.page.evaluate(zoneControls, [sel, not] as [string, string]).catch((e) => String(e));
+}
+
+async function closeTransient(a: Audit): Promise<void> {
+  await a.page.keyboard.press('Escape').catch(() => {});
+  await a.page.waitForTimeout(250);
+}
+
+/** Every section of the one-page settings (folds closed), the search, then the Advanced folds open one at a time. */
+async function settingsW2(a: Audit, prefix: string): Promise<void> {
+  const w = a.page;
+  const sections = ['general', 'profile', 'library', 'claude', 'backup', 'shortcuts', 'advanced'] as const;
+  await a.step(`${prefix} settings open`, async () => {
+    await nav(a, 'settings');
+    await expect(w.getByTestId('settings-page')).toBeVisible({ timeout: 30_000 });
+    await w.waitForTimeout(800);
+  });
+  for (const s of sections) {
+    await a.step(`${prefix} settings ${s}`, async () => {
+      await w.getByTestId(`settings-nav-${s}`).click();
+      await expect(w.getByTestId(`settings-section-${s}`)).toBeVisible();
+      await w.waitForTimeout(s === 'claude' ? 2500 : 900);
+      const g = await w.evaluate(() => {
+        const m = document.querySelector('main')!;
+        const sc = ([...document.querySelectorAll('[data-testid="settings-page"], [data-testid="settings-page"] *')].find((e) => e.scrollHeight > e.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(e).overflowY)) as HTMLElement | undefined) ?? m;
+        return { scrollHeight: sc.scrollHeight, clientHeight: sc.clientHeight };
+      });
+      a.facts[`${prefix}-settings-${s}-geometry-${a.size}`] = g;
+      await count(a, `${prefix}-settings-${s}`, `[data-testid="settings-section-${s}"]`);
+      await a.shot(`settings-${s}`, 2, s === 'general' ? { focus: 12 } : {});
+      for (let y = g.clientHeight - 60, i = 2; y < g.scrollHeight && i <= 6; y += g.clientHeight - 60, i++) {
+        await w.evaluate((top) => {
+          const m = document.querySelector('main')!;
+          const sc = ([...document.querySelectorAll('[data-testid="settings-page"], [data-testid="settings-page"] *')].find((e) => e.scrollHeight > e.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(e).overflowY)) as HTMLElement | undefined) ?? m;
+          sc.scrollTo(0, top);
+        }, y);
+        await w.waitForTimeout(250);
+        await a.shot(`settings-${s}-p${i}`, 2);
+      }
+      await w.evaluate(() => document.querySelectorAll('main, [data-testid="settings-page"] *').forEach((e) => e.scrollTop && e.scrollTo(0, 0)));
+    });
+  }
+  await a.step(`${prefix} settings nav count`, async () => count(a, `${prefix}-settings-nav`, '[data-testid="settings-page"]', '[data-testid^="settings-section-"]'));
+  await a.step(`${prefix} settings search`, async () => {
+    await w.getByTestId('settings-search').fill(prefix === 'it' ? 'chiave' : 'key');
+    await w.waitForTimeout(700);
+    await a.shot('settings-search', 3);
+    await w.getByTestId('settings-search').fill('');
+  });
+  for (const fold of ['claude', 'mcp', 'scan', 'export', 'maintenance']) {
+    await a.step(`${prefix} advanced fold ${fold}`, async () => {
+      await w.getByTestId('settings-nav-advanced').click();
+      const g = w.getByTestId(`settings-fold-${fold}`);
+      if ((await g.getAttribute('open')) === null) await g.locator('summary').first().click();
+      await w.waitForTimeout(1200);
+      await g.scrollIntoViewIfNeeded();
+      await count(a, `${prefix}-advanced-${fold}`, `[data-testid="settings-fold-${fold}"]`);
+      a.facts[`${prefix}-advanced-${fold}-height`] = await g.evaluate((e) => Math.round(e.getBoundingClientRect().height));
+      await a.shot(`advanced-${fold}`, 3);
+      await g.locator('summary').first().click();
+    });
+  }
+}
+
+/** The Account card in its states, driven only through the simulated Claude Code state file. */
+async function accountStates(a: Audit, sim: string, lang: 'it' | 'en'): Promise<void> {
+  const w = a.page;
+  const st = (o: Record<string, unknown> = {}) => writeFileSync(path.join(sim, 'state.json'), JSON.stringify({ loggedIn: true, email: 'first@example.test', orgName: 'Example Org', subscriptionType: 'pro', version: '9.1.2', ...o }));
+  // The page reads `claude auth status` when it opens, then only the change event: `leave` also leaves the page.
+  const reopen = async (leave = true) => {
+    if (leave) {
+      await nav(a, 'library');
+      await nav(a, 'settings');
+    } else {
+      await w.getByTestId('settings-nav-general').click();
+      await w.waitForTimeout(300);
+    }
+    await w.getByTestId('settings-nav-claude').click();
+    await w.waitForTimeout(2500);
+  };
+  const card = w.getByTestId('ai-account');
+  const cardShot = async (name: string, clicks: number) => {
+    await card.scrollIntoViewIfNeeded().catch(() => {});
+    await a.shot(name, clicks);
+    await card.screenshot({ path: path.join(OUT, `${a.run}-card-${name}-${a.theme}.png`), scale: 'css' }).catch(() => {});
+  };
+  await a.step('account connected', async () => {
+    st();
+    await nav(a, 'settings');
+    await reopen();
+    await count(a, 'account-card', '[data-testid="ai-account"]');
+    await cardShot('account-connected', 2);
+  });
+  await a.step('account test connection', async () => {
+    await w.getByTestId('ai-test').click();
+    await expect(w.getByTestId('ai-test-result')).toBeVisible({ timeout: 20_000 });
+    await cardShot('account-tested', 3);
+  });
+  await a.step('account more menu', async () => {
+    await w.getByTestId('ai-account-more').click();
+    await w.waitForTimeout(400);
+    await a.shot('account-more-menu', 3);
+    await closeTransient(a);
+  });
+  await a.step('account change dialog', async () => {
+    await w.getByTestId('ai-change-account').click();
+    await w.waitForTimeout(500);
+    await a.shot('account-change-dialog', 3);
+    await w.getByTestId('ai-login-open').click();
+    await expect(w.getByTestId('ai-login-wait')).toBeVisible();
+    await a.shot('account-login-waiting', 4);
+    st({ email: 'second@example.test', subscriptionType: 'max' });
+    await w.getByTestId('ai-login-done').click();
+    await w.waitForTimeout(1500);
+    await cardShot('account-switched', 5);
+  });
+  await a.step('account api-key mode without key', async () => {
+    await w.getByTestId('ai-auth-mode').getByRole('radio', { name: lang === 'it' ? 'Chiave API' : 'API key' }).click();
+    await w.waitForTimeout(1200);
+    await cardShot('account-apikey-mode-no-key', 3);
+    await w.getByTestId('ai-auth-mode').getByRole('radio', { name: lang === 'it' ? 'Automatico' : 'Automatic' }).click();
+    await w.waitForTimeout(800);
+  });
+  await a.step('account logged out', async () => {
+    st({ loggedIn: false, email: undefined, subscriptionType: undefined });
+    await reopen(false);
+    await cardShot('account-not-logged-in-same-page', 2);
+    await reopen();
+    await cardShot('account-not-logged-in', 2);
+  });
+  await a.step('account no auth commands', async () => {
+    st({ authCommands: false });
+    await reopen();
+    await cardShot('account-no-auth-commands', 2);
+  });
+  st();
+}
+
+/** Shell: sidebar, top bar, history, library switcher, Activity, palette, toast, badges. */
+async function shellW2(a: Audit, lang: 'it' | 'en'): Promise<void> {
+  const w = a.page;
+  await a.step('shell library home', async () => {
+    await nav(a, 'library');
+    await w.waitForTimeout(800);
+    await count(a, 'sidebar', '.app-sidebar');
+    await count(a, 'topbar', '[data-testid="topbar"]');
+    await count(a, 'library-view', '[data-testid="section-library"]', '[data-testid="search-results"], [data-testid="detail-pane"]');
+    await a.shot('shell-library', 0, { focus: 20 });
+    a.facts[`shell-geometry-${a.size}`] = await w.evaluate(() => {
+      const r = (s: string) => {
+        const e = document.querySelector(s);
+        if (!e) return null;
+        const b = e.getBoundingClientRect();
+        return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) };
+      };
+      return { sidebar: r('.app-sidebar'), topbar: r('[data-testid="topbar"]'), main: r('main'), search: r('[data-testid="topbar-search"]'), chip: r('[data-testid="scan-status"]'), switcher: r('[data-testid="library-switcher"]'), libSearch: r('[data-testid="search-input"]') };
+    });
+  });
+  await a.step('shell sidebar collapsed', async () => {
+    await w.getByTestId('sidebar-toggle').click();
+    await w.waitForTimeout(500);
+    await a.shot('shell-sidebar-collapsed', 1);
+    await w.getByTestId('sidebar-toggle').click();
+    await w.waitForTimeout(400);
+  });
+  await a.step('shell library switcher', async () => {
+    await w.getByTestId('library-switcher').click();
+    await w.waitForTimeout(700);
+    await a.shot('shell-library-switcher', 1);
+    await closeTransient(a);
+  });
+  await a.step('shell activity idle', async () => {
+    await w.getByTestId('scan-status').click();
+    await expect(w.getByTestId('activity-popover')).toBeVisible();
+    await w.waitForTimeout(600);
+    await count(a, 'activity-popover', '[data-testid="activity-popover"]');
+    await a.shot('shell-activity-idle', 1);
+    await closeTransient(a);
+  });
+  await a.step('shell history', async () => {
+    await w.getByTestId('history-toggle').click();
+    await w.waitForTimeout(600);
+    await a.shot('shell-history-empty', 1);
+    await closeTransient(a);
+  });
+  await a.step('shell palette', async () => {
+    await w.getByTestId('palette-open').click();
+    await w.waitForTimeout(700);
+    a.facts[`palette-items-empty-${a.size}`] = await w.getByTestId('palette-item').count();
+    await a.shot('shell-palette', 1);
+    await w.getByTestId('palette-input').fill(lang === 'it' ? 'imp' : 'sett');
+    await w.waitForTimeout(500);
+    await a.shot('shell-palette-typed', 2);
+    await closeTransient(a);
+  });
+  await a.step('shell toast and activity with a job', async () => {
+    await w.getByTestId('search-result').first().click();
+    await w.waitForTimeout(400);
+    await count(a, 'library-selection', '[data-testid="selection-bar"]');
+    await a.shot('library-selection', 1);
+    await w.getByTestId('bulk-citations').click();
+    await w.waitForTimeout(900);
+    await a.shot('shell-toast', 2);
+    await w.waitForTimeout(3500);
+    await a.shot('shell-activity-chip-after-job', 2);
+    await w.getByTestId('scan-status').click();
+    await w.waitForTimeout(700);
+    await count(a, 'activity-popover-rows', '[data-testid="activity-popover"]');
+    await a.shot('shell-activity-with-rows', 3);
+    await closeTransient(a);
+    await w.getByTestId('selection-clear').click().catch(() => {});
+  });
+  await a.step('shell review badge', async () => {
+    const outside = await mkdtemp(path.join(os.tmpdir(), 'rl-audit-drop-'));
+    const src = path.join(outside, 'download.pdf');
+    await writeSyntheticPdf(src, { title: 'Dropped synthetic paper on attention', authors: ['Bo Sample'], year: 2025, body: 'Body.', doi: '10.5555/audit.0001' });
+    await ipcData(w, 'inbox:add', { paths: [src] });
+    await expect(w.getByTestId('inbox-badge')).toBeVisible({ timeout: 30_000 });
+    a.facts['review-badge'] = await w.getByTestId('nav-review').evaluate((e) => ({ text: e.textContent, aria: e.getAttribute('aria-label'), title: e.getAttribute('title'), badgeAria: e.querySelector('[data-testid="inbox-badge"]')?.getAttribute('aria-label') ?? null }));
+    await w.getByTestId('nav-review').hover();
+    await w.waitForTimeout(1200);
+    await a.shot('shell-review-badge-hover', 0);
+    await w.getByTestId('sidebar-toggle').click();
+    await w.waitForTimeout(500);
+    await w.getByTestId('nav-review').hover();
+    await w.waitForTimeout(1200);
+    await a.shot('shell-review-badge-collapsed', 1);
+    await w.getByTestId('sidebar-toggle').click();
+  });
+}
+
+/** Views that later waves migrate, as they look inside the new shell. */
+async function viewsW2(a: Audit): Promise<void> {
+  const w = a.page;
+  for (const v of ['review', 'projects', 'discover', 'map'] as const) {
+    await a.step(`view ${v} ${a.theme} ${a.size}`, async () => {
+      await nav(a, v);
+      await w.waitForTimeout(v === 'map' ? 2000 : 1000);
+      await a.shot(`view-${v}`, 1);
+    });
+  }
+  await a.step(`view library detail ${a.theme} ${a.size}`, async () => {
+    await nav(a, 'library');
+    await w.getByTestId('search-result').first().click();
+    await w.getByTestId('selection-details').click();
+    await w.waitForTimeout(900);
+    await a.shot('view-library-detail', 2);
+    await closeTransient(a);
+    await w.getByTestId('selection-clear').click().catch(() => {});
+  });
+  await a.step(`view chat ${a.theme} ${a.size}`, async () => {
+    await nav(a, 'library');
+    const t = w.getByTestId('chat-toggle');
+    if ((await t.getAttribute('aria-expanded')) !== 'true') await t.click();
+    await w.waitForTimeout(800);
+    await a.shot('view-library-chat', 1);
+    await t.click().catch(() => closeTransient(a));
+    await w.waitForTimeout(300);
+  });
+}
+
+async function readerW2(a: Audit, ctx: LaunchedApp): Promise<void> {
+  const w = a.page;
+  const pdf = ctx.library!.manifest!.files.find((f) => f.format === 'pdf' && f.title && f.hasText !== false)!;
+  await a.step(`reader ${a.theme} ${a.size}`, async () => {
+    await nav(a, 'library');
+    const row = w.getByTestId('search-result').filter({ hasText: pdf.title! }).first();
+    await row.hover();
+    await row.getByTestId('row-read').click();
+    await expect(w.getByTestId('reader')).toBeVisible();
+    await expect(w.locator('[data-testid="reader-pages-area"] .page[data-page-number="1"] canvas')).toBeVisible({ timeout: 60_000 });
+    await w.waitForTimeout(1500);
+    const bytes = readFileSync(path.join(ctx.library!.root, pdf.relPath)).toString('latin1');
+    const mb = bytes.match(/\/MediaBox\s*\[\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\]/);
+    const media = mb ? { w: Number(mb[3]) - Number(mb[1]), h: Number(mb[4]) - Number(mb[2]) } : null;
+    a.facts[`reader-geometry-${a.theme}-${a.size}`] = { media, ...(await w.evaluate(readerGeometry)) };
+    a.facts[`reader-leaked-${a.size}`] = await w.evaluate(leakedRules);
+    await count(a, 'reader', '[data-testid="reader"]', '[data-testid="reader-pages-area"]');
+    await a.shot('reader', 2);
+    await w.getByTestId('reader-close').click().catch(() => w.keyboard.press('Escape'));
+    await w.waitForTimeout(600);
+  });
+  await a.step(`after reader ${a.theme} ${a.size}`, async () => {
+    a.facts[`after-reader-sidebar-${a.size}`] = await w.evaluate(() => {
+      const s = getComputedStyle(document.querySelector('.app-sidebar')!);
+      return { radius: s.borderRadius, shadow: s.boxShadow, padding: s.padding, width: s.width };
+    });
+  });
+}
+
+async function runW2(lang: 'it' | 'en'): Promise<void> {
+  mkdirSync(OUT, { recursive: true });
+  const sim = await mkdtemp(path.join(os.tmpdir(), 'rl-claude-sim-'));
+  mkdirSync(path.join(sim, '.claude'), { recursive: true });
+  writeFileSync(path.join(sim, 'state.json'), JSON.stringify({ loggedIn: true, email: 'first@example.test', orgName: 'Example Org', subscriptionType: 'pro', version: '9.1.2' }));
+  writeFileSync(path.join(sim, '.claude', '.credentials.json'), '{}');
+  const ctx = await launchApp({ library: lang, dialogPath: true, offline: true, env: { RL_E2E: '1', RL_E2E_CLAUDE_SIM: sim, RL_AI_PROVIDER: 'mock' } });
+  const a = new Audit(`w2${lang}`, ctx);
+  try {
+    a.facts['dpr'] = await ctx.window.evaluate(() => window.devicePixelRatio);
+    await a.setSize(1280, 800);
+    await wizard(a, lang, lang === 'it' ? 'La mia tesi' : 'My thesis');
+    const total = ctx.library!.manifest!.files.length;
+    await waitForScan(ctx.window, total);
+    await expect(ctx.window.getByTestId('scan-status')).toHaveAttribute('data-state', 'done', { timeout: 180_000 });
+    await ctx.window.waitForTimeout(1500);
+    await a.step('first screen', async () => {
+      await a.shot('first-screen', 0);
+      if (await visibleNow(ctx.window.getByTestId('welcome-dismiss'))) await ctx.window.getByTestId('welcome-dismiss').click();
+    });
+    await shellW2(a, lang);
+    await settingsW2(a, lang);
+    await accountStates(a, sim, lang);
+    await viewsW2(a);
+    await readerW2(a, ctx);
+    const combos: [Theme, number, number][] = [
+      ['dark', 1280, 800],
+      ['light', 1920, 1080],
+      ['dark', 1920, 1080],
+    ];
+    for (const [theme, cw, ch] of combos) {
+      await a.setSize(cw, ch);
+      await a.setTheme(theme);
+      await a.step(`matrix shell ${theme} ${cw}`, async () => {
+        await nav(a, 'library');
+        await count(a, 'topbar', '[data-testid="topbar"]');
+        await a.shot('shell-library', 1);
+        await a.page.getByTestId('scan-status').click();
+        await a.page.waitForTimeout(600);
+        await a.shot('shell-activity', 1);
+        await closeTransient(a);
+        await a.page.getByTestId('palette-open').click();
+        await a.page.waitForTimeout(600);
+        await a.shot('shell-palette', 1);
+        await closeTransient(a);
+      });
+      await a.step(`matrix settings ${theme} ${cw}`, async () => {
+        await nav(a, 'settings');
+        for (const s of ['general', 'claude', 'advanced', 'backup']) {
+          await a.page.getByTestId(`settings-nav-${s}`).click();
+          await a.page.waitForTimeout(s === 'claude' ? 2000 : 700);
+          await a.shot(`settings-${s}`, 1);
+        }
+      });
+      if (lang === 'it' || theme === 'light') await viewsW2(a);
+      await readerW2(a, ctx);
+    }
+    await a.setSize(1280, 800);
+    await a.setTheme('light');
+  } finally {
+    a.flush();
+    await ctx.close();
+    rmSync(sim, { recursive: true, force: true });
+  }
+}
+
+test('design audit wave 2 tour, Italian', async () => {
+  test.skip(!ENABLED, 'design audit: set RL_DESIGN_AUDIT=1');
+  test.setTimeout(30 * 60_000);
+  await runW2('it');
+});
+
+test('design audit wave 2 tour, English', async () => {
+  test.skip(!ENABLED, 'design audit: set RL_DESIGN_AUDIT=1');
+  test.setTimeout(30 * 60_000);
+  await runW2('en');
 });

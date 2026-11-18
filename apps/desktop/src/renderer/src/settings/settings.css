@@ -290,6 +290,12 @@ h3.caption + .srow {
   color: var(--text-muted);
   font-size: var(--fs-small);
 }
+.acct__usage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  align-items: center;
+}
 .acct__test {
   text-align: right;
 }

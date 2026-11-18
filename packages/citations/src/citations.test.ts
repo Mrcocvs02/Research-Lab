@@ -4,7 +4,7 @@ import { arxivFromDoi, bestKey, buildOwnedIndex, findOwned, isOwn, linkKey, link
 import { clean, encodePath, normaliseDoi, pathDoi } from './metadata.js';
 import { createNet } from './net.js';
 import { createCitationService, createCitationSources } from './service.js';
-import { createOpenAlex, createSemanticScholar } from './sources.js';
+import { createOpenAlex, createSemanticScholar, openAlexLink } from './sources.js';
 import { createWatchFetcher } from './watch.js';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -489,5 +489,23 @@ describe('watch queries: own preprints and pages', () => {
     const r = await createWatchFetcher(createNet({ fetch: f, ...noSleep }))({ kind: 'topic', query: 'busy', since });
     expect(r.truncated).toBe(true);
     expect(r.hits).toHaveLength(5);
+  });
+});
+
+describe('OpenAlex links carry the arXiv id of the preprint location', () => {
+  const work = {
+    id: 'https://openalex.org/W77',
+    doi: 'https://doi.org/10.1001/journal.77',
+    title: 'Published title of a synthetic study',
+    publication_year: 2021,
+    authorships: [{ author: { display_name: 'Ada Person' } }],
+    locations: [{ landing_page_url: 'https://doi.org/10.1001/journal.77' }, { landing_page_url: 'http://arxiv.org/abs/2101.01234v2' }],
+  };
+  it('derives the arXiv id from locations and matches a library document known only by it', () => {
+    const link = openAlexLink(work, '2024-01-01T00:00:00Z');
+    expect(link.doi).toBe('10.1001/journal.77');
+    expect(link.arxivId).toBe('2101.01234v2');
+    const ix = buildOwnedIndex([{ id: 'd1', doi: null, arxivId: '2101.01234', title: 'Different preprint title entirely', year: 2021, authors: ['Ada Person'] }] as unknown as DocumentRecord[]);
+    expect(findOwned(ix, link)).toBe('d1');
   });
 });

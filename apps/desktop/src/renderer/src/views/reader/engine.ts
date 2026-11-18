@@ -1,6 +1,6 @@
 import { loadPdfjs, pdfDocumentParams } from '../../lib/pdfjs';
 import './pdfjs-viewer.css';
-import type { Rect } from './geometry';
+import { dominantPage, type Rect } from './geometry';
 import { locateInTextLayer } from './repair';
 import { readFindMatch, readRange, type SelectionRead } from './selection';
 
@@ -47,6 +47,8 @@ export interface Viewer {
   goTo(page: number, y?: number): void;
   zoomBy(direction: 1 | -1): void;
   fitWidth(): void;
+  /** A fixed zoom (a fraction, 1 = 100 %) or the whole page in the window. */
+  zoomTo(value: number | 'page-fit'): void;
   find(query: string, opts?: { again?: boolean; backwards?: boolean }): void;
   clearFind(): void;
   /** The selected text of the document, split by page; `skipped` counts pages of the selection whose text is not drawn yet. */
@@ -139,9 +141,31 @@ export async function createViewer(container: HTMLDivElement, viewerEl: HTMLDivE
     viewer.currentScaleValue = 'page-width';
     if (pendingPage > 1) viewer.currentPageNumber = Math.min(pendingPage, viewer.pagesCount);
     handlers.onPages(viewer.pagesCount);
-    handlers.onPage(viewer.currentPageNumber);
+    showPage(viewer.currentPageNumber);
   });
-  eventBus.on('pagechanging', (e: { pageNumber: number }) => handlers.onPage(e.pageNumber));
+  let shown = 0;
+  const showPage = (n: number) => {
+    if (n !== shown) handlers.onPage((shown = n));
+  };
+  eventBus.on('pagechanging', (e: { pageNumber: number }) => showPage(e.pageNumber));
+  // The field names the page with the most area in the window, not the first one that touches it (N17).
+  let frame = 0;
+  const onScroll = () => {
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      const cur = viewer.currentPageNumber;
+      const box = container.getBoundingClientRect();
+      const near: Array<[number, number, number]> = [];
+      for (let n = Math.max(1, cur - 1); n <= Math.min(viewer.pagesCount, cur + 2); n++) {
+        const r = pageDivOf(n)?.getBoundingClientRect();
+        if (r) near.push([n, r.top, r.bottom]);
+      }
+      const n = dominantPage(near, { top: box.top, bottom: box.bottom });
+      if (n !== null) showPage(n);
+    });
+  };
+  container.addEventListener('scroll', onScroll, { passive: true });
   eventBus.on('scalechanging', (e: { scale: number; presetValue?: string }) => {
     fit = e.presetValue === 'page-width';
     handlers.onZoom(Math.round(e.scale * 100), fit);
@@ -224,6 +248,10 @@ export async function createViewer(container: HTMLDivElement, viewerEl: HTMLDivE
     fitWidth() {
       viewer.currentScaleValue = 'page-width';
     },
+    zoomTo(value) {
+      if (value === 'page-fit') viewer.currentScaleValue = 'page-fit';
+      else viewer.currentScale = value;
+    },
     find(query, opts = {}) {
       eventBus.dispatch('find', { source: null, type: opts.again ? 'again' : '', query, caseSensitive: false, entireWord: false, highlightAll: true, findPrevious: opts.backwards === true, matchDiacritics: true });
     },
@@ -269,6 +297,8 @@ export async function createViewer(container: HTMLDivElement, viewerEl: HTMLDivE
     destroy() {
       destroyed = true;
       container.removeEventListener('click', onLinkClick, true);
+      container.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(frame);
       resizer?.disconnect();
       layers.clear();
       try {

@@ -8,7 +8,7 @@
   - Fasi 0–3 chiuse con tag; fasi 4 e 5 complete nel codice; fase 6 e 7 complete con tag; fase 8 completa nel codice. Dettagli in `docs/HISTORY.md`.
   - Design: P0 approvato dall'utente (D-383); scelte delle funzioni nuove (D-389..D-409); critica del giro 4 chiusa (D-410..D-428): barra del lettore a 13 controlli, menu al massimo 7 voci in al massimo 3 gruppi, progetto al massimo 4 schede.
   - Onda 0: H0 correzione dello stretch PDF e CSS di pdf.js prefissato; R0 riparazione headless nel worker, annulla che azzera la geometria (D-429, D-430); S1 spike di autenticazione della CLI di Claude (`docs/design/spike-auth.md`, D-431); S2 prototipo di scrittura PDF in `tools/spikes/pdf-annot` (D-432); contratti per le ondate successive (D-433).
-  - Onda 1: A1 token (accento Petrolio provvisorio), CSS diviso in parti, componenti; B1 account Claude, uso di tutte le librerie, rapporto di scansione, lingua al primo avvio (D-435).
+  - Onda 1: A1 token (accento Petrolio, confermato D-448), CSS diviso in parti, componenti; B1 account Claude, uso di tutte le librerie, rapporto di scansione, lingua al primo avvio (D-435).
   - Onda 2: C2 pagina impostazioni con sotto-menu, ricerca, salvataggio automatico, scheda account Claude, Avanzate; A2 nuova shell, barra laterale, barra superiore, chip e popover Attività, badge, tavolozza (D-437, D-438).
   - Audit visivo round 5 (`docs/design/AUDIT.md`, D-441); R2 correzioni dei risultati, Annulla fuori dalla barra superiore.
   - Prova con dati reali (tesi dell'utente e 2 articoli Styliaris 2025, copie in una cartella temporanea fuori dal repository): bug corretti in `fix-real`; feedback registrato in D-446.

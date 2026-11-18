@@ -85,12 +85,8 @@ Comandi utili (in Git Bash, prima: `export PATH="/c/Program Files/nodejs:$PATH"`
 
 Non bloccanti: decidere quanto possibile e registrare.
 
-- Accento: Petrolio (provvisorio) oppure Indaco.
-- Default provvisori da confermare (non ancora risposte):
-  1. Nessun nome dell'autore nelle annotazioni PDF (D-328, opt-in).
-  2. Copia di sicurezza dei PDF annotati nella cartella dati sincronizzata (si può passare alla cartella locale).
-  3. Esc non chiude il lettore (D-329).
-  4. Nell'Account Claude il consumo del mese mostra la libreria attiva (totale di tutte le librerie al clic).
+- Confermati dall'utente (D-448): accento Petrolio; nessun nome autore nelle annotazioni PDF; copia di sicurezza nella cartella dati sincronizzata; Esc non chiude il lettore. Tag pesati e senza limite di numero (D-447).
+- Ancora provvisorio: nell'Account Claude il consumo del mese mostra la libreria attiva (totale di tutte le librerie al clic).
 - Funzione 49 generalizzata oltre la tesi: confermare (D-399, D-422).
 - Funzione 26 (operatori di ricerca): da decidere.
 - Fase 4, criteri su dati reali (poi tag `phase-4`):

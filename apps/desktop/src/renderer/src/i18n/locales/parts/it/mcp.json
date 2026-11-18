@@ -84,6 +84,7 @@
       "ok": "OK",
       "failed": "Fallita ({{code}})",
       "more": "Mostra altre ({{shown}} di {{total}})"
-    }
+    },
+    "toolsTitle": "Strumenti disponibili"
   }
 }

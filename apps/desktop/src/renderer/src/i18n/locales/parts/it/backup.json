@@ -1,6 +1,6 @@
 {
   "backup": {
-    "title": "Backup e ripristino",
+    "title": "Backup",
     "intro": "Un backup è un unico file con la cartella dati della libreria (note, evidenziazioni, citazioni, progetti, tassonomia) e, se vuoi, la cronologia delle chat e lo stato di lettura. I documenti originali non sono inclusi: restano dove sono. Chiavi API e token non vengono mai salvati.",
     "internalNote": "È una tua copia, in una cartella che scegli tu, che puoi spostare, verificare e ripristinare. È diversa dalla copia di sicurezza automatica che l'app tiene per sé per annullare i propri errori.",
     "destination": {
@@ -10,10 +10,12 @@
       "clear": "Dimentica la cartella",
       "none": "Nessuna cartella scelta.",
       "hint": "Scegli una cartella fuori dalle cartelle delle librerie, ad esempio su un altro disco o in una cartella sincronizzata.",
-      "syncNote": "Se la destinazione è in una cartella sincronizzata, i file di backup vengono caricati con essa. I backup automatici non includono mai le chat; quelli manuali solo se lo scegli qui sotto."
+      "syncNote": "Se la destinazione è in una cartella sincronizzata, i file di backup vengono caricati con essa. I backup automatici non includono mai le chat; quelli manuali solo se lo scegli qui sotto.",
+      "another": "Scegli un'altra cartella…",
+      "pick": "Scegli dove salvare i backup",
+      "refused": "Questa cartella non si può usare"
     },
     "schedule": {
-      "title": "Backup automatico",
       "label": "Frequenza",
       "hint": "Viene controllato una volta all'avvio dell'app; niente gira in background.",
       "off": "Spento",
@@ -76,7 +78,6 @@
     "list": {
       "title": "Backup",
       "empty": "Nessun backup nella cartella di destinazione.",
-      "noDestination": "Scegli una cartella di destinazione per vedere qui i tuoi backup, oppure apri un file di backup.",
       "openFile": "Apri un file di backup…",
       "fileDialogTitle": "Scegli un file di backup",
       "docs_one": "{{count}} documento",
@@ -85,8 +86,6 @@
         "manual": "manuale",
         "auto": "automatico"
       },
-      "local": "con dati locali",
-      "settings": "con impostazioni",
       "newer": "formato più recente"
     },
     "errors": {
@@ -116,7 +115,7 @@
       "holds": "Contenuto",
       "holdsValue": "{{documents}} documenti, {{files}} file, {{size}}",
       "root": "Cartella dei documenti",
-      "rootHint": "Scegli la cartella in cui, su questo computer, si trovano i documenti di questa libreria. La cartella dati viene creata al suo interno.",
+      "rootHint": "Scegli una cartella vuota: il ripristino crea lì una libreria nuova. La cartella dati viene creata al suo interno.",
       "chooseRoot": "Scegli cartella…",
       "changeRoot": "Cambia cartella…",
       "chooseRootTitle": "Scegli la cartella dei documenti",
@@ -128,12 +127,11 @@
       "settings": "Ripristina anche le impostazioni salvate",
       "settingsHint": "Sostituisce lingua, profilo, aspetto, scorciatoie e stato della guida con quelli del backup.",
       "settingsMissing": "Le impostazioni non sono state salvate in questo backup.",
-      "noOverwrite": "Per tornare a uno stato precedente, ripristina in una cartella diversa e poi togli dall'elenco la libreria che non vuoi più.",
       "start": "Ripristina",
       "failed": "Non è stato ripristinato nulla: {{message}}",
       "cancelled": "Annullato. Non è rimasta nessuna libreria né cartella dati.",
       "again": "Riprova",
-      "done": "La libreria è stata ripristinata. L'indice di ricerca si sta ricostruendo.",
+      "done": "Libreria «{{name}}» creata.",
       "settingsApplied": "Le impostazioni salvate sono state applicate.",
       "settingsKept": "Le tue impostazioni attuali sono state mantenute.",
       "secretsTitle": "Inseriscili di nuovo nelle impostazioni (i segreti non vengono mai salvati in un backup):",
@@ -151,7 +149,21 @@
         "mcp": "Il server MCP è spento.",
         "mcp-write": "La scrittura via MCP è spenta.",
         "confirm-before-send": "La conferma prima di inviare testo a Claude è attiva."
-      }
+      },
+      "defaultName": "{{name}} (ripristinata il {{date}})",
+      "libraryRoot": "Questa cartella è già una libreria. Scegli una cartella vuota: il ripristino crea una libreria nuova.",
+      "manage": "Gestisci librerie…",
+      "manageHint": "Per togliere dall'elenco una libreria che non vuoi più:",
+      "needsRoot": "Scegli prima una cartella",
+      "open": "Apri la libreria ripristinata"
+    },
+    "moreFor": "Altro sul backup {{name}}",
+    "notListed": "Questo file non è nella cartella dei backup",
+    "verifiedOk": "Verificato",
+    "verifiedBad": "Problemi trovati",
+    "options": {
+      "title": "Opzioni",
+      "keepHelp": "Vale quando il backup automatico è acceso. I backup automatici più vecchi vengono tolti; quelli fatti a mano mai."
     }
   },
   "maintenance": {
@@ -198,6 +210,7 @@
       "shown": "Testo di diagnostica"
     },
     "copied": "Diagnostica copiata negli appunti.",
-    "backupsNote": "La copia di sicurezza interna dell'app (quella che annulla i suoi errori) non viene toccata dalla pulizia: la gestisce l'app."
+    "backupsNote": "La copia di sicurezza interna dell'app (quella che annulla i suoi errori) non viene toccata dalla pulizia: la gestisce l'app.",
+    "limits": "I processi in secondo piano si fermano dopo 30 s senza lavoro. I limiti dell’app sono fissi: qui si possono solo leggere."
   }
 }

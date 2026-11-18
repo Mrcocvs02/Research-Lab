@@ -1,6 +1,6 @@
 {
   "backup": {
-    "title": "Backup and restore",
+    "title": "Backup",
     "intro": "A backup is one file with your library data folder (notes, highlights, citations, projects, taxonomy), and optionally your chat history and reading state. Your original documents are not included: they stay where they are. API keys and tokens are never saved.",
     "internalNote": "This is your own copy, in a folder you choose, that you can move, verify and restore. It is separate from the automatic safety copy the app keeps for itself to undo its own mistakes.",
     "destination": {
@@ -10,10 +10,12 @@
       "clear": "Forget folder",
       "none": "No folder chosen yet.",
       "hint": "Choose a folder outside your library folders, for example on another disk or a synced folder.",
-      "syncNote": "If the destination is in a synced folder, the backup files are uploaded with it. Automatic backups never include chat history; manual ones only if you choose it below."
+      "syncNote": "If the destination is in a synced folder, the backup files are uploaded with it. Automatic backups never include chat history; manual ones only if you choose it below.",
+      "another": "Choose another folder…",
+      "pick": "Choose where to save the backups",
+      "refused": "This folder cannot be used"
     },
     "schedule": {
-      "title": "Automatic backup",
       "label": "How often",
       "hint": "Checked once when the app starts; nothing runs in the background.",
       "off": "Off",
@@ -76,7 +78,6 @@
     "list": {
       "title": "Backups",
       "empty": "No backups in the destination folder yet.",
-      "noDestination": "Choose a destination folder to see your backups here, or open a backup file.",
       "openFile": "Open a backup file…",
       "fileDialogTitle": "Choose a backup file",
       "docs_one": "{{count}} document",
@@ -85,8 +86,6 @@
         "manual": "manual",
         "auto": "automatic"
       },
-      "local": "with local data",
-      "settings": "with settings",
       "newer": "newer format"
     },
     "errors": {
@@ -116,7 +115,7 @@
       "holds": "Contents",
       "holdsValue": "{{documents}} documents, {{files}} files, {{size}}",
       "root": "Folder of the documents",
-      "rootHint": "Choose the folder where the documents of this library are on this computer. The data folder is created inside it.",
+      "rootHint": "Choose an empty folder: the restore creates a new library there. The data folder is created inside it.",
       "chooseRoot": "Choose folder…",
       "changeRoot": "Change folder…",
       "chooseRootTitle": "Choose the folder of the documents",
@@ -128,12 +127,11 @@
       "settings": "Also restore the saved settings",
       "settingsHint": "Replaces language, profile, appearance, shortcuts and guide state with those of the backup.",
       "settingsMissing": "The settings were not saved in this backup.",
-      "noOverwrite": "To go back to an older state, restore into a different folder and then remove the library you no longer want from the list.",
       "start": "Restore",
       "failed": "Nothing was restored: {{message}}",
       "cancelled": "Cancelled. No library and no data folder were left behind.",
       "again": "Try again",
-      "done": "The library was restored. Its search index is being rebuilt.",
+      "done": "Library “{{name}}” created.",
       "settingsApplied": "The saved settings were applied.",
       "settingsKept": "Your current settings were kept.",
       "secretsTitle": "Enter these again in the settings (secrets are never stored in a backup):",
@@ -151,7 +149,21 @@
         "mcp": "The MCP server is off.",
         "mcp-write": "MCP write access is off.",
         "confirm-before-send": "Asking before sending text to Claude is on."
-      }
+      },
+      "defaultName": "{{name}} (restored on {{date}})",
+      "libraryRoot": "This folder is already a library. Choose an empty folder: the restore creates a new library.",
+      "manage": "Manage libraries…",
+      "manageHint": "To remove a library you no longer want from the list:",
+      "needsRoot": "Choose a folder first",
+      "open": "Open the restored library"
+    },
+    "moreFor": "More about the backup {{name}}",
+    "notListed": "This file is not in the backup folder",
+    "verifiedOk": "Verified",
+    "verifiedBad": "Problems found",
+    "options": {
+      "title": "Options",
+      "keepHelp": "It applies when the automatic backup is on. Older automatic backups are removed; backups you make by hand are never removed."
     }
   },
   "maintenance": {
@@ -198,6 +210,7 @@
       "shown": "Diagnostics text"
     },
     "copied": "Diagnostics copied to the clipboard.",
-    "backupsNote": "The app's own safety copy (the one that undoes its mistakes) is not touched by cleaning; it is cleaned by the app itself."
+    "backupsNote": "The app's own safety copy (the one that undoes its mistakes) is not touched by cleaning; it is cleaned by the app itself.",
+    "limits": "Background workers stop after 30 s without work. The limits of the app are fixed: here they can only be read."
   }
 }

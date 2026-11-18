@@ -59,7 +59,7 @@ describe('McpSection', () => {
     setup();
     expect(await screen.findByTestId('mcp-state')).toBeTruthy();
     expect(screen.getByTestId('mcp-state').textContent).toBe('Off');
-    expect((screen.getByTestId('mcp-enable') as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByTestId('mcp-enable').getAttribute('aria-checked')).toBe('false');
     expect(screen.getByTestId('mcp-sees').textContent).toContain('only the documents in the 1 folder enabled for AI');
     expect((screen.getByTestId('mcp-copy-cli') as HTMLButtonElement).disabled).toBe(true);
     expect(callsTo('mcp:setEnabled')).toHaveLength(0);

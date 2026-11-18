@@ -403,3 +403,8 @@
   flex: 1 1 0;
   min-width: 0;
 }
+/* The reader scrolls its own pages: the view area keeps no scrollbar gutter beside it (the 15 px belong to the pages, W10). */
+.shell[data-reading] .main {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}

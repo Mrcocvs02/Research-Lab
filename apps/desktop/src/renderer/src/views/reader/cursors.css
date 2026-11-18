@@ -1,5 +1,7 @@
 /* Cursor and edge of the pages area per tool (4.3, 8.2.7). The cursor drawing itself is set by the reader in --reader-cursor (cursors.ts). */
+/* --reader-cursor is overwritten by the reader with the drawing of the tool (cursors.ts); `text` is the plain fallback. */
 .reader-scroll {
+  --reader-cursor: text;
   border-top: 2px solid transparent;
   transition: border-color var(--dur);
 }

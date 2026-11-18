@@ -106,7 +106,7 @@ export function Shell({ section, onSection, onNewLibrary, reviewDocs = 0, readin
         )}
         <div className="banner-slot" data-testid="banner-slot">
           <NoticeBanner />
-          {banner}
+          {reading ? null : banner}
         </div>
         <main id="main" className="main" tabIndex={-1}>
           {children}

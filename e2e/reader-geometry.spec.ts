@@ -179,10 +179,11 @@ test.describe.serial('reader geometry (H0)', () => {
 
     const sample = () =>
       window.evaluate(() => {
-        const pick = (el: Element | null) => {
+        // The width of the sidebar is not compared: it shrinks to its icons while the reader is open (W10, D-441) and comes back.
+        const pick = (el: Element | null, props = ['borderRadius', 'boxShadow', 'paddingTop', 'paddingLeft', 'borderTopWidth', 'position', 'width']) => {
           if (!el) return null;
           const s = getComputedStyle(el);
-          return ['borderRadius', 'boxShadow', 'paddingTop', 'paddingLeft', 'borderTopWidth', 'position', 'width'].map((k) => `${k}=${s.getPropertyValue(k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`))}`).join(';');
+          return props.map((k) => `${k}=${s.getPropertyValue(k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`))}`).join(';');
         };
         // A probe in the position a dialog has: the class alone must give the same style whether the reader was opened or not.
         const probe = document.createElement('div');
@@ -190,7 +191,7 @@ test.describe.serial('reader geometry (H0)', () => {
         document.body.append(probe);
         const dialog = pick(probe);
         probe.remove();
-        return { sidebar: pick(document.querySelector('.app-sidebar')), dialog };
+        return { sidebar: pick(document.querySelector('.app-sidebar'), ['borderRadius', 'boxShadow', 'paddingTop', 'paddingLeft', 'borderTopWidth', 'position']), dialog };
       });
     const after = await sample();
     await window.getByTestId('reader-close').click();
@@ -199,6 +200,86 @@ test.describe.serial('reader geometry (H0)', () => {
     expect(await sample()).toEqual(after);
     expect(after.sidebar).not.toBeNull();
     expect(after.sidebar).not.toContain('border-radius=8px');
+  });
+
+  test('the sidebar shrinks while the reader is open and comes back as the user left it (W10)', async () => {
+    test.setTimeout(180_000);
+    if ((await window.getByTestId('reader').count()) > 0) await window.getByTestId('reader-close').click();
+    await setViewport(1280, 800, 1);
+    const width = () => window.evaluate(() => Math.round(document.querySelector('.app-sidebar')!.getBoundingClientRect().width));
+    const full = await width();
+    expect(full, 'the sidebar is expanded at 1280 px').toBeGreaterThan(200);
+    await openReader();
+    expect(await width(), 'compressed while the reader is open').toBeLessThanOrEqual(64);
+    await window.getByTestId('reader-close').click();
+    await expect.poll(width).toBe(full);
+    // A sidebar collapsed by hand stays collapsed after the reader, and expanded again by hand it opens again.
+    await window.getByTestId('sidebar-toggle').click();
+    await expect.poll(width).toBeLessThanOrEqual(64);
+    await openReader();
+    await window.getByTestId('reader-close').click();
+    await expect.poll(width).toBeLessThanOrEqual(64);
+    await window.getByTestId('sidebar-toggle').click();
+    await expect.poll(width).toBe(full);
+  });
+
+  test('the useful area of the pages: 960x640 at 1024x700 with the panel closed, 880x740 at 1280x800 with it open (D-370)', async () => {
+    test.setTimeout(180_000);
+    await openReader();
+    const area = () =>
+      window.evaluate(() => {
+        const r = document.querySelector('[data-testid="reader-pages-area"]')!.getBoundingClientRect();
+        const w = (sel: string) => Math.round(document.querySelector(sel)?.getBoundingClientRect().width ?? 0);
+        return { w: Math.round(r.width), h: Math.round(r.height), side: w('.app-sidebar'), panel: w('.reader-side'), main: w('.main')};
+      });
+    const panel = window.getByTestId('reader-side-panel');
+    await setViewport(1280, 800, 1);
+    await settle();
+    if (!(await panel.isVisible())) await window.getByTestId('reader-side').click();
+    await expect(panel).toBeVisible();
+    const wide = await area();
+    report.push(`useful area 1280x800 with the panel: ${JSON.stringify(wide)} (before the redesign 709x553)`);
+    expect(wide.w).toBeGreaterThanOrEqual(880);
+    expect(wide.h).toBeGreaterThanOrEqual(740);
+    await setViewport(1024, 700, 1);
+    await window.getByTestId('reader-side').click();
+    await expect(panel).toHaveCount(0);
+    await settle();
+    const narrow = await area();
+    report.push(`useful area 1024x700 without the panel: ${narrow.w}x${narrow.h}`);
+    expect(narrow.w).toBeGreaterThanOrEqual(960);
+    expect(narrow.h).toBeGreaterThanOrEqual(640);
+    await window.getByTestId('reader-side').click();
+    await setViewport(1280, 800, 1);
+  });
+
+  test('the bar is one row of 13 controls in the top bar, and nothing wraps or scrolls at 1024 px (D-410, P0)', async () => {
+    test.setTimeout(180_000);
+    await setViewport(1024, 700, 1);
+    await settle();
+    const m = await window.evaluate(() => {
+      const top = document.querySelector<HTMLElement>('[data-testid="topbar"]')!;
+      const bar = top.querySelector<HTMLElement>('[data-testid="reader-bar"]');
+      if (!bar) return null;
+      const controls = [...bar.querySelectorAll<HTMLElement>('button, input')];
+      const rects = controls.map((c) => c.getBoundingClientRect());
+      const b = bar.getBoundingClientRect();
+      return {
+        count: controls.length,
+        barHeight: Math.round(top.getBoundingClientRect().height),
+        scrolls: top.scrollWidth - top.clientWidth,
+        inside: rects.every((r) => r.left >= 0 && r.right <= innerWidth && r.top >= b.top - 1 && r.bottom <= b.bottom + 1),
+        tools: [...bar.querySelectorAll('[role="toolbar"] button')].length,
+      };
+    });
+    expect(m, 'the reader bar sits inside the top bar of the shell').not.toBeNull();
+    report.push(`reader bar at 1024: ${JSON.stringify(m)}`);
+    expect(m!.count).toBe(13); // the approved prototype P0 (updated by D-410) has 13 controls
+    expect(m!.tools).toBe(6); // five tools and the colour dot
+    expect(m!.barHeight).toBe(48);
+    expect(m!.scrolls).toBeLessThanOrEqual(0);
+    expect(m!.inside).toBe(true);
+    await setViewport(1280, 800, 1);
   });
 
   test('a new highlight at 1920 px lies on the glyphs and is saved with geom 2', async () => {

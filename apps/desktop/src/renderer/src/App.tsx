@@ -84,7 +84,7 @@ function Root() {
       return;
     }
     if (navigation.to === 'inbox' || navigation.to === 'review') setInboxTab(navigation.to === 'review' ? 'proposals' : 'arrivals');
-    setSection(navigation.to === 'settings' ? 'settings' : navigation.to === 'project' || navigation.to === 'projects' ? 'projects' : navigation.to === 'library' ? 'library' : navigation.to === 'network' ? 'network' : 'inbox');
+    setSection(navigation.to === 'settings' ? 'settings' : navigation.to === 'project' || navigation.to === 'projects' ? 'projects' : navigation.to === 'library' ? 'library' : navigation.to === 'network' ? 'network' : navigation.to === 'discover' ? 'discover' : 'inbox');
     // The focus target exists once the view is drawn.
     if (navigation.focus === 'search') setTimeout(() => document.querySelector<HTMLInputElement>('[data-testid="search-input"]')?.focus(), 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps

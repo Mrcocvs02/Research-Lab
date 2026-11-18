@@ -4,11 +4,13 @@
     "intro": "Change, turn off or restore the keys of the commands. A key needs Ctrl or Alt (F1 to F12 can stand alone). Press Escape while recording to cancel.",
     "scope": {
       "global": "Everywhere in the app",
-      "reader": "In the PDF reader"
+      "reader": "In the PDF reader",
+      "reader-tool": "Reader tools"
     },
     "scopeHint": {
       "global": "Work in every view.",
-      "reader": "Work only while the reader is focused; they may reuse a key of another place but not of the same place."
+      "reader": "Work only while the reader is focused; they may reuse a key of another place but not of the same place.",
+      "reader-tool": "Single keys without Ctrl or Alt; they work only while the reader pages have the focus, and cannot repeat a key of the reader or of the same group."
     },
     "command": "Command",
     "key": "Key",
@@ -37,15 +39,29 @@
       "search.focus": "Go to the search box",
       "nav.library": "Go to Library",
       "nav.projects": "Go to Projects",
-      "nav.network": "Go to Network",
-      "nav.inbox": "Go to Arrivals",
-      "nav.review": "Go to AI proposals to review",
+      "nav.discover": "Go to Discover",
+      "nav.map": "Go to Map",
+      "nav.review": "Go to Review",
       "nav.settings": "Open settings",
       "guide.open": "Open the guide",
       "shortcuts.show": "Show the keyboard shortcuts",
       "reader.find": "Find in the document",
       "reader.highlight": "Highlight the current match",
-      "reader.underline": "Underline the current match"
+      "reader.underline": "Underline the current match",
+      "reader.close": "Close the reader",
+      "reader.tool.select": "Tool: Select",
+      "reader.tool.highlight": "Tool: Highlight",
+      "reader.tool.underline": "Tool: Underline",
+      "reader.tool.crop": "Tool: Crop",
+      "reader.tool.eraser": "Tool: Eraser",
+      "reader.tool.swap": "Swap the current and the last tool",
+      "reader.color.1": "Color 1",
+      "reader.color.2": "Color 2",
+      "reader.color.3": "Color 3",
+      "reader.color.4": "Color 4",
+      "reader.color.5": "Color 5",
+      "reader.comment": "Comment on the selected annotation",
+      "reader.annotation.delete": "Delete the selected annotation"
     },
     "conflictRefused": "Could not save: the shortcut is already used by another command ({{commands}}). Fix the conflict and save again."
   }

@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ANNOTATION_COLORS, STUDY_LIMITS, type Annotation } from '@rl/core';
+import { costLabel } from '../../components/AiCostPreview';
+import { Lazy, lazyView } from '../../components/Lazy';
 import { ErrorNote } from '../../components/ui';
 import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
@@ -11,25 +13,35 @@ import { useNotify } from '../../lib/notify';
 import type { ReaderTarget } from '../../lib/reader';
 import { rl } from '../../lib/rl';
 import { RlError } from '../../lib/rl-error';
+import { useApp } from '../../state/app-context';
 import { useLocalFlag } from '../../lib/useLocalFlag';
 import { NoteEditor } from '../notes/NoteEditor';
 import { NotesList } from '../notes/NotesList';
 import { safeText } from '../library/safeText';
 import { AnnotationLayers, AnnotationList } from './AnnotationParts';
 import { AnnotationPopover, ConfirmErase, SelectionPopover, type Anchor } from './AnnotationPopover';
+import { CropLayer, type CropDrag } from './CropLayer';
+import { CropPopover } from './CropPopover';
+import { copyCropImage, cropTooSmall, dragRect } from './crop';
 import { cursorFor } from './cursors';
 import { createViewer, ViewerError, type FindState, type SelectionPiece, type Viewer } from './engine';
 import { FindBar } from './FindBar';
-import { annotationAt, annotationsAt, colorOf, type AnnotationColor } from './geometry';
+import { annotationAt, annotationsAt, colorOf, type AnnotationColor, type Rect } from './geometry';
 import { PdfConsentBanner, PdfConsentDialog } from './PdfConsentDialog';
 import { PdfConfirmDialogs, PdfInfoRow, usePdfWrite } from './PdfWriteChip';
 import { ReaderBar, type ZoomChoice } from './ReaderBar';
 import { useRepair } from './repair';
 import { initialCtx, step, type ColorNo, type Ctx, type Env, type Ev, type Mode, type Result, type Tool } from './toolMachine';
+import type { ExplainRequest } from './ExplainCard';
 import { useAnnotations } from './useAnnotations';
+import { useExplainEstimate } from './useExplainEstimate';
 import { useReaderDoc } from './useReaderDoc';
 import './reader.css';
+import './reader-tools.css';
 import './cursors.css';
+
+// "✦ Spiega" and its cost dialog load when the first explanation is asked for.
+const ExplainCard = lazyView(() => import('./ExplainCard').then((m) => ({ default: m.ExplainCard })), ['reader']);
 
 type Failure = { kind: 'notPdf' | 'missing' | 'encrypted' | 'invalid' | 'failed' } | { kind: 'error'; error: unknown };
 type Side = 'annotations' | 'notes' | 'info';
@@ -39,7 +51,7 @@ const SCOPES: Scope[] = ['pageNote', 'fileNote', 'notes'];
 const TOOL_KEY = 'rl.readerTool';
 const SPACE_KEY = 'rl.readerSpaceHint';
 const OVERLAY = '.rl-popover, [role="dialog"][aria-modal="true"]';
-const TOOL_OF: Partial<Record<string, Tool>> = { 'reader.tool.select': 'select', 'reader.tool.highlight': 'highlight', 'reader.tool.underline': 'underline', 'reader.tool.eraser': 'eraser' };
+const TOOL_OF: Partial<Record<string, Tool>> = { 'reader.tool.select': 'select', 'reader.tool.highlight': 'highlight', 'reader.tool.underline': 'underline', 'reader.tool.crop': 'crop', 'reader.tool.eraser': 'eraser' };
 
 /** The "how to close" hint of Escape was shown in this session. */
 let rootHinted = false;
@@ -51,7 +63,7 @@ const colorName = (n: ColorNo): AnnotationColor => ANNOTATION_COLORS[n - 1]!;
 function loadCtx(): Ctx {
   try {
     const v = JSON.parse(window.localStorage.getItem(TOOL_KEY) ?? 'null') as Partial<Ctx> | null;
-    const tools: Tool[] = ['select', 'highlight', 'underline', 'eraser'];
+    const tools: Tool[] = ['select', 'highlight', 'underline', 'crop', 'eraser'];
     if (v && tools.includes(v.prev as Tool) && [1, 2, 3, 4, 5].includes(v.color as number)) return { tool: 'select', prev: v.prev as Tool, color: v.color as ColorNo };
   } catch {
     // no storage, or not ours: the defaults
@@ -99,6 +111,13 @@ export function ReaderView({ target, onClose }: Props) {
   const [eraseIds, setEraseIds] = useState<ReadonlySet<string>>(new Set());
   const [confirm, setConfirm] = useState<{ ids: string[]; at: Anchor } | null>(null);
   const [repositionId, setRepositionId] = useState<string | null>(null);
+  // Crop (27): the rectangle being dragged (state, to draw it) and its start and latest rectangle (refs, always current).
+  const [cropDrag, setCropDrag] = useState<CropDrag | null>(null);
+  const cropStart = useRef<{ page: number; x: number; y: number } | null>(null);
+  const cropRect = useRef<CropDrag | null>(null);
+  // "✦ Spiega" (31): the passage being explained and where its card hangs.
+  const [explain, setExplain] = useState<{ req: ExplainRequest; anchor: () => Anchor | null; key: number } | null>(null);
+  const { config } = useApp();
   // The tool machine: its state is kept in a ref too, so a burst of events (a drag) always steps from the latest state.
   const [machine, setMachine] = useState<{ ctx: Ctx; mode: Mode }>(() => ({ ctx: loadCtx(), mode: { m: 'idle', hasSelection: false } }));
   const mref = useRef(machine);
@@ -255,11 +274,11 @@ export function ReaderView({ target, onClose }: Props) {
   }, [ctx.tool, color]);
 
   const sentComment = useRef<{ id: string; value: string } | null>(null);
-  const change = async (a: Annotation, patch: Partial<Pick<Annotation, 'kind' | 'color' | 'comment'>>): Promise<boolean> => {
+  const change = async (a: Annotation, patch: Partial<Pick<Annotation, 'kind' | 'color' | 'comment' | 'crop'>>): Promise<boolean> => {
     setBusy(true);
     try {
       const next = { ...a, ...patch };
-      return (await ann.save({ id: a.id, kind: next.kind, page: next.page, rects: next.rects, text: next.text, color: colorOf(next.color), ...(next.comment !== undefined ? { comment: next.comment } : {}) })) !== null;
+      return (await ann.save({ id: a.id, kind: next.kind, page: next.page, rects: next.rects, text: next.text, color: colorOf(next.color), ...(next.comment !== undefined ? { comment: next.comment } : {}), ...(next.crop ? { crop: next.crop } : {}) })) !== null;
     } finally {
       setBusy(false);
     }
@@ -280,13 +299,28 @@ export function ReaderView({ target, onClose }: Props) {
     setBusy(true);
     try {
       const gone: Annotation[] = [];
-      for (const a of list) if (await ann.remove(a.id)) gone.push(a);
+      // The image of a crop is kept in memory until the toast goes away, so that Undo can bring the crop back whole.
+      const images = new Map<string, string>();
+      for (const a of list) {
+        if (a.kind === 'area') {
+          const got = await rl.invoke('crops:get', { docId, annId: a.id }).catch(() => ({ image: null }));
+          if (got.image) images.set(a.id, got.image);
+        }
+        if (await ann.remove(a.id)) {
+          gone.push(a);
+          if (a.kind === 'area') void rl.invoke('crops:remove', { docId, annId: a.id }).catch(() => {});
+        }
+      }
       if (gone.length === 0) return;
       notifyInfo(t('reader.erased', { count: gone.length }), {
         label: t('reader.erase.undo'),
         run: () => {
           void (async () => {
-            for (const a of gone) await ann.save({ kind: a.kind, page: a.page, rects: a.rects, text: a.text, color: colorOf(a.color), ...(a.geom === 2 ? { geom: 2 as const } : {}), ...(a.comment ? { comment: a.comment } : {}) });
+            for (const a of gone) {
+              const back = await ann.save({ kind: a.kind, page: a.page, rects: a.rects, text: a.text, color: colorOf(a.color), ...(a.geom === 2 ? { geom: 2 as const } : {}), ...(a.comment ? { comment: a.comment } : {}), ...(a.crop ? { crop: a.crop } : {}) });
+              const image = images.get(a.id);
+              if (back && image) await rl.invoke('crops:save', { docId, annId: back.id, image }).catch(reportError);
+            }
           })();
         },
       });
@@ -349,6 +383,47 @@ export function ReaderView({ target, onClose }: Props) {
     notifyInfo(t('reader.spaceHint'), { label: t('reader.gotIt'), run: () => {} });
   };
 
+  /** A crop of a figure, table or equation (27): cut the image from the page, keep it in the data folder and save the annotation. */
+  const commitCrop = async () => {
+    const drag = cropRect.current;
+    cropRect.current = null;
+    cropStart.current = null;
+    setCropDrag(null);
+    const viewer = viewerRef.current;
+    if (!drag || !viewer) return;
+    const size = viewer.pageSize(drag.page);
+    if (!size || cropTooSmall(drag.rect, size)) return showText(t('reader.crop.tooSmall'), 1500);
+    const img = await viewer.renderCrop(drag.page, drag.rect);
+    if (img === 'pending') return showText(t('reader.crop.pending'), 2500);
+    if (!img) return fail(t('reader.crop.failed'));
+    setBusy(true);
+    try {
+      const saved = await ann.save({ kind: 'area', page: drag.page, rects: [drag.rect], text: '', color, crop: { type: 'figure' }, geom: 2 });
+      if (!saved) return;
+      try {
+        await rl.invoke('crops:save', { docId, annId: saved.id, image: img.base64 });
+      } catch (e) {
+        await ann.remove(saved.id);
+        reportError(e);
+        return;
+      }
+      setMode({ m: 'selected', annId: saved.id });
+      notifyInfo(t('reader.crop.saved'), [
+        { label: t('reader.crop.copy'), run: () => void copyCropImage(img.base64).then(() => notifyInfo(t('reader.crop.copied')), reportError) },
+        {
+          label: t('reader.crop.undo'),
+          run: () =>
+            void (async () => {
+              if (await ann.remove(saved.id)) await rl.invoke('crops:remove', { docId, annId: saved.id }).catch(() => {});
+              setMode({ m: 'idle', hasSelection: false });
+            })(),
+        },
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   /** Feeds one event to the machine and carries out what it asks. Returns the result (the caller may need to know if something changed). */
   const dispatch = (ev: Ev, fromUi = false): Result => {
     const before = mref.current;
@@ -357,7 +432,10 @@ export function ReaderView({ target, onClose }: Props) {
     const r = step(before.ctx, before.mode, ev, env);
     mref.current = { ctx: r.ctx, mode: r.mode };
     setMachine(mref.current);
-    if (ev.e === 'down') setPending(null);
+    if (ev.e === 'down') {
+      setPending(null);
+      setExplain(null);
+    }
     for (const fx of r.effects) {
       switch (fx) {
         case 'create':
@@ -400,6 +478,14 @@ export function ReaderView({ target, onClose }: Props) {
         case 'announce':
           showHint(r.ctx.tool);
           if (ev.e === 'swap') spaceHint();
+          break;
+        case 'crop-commit':
+          void commitCrop();
+          break;
+        case 'crop-cancel':
+          cropRect.current = null;
+          cropStart.current = null;
+          setCropDrag(null);
           break;
         case 'close-find':
           closeFind();
@@ -510,17 +596,36 @@ export function ReaderView({ target, onClose }: Props) {
   const onPointerDown = (e: ReactPointerEvent) => {
     if ((e.button !== 0 && e.button !== 5) || (e.target as Element).closest('a')) return;
     const hit = hitAt(e);
-    const on = (e.target as Element).closest('.textLayer') ? 'text' : hit ? 'annotation' : 'empty';
-    dispatch({ e: 'down', on, ...(hit ? { annId: hit.id } : {}), pointerId: e.pointerId, pen: e.pointerType === 'pen' ? 'pen' : e.pointerType === 'touch' ? 'touch' : 'mouse', eraserButton: (e.buttons & 32) !== 0 });
+    const crop = mref.current.ctx.tool === 'crop' && (e.buttons & 32) === 0;
+    const at = crop ? viewerRef.current?.pointAt(e) : null;
+    // With Crop a drag can start anywhere on a page (the text layer does not matter); only an existing crop is "an annotation".
+    const on = crop ? (hit?.kind === 'area' ? 'annotation' : at ? 'text' : 'empty') : (e.target as Element).closest('.textLayer') ? 'text' : hit ? 'annotation' : 'empty';
+    const r = dispatch({ e: 'down', on, ...(on === 'annotation' && hit ? { annId: hit.id } : {}), pointerId: e.pointerId, pen: e.pointerType === 'pen' ? 'pen' : e.pointerType === 'touch' ? 'touch' : 'mouse', eraserButton: (e.buttons & 32) !== 0 });
+    if (r.mode.m === 'cropping' && at) {
+      cropStart.current = { page: at.page, x: at.x, y: at.y };
+      cropRect.current = { page: at.page, rect: { x: at.x, y: at.y, w: 0, h: 0 } };
+      setCropDrag(cropRect.current);
+      containerRef.current?.setPointerCapture?.(e.pointerId);
+    }
   };
   const onPointerMove = (e: ReactPointerEvent) => {
+    if (mref.current.mode.m === 'cropping') {
+      const start = cropStart.current;
+      const box = start ? layers.get(start.page)?.getBoundingClientRect() : undefined;
+      if (start && box && box.width > 0 && box.height > 0) {
+        cropRect.current = { page: start.page, rect: dragRect(start, { x: (e.clientX - box.left) / box.width, y: (e.clientY - box.top) / box.height }) };
+        setCropDrag(cropRect.current);
+      }
+      return;
+    }
     if (mref.current.mode.m !== 'erasing') return;
     const at = viewerRef.current?.pointAt(e);
     if (at) dispatch({ e: 'move', annIdsUnder: annotationsAt(annotationsRef.current, at.page, at.x, at.y) });
   };
   const onPointerUp = (e: ReactPointerEvent) => {
     const m = mref.current.mode.m;
-    if (m !== 'selecting' && m !== 'stroking' && m !== 'erasing') return;
+    if (m !== 'selecting' && m !== 'stroking' && m !== 'erasing' && m !== 'cropping') return;
+    if (m === 'cropping') onPointerMove(e);
     lastUp.current = { x: e.clientX, y: e.clientY };
     const hit = hitAt(e);
     dispatch({ e: 'up', selectionText: window.getSelection()?.toString() ?? '', ...(hit ? { annId: hit.id } : {}) });
@@ -550,6 +655,7 @@ export function ReaderView({ target, onClose }: Props) {
     }
     if (e.key === 'Escape') {
       if (e.target === findInputRef.current) return (e.preventDefault(), closeFind());
+      if (explain) return (e.preventDefault(), setExplain(null));
       if (confirm) return (e.preventDefault(), setConfirm(null));
       if (pending) return (e.preventDefault(), clearPending());
       const was = mref.current;
@@ -599,6 +705,25 @@ export function ReaderView({ target, onClose }: Props) {
     const r = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).getBoundingClientRect() : null;
     return r && (r.width > 0 || r.height > 0) ? { left: r.left, top: r.top, bottom: r.bottom } : { left: lastUp.current.x, top: lastUp.current.y, bottom: lastUp.current.y };
   }, []);
+
+  // "✦ Spiega" (31): the selection (with the paragraph around it) or a crop (its caption and the text in it), each with its estimate.
+  const modelLabel = (id: string) => config?.ai.models.find((m) => m.id === id)?.label ?? id;
+  const selReq = useMemo(() => {
+    const first = pending?.[0];
+    if (!pending || !first) return null;
+    const text = pending.map((p) => p.text).join(' ').slice(0, 6000);
+    return { page: first.page, text, around: (viewerRef.current?.paragraphAround(first.page, text) ?? '').slice(0, 9000) };
+  }, [pending]);
+  const selEst = useExplainEstimate(docId, selReq);
+  const cropReq = useMemo(() => {
+    const rect = selected?.rects[0];
+    if (!selected || selected.kind !== 'area' || !rect) return null;
+    const near = viewerRef.current?.textNear(selected.page, rect) ?? { inside: '', around: '' };
+    return { page: selected.page, text: [selected.crop?.caption ?? '', near.inside].filter(Boolean).join('\n').slice(0, 6000), around: near.around.slice(0, 9000) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id, selected?.crop?.caption, ready]);
+  const cropEst = useExplainEstimate(docId, cropReq);
+  const askExplain = (req: ExplainRequest, anchor: () => Anchor | null) => setExplain({ req, anchor, key: Date.now() });
 
   const bar = (
     <ReaderBar
@@ -717,8 +842,9 @@ export function ReaderView({ target, onClose }: Props) {
           >
             <div ref={viewerElRef} className="pdfViewer" />
             <AnnotationLayers layers={layers} annotations={ann.annotations} selectedId={selectedId} staleIds={ann.staleIds} erasing={eraseIds} />
+            <CropLayer drag={cropDrag} layers={layers} />
           </div>
-          {pending && (
+          {pending && !explain && (
             <SelectionPopover
               anchor={selectionAnchor}
               text={pending.map((p) => p.text).join(' … ')}
@@ -728,9 +854,28 @@ export function ReaderView({ target, onClose }: Props) {
               onHighlight={() => void createFrom('highlight', pending, true, color)}
               onCopy={() => void navigator.clipboard?.writeText(pending.map((p) => p.text).join(' ')).then(() => notifyInfo(t('reader.ann.copied')), reportError)}
               onReposition={repositionId ? () => void applyReposition() : undefined}
+              explainLabel={costLabel(t, t('reader.explain.button'), selEst, selEst ? modelLabel(selEst.model) : '')}
+              onExplain={selReq ? () => askExplain({ ...selReq, from: 'selection' }, selectionAnchor) : undefined}
             />
           )}
-          {!pending && selected && (
+          {!pending && !explain && selected?.kind === 'area' && (
+            <CropPopover
+              key={selected.id}
+              annotation={selected}
+              anchor={() => markAnchor(selected.id)}
+              busy={busy}
+              explainLabel={costLabel(t, t('reader.explain.crop'), cropEst, cropEst ? modelLabel(cropEst.model) : '')}
+              explainDisabled={cropReq && cropReq.text.trim() === '' ? t('reader.explain.cropNoText') : undefined}
+              onType={(type) => void change(selected, { crop: { type, ...(selected.crop?.caption ? { caption: selected.crop.caption } : {}) } })}
+              onCaption={(caption) => void change(selected, { crop: { type: selected.crop?.type ?? 'figure', ...(caption ? { caption } : {}) } })}
+              onCopyImage={() =>
+                void rl.invoke('crops:get', { docId, annId: selected.id }).then((r) => (r.image ? copyCropImage(r.image).then(() => notifyInfo(t('reader.crop.copied'))) : fail(t('reader.crop.failed'))), reportError)
+              }
+              onExplain={() => cropReq && askExplain({ ...cropReq, from: 'crop' }, () => markAnchor(selected.id))}
+              onDelete={() => dispatch({ e: 'delete' }, true)}
+            />
+          )}
+          {!pending && !explain && selected && selected.kind !== 'area' && (
             <AnnotationPopover
               key={selected.id}
               annotation={selected}
@@ -746,6 +891,11 @@ export function ReaderView({ target, onClose }: Props) {
               onDelete={() => dispatch({ e: 'delete' }, true)}
               onReconfirm={() => void change(selected, {})}
             />
+          )}
+          {explain && (
+            <Lazy>
+              <ExplainCard key={explain.key} docId={docId} request={explain.req} anchor={explain.anchor} onClose={() => setExplain(null)} />
+            </Lazy>
           )}
           {confirm && (
             <ConfirmErase
@@ -772,6 +922,7 @@ export function ReaderView({ target, onClose }: Props) {
             <div role="tabpanel" id="reader-sidepanel" aria-labelledby={`reader-panel-${side}`} className="reader-tabpanel">
               {side === 'annotations' && (
                 <AnnotationList
+                  docId={docId}
                   annotations={ann.annotations}
                   selectedId={selectedId}
                   staleIds={ann.staleIds}

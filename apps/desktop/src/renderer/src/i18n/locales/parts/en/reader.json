@@ -40,7 +40,8 @@
     },
     "kind": {
       "highlight": "Highlight",
-      "underline": "Underline"
+      "underline": "Underline",
+      "area": "Crop"
     },
     "colors": {
       "yellow": "Yellow",
@@ -88,7 +89,6 @@
       "undo": "Undo"
     },
     "later": "Available in a later version.",
-    "cropLater": "Crop arrives in a later version.",
     "tools": {
       "label": "Tools",
       "select": "Select",
@@ -214,6 +214,78 @@
       "no": "No",
       "pdf": "In the PDF"
     },
-    "rootHint": "To close: Alt+← or Ctrl+W"
+    "rootHint": "To close: Alt+← or Ctrl+W",
+    "crop": {
+      "saved": "Crop saved in the page notes",
+      "copy": "Copy",
+      "undo": "Undo",
+      "copied": "Image copied",
+      "tooSmall": "Too small to be a crop",
+      "pending": "The page is not drawn yet: try again in a moment",
+      "failed": "The crop could not be saved",
+      "label": "Crop of page {{page}}",
+      "popover": "This crop",
+      "type": "Type",
+      "caption": "Caption",
+      "captionPlaceholder": "Caption (optional)",
+      "copyImage": "Copy image",
+      "removed": "Crop deleted",
+      "types": {
+        "figure": "Figure",
+        "table": "Table",
+        "equation": "Equation",
+        "other": "Other"
+      }
+    },
+    "explain": {
+      "button": "✦ Explain",
+      "title": "✦ Explain",
+      "model": "{{model}} · {{date}}",
+      "means": "What it says",
+      "symbols": "Symbols",
+      "role": "In the paper",
+      "copy": "Copy",
+      "addToNotes": "Add to the notes",
+      "more": "More detail ✦",
+      "added": "Added to the notes of page {{page}}",
+      "copied": "Explanation copied",
+      "loading": "Asking Claude…",
+      "notEnabled": "The folder of this document is not enabled for sending text",
+      "enable": "Enable…",
+      "capReached": "The daily limit is reached. Try later, with less text, or with a cheaper model.",
+      "noText": "Nothing to explain: select some text or write a caption first.",
+      "close": "Close",
+      "ready": "Ready · nothing sent",
+      "cached": "From the cache · nothing sent",
+      "block": "✦ Explanation ({{model}}, {{date}})",
+      "crop": "✦ Explain",
+      "cropNoText": "Write a caption to explain this crop",
+      "whatSelection": "The selected text and the paragraph around it.",
+      "whatCrop": "The caption of the crop, the text in it and the text around it."
+    },
+    "cost": {
+      "title": "Send to Claude?",
+      "ready": "Ready, nothing sent",
+      "inButton": "≈ {{tokens}} tokens · {{model}}",
+      "today": "Today: {{pct}} % of the cap used",
+      "requests_one": "{{count}} request",
+      "requests_other": "{{count}} requests",
+      "tokens": "≈ {{tokens}} tokens",
+      "noPrice": "no price for this model",
+      "usd": "≈ {{usd}}",
+      "first": "This is the first time the text of this folder is sent to Claude.",
+      "over": "This send is larger than {{threshold}} tokens, your threshold for asking first.",
+      "cap": "The daily limit is reached: nothing is sent. Choose less text or a cheaper model.",
+      "send": "Send to {{model}}",
+      "model": "Model"
+    },
+    "colorMeaning": {
+      "tip": "{{color}}: {{meaning}}",
+      "filter": "Meaning",
+      "all": "All colours",
+      "none": "No meaning",
+      "menu": "Filter by meaning"
+    },
+    "listCrop": "Crop, page {{page}}"
   }
 }

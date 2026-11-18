@@ -23,6 +23,7 @@ import { exportHandlers } from './export-handlers.js';
 import { bibHandlers } from './bib-handlers.js';
 import { graphHandlers } from './graph-handlers.js';
 import { backupHandlers, maintenanceHandlers } from './backup-handlers.js';
+import { cropsHandlers, explainHandlers } from './readertools-handlers.js';
 
 export type { MainServices } from './services.js';
 
@@ -62,5 +63,7 @@ export function buildHandlers(s: MainServices): HandlerMap<Channels> {
     ...backupHandlers(s),
     ...maintenanceHandlers(s),
     ...bibHandlers(s),
+    ...cropsHandlers(s),
+    ...explainHandlers(s),
   };
 }

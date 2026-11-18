@@ -192,3 +192,57 @@ describe('tool machine: properties', () => {
     expect(initialCtx()).toEqual({ tool: 'select', prev: 'highlight', color: 1 });
   });
 });
+
+/** The rows of Crop (§17.4.8), one test per row, added to the table of 8.2.4. */
+describe('tool machine: the rows of Crop', () => {
+  const cropping: Mode = { m: 'cropping', pointerId: 1 };
+  it('crop row 1: idle + tool crop -> crop becomes the tool, the previous one is kept, announce', () => {
+    const r = run(ctxOf('select', 'highlight'), idle, { e: 'tool', tool: 'crop' });
+    expect(r.ctx).toMatchObject({ tool: 'crop', prev: 'select' });
+    expect(r.effects).toEqual(['announce']);
+  });
+  it('crop row 2: idle + down on a page (text or empty page area) with Crop -> cropping, nothing else', () => {
+    const r = run(ctxOf('crop', 'select'), idle, down('text'));
+    expect(r.mode).toEqual(cropping);
+    expect(r.effects).toEqual([]);
+  });
+  it('crop row 3: idle + down on an existing annotation with Crop -> selecting (a click opens its popover)', () => {
+    expect(run(ctxOf('crop', 'select'), idle, down('annotation', { annId: 'a' })).mode).toEqual({ m: 'selecting' });
+  });
+  it('crop row 4: idle + down outside the pages with Crop -> clear-selection', () => {
+    const r = run(ctxOf('crop', 'select'), idle, down('empty'));
+    expect(r.mode).toEqual(idle);
+    expect(r.effects).toEqual(['clear-selection']);
+  });
+  it('crop row 5: cropping + up -> idle, crop-commit (the tool stays Crop)', () => {
+    const r = run(ctxOf('crop', 'select'), cropping, { e: 'up', selectionText: '' });
+    expect(r.mode).toEqual(idle);
+    expect(r.ctx.tool).toBe('crop');
+    expect(r.effects).toEqual(['crop-commit']);
+  });
+  it('crop row 6: cropping + Escape or cancel -> idle, crop-cancel', () => {
+    for (const ev of [{ e: 'esc' }, { e: 'cancel' }] as Ev[]) {
+      const r = run(ctxOf('crop', 'select'), cropping, ev);
+      expect(r.mode).toEqual(idle);
+      expect(r.effects).toEqual(['crop-cancel']);
+    }
+  });
+  it('crop row 7: a tool, swap or colour key during the drag changes nothing', () => {
+    for (const ev of [{ e: 'tool', tool: 'eraser' }, { e: 'swap', repeat: false }, { e: 'color', n: 2 }] as Ev[]) {
+      expect(run(ctxOf('crop', 'select'), cropping, ev)).toEqual({ ctx: ctxOf('crop', 'select'), mode: cropping, effects: [] });
+    }
+  });
+  it('crop row 8: blur or a document change during the drag -> idle, crop-cancel, the tool stays', () => {
+    for (const ev of [{ e: 'blur' }, { e: 'doc-change' }] as Ev[]) {
+      const r = run(ctxOf('crop', 'select'), cropping, ev);
+      expect(r.mode).toEqual(idle);
+      expect(r.ctx.tool).toBe('crop');
+      expect(r.effects).toEqual(['crop-cancel']);
+    }
+  });
+  it('crop row 9: idle + Escape with Crop -> back to Select, announce', () => {
+    const r = run(ctxOf('crop', 'select'), idle, { e: 'esc' });
+    expect(r.ctx.tool).toBe('select');
+    expect(r.effects).toEqual(['announce']);
+  });
+});

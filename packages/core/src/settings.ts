@@ -209,6 +209,10 @@ const aiFields = {
   defaultReasoning: reasoningLevelSchema,
   /** When true (default), every send to the AI needs an explicit confirmation with preview. */
   confirmBeforeSend: z.boolean(),
+  /** Estimated tokens above which a send shows the cost dialog (D-416); below it the estimate is in the button. */
+  costThresholdTokens: z.number().int().min(100).max(10_000_000),
+  /** Tokens per day (this device's local day, active library) above which the dialog offers less; null: no cap. */
+  dailyTokenCap: z.number().int().positive().max(1e12).nullable(),
 };
 export const libraryAiConfigSchema = z.object({
   provider: aiFields.provider.default('claude-agent-sdk'),
@@ -217,6 +221,8 @@ export const libraryAiConfigSchema = z.object({
   defaultReasoning: aiFields.defaultReasoning.default('low'),
   usageCap: usageCapSchema.prefault({}),
   confirmBeforeSend: aiFields.confirmBeforeSend.default(true),
+  costThresholdTokens: aiFields.costThresholdTokens.default(5000),
+  dailyTokenCap: aiFields.dailyTokenCap.default(null),
 });
 export const libraryAiPatchSchema = z.object({
   provider: aiFields.provider.optional(),
@@ -225,6 +231,8 @@ export const libraryAiPatchSchema = z.object({
   defaultReasoning: aiFields.defaultReasoning.optional(),
   usageCap: usageCapPatchSchema.optional(),
   confirmBeforeSend: aiFields.confirmBeforeSend.optional(),
+  costThresholdTokens: aiFields.costThresholdTokens.optional(),
+  dailyTokenCap: aiFields.dailyTokenCap.optional(),
 });
 
 export const exportPresetSchema = z.object({
@@ -268,6 +276,8 @@ export const annotationsConfigSchema = z.object({
   writeToPdfConfirmedAt: isoDateSchema.nullable().default(null),
   author: z.enum(['profile', 'none']).default('none'),
   backupLocation: z.enum(['data', 'local']).default('data'),
+  /** What each of the five colours means to the user (D-427, feature 36): '' = no meaning. Order of `ANNOTATION_COLORS`. */
+  colorMeanings: z.array(z.string().trim().max(60)).length(5).default(['', '', '', '', '']),
 });
 export type AnnotationsConfig = z.infer<typeof annotationsConfigSchema>;
 
@@ -315,7 +325,7 @@ export const libraryConfigPatchSchema = z.object({
   ai: libraryAiPatchSchema.optional(),
   scan: scanConfigPatchSchema.optional(),
   /** `writeToPdfConfirmedAt` is not here: only the consent channel sets it. */
-  annotations: annotationsConfigSchema.pick({ writeToPdf: true, author: true, backupLocation: true }).partial().optional(),
+  annotations: annotationsConfigSchema.pick({ writeToPdf: true, author: true, backupLocation: true, colorMeanings: true }).partial().optional(),
   exportPresets: z.array(exportPresetSchema).optional(),
   mcp: z.object({ enabled: mcpFields.enabled.optional(), writeEnabled: mcpFields.writeEnabled.optional() }).optional(),
 });

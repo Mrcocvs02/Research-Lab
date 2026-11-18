@@ -142,7 +142,11 @@
       "intro": "Account, what Claude can read, model and spending.",
       "reads": "What Claude can read",
       "spend": "Model and spending",
-      "confirmHelp": "Before each send you see what leaves your computer."
+      "confirmHelp": "Before each send you see what leaves your computer.",
+      "costThreshold": "Show the cost dialog above (tokens)",
+      "costThresholdHelp": "Under this size a send only shows its estimate in the button; above it, a dialog asks first. Default 5 000.",
+      "dailyCap": "Daily token cap",
+      "dailyCapHelp": "Tokens per day for this library. Past it, the dialog offers less text or a cheaper model. Empty: no cap."
     },
     "keys": {
       "title": "Saved keys (secure storage)",

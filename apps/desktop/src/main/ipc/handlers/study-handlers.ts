@@ -204,6 +204,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
               rects: fields.rects,
               ...(fields.text !== undefined ? { text: fields.text } : {}),
               ...(fields.color !== undefined ? { color: fields.color } : {}),
+              ...(fields.crop !== undefined ? { crop: fields.crop } : {}),
               ...(geom === 2 ? { geom } : {}),
               forHash: contentHashOf(rec),
               updatedAt: now,
@@ -227,7 +228,8 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
           }
           return next;
         });
-        const u = await rt.organizer.syncUnderlined(docId, file.annotations.length > 0);
+        // A crop (`area`) is not an underline: only highlights and underlines set the flag.
+        const u = await rt.organizer.syncUnderlined(docId, file.annotations.some((x) => x.kind !== 'area'));
         return { value: saved, changed: true, flagChanged: u.changed, underlined: u.underlined };
       });
       return { annotation: r.value, underlined: r.underlined };
@@ -239,7 +241,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
         const removed = current !== null && list.length !== current.annotations.length;
         // Nothing to remove: nothing is written (not even an empty file).
         if (current && removed) await rt.store.annotations.put({ ...current, annotations: list });
-        const u = await rt.organizer.syncUnderlined(docId, list.length > 0);
+        const u = await rt.organizer.syncUnderlined(docId, list.some((x) => x.kind !== 'area'));
         return { value: removed, changed: removed || u.changed, flagChanged: u.changed, underlined: u.underlined };
       });
       return { removed: r.value, underlined: r.underlined };

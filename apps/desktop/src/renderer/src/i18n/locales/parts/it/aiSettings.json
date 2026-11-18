@@ -142,7 +142,11 @@
       "intro": "Account, cosa può leggere Claude, modello e spesa.",
       "reads": "Cosa può leggere Claude",
       "spend": "Modello e spesa",
-      "confirmHelp": "Prima di ogni invio vedi cosa lascia il tuo computer."
+      "confirmHelp": "Prima di ogni invio vedi cosa lascia il tuo computer.",
+      "costThreshold": "Mostra il dialogo del costo sopra (token)",
+      "costThresholdHelp": "Sotto questa dimensione un invio mostra solo la stima nel pulsante; sopra, un dialogo chiede prima. Predefinita 5 000.",
+      "dailyCap": "Tetto di token al giorno",
+      "dailyCapHelp": "Token al giorno per questa libreria. Oltre il tetto, il dialogo propone meno testo o un modello più economico. Vuoto: nessun tetto."
     },
     "keys": {
       "title": "Chiavi salvate (archivio sicuro)",

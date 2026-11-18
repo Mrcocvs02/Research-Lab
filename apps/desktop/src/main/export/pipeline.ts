@@ -318,10 +318,10 @@ export async function generate(o: PipelineOptions, sink: Sink): Promise<Pipeline
       summary: marked(d.ai.summary),
       notes: notes.map((n) => ({ page: n.frontmatter.scope === 'page' ? (n.frontmatter.page ?? null) : null, body: n.body.slice(0, 8000) })).filter((n) => n.body.trim() !== ''),
       highlights: (ann?.annotations ?? [])
-        .filter((a) => a.text.trim() !== '' || a.comment)
+        .filter((a) => a.kind !== 'area' && (a.text.trim() !== '' || a.comment))
         .sort((a, b) => a.page - b.page)
         .slice(0, HIGHLIGHTS_PER_CARD)
-        .map((a) => ({ page: a.page, text: a.text, comment: a.comment, kind: a.kind })),
+        .flatMap((a) => (a.kind === 'area' ? [] : [{ page: a.page, text: a.text, comment: a.comment, kind: a.kind }])),
       cites: cites(d),
       citedBy: citedBy(d),
       concepts: conceptsOfDoc.get(d.id) ?? [],

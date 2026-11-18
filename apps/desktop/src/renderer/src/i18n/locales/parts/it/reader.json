@@ -40,7 +40,8 @@
     },
     "kind": {
       "highlight": "Evidenzia",
-      "underline": "Sottolinea"
+      "underline": "Sottolinea",
+      "area": "Ritaglio"
     },
     "colors": {
       "yellow": "Giallo",
@@ -88,7 +89,6 @@
       "undo": "Annulla"
     },
     "later": "Disponibile in una versione successiva.",
-    "cropLater": "Il ritaglio arriva in una versione successiva.",
     "tools": {
       "label": "Strumenti",
       "select": "Seleziona",
@@ -214,6 +214,78 @@
       "no": "No",
       "pdf": "Nel PDF"
     },
-    "rootHint": "Per chiudere: Alt+← o Ctrl+W"
+    "rootHint": "Per chiudere: Alt+← o Ctrl+W",
+    "crop": {
+      "saved": "Ritaglio salvato nelle note della pagina",
+      "copy": "Copia",
+      "undo": "Annulla",
+      "copied": "Immagine copiata",
+      "tooSmall": "Troppo piccolo per essere un ritaglio",
+      "pending": "La pagina non è ancora resa: riprova tra un momento",
+      "failed": "Non è stato possibile salvare il ritaglio",
+      "label": "Ritaglio della pagina {{page}}",
+      "popover": "Questo ritaglio",
+      "type": "Tipo",
+      "caption": "Didascalia",
+      "captionPlaceholder": "Didascalia (facoltativa)",
+      "copyImage": "Copia immagine",
+      "removed": "Ritaglio eliminato",
+      "types": {
+        "figure": "Figura",
+        "table": "Tabella",
+        "equation": "Equazione",
+        "other": "Altro"
+      }
+    },
+    "explain": {
+      "button": "✦ Spiega",
+      "title": "✦ Spiega",
+      "model": "{{model}} · {{date}}",
+      "means": "Cosa dice",
+      "symbols": "Simboli",
+      "role": "Nel paper",
+      "copy": "Copia",
+      "addToNotes": "Aggiungi alle note",
+      "more": "Più dettagli ✦",
+      "added": "Aggiunto alle note della pagina {{page}}",
+      "copied": "Spiegazione copiata",
+      "loading": "Chiedo a Claude…",
+      "notEnabled": "La cartella di questo documento non è abilitata per l'invio del testo",
+      "enable": "Abilita…",
+      "capReached": "Il limite del giorno è raggiunto. Riprova più tardi, con meno testo o con un modello più economico.",
+      "noText": "Niente da spiegare: seleziona del testo o scrivi prima una didascalia.",
+      "close": "Chiudi",
+      "ready": "Già pronto · 0 invii",
+      "cached": "Dalla cache · 0 invii",
+      "block": "✦ Spiegazione ({{model}}, {{date}})",
+      "crop": "✦ Spiega",
+      "cropNoText": "Scrivi una didascalia per spiegare questo ritaglio",
+      "whatSelection": "Il testo selezionato e il paragrafo intorno.",
+      "whatCrop": "La didascalia del ritaglio, il testo al suo interno e quello intorno."
+    },
+    "cost": {
+      "title": "Inviare a Claude?",
+      "ready": "Già pronto, 0 invii",
+      "inButton": "≈ {{tokens}} token · {{model}}",
+      "today": "Oggi: {{pct}} % del tetto usato",
+      "requests_one": "{{count}} richiesta",
+      "requests_other": "{{count}} richieste",
+      "tokens": "≈ {{tokens}} token",
+      "noPrice": "nessun prezzo per questo modello",
+      "usd": "≈ {{usd}}",
+      "first": "È la prima volta che il testo di questa cartella va a Claude.",
+      "over": "Questo invio supera {{threshold}} token, la tua soglia per chiedere prima.",
+      "cap": "Il limite del giorno è raggiunto: non si invia nulla. Scegli meno testo o un modello più economico.",
+      "send": "Invia a {{model}}",
+      "model": "Modello"
+    },
+    "colorMeaning": {
+      "tip": "{{color}}: {{meaning}}",
+      "filter": "Significato",
+      "all": "Tutti i colori",
+      "none": "Senza significato",
+      "menu": "Filtra per significato"
+    },
+    "listCrop": "Ritaglio, pagina {{page}}"
   }
 }

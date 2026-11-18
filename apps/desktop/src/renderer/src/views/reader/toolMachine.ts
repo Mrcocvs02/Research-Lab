@@ -1,8 +1,9 @@
 /**
  * The tool machine of the reader (ARCHITETTURA-UI 8.2.4, 8.2.7): pure, no DOM and no React. The reader feeds it pointer and
- * keyboard events and carries out the effects it returns. Crop (R) is not here: its behaviour arrives with the crop feature.
+ * keyboard events and carries out the effects it returns. Crop (R, §17.4.8) drags a rectangle on one page; the reader draws it
+ * and, on release, cuts the image and saves the annotation.
  */
-export type Tool = 'select' | 'highlight' | 'underline' | 'eraser';
+export type Tool = 'select' | 'highlight' | 'underline' | 'crop' | 'eraser';
 export type Brush = 'highlight' | 'underline';
 export type ColorNo = 1 | 2 | 3 | 4 | 5;
 /** The pen eraser button of a stylus makes the eraser a temporary tool (`tempFrom` is the tool to give back). */
@@ -12,6 +13,7 @@ export type Mode =
   | { m: 'selecting' }
   | { m: 'stroking'; kind: Brush; pointerId: number }
   | { m: 'erasing'; pointerId: number; erased: string[] }
+  | { m: 'cropping'; pointerId: number }
   | { m: 'selected'; annId: string }
   | { m: 'commenting'; annId: string; draft: string; original: string };
 export type Ev =
@@ -43,6 +45,10 @@ export type Effect =
   | 'close-reader'
   /** An annotation was touched by the eraser: outline it (`--danger`); the deletion waits for the release. */
   | 'erase-hint'
+  /** The crop rectangle was released: the reader cuts the image (a rectangle under 24 px is ignored there) and saves it. */
+  | 'crop-commit'
+  /** The crop drag was abandoned (Escape, cancel, focus lost). */
+  | 'crop-cancel'
   /** The stroke touched more than `ERASE_LIMIT` annotations: ask before deleting any of them. */
   | 'confirm-erase';
 export interface Env {
@@ -80,7 +86,7 @@ export function step(ctx: Ctx, mode: Mode, ev: Ev, env: Env, escAtRoot: 'hint' |
 
   // The window lost the focus or the document changed: strokes and popovers are dropped, tool, last tool and colour stay.
   if (ev.e === 'blur' || ev.e === 'doc-change') {
-    const hide: Effect[] = mode.m === 'stroking' ? ['clear-selection'] : mode.m === 'selected' || mode.m === 'commenting' ? ['hide-popover'] : [];
+    const hide: Effect[] = mode.m === 'cropping' ? ['crop-cancel'] : mode.m === 'stroking' ? ['clear-selection'] : mode.m === 'selected' || mode.m === 'commenting' ? ['hide-popover'] : [];
     return out(restore(ctx), IDLE, ...hide);
   }
 
@@ -98,7 +104,7 @@ export function step(ctx: Ctx, mode: Mode, ev: Ev, env: Env, escAtRoot: 'hint' |
   if (KEYBOARD.has(ev.e) && (env.inTextField || env.overlayOpen)) return same;
 
   // A gesture in progress keeps its tool: tool, swap and colour only count from the next gesture.
-  if (mode.m === 'selecting' || mode.m === 'stroking' || mode.m === 'erasing') {
+  if (mode.m === 'selecting' || mode.m === 'stroking' || mode.m === 'erasing' || mode.m === 'cropping') {
     if (ev.e === 'tool' || ev.e === 'swap' || ev.e === 'color') return same;
   }
 
@@ -120,6 +126,11 @@ export function step(ctx: Ctx, mode: Mode, ev: Ev, env: Env, escAtRoot: 'hint' |
         return ev.annId ? out(ctx, { m: 'selected', annId: ev.annId }, 'show-popover') : out(ctx, IDLE, 'clear-selection');
       }
       if (ev.e === 'cancel' || ev.e === 'esc') return out(ctx, IDLE, 'clear-selection');
+      return same;
+    }
+    case 'cropping': {
+      if (ev.e === 'up') return out(ctx, IDLE, 'crop-commit');
+      if (ev.e === 'cancel' || ev.e === 'esc') return out(ctx, IDLE, 'crop-cancel');
       return same;
     }
     case 'erasing': {
@@ -166,7 +177,9 @@ function idle(ctx: Ctx, mode: Extract<Mode, { m: 'idle' }>, ev: Ev, env: Env, es
       }
       if (ev.on === 'empty') return out(ctx, { m: 'idle', hasSelection: false }, 'clear-selection');
       if (ctx.tool === 'select') return out(ctx, { m: 'selecting' });
-      return out(ctx, { m: 'stroking', kind: ctx.tool, pointerId: ev.pointerId });
+      // Crop: a drag on a page starts a rectangle; a click on an existing crop (`on: 'annotation'`) selects it like Select does.
+      if (ctx.tool === 'crop') return ev.on === 'annotation' ? out(ctx, { m: 'selecting' }) : out(ctx, { m: 'cropping', pointerId: ev.pointerId });
+      return out(ctx, { m: 'stroking', kind: ctx.tool as Brush, pointerId: ev.pointerId });
     }
     case 'esc':
       if (mode.hasSelection) return out(ctx, { m: 'idle', hasSelection: false }, 'clear-selection');

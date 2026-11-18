@@ -93,10 +93,17 @@ export function createWatchFetcher(net: Net): (w: WatchQuery, signal?: AbortSign
       filters.push(`author.id:${ids.join('|')}`, 'type:preprint');
     }
     const out: WatchHit[] = [];
-    let cursor: string | null = '*';
+    let more = false;
+    // Plain pages (`page=N`): `cursor=*` needs an API key, page numbers do not (up to 10,000 works).
     // Oldest first: when there are more works than `WATCH_HITS_MAX`, the ones returned are the oldest and the caller continues from their date.
-    for (let page = 0; cursor && page < PAGES; page++) {
-      const res = asObj(await net.json(`${OA}/works?filter=${q(filters.join(','))}${search}&sort=publication_date:asc&per-page=${PER_PAGE}&cursor=${q(cursor)}&select=${FIELDS}`, signal, 4 * 1024 * 1024));
+    for (let page = 1; page <= PAGES; page++) {
+      let res: Record<string, unknown>;
+      try {
+        res = asObj(await net.json(`${OA}/works?filter=${q(filters.join(','))}${search}&sort=publication_date:asc&per-page=${PER_PAGE}&page=${page}&select=${FIELDS}`, signal, 4 * 1024 * 1024));
+      } catch (e) {
+        if (e instanceof AppError && (e.details as { status?: number } | undefined)?.status === 401) throw new AppError('NETWORK_ERROR', 'OpenAlex needs an API key for this check: add one in Settings', { reason: 'openalex-key-required', status: 401 });
+        throw e;
+      }
       const results = Array.isArray(res['results']) ? res['results'] : [];
       for (const r of results) {
         const l = openAlexLink(asObj(r), '1970-01-01T00:00:00.000Z');
@@ -115,9 +122,10 @@ export function createWatchFetcher(net: Net): (w: WatchQuery, signal?: AbortSign
           ...(typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) ? { publishedOn: date } : {}),
         });
       }
-      const next = asObj(res['meta'])['next_cursor'];
-      cursor = results.length > 0 && typeof next === 'string' && next && next !== cursor ? next : null;
+      const meta = asObj(res['meta']);
+      more = results.length > 0 && (typeof meta['count'] === 'number' ? meta['count'] > page * PER_PAGE : typeof meta['next_cursor'] === 'string' && meta['next_cursor'] !== '');
+      if (!more) break;
     }
-    return { hits: out.slice(0, WATCH_FILE_LIMITS.seen), truncated: cursor !== null };
+    return { hits: out.slice(0, WATCH_FILE_LIMITS.seen), truncated: more };
   };
 }

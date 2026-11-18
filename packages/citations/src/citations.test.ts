@@ -483,6 +483,18 @@ describe('watch queries: own preprints and pages', () => {
     await expect(none({ kind: 'own-preprint', query: '', since, authorVariants: [], openAlexId: 'A1,type:article' })).rejects.toMatchObject({ details: { reason: 'own-author-unknown' } });
   });
 
+  it('uses plain page numbers (no cursor) and explains a 401 with a typed error', async () => {
+    const { f, urls } = fake((u) => (u.pathname === '/works' ? json({ results: [W(1)], meta: { count: 1 } }) : undefined));
+    const r = await createWatchFetcher(createNet({ fetch: f, ...noSleep }))({ kind: 'topic', query: 'graphs', since });
+    expect(r.hits).toHaveLength(1);
+    expect(r.truncated).toBe(false);
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).toContain('page=1');
+    expect(urls[0]).not.toContain('cursor');
+    const denied = createWatchFetcher(createNet({ fetch: fake(() => new Response('{}', { status: 401 })).f, ...noSleep }));
+    await expect(denied({ kind: 'topic', query: 'graphs', since })).rejects.toMatchObject({ code: 'NETWORK_ERROR', details: { reason: 'openalex-key-required' } });
+  });
+
   it('reports when there were more works than a check reads', async () => {
     let n = 0;
     const { f } = fake((u) => (u.pathname === '/works' ? json({ results: [W(++n)], meta: { next_cursor: `c${n}` } }) : undefined));

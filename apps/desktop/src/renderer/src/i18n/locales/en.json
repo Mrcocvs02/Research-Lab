@@ -48,7 +48,8 @@
     "doiOwned": "Another document of your library already has this DOI, so the published version was not applied.",
     "STOPPED": "not tried: the sources before it kept failing",
     "PARTIAL": "more works than one check reads: check again to continue",
-    "OWN_AUTHOR_UNKNOWN": "no OpenAlex author matches your profile: add your OpenAlex author id in Settings"
+    "OWN_AUTHOR_UNKNOWN": "no OpenAlex author matches your profile: add your OpenAlex author id in Settings",
+    "OPENALEX_KEY_REQUIRED": "an OpenAlex API key is needed: add one in Settings"
   },
   "notices": {
     "settingsReset": "Your settings file could not be used ({{reason}}), so the app restarted with default settings. The damaged file was kept as \"{{backup}}\" in the app data folder; libraries must be added again.",

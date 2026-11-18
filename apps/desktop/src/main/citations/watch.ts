@@ -98,7 +98,7 @@ export async function resetSources(s: MainServices): Promise<{ backedUp: boolean
   return { backedUp };
 }
 
-const failCode = (e: unknown): string => (e instanceof AppError ? (e.details?.['reason'] === 'own-author-unknown' ? 'OWN_AUTHOR_UNKNOWN' : e.code) : 'INTERNAL');
+const failCode = (e: unknown): string => (e instanceof AppError ? (e.details?.['reason'] === 'own-author-unknown' ? 'OWN_AUTHOR_UNKNOWN' : e.details?.['reason'] === 'openalex-key-required' ? 'OPENALEX_KEY_REQUIRED' : e.code) : 'INTERNAL');
 const isNetworkFailure = (e: unknown): boolean => e instanceof AppError && e.code === 'NETWORK_ERROR';
 
 export async function listSources(s: MainServices): Res<H['watch:list']> {

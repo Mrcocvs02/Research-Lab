@@ -46,8 +46,8 @@ export interface AiCtx {
 export async function loadCtx(s: MainServices): Promise<AiCtx> {
   const rt = await s.runtime.require();
   const cfg = await rt.store.readConfig();
-  const claudeCodePath = (await s.settings.get()).ai.claudeCodePath;
-  const provider = s.aiProvider ? s.aiProvider({ provider: cfg.ai.provider, models: cfg.ai.models, claudeCodePath }) : null;
+  const { claudeCodePath, authMode } = (await s.settings.get()).ai;
+  const provider = s.aiProvider ? s.aiProvider({ provider: cfg.ai.provider, models: cfg.ai.models, claudeCodePath, authMode }) : null;
   return { rt, cfg, provider };
 }
 

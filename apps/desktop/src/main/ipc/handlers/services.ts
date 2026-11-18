@@ -1,4 +1,5 @@
 import type { LegacyImporter, LibraryConfig, Logger, SecretStore } from '@rl/core';
+import type { AccountIo } from '../../ai/account.js';
 import type { AiProviderFactory } from '../../ai/provider-factory.js';
 import type { ApprovedPaths } from '../../approved-paths.js';
 import type { GraphEngine } from '../../graph/engine.js';
@@ -54,6 +55,8 @@ export interface MainServices {
   backupDataDir(libraryId: string, dataDir: string): Promise<{ backupDir: string; files: number } | null>;
   /** The AI provider for a library's configuration (D-204); absent in tests that do not use the AI layer. */
   aiProvider?: AiProviderFactory;
+  /** The machine side of the Claude account channels (runs `claude auth ...`, opens the login console, watches the credentials); absent: the real one. Tests and the simulated run give their own. */
+  claudeIo?: AccountIo;
   /** Whether the machine has a network connection (`net.isOnline()`); absent: assumed online. Not used by the mock provider. */
   isOnline?: () => boolean;
   /** HTTPS fetch of the metadata lookup (Electron `net.fetch`); absent in tests that do not use it. */

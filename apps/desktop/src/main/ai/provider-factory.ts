@@ -1,13 +1,13 @@
 import path from 'node:path';
 import { createClaudeProvider, createMockAiProvider, type AiProviderEx, type MockScript } from '@rl/ai';
-import type { AiProviderId, ModelConfig, SecretStore } from '@rl/core';
+import type { AiAuthMode, AiProviderId, ModelConfig, SecretStore } from '@rl/core';
 
 /** Secret under which the user's Anthropic API key lives (scope `app`, OS secure store). The Claude Code login needs none. */
 export const API_KEY_SECRET = 'anthropic-api-key';
 
 export interface AiProviderFactory {
   /** The provider for a library's configuration; null when that provider is not available in this app (yet). */
-  (config: { provider: AiProviderId; models: ModelConfig[]; /** Claude Code executable chosen by the user (settings of this machine). */ claudeCodePath?: string | null }): AiProviderEx | null;
+  (config: { provider: AiProviderId; models: ModelConfig[]; /** Claude Code executable chosen by the user (settings of this machine). */ claudeCodePath?: string | null; /** Which credentials the child may use (settings of this machine). */ authMode?: AiAuthMode }): AiProviderEx | null;
 }
 
 export interface FactoryDeps {
@@ -32,6 +32,7 @@ export function createProviderFactory(d: FactoryDeps): AiProviderFactory {
     return createClaudeProvider({
       models: config.models,
       configuredExecutable: () => config.claudeCodePath ?? null,
+      getAuthMode: () => config.authMode ?? 'auto',
       workDir: path.join(d.localDataDir, 'ai-work'),
       getApiKey: () => d.secrets.get({ kind: 'app' }, API_KEY_SECRET),
       ...(d.clientApp ? { clientApp: d.clientApp } : {}),

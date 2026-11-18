@@ -23,6 +23,7 @@ import { honoursDialogHooks, honoursProfileSwitch, mustRefuseDebugSwitches, PACK
 import { resolveAppDirs } from './dirs.js';
 import { presentPdf } from './ipc/handlers/doc-files.js';
 import { buildHandlers, type MainServices } from './ipc/handlers/index.js';
+import { simulatedClaudeIo } from './ai/account.js';
 import { createProviderFactory } from './ai/provider-factory.js';
 import { abortAllChatTurns } from './ai/service.js';
 import { abortAllJobs } from './ai/jobs.js';
@@ -80,7 +81,7 @@ async function main(): Promise<void> {
     serveRenderer(session.defaultSession, path.join(import.meta.dirname, '../renderer'));
   }
 
-  const settings = SettingsStore.forDir(dirs.userData, log);
+  const settings = SettingsStore.forDir(dirs.userData, log, app.getLocale());
   const approved = new ApprovedPaths();
   const secrets = new FileSecretStore(dirs.userData, {
     isAvailable: () => safeStorage.isEncryptionAvailable(),
@@ -172,6 +173,8 @@ async function main(): Promise<void> {
     // Test hook: canned answers instead of the network (development run with RL_E2E=1 only).
     fetch: runtime.netFixturesFile ? fixtureFetch(runtime.netFixturesFile) : (input, init) => net.fetch(input as string, init as never) as Promise<Response>,
     metadataFile: runtime.metadataFile,
+    // Test hook: a simulated Claude Code instead of the real program and account (development run with RL_E2E=1 only).
+    ...(runtime.claudeSimDir ? { claudeIo: simulatedClaudeIo(runtime.claudeSimDir) } : {}),
     // The graph worker thread (build, similarity on the fly): started by the first call, closed when idle.
     graphEngine: () => (graphHost ??= spawnGraphWorker(path.join(import.meta.dirname, 'graph-worker.js'), { log })),
     // Maintenance report (D-258): time to the first window content, and the worker threads alive right now.

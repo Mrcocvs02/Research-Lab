@@ -600,6 +600,9 @@ describe('inbox security and robustness (review fixes)', () => {
     expect(fetched).toEqual([]);
     // After a scan the renderer asks for a recount: one pass over the records, still no lookup.
     expect(ok(await call('inbox:count', { recount: true }))).toMatchObject({ count: 2 });
+    // The parts of the number (tooltip of the badge): files dropped in the app and flagged library files.
+    const parts = ok(await call('inbox:count', {}));
+    expect(parts.dropped + parts.library).toBe(parts.count);
     expect(ok(await call('inbox:count', {}))).toMatchObject({ count: 2 });
     await whenInboxIdle();
     expect(fetched).toEqual([]);

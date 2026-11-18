@@ -1,4 +1,4 @@
-import { AppError, defaultAppSettings, effectiveShortcuts, findShortcutConflicts, type AppSettings, type BackupInfo, type LibraryProfile } from '@rl/core';
+import { AppError, defaultAppSettings, effectiveShortcuts, findShortcutConflicts, type AiAccount, type AppSettings, type BackupInfo, type LibraryProfile, type ScanReport } from '@rl/core';
 
 type Handler = (payload: any) => unknown;
 
@@ -57,6 +57,11 @@ export function memoryBackend(init: { settings?: Partial<AppSettings>; profiles?
       /** Fields of a finished job's result (`skipped`, `resetOnRestore`, `secretsToEnter`, ...). */
       resultExtra: {} as Record<string, unknown>,
     },
+    /** The Claude account the card shows (`ai:account`): a logged-in Claude Code with a known identity. Tests edit it. */
+    claudeCode: { loggedIn: true as boolean | null, account: { email: 'user@example.test', organization: 'Example Org', plan: 'pro' } as AiAccount['claudeCode']['account'], supportsAuthCommands: true, path: '/tmp/claude' as string | null },
+    apiKeyStored: false,
+    test: { ok: true, ms: 1200, model: 'claude-haiku-5-5', usd: 0.001 as number | null, error: undefined as { code: string } | undefined },
+    scanReport: { finishedAt: null, summary: null, firstScan: false, added: [], changed: [], moved: [], missing: [], failed: [], truncated: false } as ScanReport,
     report: { documents: 0, dataBytes: 0, local: { index: 0, cache: 0, thumbs: 0, graph: 0, chats: 0, backups: 0 }, logsBytes: 0, process: { rssMb: 100, heapMb: 20, uptimeSec: 1, startupMs: 400 }, workers: 0 },
   };
   const jobs = new Map<string, Record<string, unknown>>();
@@ -70,6 +75,17 @@ export function memoryBackend(init: { settings?: Partial<AppSettings>; profiles?
     return { jobId };
   };
   const backupSettings = () => ({ destination: state.backup.destination, auto: state.backup.auto, keep: state.backup.keep, lastBackupAt: state.backup.lastBackupAt, lastAutoError: state.backup.lastAutoError });
+  const accountView = (): AiAccount => {
+    const c = state.claudeCode;
+    const mode = state.settings.ai.authMode;
+    const key = state.apiKeyStored && mode !== 'claude-code';
+    return {
+      authMode: mode,
+      effective: key ? 'api-key' : mode !== 'api-key' && c.loggedIn ? 'claude-code' : 'none',
+      apiKey: { stored: state.apiKeyStored, envVar: false },
+      claudeCode: { path: c.path, source: c.path ? 'path' : 'none', version: c.path ? '2.1.0' : null, loggedIn: c.loggedIn, account: c.loggedIn ? c.account : null, supportsAuthCommands: c.supportsAuthCommands },
+    };
+  };
   const handlers: Record<string, Handler> = {
     'app:info': () => ({ name: 'Research Lab', version: '0.0.0', platform: 'test', electron: 'x' }),
     'settings:get': () => ({ ...state.settings, libraries: state.profiles, activeLibraryId: state.active }),
@@ -132,6 +148,20 @@ export function memoryBackend(init: { settings?: Partial<AppSettings>; profiles?
       state.backup.items = state.backup.items.filter((i) => i.file !== p.file);
       return { ok: true };
     },
+    'ai:account': accountView,
+    'ai:setAuthMode': (p: any) => {
+      state.settings.ai = { ...state.settings.ai, authMode: p.mode };
+      return accountView();
+    },
+    'ai:login': () => ({ started: true }),
+    'ai:loginDone': accountView,
+    'ai:logout': () => {
+      state.claudeCode.loggedIn = false;
+      return accountView();
+    },
+    'ai:test': () => ({ ...state.test }),
+    'ai:usageAll': () => ({ totalUsd: 0, sends: 0, libraries: state.profiles.map((p) => ({ libraryId: p.id, usd: 0, reachable: true })) }),
+    'scan:report': () => state.scanReport,
     'maintenance:report': () => state.report,
     'maintenance:clean': () => ({ freedBytes: 0 }),
     'maintenance:openLogs': () => ({ ok: true }),

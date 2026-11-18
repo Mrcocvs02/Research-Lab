@@ -516,7 +516,7 @@ describe('time to prepare the paths of 20000 points', () => {
     const n = 20_000;
     const { xs, ys } = points(n, 9);
     const calls = { rect: 0, fill: 0 };
-    const ctx = { beginPath() {}, rect() { calls.rect++; }, fill() { calls.fill++; } };
+    const ctx = { beginPath() {}, rect(_x: number, _y: number, _w: number, _h: number) { calls.rect++; }, fill() { calls.fill++; } };
     const t0 = performance.now();
     for (let colour = 0; colour < 10; colour++) {
       ctx.beginPath();

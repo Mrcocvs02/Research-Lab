@@ -59,7 +59,10 @@ export function HoverCard({ x, y, width, height, testId, children }: { x: number
   const [size, setSize] = useState({ w: 280, h: 90 });
   useEffect(() => {
     const el = ref.current;
-    if (el) setSize({ w: el.offsetWidth || 280, h: el.offsetHeight || 90 });
+    if (!el) return;
+    const w = el.offsetWidth || 280;
+    const h = el.offsetHeight || 90;
+    setSize((cur) => (cur.w === w && cur.h === h ? cur : { w, h }));
   }, [children]);
   const left = Math.max(4, Math.min(x + 14, width - size.w - 4));
   const top = Math.max(4, Math.min(y + 14, height - size.h - 4));

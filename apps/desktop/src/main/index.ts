@@ -38,6 +38,8 @@ import { reconcileMcp, stopMcp } from './mcp/service.js';
 import { LibraryService } from './library-service.js';
 import { applyResourceSwitches } from './resources.js';
 import { configureRuntime, resolveRuntimeConfig } from './runtime.js';
+import { PDF_WRITE_ENABLED } from '@rl/core';
+import { flushPdfWrites } from './study/pdf-sync.js';
 import { FileSecretStore } from './secret-store.js';
 import { installGlobalSecurity, isTrustedUrl, registerPrivilegedSchemes, rendererOrigin, serveDocuments, serveRenderer, serveThumbnails } from './security.js';
 import { SettingsStore } from './settings-store.js';
@@ -173,6 +175,8 @@ async function main(): Promise<void> {
     // Test hook: canned answers instead of the network (development run with RL_E2E=1 only).
     fetch: runtime.netFixturesFile ? fixtureFetch(runtime.netFixturesFile) : (input, init) => net.fetch(input as string, init as never) as Promise<Response>,
     metadataFile: runtime.metadataFile,
+    // Writing into the PDFs is off (D-354); tests of the writer turn it on in a development run only.
+    pdfWriteEnabled: PDF_WRITE_ENABLED || (!app.isPackaged && process.env['RL_E2E'] === '1' && process.env['RL_E2E_PDF_WRITE'] === '1'),
     // Test hook: a simulated Claude Code instead of the real program and account (development run with RL_E2E=1 only).
     ...(runtime.claudeSimDir ? { claudeIo: simulatedClaudeIo(runtime.claudeSimDir) } : {}),
     // The graph worker thread (build, similarity on the fly): started by the first call, closed when idle.
@@ -235,7 +239,8 @@ async function main(): Promise<void> {
     void closeGraph(services);
     // A worker stuck in a synchronous loop must not keep the app from quitting: after a limit it is killed.
     const limit = new Promise<void>((resolve) => setTimeout(resolve, 15_000).unref());
-    void Promise.race([Promise.all([runtimeManager.closeAll(), stopMcp(services), whenBackupDone(services)]), limit])
+    // The pending annotations are written into their PDFs first (at most 5 s, D-349); the worker must still be alive for it.
+    void Promise.race([flushPdfWrites(services).then(() => Promise.all([runtimeManager.closeAll(), stopMcp(services), whenBackupDone(services)])), limit])
       .then(() => runtimeManager.terminateAll())
       .catch((e: unknown) => log.warn('closing the library runtime failed', { error: e }))
       .finally(() => app.quit());

@@ -2,6 +2,7 @@ import { reconcileMcp } from '../../mcp/service.js';
 import { abortAllJobs } from '../../ai/jobs.js';
 import { invalidateOpenAlexKey, OPENALEX_KEY_SECRET } from '../../citations/context.js';
 import { abortChatTurnsAndWait } from '../../ai/service.js';
+import { flushPdfWrites } from '../../study/pdf-sync.js';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
@@ -46,6 +47,8 @@ export const libraryHandlers = (s: MainServices): Omit<DomainHandlers<'library'>
     abortAllJobs();
     // A running chat turn stops and writes its log entry in its own library before the switch.
     await abortChatTurnsAndWait();
+    // The annotations of the library being left are written into their PDFs first (D-349: change of library); what does not fit stays pending.
+    await flushPdfWrites(s);
     const activeLibraryId = await s.libraries.setActive(libraryId);
     await s.runtime.sync({ autoScan: true });
     await reconcileMcp(s);

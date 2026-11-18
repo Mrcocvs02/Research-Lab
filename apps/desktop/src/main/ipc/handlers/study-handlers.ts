@@ -9,6 +9,7 @@ import type { LibraryRuntime } from '../../library/library-runtime.js';
 import type { DomainHandlers } from '../types.js';
 
 import { listThumbs, nativeThumb, pruneThumbs, putThumb } from '../../thumbs.js';
+import { getPdfSync } from '../../study/pdf-sync.js';
 import { scheduleRepairJob } from '../../study/repair-job.js';
 import { openPdfHandle, presentPdf } from './doc-files.js';
 import type { MainServices } from './services.js';
@@ -155,6 +156,8 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
   const queue = new KeyedQueue();
   // Annotations saved while the page was stretched are measured again in the background (D-373), once per library.
   scheduleRepairJob(s);
+  // Writing into the PDFs (D-316): the moments of writing, consent, restore. Off while `PDF_WRITE_ENABLED` is off.
+  const pdf = getPdfSync(s);
   /** The annotations of one document change one at a time, together with the flag that follows them. */
   const change = async <T>(docId: string, fn: (rt: LibraryRuntime) => Promise<{ value: T; changed: boolean; flagChanged: boolean; underlined: Underlined }>) => {
     const rt = await activeDocument(s, docId);
@@ -162,6 +165,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
     if (r.changed) {
       await refreshIndex(s, rt, docId);
       s.emit('library:changed', { kind: 'annotations', ids: [docId] });
+      pdf.touch(rt.libraryId, docId);
       // The "underlined" flag lives in the document record: lists showing it reload that document.
       if (r.flagChanged) s.emit('library:changed', { kind: 'documents', ids: [docId] });
     }
@@ -240,6 +244,19 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
       });
       return { removed: r.value, underlined: r.underlined };
     },
+    'annotations:pdfState': async ({ docId }) => pdf.state(docId),
+    'annotations:writeNow': async ({ docId }) => pdf.writeNow(docId),
+    'annotations:setPdfMode': async ({ docId, mode }) => pdf.setMode(docId, mode),
+    'annotations:confirmPdfWrite': async ({ choice }) => pdf.confirm(choice),
+    'annotations:removeFromPdf': async ({ docId }) => pdf.removeFromPdf(docId),
+    'annotations:restoreOriginal': async ({ docId }) => pdf.restoreOriginal(docId),
+    'annotations:resolveMissing': async ({ docId, choice, ids }) => pdf.resolveMissing(docId, choice, ids),
+    'annotations:migrate': async () => pdf.migrate(),
+    'annotations:restoreAll': async () => pdf.restoreAll(),
+    'annotations:jobCancel': async ({ jobId }) => (pdf.cancel(jobId), {}),
+    'annotations:backups': async () => pdf.backups(),
+    'annotations:deleteBackups': async () => pdf.deleteBackups(),
+    'annotations:migrationPlan': async () => pdf.migrationPlan(),
   };
 };
 

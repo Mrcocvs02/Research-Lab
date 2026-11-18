@@ -384,6 +384,16 @@ export class LibraryRuntime {
     return this.d.worker.repairAnnotations(args, { signal });
   }
 
+  /**
+   * The annotation writer's calls in the worker (§8.3.3 steps 3 and 6). The worker reads the PDF and builds the bytes; the main
+   * process (`study/pdf-sync.ts`) writes. They fail with IO_ERROR when this worker has no writer (tests).
+   */
+  get pdf(): Required<Pick<LibraryWorker, 'pdfSync' | 'pdfVerify' | 'pdfInspect'>> {
+    const w = this.d.worker;
+    const missing = () => Promise.reject(new AppError('IO_ERROR', 'The library worker cannot write PDF annotations'));
+    return { pdfSync: w.pdfSync?.bind(w) ?? missing, pdfVerify: w.pdfVerify?.bind(w) ?? missing, pdfInspect: w.pdfInspect?.bind(w) ?? missing };
+  }
+
   /** Extracts one file under the worker's watchdog; the result says what became of it (never throws, except on cancel). */
   private extractOne(rec: DocumentRecord, signal: AbortSignal): Promise<ExtractResult> {
     return this.extractAt(this.d.rootPath, rec.path, contentHashOf(rec), signal, rec.pdfWrite !== undefined);

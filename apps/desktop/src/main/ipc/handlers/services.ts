@@ -67,6 +67,8 @@ export interface MainServices {
   startupMs?: () => number | null;
   /** Worker threads alive right now (scan and graph). */
   workers?: () => number;
+  /** Whether highlights are written into the PDFs: `PDF_WRITE_ENABLED`, or true in a development run with RL_E2E=1 and RL_E2E_PDF_WRITE=1 (tests). Absent: `PDF_WRITE_ENABLED`. */
+  pdfWriteEnabled?: boolean;
   /** Test hook (RL_E2E=1, development run only): JSON file that replaces the online metadata lookup. */
   metadataFile?: string | null;
 }

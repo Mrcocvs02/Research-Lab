@@ -8,29 +8,26 @@ import { AppError, DEFAULT_MODELS, type AiAccount, type AiAuthMode } from '@rl/c
 import type { MainServices } from '../ipc/handlers/services.js';
 import { API_KEY_SECRET } from './provider-factory.js';
 
-/** `auth status` answers within a second; logout may wait on the network a little longer (D-431). */
-const STATUS_TIMEOUT_MS = 10_000;
-const LOGOUT_TIMEOUT_MS = 20_000;
-/** How long the credentials watcher stays on after "Change account…" (§10.3). */
+const STATUS_MS = 10_000;
+const LOGOUT_MS = 20_000;
 const WATCH_MS = 10 * 60_000;
 const DEBOUNCE_MS = 500;
 const MAX_OUT = 64 * 1024;
-const TEST_MODEL = 'claude-haiku-5-5';
-const TEST_BUDGET_USD = 0.01;
+const MODEL = 'claude-haiku-5-5';
 
 export interface CliResult {
-  /** Null when the process could not start or was killed. */
+  /** Null: the process did not start or was killed. */
   code: number | null;
   stdout: string;
   timedOut: boolean;
 }
 
-/** Everything that touches the machine; tests give fakes, so no test ever runs the real `claude` or reads a real account. */
+/** Everything that touches the machine; tests give fakes, so no test runs the real `claude` or reads a real account. */
 export interface AccountIo {
-  run(exe: string, args: readonly string[], opts: { timeoutMs: number; env: NodeJS.ProcessEnv }): Promise<CliResult>;
-  /** Opens a visible console that runs the executable with these fixed arguments. */
+  run(exe: string, args: readonly string[], o: { timeoutMs: number; env: NodeJS.ProcessEnv }): Promise<CliResult>;
+  /** A visible console that runs the program with these fixed arguments. */
   openConsole(exe: string, args: readonly string[], env: NodeJS.ProcessEnv): void;
-  /** Watches the folder of the credentials file; `onChange` gets the name of the file that changed. */
+  /** Watches a folder; `onChange` gets the name of the file that changed. */
   watch(dir: string, onChange: (name: string) => void): { close(): void } | null;
   env: NodeJS.ProcessEnv;
   home: string;
@@ -39,22 +36,21 @@ export interface AccountIo {
 }
 
 export const realIo = (): AccountIo => ({
+  // No shell, fixed arguments, allow-listed environment; the output is capped and never logged.
   run: (exe, args, o) =>
-    new Promise((resolve) => {
-      // No shell, fixed arguments, an allow-listed environment; the output is capped and never logged.
+    new Promise((resolve) =>
       execFile(exe, [...args], { timeout: o.timeoutMs, env: o.env, windowsHide: true, maxBuffer: MAX_OUT, shell: false }, (err, stdout) => {
         const e = err as (NodeJS.ErrnoException & { killed?: boolean }) | null;
         resolve({ code: e ? (typeof e.code === 'number' ? e.code : null) : 0, stdout: String(stdout ?? ''), timedOut: Boolean(e?.killed) });
-      });
-    }),
+      }),
+    ),
   openConsole(exe, args, env) {
     if (process.platform === 'win32') {
-      // `start` runs through cmd.exe: a path with a cmd metacharacter is refused, never escaped.
+      // `start` goes through cmd.exe: a path with one of its metacharacters is refused, never escaped.
       if (/[&|<>^%"\r\n]/.test(exe)) throw new AppError('INVALID_REQUEST', 'The Claude Code path cannot be opened in a console');
       spawn('cmd.exe', ['/c', 'start', '""', exe, ...args], { detached: true, windowsHide: false, stdio: 'ignore', env }).unref();
-    } else if (process.platform === 'linux') {
-      spawn('x-terminal-emulator', ['-e', exe, ...args], { detached: true, stdio: 'ignore', env }).unref();
-    } else throw new AppError('NOT_IMPLEMENTED', 'Opening a console is not supported on this system');
+    } else if (process.platform === 'linux') spawn('x-terminal-emulator', ['-e', exe, ...args], { detached: true, stdio: 'ignore', env }).unref();
+    else throw new AppError('NOT_IMPLEMENTED', 'Opening a console is not supported on this system');
   },
   watch(dir, onChange) {
     try {
@@ -67,30 +63,20 @@ export const realIo = (): AccountIo => ({
   },
   env: process.env,
   home: os.homedir(),
-  exists: (p) => existsSync(p),
+  exists: existsSync,
 });
 
-/** The only fields read of `claude auth status` (D-431); anything else, `orgId` and paths included, is ignored. */
-const statusSchema = z.object({
-  loggedIn: z.boolean().optional(),
-  email: z.string().max(320).optional(),
-  orgName: z.string().max(200).optional(),
-  subscriptionType: z.string().max(100).optional(),
-});
+/** The only fields read of `claude auth status` (D-431): `orgId`, paths and the rest are ignored. */
+const statusSchema = z.object({ loggedIn: z.boolean(), email: z.string().max(320).optional(), orgName: z.string().max(200).optional(), subscriptionType: z.string().max(100).optional() });
 
-interface Status {
-  loggedIn: boolean;
-  account: AiAccount['claudeCode']['account'];
-}
-
-/** Reads the JSON of `claude auth status`; null when it is not that (the command is missing or the output is odd). */
-export function parseStatus(out: string): Status | null {
+/** Reads the JSON of `auth status`; null when it is not that (command missing, odd output). */
+export function parseStatus(out: string): { loggedIn: boolean; account: AiAccount['claudeCode']['account'] } | null {
   try {
     const r = statusSchema.safeParse(JSON.parse(out.slice(0, MAX_OUT)));
-    if (!r.success || r.data.loggedIn === undefined) return null;
-    const { email, orgName, subscriptionType } = r.data;
-    const account = email || orgName || subscriptionType ? { ...(email ? { email } : {}), ...(orgName ? { organization: orgName } : {}), ...(subscriptionType ? { plan: subscriptionType } : {}) } : null;
-    return { loggedIn: r.data.loggedIn, account: r.data.loggedIn ? account : null };
+    if (!r.success) return null;
+    const { loggedIn, email, orgName, subscriptionType } = r.data;
+    const account = { ...(email ? { email } : {}), ...(orgName ? { organization: orgName } : {}), ...(subscriptionType ? { plan: subscriptionType } : {}) };
+    return { loggedIn, account: loggedIn && Object.keys(account).length ? account : null };
   } catch {
     return null;
   }
@@ -103,41 +89,33 @@ export interface AccountService {
   loginDone(): Promise<AiAccount>;
   logout(): Promise<AiAccount>;
   test(): Promise<{ ok: boolean; ms: number; model: string; usd: number | null; error?: { code: string } }>;
-  dispose(): void;
 }
 
 export function createAccountService(s: MainServices, io: AccountIo = realIo()): AccountService {
   const versions = new Map<string, string | null>();
   let watcher: { close(): void } | null = null;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let stop: ReturnType<typeof setTimeout> | null = null;
-  /** `loggedIn|email|org` of the last state shown: a token refresh keeps it, a different account does not. */
+  let timers: Array<ReturnType<typeof setTimeout>> = [];
+  /** `loggedIn|email|org` of the state last shown: a token refresh keeps it, another account changes it. */
   let identity: string | null = null;
-
-  const exe = async () =>
-    findClaudeExecutable({ configured: (await s.settings.get()).ai.claudeCodePath, env: io.env, home: io.home, exists: io.exists, ...(io.bundled ? { bundled: io.bundled } : {}) });
+  const credentials = claudeCredentialsFile(io.home);
 
   async function build(): Promise<AiAccount> {
-    const mode = (await s.settings.get()).ai.authMode;
-    const found = await exe();
+    const { authMode: mode, claudeCodePath } = (await s.settings.get()).ai;
+    const found = findClaudeExecutable({ configured: claudeCodePath, env: io.env, home: io.home, exists: io.exists, ...(io.bundled ? { bundled: io.bundled } : {}) });
     const stored = await s.secrets.has({ kind: 'app' }, API_KEY_SECRET).catch(() => false);
     const env = childEnvFor(io.env, mode);
     let version: string | null = null;
-    let status: Status | null = null;
+    let status: ReturnType<typeof parseStatus> = null;
     if (found.path) {
-      if (!versions.has(found.path)) {
-        const v = await io.run(found.path, ['--version'], { timeoutMs: STATUS_TIMEOUT_MS, env });
-        versions.set(found.path, /^\d+\.\d+\.\d+[\w.+-]{0,32}/.exec(v.stdout.trim())?.[0] ?? null);
-      }
+      if (!versions.has(found.path)) versions.set(found.path, /^\d+\.\d+\.\d+[\w.+-]{0,32}/.exec((await io.run(found.path, ['--version'], { timeoutMs: STATUS_MS, env })).stdout.trim())?.[0] ?? null);
       version = versions.get(found.path) ?? null;
-      status = parseStatus((await io.run(found.path, ['auth', 'status', '--json'], { timeoutMs: STATUS_TIMEOUT_MS, env })).stdout);
+      status = parseStatus((await io.run(found.path, ['auth', 'status', '--json'], { timeoutMs: STATUS_MS, env })).stdout);
     }
-    const access = detectAccess({ apiKey: stored ? 'stored' : null, authMode: mode, env: io.env, home: io.home, exists: io.exists });
-    // Without the `auth` commands the answer comes from the files and variables only (no identity).
-    const hasLogin = Boolean(io.env.CLAUDE_CODE_OAUTH_TOKEN) || io.exists(claudeCredentialsFile(io.home));
-    const loggedIn = status ? status.loggedIn : found.path && hasLogin ? true : null;
+    const auth = detectAccess({ apiKey: stored ? 'stored' : null, authMode: mode, env: io.env, home: io.home, exists: io.exists }).auth;
+    // Without the `auth` commands only files and variables speak (no identity).
+    const loggedIn = status ? status.loggedIn : found.path && (io.env.CLAUDE_CODE_OAUTH_TOKEN || io.exists(credentials)) ? true : null;
     // `auth status` knows better than the files (the login may live in the system's credential store).
-    const effective = access.auth === 'claude-code' && loggedIn === false ? 'none' : access.auth === 'none' && mode !== 'api-key' && loggedIn === true ? 'claude-code' : access.auth;
+    const effective = auth === 'claude-code' && loggedIn === false ? 'none' : auth === 'none' && mode !== 'api-key' && loggedIn === true ? 'claude-code' : auth;
     return {
       authMode: mode,
       effective,
@@ -154,32 +132,29 @@ export function createAccountService(s: MainServices, io: AccountIo = realIo()):
     if (emit && changed) s.emit('ai:accountChanged', a);
     return a;
   }
-
   const closeWatcher = () => {
     watcher?.close();
     watcher = null;
-    for (const t of [timer, stop]) if (t) clearTimeout(t);
-    timer = stop = null;
+    timers.forEach(clearTimeout);
+    timers = [];
   };
 
+  /** Only after `ai:login`: any event on the credentials file (token refreshes too) re-checks the status, never reads the file. */
   function watchLogin(): void {
     closeWatcher();
-    const file = claudeCredentialsFile(io.home);
-    let debounce: ReturnType<typeof setTimeout> | null = null;
-    watcher = io.watch(path.dirname(file), (name) => {
-      if (name !== path.basename(file)) return;
-      if (debounce) clearTimeout(debounce);
-      // Every event, token refreshes included, only triggers a re-check; the content of the file is never read.
+    let debounce: ReturnType<typeof setTimeout> | undefined;
+    watcher = io.watch(path.dirname(credentials), (name) => {
+      if (name !== path.basename(credentials)) return;
+      clearTimeout(debounce);
       debounce = setTimeout(() => {
         const before = identity;
         refresh(true)
-          .then(() => {
-            if (identity !== before) stop = setTimeout(closeWatcher, 2000);
-          })
+          .then(() => identity !== before && timers.push(setTimeout(closeWatcher, 2000)))
           .catch((e: unknown) => s.log.warn('Claude account re-check failed', { code: AppError.from(e).code }));
       }, DEBOUNCE_MS);
+      timers.push(debounce);
     });
-    if (watcher) timer = setTimeout(closeWatcher, WATCH_MS);
+    if (watcher) timers.push(setTimeout(closeWatcher, WATCH_MS));
   }
 
   return {
@@ -192,11 +167,11 @@ export function createAccountService(s: MainServices, io: AccountIo = realIo()):
       return refresh(true);
     },
     async login() {
-      const before = await build();
-      if (!before.claudeCode.path) throw new AppError('NOT_FOUND', 'Claude Code was not found');
-      identity = key(before);
-      // Fixed arguments (D-431); where the CLI has no `auth` commands the plain executable opens and the user types /login.
-      io.openConsole(before.claudeCode.path, before.claudeCode.supportsAuthCommands ? ['auth', 'login', '--claudeai'] : [], childEnvFor(io.env, 'claude-code'));
+      const now = await build();
+      if (!now.claudeCode.path) throw new AppError('NOT_FOUND', 'Claude Code was not found');
+      identity = key(now);
+      // Fixed arguments (D-431); without the `auth` commands the plain program opens and the user types /login.
+      io.openConsole(now.claudeCode.path, now.claudeCode.supportsAuthCommands ? ['auth', 'login', '--claudeai'] : [], childEnvFor(io.env, 'claude-code'));
       watchLogin();
       return { started: true as const };
     },
@@ -206,9 +181,9 @@ export function createAccountService(s: MainServices, io: AccountIo = realIo()):
       return a;
     },
     async logout() {
-      const now = await build();
-      if (now.claudeCode.path && now.claudeCode.supportsAuthCommands) {
-        const r = await io.run(now.claudeCode.path, ['auth', 'logout'], { timeoutMs: LOGOUT_TIMEOUT_MS, env: childEnvFor(io.env, 'claude-code') });
+      const { path: exe, supportsAuthCommands } = (await build()).claudeCode;
+      if (exe && supportsAuthCommands) {
+        const r = await io.run(exe, ['auth', 'logout'], { timeoutMs: LOGOUT_MS, env: childEnvFor(io.env, 'claude-code') });
         if (r.timedOut || r.code !== 0) s.log.warn('claude auth logout did not finish cleanly', { timedOut: r.timedOut, code: r.code });
       }
       // The exit code is not trusted: the state is what `auth status` says now.
@@ -218,9 +193,9 @@ export function createAccountService(s: MainServices, io: AccountIo = realIo()):
       const rt = await s.runtime.require().catch(() => null);
       const cfg = rt ? await rt.store.readConfig() : null;
       const models = cfg?.ai.models ?? DEFAULT_MODELS;
-      const fail = (code: string) => ({ ok: false, ms: 0, model: TEST_MODEL, usd: null, error: { code } });
-      const settings = await s.settings.get();
-      const provider = s.aiProvider?.({ provider: cfg?.ai.provider ?? 'claude-agent-sdk', models, claudeCodePath: settings.ai.claudeCodePath, authMode: settings.ai.authMode }) ?? null;
+      const fail = (code: string) => ({ ok: false, ms: 0, model: MODEL, usd: null, error: { code } });
+      const { ai, deviceId } = await s.settings.get();
+      const provider = s.aiProvider?.({ provider: cfg?.ai.provider ?? 'claude-agent-sdk', models, claudeCodePath: ai.claudeCodePath, authMode: ai.authMode }) ?? null;
       if (!provider) return fail('no-provider');
       if (provider.id !== 'mock' && s.isOnline && !s.isOnline()) return fail('offline');
       if (provider.executable?.().path === null) return fail('exe-not-found');
@@ -232,11 +207,11 @@ export function createAccountService(s: MainServices, io: AccountIo = realIo()):
       let tokens = { in: 0, out: 0 };
       let error: string | null = null;
       try {
-        for await (const ev of provider.chat({ model: TEST_MODEL, reasoning: 'low', system: 'Reply with the single word OK.', messages: [{ role: 'user', content: 'Rispondi solo: OK' }], signal: abort.signal, maxBudgetUsd: TEST_BUDGET_USD })) {
+        for await (const ev of provider.chat({ model: MODEL, reasoning: 'low', system: 'Reply with the single word OK.', messages: [{ role: 'user', content: 'Rispondi solo: OK' }], signal: abort.signal, maxBudgetUsd: 0.01 })) {
           if (ev.type === 'usage') {
             tokens = { in: ev.usage.inputTokens, out: ev.usage.outputTokens };
             const c = (ev.usage as { costUsd?: number }).costUsd;
-            usd = typeof c === 'number' && Number.isFinite(c) ? c : usdFor(models, TEST_MODEL, tokens.in, tokens.out);
+            usd = typeof c === 'number' && Number.isFinite(c) ? c : usdFor(models, MODEL, tokens.in, tokens.out);
           } else if (ev.type === 'error') error = ev.code === 'AI_BUDGET_EXCEEDED' ? 'budget' : /access problem/.test(ev.message) ? 'access-denied' : ev.code === 'CANCELLED' ? 'timeout' : 'error';
         }
       } catch {
@@ -245,20 +220,17 @@ export function createAccountService(s: MainServices, io: AccountIo = realIo()):
         clearTimeout(timeout);
       }
       const ms = Date.now() - t0;
-      if (rt) {
-        // Counted like any send, with its own purpose; without an active library nothing is recorded.
-        await rt.store
-          .appendLog({ type: 'ai-send', at: new Date().toISOString(), deviceId: settings.deviceId, provider: provider.id, model: TEST_MODEL, purpose: 'connection-test', docIds: [], folders: [], approxInputTokens: tokens.in, approxOutputTokens: tokens.out, ...(usd !== null ? { estimatedCostUsd: usd } : {}), confirmed: true })
-          .catch((e: unknown) => s.log.warn('could not log the connection test', { code: AppError.from(e).code }));
-      }
-      return error ? { ok: false, ms, model: TEST_MODEL, usd, error: { code: error } } : { ok: true, ms, model: TEST_MODEL, usd };
+      // Counted like any send; without an active library nothing is recorded.
+      await rt?.store
+        .appendLog({ type: 'ai-send', at: new Date().toISOString(), deviceId, provider: provider.id, model: MODEL, purpose: 'connection-test', docIds: [], folders: [], approxInputTokens: tokens.in, approxOutputTokens: tokens.out, ...(usd !== null ? { estimatedCostUsd: usd } : {}), confirmed: true })
+        .catch((e: unknown) => s.log.warn('could not log the connection test', { code: AppError.from(e).code }));
+      return error ? { ok: false, ms, model: MODEL, usd, error: { code: error } } : { ok: true, ms, model: MODEL, usd };
     },
-    dispose: closeWatcher,
   };
 }
 
 const services = new WeakMap<MainServices, AccountService>();
-/** One service per `MainServices` (the watcher and the identity it compares live in it). Tests pass their fake I/O in `io`. */
+/** One service per `MainServices` (the watcher and the identity it compares live in it); `io` only on the first call. */
 export function accountService(s: MainServices, io?: AccountIo): AccountService {
   let svc = services.get(s);
   if (!svc) services.set(s, (svc = createAccountService(s, io)));
@@ -266,9 +238,9 @@ export function accountService(s: MainServices, io?: AccountIo): AccountService 
 }
 
 /**
- * Test double (development run with RL_E2E=1 only, see `runtime.ts`): a Claude Code whose whole state is `<dir>/state.json`
- * (`loggedIn`, `email`, `orgName`, `subscriptionType`, `version`, `authCommands`), with the calls it received in
- * `<dir>/calls.log`. The login console is not opened; a test changes the state and touches `<dir>/.claude/.credentials.json`.
+ * Test double (development run with RL_E2E=1, see `runtime.ts`): a Claude Code whose state is `<dir>/state.json`
+ * (`loggedIn`, `email`, `orgName`, `subscriptionType`, `version`, `authCommands`); the calls it gets go to `<dir>/calls.log`.
+ * No console opens: a test edits the state and touches `<dir>/.claude/.credentials.json`.
  */
 export function simulatedClaudeIo(dir: string): AccountIo {
   const file = path.join(dir, 'state.json');
@@ -279,8 +251,7 @@ export function simulatedClaudeIo(dir: string): AccountIo {
       return {};
     }
   };
-  const note = (line: string) => appendFileSync(path.join(dir, 'calls.log'), `${line}
-`);
+  const note = (line: string) => appendFileSync(path.join(dir, 'calls.log'), `${line}\n`);
   return {
     run: async (_exe, args) => {
       const line = args.join(' ');

@@ -1,8 +1,8 @@
-import { expect, test, type Page } from '@playwright/test';
+import { _electron as electron, expect, test, type Page } from '@playwright/test';
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { launchApp, type LaunchedApp } from './helpers/launch';
+import { DESKTOP_DIR, launchApp, type LaunchedApp } from './helpers/launch';
 
 interface Scenario {
   title: string;
@@ -100,6 +100,28 @@ for (const scenario of scenarios) {
       expect(html).toBe(scenario.uiLanguage);
     } finally {
       await ctx?.close();
+      await rm(base, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+}
+
+// D-357: with no settings file the interface starts in the language of the system (Electron's --lang stands for it here).
+for (const [locale, welcome] of [['en-US', 'Welcome'], ['it-IT', 'Benvenuto']] as const) {
+  test(`first run: a system in ${locale} starts the wizard in ${welcome === 'Welcome' ? 'English' : 'Italian'}`, async () => {
+    const base = await mkdtemp(path.join(os.tmpdir(), 'rl-lang-'));
+    const env: Record<string, string> = {};
+    for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
+    delete env.ELECTRON_RENDERER_URL;
+    delete env.ELECTRON_RUN_AS_NODE;
+    Object.assign(env, { RL_USER_DATA_DIR: path.join(base, 'user'), RL_LOCAL_DATA_DIR: path.join(base, 'local'), RL_E2E_HIDDEN: '1', NODE_ENV: 'production' });
+    const app = await electron.launch({ args: [DESKTOP_DIR, `--lang=${locale}`], env });
+    try {
+      const window = await app.firstWindow();
+      await expect(window.getByTestId('wizard')).toBeVisible({ timeout: 30_000 });
+      await expect(window.getByTestId('wizard-step-title')).toHaveText(welcome);
+      await expect(window.getByTestId('wizard-ui-language')).toHaveValue(locale.startsWith('en') ? 'en' : 'it');
+    } finally {
+      await app.close().catch(() => {});
       await rm(base, { recursive: true, force: true }).catch(() => {});
     }
   });

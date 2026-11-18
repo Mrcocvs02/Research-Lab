@@ -12,12 +12,13 @@ import { errorMessage } from '../../lib/errors';
 import { useChangeVersion } from '../../lib/events';
 import { useInbox } from '../../lib/inbox';
 import { setSearchText, useSearchText } from '../../lib/librarySearch';
+import { takeLibraryIntent } from '../../lib/libraryIntent';
 import { useLocalChoice } from '../../lib/useLocalString';
 import { useLocalFlag } from '../../lib/useLocalFlag';
 import { useNotify } from '../../lib/notify';
 import { useApp } from '../../state/app-context';
 import { DocViews, type ViewMode } from './DocViews';
-import { hasAnyCondition, initialBrowse, planQuery, setTagFilter, withMissing, type BrowseState } from './docQuery';
+import { browseFromIntent, hasAnyCondition, initialBrowse, planQuery, setTagFilter, withMissing, type BrowseState } from './docQuery';
 import { FacetBar } from './FacetBar';
 import { LibraryHeader } from './LibraryHeader';
 import { FolderPane, TagTreePane } from './NavPanes';
@@ -60,7 +61,7 @@ function LibraryInner() {
   const docsVersion = useChangeVersion('documents');
   const text = useSearchText();
 
-  const [state, setState] = useState<BrowseState>(initialBrowse);
+  const [state, setState] = useState<BrowseState>(() => browseFromIntent(takeLibraryIntent()));
   const browse = useMemo<BrowseState>(() => ({ ...state, text }), [state, text]);
   const [view, setView] = useLocalChoice<ViewMode>('rl.libraryView', ['list', 'grid'], 'list');
   const [tab, setTab] = useLocalChoice<PaneTab>('rl.libraryTab', TABS, 'folders');

@@ -11,8 +11,8 @@
     "readerResourcesKB": 2760
   },
   "main": {
-    "entryJsKB": 1110,
-    "lazyJsKB": 120,
+    "entryJsKB": 1135,
+    "lazyJsKB": 260,
     "lazyChunkKB": 30,
     "lazyChunkOverrides": {
       "writer": 45

@@ -53,6 +53,16 @@ export function applyEvent(turn: Turn, ev: ChatEvent): Turn {
   }
 }
 
+/** What the user confirmed for the conversation shown (D-339, D-364): later turns send with the inline preview while nothing new goes. */
+export interface Confirmed {
+  model: string;
+  docs: ReadonlySet<string>;
+}
+/** True when a send that needs a confirmation is already covered by the one given for this conversation: no new document, no refusal, same model. */
+export function coveredBy(c: Confirmed | null, preview: AiPreview, model: string): boolean {
+  return c !== null && c.model === model && preview.refused.length === 0 && !preview.overCap && preview.allowed.every((id) => c.docs.has(id));
+}
+
 /** After a cancel, how long to wait for the terminal event of main before unlocking the panel. */
 const CANCEL_GRACE_MS = 10_000;
 let localCounter = 0;
@@ -97,6 +107,12 @@ export function useChat(onStarted: (mode: 'chat' | 'search') => void) {
   const [usage, setUsage] = useState<AiUsage | null>(null);
   const [history, setHistory] = useState<ConversationSummary[] | null>(null);
   const [historyError, setHistoryError] = useState<unknown>(null);
+  const [confirmed, setConfirmedState] = useState<Confirmed | null>(null);
+  const confirmedRef = useRef<Confirmed | null>(null);
+  const setConfirmed = useCallback((c: Confirmed | null) => {
+    confirmedRef.current = c;
+    setConfirmedState(c);
+  }, []);
 
   const viewRef = useRef<View>(view);
   const liveRef = useRef<Live | null>(null);
@@ -213,6 +229,8 @@ export function useChat(onStarted: (mode: 'chat' | 'search') => void) {
           try {
             const given = err.details.preview as AiPreview | undefined;
             const preview = given && Array.isArray(given.folders) ? given : await rl.invoke('ai:preview', { purpose: 'chat', model: req.model, docIds: req.contextDocIds, promptChars: req.text.length });
+            // Nothing new since the confirmation of this conversation: the inline preview above the field was the notice.
+            if (!confirmed && coveredBy(confirmedRef.current, preview, req.model)) return start(req, true);
             setHeld({ req, preview });
             return 'held';
           } catch (e2) {
@@ -246,6 +264,7 @@ export function useChat(onStarted: (mode: 'chat' | 'search') => void) {
             return 'failed';
           }
           if (preview.needsConfirmation || preview.refused.length > 0) {
+            if (coveredBy(confirmedRef.current, preview, req.model)) return start(req, true);
             setHeld({ req, preview });
             return 'held';
           }
@@ -263,10 +282,11 @@ export function useChat(onStarted: (mode: 'chat' | 'search') => void) {
   const switchTo = useCallback(
     (convId: string | null, base: Turn[]) => {
       if (liveRef.current?.done) setLive(null);
+      setConfirmed(null);
       setView({ key: ++viewCounter, convId, base });
       setBanner(null);
     },
-    [setLive, setView],
+    [setConfirmed, setLive, setView],
   );
 
   /** The advanced search: a new conversation, sent at once (the user confirmed in the dialog; no document goes with it). */
@@ -279,8 +299,13 @@ export function useChat(onStarted: (mode: 'chat' | 'search') => void) {
   );
 
   const confirmHeld = useCallback(async () => {
-    if (held) await start(held.req, true);
-  }, [held, start]);
+    if (!held) return;
+    const key = viewRef.current.key;
+    const before = confirmedRef.current;
+    const r = await start(held.req, true);
+    // The confirmation covers what was shown, for the turns that follow in this conversation.
+    if (r === 'sent' && viewRef.current.key === key) setConfirmed({ model: held.req.model, docs: new Set([...(before?.model === held.req.model ? before.docs : []), ...held.preview.allowed]) });
+  }, [held, setConfirmed, start]);
   const dismissHeld = useCallback(() => setHeld(null), []);
 
   const cancel = useCallback(async () => {
@@ -348,7 +373,7 @@ export function useChat(onStarted: (mode: 'chat' | 'search') => void) {
     turns,
     /** A turn is being written for another conversation than the one shown. */
     busyElsewhere: sending && !shown,
-    active, sending, held, banner, status, statusError, usage, history, historyError,
+    active, sending, held, banner, confirmed, status, statusError, usage, history, historyError,
     send, sendSearch, confirmHeld, dismissHeld, cancel, newConversation, loadHistory, openConversation, deleteConversation, refreshMeta,
   };
 }

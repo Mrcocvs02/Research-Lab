@@ -3,7 +3,7 @@
     "busyOther": "An answer is still being written in another conversation. Wait for it or stop it to send here.",
     "removeContext": "Remove {{name}} from the context",
     "new": "New conversation",
-    "history": "History",
+    "history": "Conversations",
     "searchLabel": "search",
     "historyEmpty": "No conversations yet.",
     "deleteTitle": "Delete conversation",
@@ -22,8 +22,37 @@
     "inputPlaceholder": "Write a message…",
     "cancel": "Stop",
     "send": "Send",
-    "shortcuts": "Enter sends, Shift+Enter adds a line. Ctrl+J shows or hides the chat, Ctrl+K opens the commands.",
     "usage": "This month: {{used}}",
-    "usageCap": "This month: {{used}} of {{cap}}"
+    "usageCap": "This month: {{used}} of {{cap}}",
+    "reasoningChip": "Reasoning: {{level}}",
+    "sendTip": "Send · Enter; new line · Shift+Enter",
+    "tool": {
+      "search_library": "Library search",
+      "get_document": "Opening a document",
+      "read_pages": "Reading pages",
+      "list_notes": "Listing notes",
+      "read_note": "Reading a note",
+      "write_ai_field": "Proposing a field",
+      "failed": "It did not work.",
+      "details": "Technical details",
+      "aDoc": "a document",
+      "result": {
+        "search_library": "Documents found: {{count}}",
+        "get_document": "Opened “{{doc}}”",
+        "read_pages": "Read pages of “{{doc}}”",
+        "list_notes": "Listed the notes of “{{doc}}”",
+        "read_note": "Read a note of “{{doc}}”",
+        "write_ai_field": "Wrote a proposal for “{{doc}}”: you decide it in To review."
+      }
+    },
+    "inline": {
+      "withDocs_one": "Will be sent: the question + {{count}} document",
+      "withDocs_other": "Will be sent: the question + {{count}} documents",
+      "only": "Will be sent: the question",
+      "cost": "about {{usd}}",
+      "newDocs": "New:",
+      "asksAgain": "Send will ask for confirmation again.",
+      "details": "Details"
+    }
   }
 }

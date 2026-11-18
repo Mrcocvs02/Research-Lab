@@ -33,12 +33,17 @@ test('project from the library selection, members, notes, reading plan, archive 
 
     // A second project exists; the first document is added to it from the library too.
     await window.getByTestId('nav-projects').click();
+    await window.getByTestId('project-new').click();
     await window.getByTestId('project-create-name').fill('Side project');
-    await window.getByTestId('project-kind-collection').check();
+    await window.getByTestId('project-kind-collection').click();
+    await expect(window.getByTestId('project-kind-hint')).toContainText('just a set of documents');
     await window.getByTestId('project-create').click();
     await expect(window.getByTestId('project-detail')).toBeVisible();
     await expect(window.getByTestId('members-empty')).toBeVisible();
-    await window.getByTestId('project-back').click();
+    // The empty project has one way forward, and the crumb "Projects" goes back to the list.
+    await expect(window.getByTestId('members-empty-add')).toBeVisible();
+    await expect(window.getByTestId('crumbs')).toContainText('Side project');
+    await window.getByTestId('crumbs').getByRole('button', { name: 'Projects' }).click();
     await expect(window.getByTestId('project-row')).toHaveCount(2);
     await window.getByTestId('nav-library').click();
     await clickRow(window, third.title!);
@@ -53,6 +58,12 @@ test('project from the library selection, members, notes, reading plan, archive 
     // Detail: members from different folders and their study state, which can be changed here.
     await row.getByTestId('project-open').click();
     await expect(window.getByTestId('member-row')).toHaveCount(2);
+    // "Add documents…" shows the library search; the documents already in the project cannot be picked twice.
+    await window.getByTestId('project-add-docs').click();
+    await window.getByTestId('adddocs-search').fill(first.title!);
+    await expect(window.getByTestId('adddocs-row').filter({ hasText: first.title! }).getByRole('checkbox')).toBeDisabled();
+    await window.keyboard.press('Escape');
+    await expect(window.getByTestId('add-documents')).toHaveCount(0);
     await window.getByTestId('member-state').first().selectOption('read');
     await expect(window.getByTestId('project-counts')).toContainText('1 read');
 
@@ -90,16 +101,20 @@ test('project from the library selection, members, notes, reading plan, archive 
     await expect(window.getByTestId('plan-item').first()).toHaveAttribute('data-status', 'reading');
 
     // Rename, archive, restore.
+    await window.getByTestId('project-more').click();
+    await window.getByTestId('project-rename').click();
     await window.getByTestId('project-name').fill('Literature review (renamed)');
-    await window.getByTestId('project-name').blur();
+    await window.getByTestId('project-rename-save').click();
     await expect(window.getByTestId('project-title')).toHaveText('Literature review (renamed)');
-    await window.getByTestId('project-back').click();
-    await window.getByTestId('project-row').filter({ hasText: 'renamed' }).getByTestId('project-archive').click();
+    await window.getByTestId('crumbs').getByRole('button', { name: 'Projects' }).click();
+    await window.getByTestId('project-row').filter({ hasText: 'renamed' }).getByTestId('project-row-more').click();
+    await window.getByTestId('project-archive').click();
     await expect(window.getByTestId('project-row').filter({ hasText: 'renamed' })).toHaveCount(0);
-    await window.getByTestId('show-archived').check();
+    await window.getByTestId('show-archived').getByRole('button').click();
     const archived = window.getByTestId('project-row').filter({ hasText: 'renamed' });
     await expect(archived).toHaveAttribute('data-status', 'archived');
-    await archived.getByTestId('project-restore').click();
+    await archived.getByTestId('project-row-more').click();
+    await window.getByTestId('project-restore').click();
     await expect(window.getByTestId('project-row').filter({ hasText: 'renamed' })).toHaveAttribute('data-status', 'active');
 
     // Undo from the history: the archive/restore pair is reversible.

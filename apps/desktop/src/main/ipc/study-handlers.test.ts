@@ -251,8 +251,10 @@ describe('annotations', () => {
     expect(legacy.geom).toBeUndefined();
     const fixed = ok(await call('annotations:save', { docId: hex(1), annotation: ann({ id: legacy.id, geom: 2 }) })).annotation;
     expect(fixed.geom).toBe(2);
-    expect(ok(await call('annotations:save', { docId: hex(1), annotation: ann({ id: legacy.id, color: 'green' }) })).annotation.geom).toBe(2);
-    expect(ok(await call('annotations:save', { docId: hex(1), annotation: ann({ geom: 2 }) })).annotation.geom).toBe(2);
+    const recolored = ok(await call('annotations:save', { docId: hex(1), annotation: ann({ id: legacy.id, color: 'green' }) })).annotation;
+    expect(recolored.geom, 'update keeps').toBe(2);
+    const created = ok(await call('annotations:save', { docId: hex(1), annotation: ann({ geom: 2 }) })).annotation;
+    expect(created.geom, 'create stores').toBe(2);
     expect(fail(await call('annotations:save', { docId: hex(1), annotation: ann({ geom: 1 }) })).code).toBe('INVALID_REQUEST');
   });
 

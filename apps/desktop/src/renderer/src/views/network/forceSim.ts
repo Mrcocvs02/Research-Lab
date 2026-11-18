@@ -1,8 +1,10 @@
+import type { EntityNode } from './entityTypes';
 import { hash01 } from './geometry';
+import { QuadTree } from './quadtree';
 
 /** The expandable network: nodes, edges and a tiny incremental force simulation (no graph library). */
-export type NodeKind = 'doc' | 'folder' | 'tag';
-export type EdgeKind = 'similar' | 'cites' | 'tagged' | 'contains';
+export type NodeKind = 'doc' | 'folder' | 'tag' | 'entity';
+export type EdgeKind = 'similar' | 'cites' | 'tagged' | 'contains' | 'link' | 'implies';
 
 export interface NetNode {
   /** Unique key `kind:id`. */
@@ -22,6 +24,12 @@ export interface NetNode {
   via: string | null;
   /** Held by the pointer. */
   pinned: boolean;
+  /** Left where the user dropped it (the pin): the simulation does not move it until it is released. */
+  fixed: boolean;
+  /** Entity networks: the data of the node, its colour group and radius in pixels. */
+  entity?: EntityNode | undefined;
+  group?: string | undefined;
+  r?: number | undefined;
 }
 
 export interface NetEdge {
@@ -36,6 +44,12 @@ export interface RawNode {
   id: string;
   label: string;
   count?: number | undefined;
+  /** Entity networks: starting position, data, group and radius. */
+  x?: number;
+  y?: number;
+  entity?: EntityNode;
+  group?: string;
+  r?: number;
 }
 export interface RawEdge {
   from: string;
@@ -47,10 +61,34 @@ export interface RawEdge {
 export const MAX_NET_NODES = 800;
 const REST = 70;
 const OLD_MOBILITY = 0.04;
+const THETA = 0.9;
+const REPEL = REST * REST * 0.9;
+const SPRING = 0.08;
+const GRAVITY = 0.012;
+const GROUP_PULL = 0.03;
+const DAMP = 0.6;
+const MAX_SPEED = 40;
+/** The temperature decays from 1 to this in about 300 steps. */
+export const ALPHA_MIN = 0.001;
+const ALPHA_DECAY = 1 - Math.pow(ALPHA_MIN, 1 / 300);
+
+interface Sim {
+  version: number;
+  n: number;
+  list: NetNode[];
+  ei: Int32Array;
+  ej: Int32Array;
+  ew: Float64Array;
+  xs: Float64Array;
+  ys: Float64Array;
+  fx: Float64Array;
+  fy: Float64Array;
+  tree: QuadTree;
+}
 
 export const keyOf = (kind: NodeKind, id: string): string => `${kind}:${id}`;
 
-const makeNode = (r: RawNode, via: string | null): NetNode => ({ key: keyOf(r.kind, r.id), kind: r.kind, id: r.id, label: r.label, count: r.count, x: 0, y: 0, vx: 0, vy: 0, mobility: 1, expanded: false, via, pinned: false });
+const makeNode = (r: RawNode, via: string | null): NetNode => ({ key: keyOf(r.kind, r.id), kind: r.kind, id: r.id, label: r.label, count: r.count, x: r.x ?? 0, y: r.y ?? 0, vx: 0, vy: 0, mobility: 1, expanded: false, via, pinned: false, fixed: false, entity: r.entity, group: r.group, r: r.r });
 
 export class Network {
   nodes = new Map<string, NetNode>();
@@ -58,14 +96,23 @@ export class Network {
   private edgeSet = new Set<string>();
   /** Bumps when nodes or edges change. */
   version = 0;
-  /** Remaining simulation ticks; 0 when settled. */
-  heat = 0;
+  /** Temperature of the simulation: 1 when hot, it decays to `ALPHA_MIN` and then the simulation stops. */
+  alpha = 0;
+  /** Mean squared speed of the last step. */
+  energy = 0;
+  private cache: Sim | null = null;
+  private adj: { version: number; map: Map<string, string[]> } | null = null;
+
+  /** 1 while the simulation still has to run, 0 when settled. */
+  get heat(): number {
+    return this.alpha > ALPHA_MIN ? 1 : 0;
+  }
 
   clear(): void {
     this.nodes.clear();
     this.edges = [];
     this.edgeSet.clear();
-    this.heat = 0;
+    this.alpha = 0;
     this.version++;
   }
 
@@ -89,7 +136,7 @@ export class Network {
     }
     this.add(n);
     this.version++;
-    this.heat = Math.max(this.heat, 60);
+    this.alpha = Math.max(this.alpha, 0.8);
     return n;
   }
 
@@ -98,18 +145,16 @@ export class Network {
    * of the network; the nodes already there keep their place (they only give way a little while the new ones settle).
    * Nodes past `MAX_NET_NODES` are not added.
    */
-  expand(from: NetNode, rawNodes: readonly RawNode[], rawEdges: readonly RawEdge[]): { added: number; capped: boolean } {
+  expand(from: NetNode, rawNodes: readonly RawNode[], rawEdges: readonly RawEdge[]): { added: number; capped: boolean; omitted: number } {
     from.expanded = true;
     const fresh: NetNode[] = [];
-    let capped = false;
+    let omitted = 0;
     for (const r of rawNodes) {
       if (this.nodes.has(keyOf(r.kind, r.id))) continue;
-      if (this.nodes.size + fresh.length >= MAX_NET_NODES) {
-        capped = true;
-        break;
-      }
-      fresh.push(makeNode(r, from.key));
+      if (this.nodes.size + fresh.length >= MAX_NET_NODES) omitted++;
+      else fresh.push(makeNode(r, from.key));
     }
+    const capped = omitted > 0;
     let gx = 0;
     let gy = 0;
     for (const n of this.nodes.values()) {
@@ -139,8 +184,8 @@ export class Network {
     const freshSet = new Set(fresh);
     for (const n of this.nodes.values()) n.mobility = freshSet.has(n) ? 1 : OLD_MOBILITY;
     this.version++;
-    this.heat = fresh.length > 0 ? 90 : 0;
-    return { added: fresh.length, capped };
+    this.alpha = fresh.length > 0 ? 0.7 : this.alpha;
+    return { added: fresh.length, capped, omitted };
   }
 
   private removeKeys(keys: Set<string>): void {
@@ -150,6 +195,30 @@ export class Network {
     this.edges = this.edges.filter((e) => !keys.has(e.a) && !keys.has(e.b));
     this.edgeSet = new Set(this.edges.map((e) => `${e.a}|${e.b}|${e.kind}`));
     this.version++;
+  }
+
+  /** Replaces one node by new ones placed at its position (a topic that splits into its sub-topics); the others stay. Returns how many were added. */
+  replace(key: string, rawNodes: readonly RawNode[], rawEdges: readonly RawEdge[]): number {
+    const from = this.nodes.get(key);
+    if (!from) return 0;
+    const placed = rawNodes.map((r, i) => ({ ...r, x: from.x + Math.cos((i / Math.max(rawNodes.length, 1)) * Math.PI * 2) * 12, y: from.y + Math.sin((i / Math.max(rawNodes.length, 1)) * Math.PI * 2) * 12 }));
+    for (const r of placed) {
+      const n = makeNode(r, null);
+      if (!this.nodes.has(n.key)) this.add(n);
+    }
+    for (const e of rawEdges) {
+      const a = this.nodes.get(e.from);
+      const b = this.nodes.get(e.to);
+      if (!a || !b || a === b) continue;
+      const k = `${a.key}|${b.key}|${e.kind}`;
+      if (this.edgeSet.has(k)) continue;
+      this.edgeSet.add(k);
+      this.edges.push({ a: a.key, b: b.key, kind: e.kind, weight: e.weight });
+    }
+    this.removeKeys(new Set([key]));
+    this.version++;
+    this.alpha = Math.max(this.alpha, 0.6);
+    return placed.length;
   }
 
   /** Removes what the expansion of `key` brought (recursively) and marks the node as not expanded. */
@@ -187,98 +256,171 @@ export class Network {
   }
 
   /**
-   * One simulation tick: springs along the edges (stronger edges are shorter), repulsion between near nodes (a grid keeps
-   * it cheap), displacement scaled by each node's mobility. Returns true if it ran (the view redraws).
+   * One simulation step (a few when the network is big and still hot): Barnes-Hut repulsion on a quadtree (theta 0.9),
+   * springs along the edges (stronger edges are shorter), a pull towards the group of a node and towards the centre,
+   * all scaled by the temperature `alpha`, which decays from 1 to `ALPHA_MIN` in about 300 steps: then the simulation
+   * stops (nothing runs at rest). Displacement is scaled by each node's mobility. Returns true if it ran (the view redraws).
    */
   tick(): boolean {
-    if (this.heat <= 0) return false;
-    const nodes = [...this.nodes.values()];
-    const n = nodes.length;
-    const index = new Map<string, number>();
-    nodes.forEach((nd, i) => index.set(nd.key, i));
-    const R = REST * 1.8;
-    const grid = new Map<string, number[]>();
-    const keyAt = (cx: number, cy: number) => `${cx},${cy}`;
-    nodes.forEach((nd, i) => {
-      const k = keyAt(Math.floor(nd.x / R), Math.floor(nd.y / R));
-      const l = grid.get(k);
-      if (l) l.push(i);
-      else grid.set(k, [i]);
-    });
-    const fx = new Float64Array(n);
-    const fy = new Float64Array(n);
-    for (let i = 0; i < n; i++) {
-      const a = nodes[i]!;
-      const cx = Math.floor(a.x / R);
-      const cy = Math.floor(a.y / R);
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-          const l = grid.get(keyAt(cx + dx, cy + dy));
-          if (!l) continue;
-          for (const j of l) {
-            if (j <= i) continue;
-            const b = nodes[j]!;
-            let ex = a.x - b.x;
-            let ey = a.y - b.y;
-            let d2 = ex * ex + ey * ey;
-            if (d2 > R * R) continue;
-            if (d2 < 0.01) {
-              ex = hash01(a.key) - 0.5;
-              ey = hash01(b.key) - 0.5;
-              d2 = ex * ex + ey * ey + 0.01;
-            }
-            const d = Math.sqrt(d2);
-            const f = (REST * REST * 0.9) / d2;
-            fx[i]! += (ex / d) * f;
-            fy[i]! += (ey / d) * f;
-            fx[j]! -= (ex / d) * f;
-            fy[j]! -= (ey / d) * f;
-          }
-        }
-      }
+    if (this.alpha <= ALPHA_MIN) {
+      this.alpha = 0;
+      return false;
     }
+    const reps = this.nodes.size > 400 && this.alpha > 0.3 ? 3 : 1;
+    for (let r = 0; r < reps && this.alpha > ALPHA_MIN; r++) this.step();
+    return true;
+  }
+
+  private sync(): Sim {
+    let c = this.cache;
+    if (c && c.version === this.version && c.n === this.nodes.size) return c;
+    const list = [...this.nodes.values()];
+    const n = list.length;
+    const index = new Map<string, number>();
+    list.forEach((nd, i) => index.set(nd.key, i));
+    const ei: number[] = [];
+    const ej: number[] = [];
+    const ew: number[] = [];
     for (const e of this.edges) {
       const i = index.get(e.a);
       const j = index.get(e.b);
       if (i === undefined || j === undefined) continue;
-      const a = nodes[i]!;
-      const b = nodes[j]!;
-      const ex = b.x - a.x;
-      const ey = b.y - a.y;
+      ei.push(i);
+      ej.push(j);
+      ew.push(e.weight);
+    }
+    c = { version: this.version, n, list, ei: Int32Array.from(ei), ej: Int32Array.from(ej), ew: Float64Array.from(ew), xs: new Float64Array(n), ys: new Float64Array(n), fx: new Float64Array(n), fy: new Float64Array(n), tree: c?.tree ?? new QuadTree() };
+    this.cache = c;
+    return c;
+  }
+
+  private step(): void {
+    const c = this.sync();
+    const { list, xs, ys, fx, fy, n } = c;
+    for (let i = 0; i < n; i++) {
+      xs[i] = list[i]!.x;
+      ys[i] = list[i]!.y;
+      fx[i] = 0;
+      fy[i] = 0;
+    }
+    c.tree.build(xs, ys, n);
+    const out = { x: 0, y: 0 };
+    let cx = 0;
+    let cy = 0;
+    for (let i = 0; i < n; i++) {
+      c.tree.repulse(i, xs[i]!, ys[i]!, THETA, REPEL, out);
+      fx[i]! += out.x;
+      fy[i]! += out.y;
+      cx += xs[i]!;
+      cy += ys[i]!;
+    }
+    for (let k = 0; k < c.ei.length; k++) {
+      const i = c.ei[k]!;
+      const j = c.ej[k]!;
+      const ex = xs[j]! - xs[i]!;
+      const ey = ys[j]! - ys[i]!;
       const d = Math.sqrt(ex * ex + ey * ey) || 0.01;
-      const f = (d - REST * (1.3 - 0.5 * e.weight)) * 0.08;
+      const f = (d - REST * (1.3 - 0.5 * c.ew[k]!)) * SPRING;
       fx[i]! += (ex / d) * f;
       fy[i]! += (ey / d) * f;
       fx[j]! -= (ex / d) * f;
       fy[j]! -= (ey / d) * f;
     }
-    let energy = 0;
+    // Gravity towards the centre of mass and, for entities, towards the centre of their group.
+    cx /= Math.max(n, 1);
+    cy /= Math.max(n, 1);
+    const groups = new Map<string, [number, number, number]>();
     for (let i = 0; i < n; i++) {
-      const a = nodes[i]!;
-      if (a.pinned) {
-        a.vx = 0;
-        a.vy = 0;
+      const g = list[i]!.group;
+      if (g === undefined) continue;
+      const a = groups.get(g) ?? [0, 0, 0];
+      a[0] += xs[i]!;
+      a[1] += ys[i]!;
+      a[2]++;
+      groups.set(g, a);
+    }
+    let energy = 0;
+    const a = this.alpha;
+    for (let i = 0; i < n; i++) {
+      const nd = list[i]!;
+      let gx = (cx - xs[i]!) * GRAVITY;
+      let gy = (cy - ys[i]!) * GRAVITY;
+      const g = nd.group !== undefined ? groups.get(nd.group) : undefined;
+      if (g && g[2] > 1) {
+        gx += (g[0] / g[2] - xs[i]!) * GROUP_PULL;
+        gy += (g[1] / g[2] - ys[i]!) * GROUP_PULL;
+      }
+      if (nd.pinned || nd.fixed) {
+        nd.vx = 0;
+        nd.vy = 0;
         continue;
       }
-      a.vx = (a.vx + fx[i]! * a.mobility) * 0.82;
-      a.vy = (a.vy + fy[i]! * a.mobility) * 0.82;
-      const sp = Math.hypot(a.vx, a.vy);
-      if (sp > 30) {
-        a.vx *= 30 / sp;
-        a.vy *= 30 / sp;
+      nd.vx = (nd.vx + (fx[i]! + gx) * a * nd.mobility) * DAMP;
+      nd.vy = (nd.vy + (fy[i]! + gy) * a * nd.mobility) * DAMP;
+      const sp = Math.hypot(nd.vx, nd.vy);
+      if (sp > MAX_SPEED) {
+        nd.vx *= MAX_SPEED / sp;
+        nd.vy *= MAX_SPEED / sp;
       }
-      a.x += a.vx;
-      a.y += a.vy;
-      energy += a.vx * a.vx + a.vy * a.vy;
+      nd.x += nd.vx;
+      nd.y += nd.vy;
+      energy += nd.vx * nd.vx + nd.vy * nd.vy;
     }
-    this.heat--;
-    if (energy / Math.max(n, 1) < 0.002) this.heat = 0;
-    return true;
+    this.energy = energy / Math.max(n, 1);
+    this.alpha *= 1 - ALPHA_DECAY;
   }
 
-  /** Lets the network move again for a while (a node was dragged). */
-  warm(ticks = 30): void {
-    this.heat = Math.max(this.heat, ticks);
+  /** Lets the network move again for a while (a node was dragged): a gentle temperature, so the neighbours follow like elastics. */
+  warm(alpha = 0.3): void {
+    this.alpha = Math.max(this.alpha, alpha);
     for (const n of this.nodes.values()) n.mobility = Math.max(n.mobility, 0.35);
+  }
+
+  /** Replaces everything with an entity network (nodes already placed), capped at `MAX_NET_NODES`. Returns how many nodes were left out. */
+  load(raws: readonly RawNode[], edges: ReadonlyArray<{ a: string; b: string; kind: EdgeKind; weight: number }>, alpha = 0.5): number {
+    this.clear();
+    const keep = raws.slice(0, MAX_NET_NODES);
+    for (const r of keep) this.add(makeNode(r, null));
+    for (const e of edges) {
+      const a = this.nodes.get(e.a);
+      const b = this.nodes.get(e.b);
+      if (!a || !b || a === b) continue;
+      const k = `${a.key}|${b.key}|${e.kind}`;
+      if (this.edgeSet.has(k)) continue;
+      this.edgeSet.add(k);
+      this.edges.push({ a: a.key, b: b.key, kind: e.kind, weight: e.weight });
+    }
+    this.version++;
+    this.alpha = alpha;
+    return raws.length - keep.length;
+  }
+
+  /** Random positions (a seeded disc) and a hot simulation: "Mescola". Pinned nodes stay where they are. */
+  shuffle(rand: () => number): void {
+    const radius = REST * Math.sqrt(Math.max(this.nodes.size, 1)) * 0.9;
+    for (const n of this.nodes.values()) {
+      n.mobility = 1;
+      if (n.fixed) continue;
+      const a = rand() * Math.PI * 2;
+      const d = Math.sqrt(rand()) * radius;
+      n.x = Math.cos(a) * d;
+      n.y = Math.sin(a) * d;
+      n.vx = 0;
+      n.vy = 0;
+    }
+    this.alpha = 1;
+  }
+
+  /** Keys of the nodes linked to `key` (either direction). */
+  neighbors(key: string): readonly string[] {
+    if (!this.adj || this.adj.version !== this.version) {
+      const map = new Map<string, string[]>();
+      for (const e of this.edges) {
+        (map.get(e.a) ?? map.set(e.a, []).get(e.a)!).push(e.b);
+        (map.get(e.b) ?? map.set(e.b, []).get(e.b)!).push(e.a);
+      }
+      this.adj = { version: this.version, map };
+    }
+    return this.adj.map.get(key) ?? [];
   }
 }

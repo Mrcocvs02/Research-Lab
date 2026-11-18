@@ -21,6 +21,8 @@ export const annotationInputSchema = z.object({
   text: z.string().max(STUDY_LIMITS.annotationText).optional(),
   color: annotationColorSchema.optional(),
   comment: z.string().max(STUDY_LIMITS.annotationComment).optional(),
+  /** 2 = the rectangles were measured on the corrected text layer (new annotations, repaired ones). Absent on update keeps the stored value. */
+  geom: z.literal(2).optional(),
 });
 export type AnnotationInput = z.input<typeof annotationInputSchema>;
 

@@ -197,6 +197,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
               rects: fields.rects,
               ...(fields.text !== undefined ? { text: fields.text } : {}),
               ...(fields.color !== undefined ? { color: fields.color } : {}),
+              ...(fields.geom !== undefined ? { geom: fields.geom } : {}),
               forHash: rec.hash,
               updatedAt: now,
             };

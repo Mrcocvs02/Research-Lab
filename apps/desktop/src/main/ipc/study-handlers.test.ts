@@ -245,6 +245,17 @@ const rect = { x: 0.1, y: 0.2, w: 0.3, h: 0.02 };
 const ann = (over: Record<string, unknown> = {}) => ({ kind: 'highlight', page: 1, rects: [rect], text: 'important finding', ...over });
 
 describe('annotations', () => {
+  it('stores the geom marker on create and sets it on update without dropping it later', async () => {
+    const call = await harness();
+    const legacy = ok(await call('annotations:save', { docId: hex(1), annotation: ann() })).annotation;
+    expect(legacy.geom).toBeUndefined();
+    const fixed = ok(await call('annotations:save', { docId: hex(1), annotation: ann({ id: legacy.id, geom: 2 }) })).annotation;
+    expect(fixed.geom).toBe(2);
+    expect(ok(await call('annotations:save', { docId: hex(1), annotation: ann({ id: legacy.id, color: 'green' }) })).annotation.geom).toBe(2);
+    expect(ok(await call('annotations:save', { docId: hex(1), annotation: ann({ geom: 2 }) })).annotation.geom).toBe(2);
+    expect(fail(await call('annotations:save', { docId: hex(1), annotation: ann({ geom: 1 }) })).code).toBe('INVALID_REQUEST');
+  });
+
   it('creates, updates by id, lists and removes', async () => {
     const call = await harness();
     expect(ok(await call('annotations:list', { docId: hex(1) }))).toEqual({ annotations: [], stale: false, staleIds: [] });

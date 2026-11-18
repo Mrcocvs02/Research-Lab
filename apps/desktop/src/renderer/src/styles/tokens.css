@@ -135,7 +135,7 @@
   --r-md: 10px;
   --r-lg: 14px;
   --r-pill: 999px;
-  --sidebar-w: 232px;
+  --sidebar-w: 236px; /* 232 in the design (5.3): A2 sets it with the new shell */
   --chat-w: 380px;
 
   /* Elevation */

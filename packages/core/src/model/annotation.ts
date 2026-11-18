@@ -9,9 +9,13 @@ export const normRectSchema = z.object({
   h: z.number().min(0).max(1),
 });
 
+export const cropMetaSchema = z.object({ type: z.enum(['figure', 'table', 'equation', 'other']), caption: z.string().max(500).optional() });
+export type CropMeta = z.infer<typeof cropMetaSchema>;
+
 export const annotationSchema = z.object({
   id: itemIdSchema,
-  kind: z.enum(['highlight', 'underline']),
+  /** `area`: a crop of a figure, table or equation (D-427); never written into the PDF. */
+  kind: z.enum(['highlight', 'underline', 'area']),
   /** 1-based page. */
   page: z.number().int().positive(),
   rects: z.array(normRectSchema).min(1),
@@ -19,6 +23,8 @@ export const annotationSchema = z.object({
   text: z.string().default(''),
   color: z.string().default('yellow'),
   comment: z.string().optional(),
+  /** Only for `area`: what the crop shows and its caption. The image itself is `crops/<docId>/<id>.webp` in the data folder. */
+  crop: cropMetaSchema.optional(),
   /**
    * Hash of the PDF this annotation was placed on (set at every save). Files written before this field existed have
    * none: such an annotation inherits the file-level `forHash`.

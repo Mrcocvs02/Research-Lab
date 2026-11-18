@@ -127,7 +127,10 @@
       "exportPresets": "Preset di esportazione|export copie",
       "deviceId": "Id del dispositivo|diagnostica",
       "maintenance": "Manutenzione e diagnostica|dimensioni pulizia log memoria processi limiti cache",
-      "tokenCap": "Tetto mensile di token|limite consumo token budget account"
+      "tokenCap": "Tetto mensile di token|limite consumo token budget account",
+      "colorMeanings": "Significato dei colori|evidenziazioni legenda nomi",
+      "costThreshold": "Soglia dell'anteprima del costo|token dialogo stima invio",
+      "dailyTokenCap": "Tetto di token al giorno|limite giorno budget token"
     },
     "search": {
       "label": "Cerca nelle impostazioni",
@@ -212,6 +215,13 @@
       "started": "Avviata"
     },
     "savedUndo": "Salvato",
-    "undo": "Annulla"
+    "undo": "Annulla",
+    "colorMeanings": {
+      "title": "Significato dei colori",
+      "label": "Cosa significa ogni colore",
+      "hint": "Scrivi a cosa serve ogni colore, per esempio «Risultato chiave». I nomi compaiono nel lettore, sui pallini dei colori e nell'elenco delle annotazioni.",
+      "placeholder": "Nessun significato",
+      "field": "Significato del colore {{color}}"
+    }
   }
 }

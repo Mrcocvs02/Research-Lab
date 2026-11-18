@@ -8,6 +8,7 @@ import { rl } from '../lib/rl';
 import { useApp } from '../state/app-context';
 import { AccountCard } from './AccountCard';
 import { AiLog } from './AiLog';
+import { ClaudeSpendGroup } from './ClaudeSpendGroup';
 import { Fold, Group, NeedsLibrary, Row, SectionHead, TextRow, useLibraryPatch } from './rows';
 import { useAutoSave } from './useAutoSave';
 
@@ -103,6 +104,7 @@ export function ClaudeSection() {
             <Row sid="confirmBeforeSend" label={t('settings.library.confirmBeforeSend')} help={t('settings.claude.confirmHelp')} save={confirm}>
               <Switch aria-label={t('settings.library.confirmBeforeSend')} checked={config.ai.confirmBeforeSend} onChange={(v) => void confirm.run(() => patch({ ai: { confirmBeforeSend: v } }))} data-testid="ai-confirm" />
             </Row>
+            <ClaudeSpendGroup />
           </>
         )}
       </Group>

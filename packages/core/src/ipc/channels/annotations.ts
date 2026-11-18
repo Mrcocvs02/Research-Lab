@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { documentIdSchema, isoDateSchema, itemIdSchema } from '../../common.js';
 import { ANNOTATION_COLORS, STUDY_LIMITS } from '../../limits.js';
-import { annotationSchema, normRectSchema } from '../../model/annotation.js';
+import { annotationSchema, cropMetaSchema, normRectSchema } from '../../model/annotation.js';
 import { underlinedSchema } from '../../model/document.js';
 import { defineChannels, defineEvents } from '../registry.js';
 
@@ -57,12 +57,14 @@ export const annotationColorSchema = z.enum(ANNOTATION_COLORS);
  */
 export const annotationInputSchema = z.object({
   id: itemIdSchema.optional(),
-  kind: z.enum(['highlight', 'underline']),
+  kind: z.enum(['highlight', 'underline', 'area']),
   page: z.number().int().positive().max(STUDY_LIMITS.pageMax),
   rects: z.array(normRectSchema).min(1).max(STUDY_LIMITS.rectsPerAnnotation),
   text: z.string().max(STUDY_LIMITS.annotationText).optional(),
   color: annotationColorSchema.optional(),
   comment: z.string().max(STUDY_LIMITS.annotationComment).optional(),
+  /** `area` only; absent on update keeps the stored value. */
+  crop: cropMetaSchema.optional(),
   /**
    * 2 = the rectangles were measured on the corrected text layer (new annotations, repaired ones). Absent on update keeps
    * the stored value; null on update clears it (an undone repair is no longer trustworthy). null on create is ignored.

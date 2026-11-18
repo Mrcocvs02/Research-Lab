@@ -3,6 +3,7 @@ import './pdfjs-viewer.css';
 import { dominantPage, type Rect } from './geometry';
 import { locateInTextLayer } from './repair';
 import { readFindMatch, readRange, type SelectionRead } from './selection';
+import { contextAround, cutCanvas, pickText, type CropImage, type TextItem } from './crop';
 
 export type { SelectionPiece, SelectionRead } from './selection';
 
@@ -59,6 +60,14 @@ export interface Viewer {
   locateText(page: number, quote: string, savedCenter: number, line: number): Promise<Located>;
   /** The page and position (fractions) under a mouse event, or `null` outside a page. */
   pointAt(event: { target: EventTarget | null; clientX: number; clientY: number }): { page: number; x: number; y: number } | null;
+  /** Cuts a rectangle (fractions) out of the canvas of a page as WebP; `pending`: the page is not drawn yet; `null`: it could not be encoded. */
+  renderCrop(page: number, rect: Rect): Promise<CropImage | 'pending' | null>;
+  /** The text of the text layer inside a rectangle and in the band around it (for the explanation of a crop). */
+  textNear(page: number, rect: Rect): { inside: string; around: string };
+  /** The text of a page's text layer around a selection (the paragraph that goes with the explanation). */
+  paragraphAround(page: number, selection: string): string;
+  /** The size of a page on screen, in pixels, or `null` when it is not drawn. */
+  pageSize(page: number): { width: number; height: number } | null;
   destroy(): void;
 }
 
@@ -293,6 +302,30 @@ export async function createViewer(container: HTMLDivElement, viewerEl: HTMLDivE
       const frame = (pageDiv.querySelector(`.${LAYER_CLASS}`) ?? pageDiv).getBoundingClientRect();
       if (!Number.isInteger(page) || frame.width <= 0 || frame.height <= 0) return null;
       return { page, x: (event.clientX - frame.left) / frame.width, y: (event.clientY - frame.top) / frame.height };
+    },
+    async renderCrop(page, rect) {
+      const canvas = pageDivOf(page)?.querySelector<HTMLCanvasElement>('canvas') ?? null;
+      if (!canvas || canvas.width === 0) return 'pending';
+      return cutCanvas(canvas, rect);
+    },
+    textNear(page, rect) {
+      const div = pageDivOf(page);
+      if (!div) return { inside: '', around: '' };
+      const frame = frameOf(page, div);
+      const items: TextItem[] = [];
+      if (frame.width > 0 && frame.height > 0)
+        for (const span of div.querySelectorAll<HTMLElement>('.textLayer span')) {
+          const r = span.getBoundingClientRect();
+          items.push({ text: span.textContent ?? '', cx: (r.left + r.width / 2 - frame.left) / frame.width, cy: (r.top + r.height / 2 - frame.top) / frame.height });
+        }
+      return pickText(items, rect);
+    },
+    paragraphAround(page, selection) {
+      return contextAround(pageDivOf(page)?.querySelector('.textLayer')?.textContent ?? '', selection);
+    },
+    pageSize(page) {
+      const r = pageDivOf(page)?.getBoundingClientRect();
+      return r && r.width > 0 && r.height > 0 ? { width: r.width, height: r.height } : null;
     },
     destroy() {
       destroyed = true;

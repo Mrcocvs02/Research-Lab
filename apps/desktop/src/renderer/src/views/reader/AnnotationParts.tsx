@@ -1,11 +1,30 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import type { Annotation } from '@rl/core';
+import { ANNOTATION_COLORS, type Annotation } from '@rl/core';
+import { rl } from '../../lib/rl';
 import { safeText } from '../library/safeText';
-import { colorOf, excerpt } from './geometry';
+import { colorName, useColorMeanings } from './colorMeaning';
+import { colorOf, excerpt, type AnnotationColor } from './geometry';
 import { ReaderMenu } from './ReaderMenu';
 import './reader.css';
+import './reader-tools.css';
+
+/** The picture of a crop, loaded from the data folder when its entry is drawn; nothing shows while it is missing. */
+function CropThumb({ docId, annId, label }: { docId: string; annId: string; label: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    rl.invoke('crops:get', { docId, annId }).then(
+      (r) => alive && setSrc(r.image ? `data:image/webp;base64,${r.image}` : null),
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+  }, [docId, annId]);
+  return src ? <img className="crop-thumb" src={src} alt={label} data-testid="crop-thumb" /> : null;
+}
 
 const pct = (n: number) => `${Math.round(Math.min(1, Math.max(0, Number(n) || 0)) * 10000) / 100}%`;
 
@@ -52,6 +71,7 @@ export function AnnotationLayers({ layers, annotations, selectedId, staleIds, er
 
 /** The annotations of the document by page; each entry takes the reader to it. */
 export function AnnotationList({
+  docId,
   annotations,
   selectedId,
   staleIds,
@@ -63,6 +83,7 @@ export function AnnotationList({
   onKind,
   onDelete,
 }: {
+  docId: string;
   annotations: readonly Annotation[];
   selectedId: string | null;
   staleIds: ReadonlySet<string>;
@@ -77,11 +98,17 @@ export function AnnotationList({
   onDelete?(a: Annotation): void;
 }) {
   const { t } = useTranslation();
+  const meanings = useColorMeanings();
+  // The filter by meaning (feature 36): one colour, or all of them.
+  const [filter, setFilter] = useState<AnnotationColor | null>(null);
+  const [filterMenu, setFilterMenu] = useState(false);
+  const filterBtn = useRef<HTMLButtonElement>(null);
+  const shown = useMemo(() => (filter ? annotations.filter((a) => colorOf(a.color) === filter) : annotations), [annotations, filter]);
   const pages = useMemo(() => {
     const m = new Map<number, Annotation[]>();
-    for (const a of [...annotations].sort((x, y) => x.page - y.page || (x.rects[0]?.y ?? 0) - (y.rects[0]?.y ?? 0))) m.set(a.page, [...(m.get(a.page) ?? []), a]);
+    for (const a of [...shown].sort((x, y) => x.page - y.page || (x.rects[0]?.y ?? 0) - (y.rects[0]?.y ?? 0))) m.set(a.page, [...(m.get(a.page) ?? []), a]);
     return [...m];
-  }, [annotations]);
+  }, [shown]);
   if (annotations.length === 0) {
     return (
       <p className="hint" data-testid="annotation-empty">
@@ -92,6 +119,34 @@ export function AnnotationList({
   const toCheck = annotations.filter((a) => review?.has(a.id));
   return (
     <div className="ann-list" data-testid="annotation-list">
+      <div className="ann-list__head">
+        {filter && (
+          <span className="ann-list__filter" data-testid="annotation-filter-label">
+            {colorName(t, filter, meanings)}
+          </span>
+        )}
+        <button ref={filterBtn} type="button" className="ann-more" aria-label={t('reader.colorMeaning.menu')} aria-expanded={filterMenu} onClick={() => setFilterMenu(!filterMenu)} data-testid="annotation-panel-more">
+          <span aria-hidden="true">⋯</span>
+        </button>
+        <ReaderMenu
+          anchor={filterBtn}
+          open={filterMenu}
+          onClose={() => setFilterMenu(false)}
+          label={t('reader.colorMeaning.menu')}
+          width={240}
+          placement="bottom-end"
+          groups={[
+            {
+              id: 'meaning',
+              heading: t('reader.colorMeaning.filter'),
+              items: [
+                { id: 'all', label: t('reader.colorMeaning.all'), checked: filter === null, testId: 'ann-filter-all', onSelect: () => setFilter(null) },
+                ...ANNOTATION_COLORS.map((c) => ({ id: c, label: colorName(t, c, meanings), checked: filter === c, testId: `ann-filter-${c}`, onSelect: () => setFilter(c) })),
+              ],
+            },
+          ]}
+        />
+      </div>
       {toCheck.length > 0 && (
         <section aria-label={t('reader.repair.heading')} className="ann-review" data-testid="annotation-review">
           <h4>{t('reader.repair.heading')}</h4>
@@ -127,8 +182,9 @@ export function AnnotationList({
               <li key={a.id}>
                 <button type="button" className={`ann-item${a.id === selectedId ? ' on' : ''}`} onClick={() => onPick(a)} aria-label={t('reader.ann.jump', { kind: t(`reader.kind.${a.kind}`), page })} data-testid="annotation-item" data-annotation-id={a.id}>
                   <span className={`ann-dot ann-${colorOf(a.color)}`} aria-hidden="true" />
+                  {a.kind === 'area' && <CropThumb docId={docId} annId={a.id} label={t('reader.crop.label', { page })} />}
                   <span className="ann-item-body">
-                    <span className="ann-item-text">{safeText(excerpt(a.text, 100)) || t(`reader.kind.${a.kind}`)}</span>
+                    <span className="ann-item-text">{a.kind === 'area' ? safeText(excerpt(a.crop?.caption ?? '', 100)) || t(`reader.crop.types.${a.crop?.type ?? 'figure'}`) : safeText(excerpt(a.text, 100)) || t(`reader.kind.${a.kind}`)}</span>
                     {a.comment && <span className="ann-item-comment">{safeText(excerpt(a.comment, 100))}</span>}
                     {staleIds.has(a.id) && (
                       <span className="ann-item-stale" data-testid="annotation-stale">
@@ -152,7 +208,7 @@ function ItemMenu({ annotation: a, onKind, onDelete }: { annotation: Annotation;
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
-  const other = a.kind === 'highlight' ? 'underline' : 'highlight';
+  const other = a.kind === 'underline' ? 'highlight' : 'underline';
   return (
     <>
       <button ref={btn} type="button" className="ann-more" aria-label={t('reader.more')} aria-expanded={open} onClick={() => setOpen(!open)} data-testid="annotation-more">
@@ -169,7 +225,8 @@ function ItemMenu({ annotation: a, onKind, onDelete }: { annotation: Annotation;
           {
             id: 'a',
             items: [
-              { id: 'kind', label: t(`reader.ann.to_${other}`), testId: 'ann-item-kind', onSelect: () => onKind?.(a, other) },
+              // A crop has no type to switch to: only deleting.
+              ...(a.kind === 'area' ? [] : [{ id: 'kind', label: t(`reader.ann.to_${other}`), testId: 'ann-item-kind', onSelect: () => onKind?.(a, other) }]),
               { id: 'del', label: t('reader.ann.delete'), danger: true, testId: 'ann-item-delete', onSelect: () => onDelete?.(a) },
             ],
           },

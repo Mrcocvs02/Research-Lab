@@ -5,6 +5,7 @@ import { Lazy, lazyView } from '../../components/Lazy';
 import { Popover } from '../../components/Popover';
 import { Icon } from '../../shell/shellIcons';
 import { ColorDots } from './AnnotationPopover';
+import { colorName as meaningName, useColorMeanings } from './colorMeaning';
 import { usePdfGroup, type PdfWrite } from './PdfWriteChip';
 import { ReaderMenu, type RGroup } from './ReaderMenu';
 import type { ColorNo, Tool } from './toolMachine';
@@ -108,6 +109,7 @@ export function ReaderBar(p: Props) {
   const moreBtn = useRef<HTMLButtonElement>(null);
   const close = () => setOpen(null);
   const colorName = ANNOTATION_COLORS[p.color - 1]!;
+  const meanings = useColorMeanings();
   const later = t('reader.later');
 
   const zoomGroups: RGroup[] = [
@@ -155,11 +157,10 @@ export function ReaderBar(p: Props) {
   ];
 
   const tools = TOOLS.map((id) => {
-    const crop = id === 'crop';
     const label = t(`reader.tools.${id}`);
     return (
       <span key={id} className="rbar__tool">
-        <BarButton label={label} keys={KEY[id]} pressed={p.tool === id} disabled={crop} reason={t('reader.cropLater')} testId={`reader-tool-${id}`} onClick={() => p.onTool(id as Tool)}>
+        <BarButton label={label} keys={KEY[id]} pressed={p.tool === id} testId={`reader-tool-${id}`} onClick={() => p.onTool(id as Tool)}>
           <Glyph name={id} />
           {(id === 'highlight' || id === 'underline') && <span className={`rbar__cd ann-${colorName}`} aria-hidden="true" />}
         </BarButton>
@@ -180,7 +181,7 @@ export function ReaderBar(p: Props) {
       </div>
       <div className="rbar__grp" role="toolbar" aria-label={t('reader.tools.label')} data-testid="reader-toolbar" data-away={p.away ? '' : undefined}>
         {tools}
-        <BarButton label={t('reader.colorPip', { name: t(`reader.colors.${colorName}`) })} keys="1-5" expanded={open === 'color'} testId="ann-color" buttonRef={colorBtn} onClick={() => setOpen(open === 'color' ? null : 'color')}>
+        <BarButton label={t('reader.colorPip', { name: meaningName(t, colorName, meanings) })} keys="1-5" expanded={open === 'color'} testId="ann-color" buttonRef={colorBtn} onClick={() => setOpen(open === 'color' ? null : 'color')}>
           <span className={`rbar__pip ann-${colorName}`} aria-hidden="true" />
         </BarButton>
         <Popover anchor={colorBtn} open={open === 'color'} onClose={close} label={t('reader.ann.color')} width={196}>

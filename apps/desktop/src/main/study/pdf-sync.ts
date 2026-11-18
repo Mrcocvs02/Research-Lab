@@ -128,6 +128,8 @@ export class PdfSync {
     const otherIds: string[] = [];
     let needsRepair = 0;
     for (const a of file?.annotations ?? []) {
+      // A crop (`area`) never goes into the PDF (§17.4.8): it is not counted, repaired or written.
+      if (a.kind === 'area') continue;
       if (a.geom !== 2) needsRepair++;
       const aligned = (a.forHash ?? file?.forHash ?? contentHashOf(rec)) === contentHashOf(rec);
       if (a.geom === 2 && aligned) plan.push({ id: a.id, kind: a.kind, page: a.page, rects: a.rects, color: a.color, comment: a.comment, createdAt: a.createdAt, pdf: a.pdf });
@@ -158,7 +160,7 @@ export class PdfSync {
     const ld = (await this.loadLocal()).libs[rt.libraryId]?.docs[docId];
     const mem = this.memOf(rt.libraryId, docId);
     const { plan, needsRepair } = this.split(file, rec);
-    const all = file?.annotations ?? [];
+    const all = (file?.annotations ?? []).filter((a) => a.kind !== 'area');
     const mode: PdfState['mode'] = !this.enabled || !cfg.annotations.writeToPdf ? 'off' : file?.pdfMode === 'app-only' ? 'app-only' : 'write';
     const missing = all.filter((a) => a.pdf?.missing).length;
     const appOnly = all.filter((a) => !a.pdf).length;
@@ -304,7 +306,7 @@ export class PdfSync {
     } else if (!this.enabled) return 'skipped';
     const rec = await rt.getDocument(docId);
     const file = await rt.store.annotations.get(docId);
-    if (kind === 'sync' && (file?.pdfMode === 'app-only' || !file || file.annotations.length === 0 && Object.keys(ld.written).length === 0)) {
+    if (kind === 'sync' && (file?.pdfMode === 'app-only' || !file || !file.annotations.some((a) => a.kind !== 'area') && Object.keys(ld.written).length === 0)) {
       if (ld.pending === 'dirty') ((ld.pending = undefined), await this.saveLocal());
       return 'skipped';
     }

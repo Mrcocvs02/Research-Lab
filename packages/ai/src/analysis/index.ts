@@ -4,3 +4,4 @@ export * from './closure.js';
 export * from './candidates.js';
 export * from './litnote.js';
 export * from './prompts.js';
+export * from './explain.js';

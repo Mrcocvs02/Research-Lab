@@ -91,6 +91,9 @@ export function mockStructured(request: { schema: unknown; prompt: string }): un
     else if (k === 'keywords') out[k] = ['mock keyword', 'second keyword'];
     else if (k === 'synonyms') out[k] = ['mock synonym'];
     else if (k === 'labels') out[k] = mockClusterLabels(request.prompt);
+    else if (k === 'means') out[k] = 'Mock explanation of the selection.';
+    else if (k === 'symbols') out[k] = [{ symbol: 'x', meaning: 'a mock symbol' }];
+    else if (k === 'role') out[k] = 'Mock role in the paper.';
   }
   return out;
 }

@@ -127,7 +127,10 @@
       "exportPresets": "Export presets|export copies",
       "deviceId": "Device id|diagnostics",
       "maintenance": "Maintenance and diagnostics|size clean logs memory processes limits cache",
-      "tokenCap": "Monthly token cap|limit consumption tokens budget account"
+      "tokenCap": "Monthly token cap|limit consumption tokens budget account",
+      "colorMeanings": "Colour meanings|highlight colours legend names",
+      "costThreshold": "Cost preview threshold|tokens dialog estimate send",
+      "dailyTokenCap": "Daily token cap|limit day budget tokens"
     },
     "search": {
       "label": "Search settings",
@@ -212,6 +215,13 @@
       "started": "Started"
     },
     "savedUndo": "Saved",
-    "undo": "Undo"
+    "undo": "Undo",
+    "colorMeanings": {
+      "title": "Colour meanings",
+      "label": "What each colour means",
+      "hint": "Name what you use each colour for, for example \"Key result\". The names show in the reader, on the colour dots and in the annotation list.",
+      "placeholder": "No meaning",
+      "field": "Meaning of {{color}}"
+    }
   }
 }

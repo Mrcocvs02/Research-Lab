@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { useTranslation } from 'react-i18next';
 import { ANNOTATION_COLORS, type Annotation } from '@rl/core';
 import { safeText } from '../library/safeText';
+import { colorName, useColorMeanings } from './colorMeaning';
 import { colorOf, excerpt, type AnnotationColor } from './geometry';
 
 /** A place in the window (client coordinates) a popover hangs from. */
@@ -19,7 +20,7 @@ export function popoverPlace(anchor: Anchor, size: { width: number; height: numb
 }
 
 /** The floating box of the reader: anchored to a rectangle (it follows the anchor while the pages scroll), 40 px high rows. */
-function Floating({ anchor, label, testId, mode, children }: { anchor: () => Anchor | null; label: string; testId: string; mode: string; children: ReactNode }) {
+export function Floating({ anchor, label, testId, mode, className, children }: { anchor: () => Anchor | null; label: string; testId: string; mode: string; className?: string; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const get = useRef(anchor);
@@ -45,7 +46,7 @@ function Floating({ anchor, label, testId, mode, children }: { anchor: () => Anc
     };
   }, []);
   return (
-    <div ref={box} className="ann-pop" role="group" aria-label={label} data-testid={testId} data-mode={mode} style={{ left: pos?.left ?? 0, top: pos?.top ?? 0, visibility: pos ? 'visible' : 'hidden' }}>
+    <div ref={box} className={className ? `ann-pop ${className}` : 'ann-pop'} role="group" aria-label={label} data-testid={testId} data-mode={mode} style={{ left: pos?.left ?? 0, top: pos?.top ?? 0, visibility: pos ? 'visible' : 'hidden' }}>
       {children}
     </div>
   );
@@ -54,6 +55,7 @@ function Floating({ anchor, label, testId, mode, children }: { anchor: () => Anc
 /** The five colour dots (a radiogroup): `testPrefix` + the colour name is the test id. */
 export function ColorDots({ value, onPick, prefix, label }: { value: AnnotationColor; onPick(n: 1 | 2 | 3 | 4 | 5): void; prefix: string; label: string }) {
   const { t } = useTranslation();
+  const meanings = useColorMeanings();
   return (
     <div className="ann-dots" role="radiogroup" aria-label={label}>
       {ANNOTATION_COLORS.map((c, i) => (
@@ -63,8 +65,8 @@ export function ColorDots({ value, onPick, prefix, label }: { value: AnnotationC
           role="radio"
           aria-checked={value === c}
           className={`ann-dot-btn ann-${c}`}
-          title={`${t(`reader.colors.${c}`)} (${i + 1})`}
-          aria-label={t(`reader.colors.${c}`)}
+          title={`${colorName(t, c, meanings)} (${i + 1})`}
+          aria-label={colorName(t, c, meanings)}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onPick((i + 1) as 1 | 2 | 3 | 4 | 5)}
           data-testid={`${prefix}-${c}`}
@@ -76,8 +78,8 @@ export function ColorDots({ value, onPick, prefix, label }: { value: AnnotationC
   );
 }
 
-/** Select tool, text selected: Copy and Highlight (in the current colour). Underline is the U tool (D-415). */
-export function SelectionPopover({ anchor, text, notice, busy, color, onHighlight, onCopy, onReposition }: { anchor: () => Anchor | null; text: string; notice?: string | undefined; busy: boolean; color: AnnotationColor; onHighlight(): void; onCopy(): void; onReposition?: (() => void) | undefined }) {
+/** Select tool, text selected: Copy, Highlight (in the current colour) and ✦ Explain with its estimate (D-415, D-416). Underline is the U tool. */
+export function SelectionPopover({ anchor, text, notice, busy, color, onHighlight, onCopy, onReposition, explainLabel, onExplain }: { anchor: () => Anchor | null; text: string; notice?: string | undefined; busy: boolean; color: AnnotationColor; onHighlight(): void; onCopy(): void; onReposition?: (() => void) | undefined; explainLabel?: string | undefined; onExplain?: (() => void) | undefined }) {
   const { t } = useTranslation();
   return (
     <Floating anchor={anchor} label={t('reader.ann.newLabel')} testId="annotation-bar" mode="new">
@@ -94,6 +96,11 @@ export function SelectionPopover({ anchor, text, notice, busy, color, onHighligh
           <span className={`ann-pip ann-${color}`} aria-hidden="true" />
           {t('reader.kind.highlight')}
         </button>
+        {onExplain && (
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onExplain} data-testid="ann-explain">
+            {explainLabel ?? t('reader.explain.button')}
+          </button>
+        )}
         {onReposition && (
           <button type="button" disabled={busy} onMouseDown={(e) => e.preventDefault()} onClick={onReposition} data-testid="ann-reposition-apply">
             {t('reader.repair.apply')}

@@ -11,6 +11,8 @@ import { rl } from '../../lib/rl';
 import { safeText } from '../library/safeText';
 import { ReadingPlanPanel } from './ReadingPlanPanel';
 import { toRequestItems, type PlanItemView } from './readingPlan';
+import './projects.css';
+import '../notes/notes.css';
 
 type Tab = 'members' | 'notes' | 'plan';
 const TABS: Tab[] = ['members', 'notes', 'plan'];

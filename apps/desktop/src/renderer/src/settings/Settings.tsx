@@ -5,6 +5,7 @@ import { LibraryConfigSection } from './LibraryConfigSection';
 import { NetworkSection } from './NetworkSection';
 import { ProfileSection } from './ProfileSection';
 import { SecretsSection } from './SecretsSection';
+import './settings.css';
 
 // The AI settings (and the log viewer) load when the Settings page opens, not with the first screen.
 const AiSection = lazyView(() => import('./AiSection').then((m) => ({ default: m.AiSection })), ['aiSettings']);

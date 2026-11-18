@@ -1,0 +1,31 @@
+.notes-bar {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+.notes-panes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+.notes-panes.notes-edit,
+.notes-panes.notes-preview {
+  grid-template-columns: 1fr;
+}
+.notes-edit textarea {
+  min-height: 320px;
+  font-family: var(--mono);
+}
+.notes-preview {
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-height: 320px;
+  overflow-wrap: anywhere;
+}
+.notes-conflict-actions {
+  display: flex;
+  gap: var(--space-2);
+}

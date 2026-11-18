@@ -1,0 +1,422 @@
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 var(--font);
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  margin: 0 0 var(--space-3);
+}
+h1 {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+h2 {
+  font-size: 16px;
+  font-weight: 650;
+}
+h3 {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+p {
+  margin: 0 0 var(--space-3);
+}
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Controls. Global button/field rules keep the layout of views not yet migrated; the states follow 5.5.1: hover and focus never
+   use a solid grey fill without a border (secondary), disabled is the only state that loses contrast. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+input[type='text'],
+input[type='email'],
+input[type='password'],
+input[type='number'],
+input:not([type]),
+select,
+textarea {
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  transition: border-color var(--dur-fast);
+}
+input[type='text']:hover:not(:disabled),
+input[type='email']:hover:not(:disabled),
+input[type='password']:hover:not(:disabled),
+input[type='number']:hover:not(:disabled),
+input:not([type]):hover:not(:disabled),
+select:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+  border-color: var(--text-muted);
+}
+input[type='text']:focus-visible,
+input[type='email']:focus-visible,
+input[type='password']:focus-visible,
+input[type='number']:focus-visible,
+input:not([type]):focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--accent);
+}
+textarea {
+  resize: vertical;
+}
+input[aria-invalid='true'],
+textarea[aria-invalid='true'],
+select[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+button {
+  padding: 7px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast),
+    box-shadow var(--dur-fast),
+    filter var(--dur-fast);
+}
+button:hover:not(:disabled) {
+  border-color: var(--text-muted);
+  box-shadow: var(--e-1);
+}
+button:active:not(:disabled) {
+  background: var(--surface-2);
+}
+button:disabled {
+  border-color: var(--border);
+  color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+button.primary:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: none;
+  filter: brightness(0.92);
+}
+button.primary:active:not(:disabled),
+button.danger:active:not(:disabled) {
+  filter: brightness(0.85);
+}
+button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-danger);
+}
+button.danger:hover:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+  box-shadow: none;
+  filter: brightness(0.92);
+}
+button.primary:disabled,
+button.danger:disabled {
+  background: var(--surface-3);
+  border-color: var(--surface-3);
+  color: var(--text-muted);
+  filter: none;
+}
+button.link {
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+button.icon-button {
+  padding: 2px 8px;
+  line-height: 1.2;
+  border-color: transparent;
+  background: none;
+}
+/* Ghost-like buttons: hover is a surface-2 fill WITH the text colour kept, and they never get the bordered-button shadow. */
+:is(button.link, button.icon-button, .nav-item, .tab, .tag-remove, .legend-item, .explore-node, .notes-list-item):hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: transparent;
+  box-shadow: none;
+  filter: none;
+}
+:is(button.link, button.icon-button, .nav-item, .tab, .tag-remove, .legend-item, .explore-node, .notes-list-item):active:not(:disabled) {
+  background: var(--surface-3);
+}
+
+/* Fields */
+.field {
+  margin-bottom: var(--space-4);
+}
+.field > label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-weight: 600;
+}
+.hint {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.field-error,
+.error-note {
+  color: var(--danger);
+  font-size: 13px;
+  margin: var(--space-1) 0 0;
+}
+.error-note {
+  padding: var(--space-2) var(--space-3);
+  background: var(--danger-soft);
+  border-radius: var(--radius);
+}
+.check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--space-2);
+  align-items: start;
+  margin-bottom: var(--space-3);
+}
+.check input {
+  margin-top: 4px;
+}
+.check .hint {
+  grid-column: 2;
+  margin-top: 0;
+}
+.rl-radio {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.rl-radio .hint {
+  grid-column: 2;
+}
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin: 0 0 var(--space-4);
+}
+legend {
+  font-weight: 600;
+  padding: 0 var(--space-2);
+}
+.indent {
+  margin: 0 0 var(--space-3) 24px;
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.actions.start {
+  justify-content: flex-start;
+}
+.actions.sticky {
+  position: sticky;
+  bottom: 0;
+  padding: var(--space-3) 0;
+  background: var(--surface);
+}
+.status {
+  color: var(--ok);
+  font-size: 13px;
+}
+.inline-form {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.inline-form input {
+  flex: 1;
+}
+.two-col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+.path {
+  display: block;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.badge {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.badge.ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.callout {
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+/* Progress */
+.progress {
+  height: 10px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+.progress.indeterminate .progress-fill {
+  width: 35%;
+  animation: slide 1.2s ease-in-out infinite;
+}
+@keyframes slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress.indeterminate .progress-fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+  .progress-fill {
+    transition: none;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.spacer {
+  flex: 1;
+}
+.ai-mark {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-1);
+}
+.badge.ai {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.palette-key,
+.kbd {
+  margin-left: var(--space-3);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font: 12px/1.6 var(--mono);
+  white-space: nowrap;
+}
+.row-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.confirm {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--danger-soft);
+  border-radius: var(--radius);
+}
+.chosen {
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+  border-radius: var(--radius);
+}
+.facts {
+  margin-bottom: var(--space-4);
+  padding-left: var(--space-5);
+  list-style: disc;
+}
+.summary {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: 0 0 var(--space-3);
+}
+.summary dt {
+  color: var(--text-muted);
+}
+.summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+

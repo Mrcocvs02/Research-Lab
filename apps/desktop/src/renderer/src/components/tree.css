@@ -1,0 +1,33 @@
+/* Folder tree */
+.folder-tree,
+.folder-tree ul {
+  list-style: none;
+}
+.folder-tree ul {
+  margin-left: 22px;
+}
+.folder-tree {
+  max-height: 280px;
+  overflow: auto;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: var(--space-2);
+}
+.folder-row {
+  display: flex;
+  align-items: center;
+}
+.icon-spacer {
+  display: inline-block;
+  width: 30px;
+}
+.folder-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px 0;
+  cursor: pointer;
+}
+

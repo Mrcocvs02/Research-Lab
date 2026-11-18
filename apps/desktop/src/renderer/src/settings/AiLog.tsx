@@ -8,6 +8,7 @@ import { useReader } from '../lib/reader';
 import { safeText } from '../views/library/safeText';
 import { formatTokens, formatUsd } from '../views/chat/format';
 import { useDocTitle } from '../views/chat/useLabels';
+import './settings.css';
 
 type Send = ResponseOf<Channels, 'ai:log'>['items'][number];
 

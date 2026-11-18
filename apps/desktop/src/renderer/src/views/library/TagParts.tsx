@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { safeText } from './safeText';
 import { canCreateTag, suggestTags } from './tagSuggest';
 import type { TaxonomyModel } from './taxonomyModel';
+import './library.css';
 
 /** A tag as a coloured chip: the node's colour is the stripe and a light tint, so it works in both themes. */
 export function TagChip({

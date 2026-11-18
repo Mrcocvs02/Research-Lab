@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { errorMessage } from '../lib/errors';
 import { ErrorNote } from './ui';
+import './tree.css';
 
 export interface FolderEntry {
   path: string;

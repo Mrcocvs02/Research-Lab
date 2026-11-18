@@ -17,6 +17,7 @@ import { TagChip, TagPicker } from '../library/TagParts';
 import { resolveId } from '../library/taxonomyModel';
 import { useTaxonomy } from '../library/useTaxonomy';
 import type { InboxItem } from './InboxView';
+import './inbox.css';
 
 const PreviewDialog = lazyView(() => import('../chat/PreviewDialog').then((m) => ({ default: m.PreviewDialog })), ['chat-preview']);
 type Preview = ResponseOf<Channels, 'inbox:previewTags'>;

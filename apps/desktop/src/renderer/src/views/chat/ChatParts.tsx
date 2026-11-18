@@ -9,6 +9,7 @@ import { safeText } from '../library/safeText';
 import { formatTokens, formatUsd } from './format';
 import { labelNamesPage, parseLabLink, type LabLink } from './labLinks';
 import { useDocTitle, useProjectName } from './useLabels';
+import './chat.css';
 
 export type Turn = ResponseOf<Channels, 'chat:get'>['turns'][number] & { streaming?: boolean };
 export type Card = Turn['cards'][number];

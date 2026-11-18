@@ -10,6 +10,7 @@ import { NewItems } from './NewItems';
 import { Published } from './Published';
 import { ReadNext } from './ReadNext';
 import { Sources } from './Sources';
+import './discover.css';
 
 export type WatchSource = ResponseOf<Channels, 'watch:list'>['sources'][number];
 export type DiscoverTab = 'readnext' | 'new' | 'published' | 'sources';

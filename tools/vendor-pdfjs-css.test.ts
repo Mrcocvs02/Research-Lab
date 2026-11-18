@@ -74,7 +74,7 @@ describe('vendored pdf.js viewer css', () => {
   });
 
   it('the app css has no global .page rule', () => {
-    const css = readFileSync(path.join(src, 'styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const css = walk(src).filter((f) => f.endsWith('.css') && f !== OUTPUT).map((f) => readFileSync(f, 'utf8')).join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
     expect(/(^|[,}\s>+~])\.page(?![\w-])/m.test(css.replace(/\.reader-scroll \.pdfViewer \.page/g, ''))).toBe(false);
   });
 });

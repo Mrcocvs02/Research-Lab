@@ -7,6 +7,7 @@ import { RlError } from '../../lib/rl-error';
 import { useCitationJob } from '../../lib/citationJobs';
 import { rl } from '../../lib/rl';
 import { WorkRow } from './WorkRow';
+import './citations.css';
 
 type View = ResponseOf<Channels, 'citations:get'>;
 type Link = View['references'][number];

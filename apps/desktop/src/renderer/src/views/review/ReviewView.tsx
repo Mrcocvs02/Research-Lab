@@ -11,6 +11,7 @@ import { DocChip } from '../chat/ChatParts';
 import { safeText } from '../library/safeText';
 import { ReviewItemView, type ReviewItemData } from './ReviewItem';
 import { useDecide, type ReviewField } from './useDecide';
+import '../inbox/inbox.css';
 
 type Stats = ResponseOf<Channels, 'review:stats'>;
 const PAGE = 50;

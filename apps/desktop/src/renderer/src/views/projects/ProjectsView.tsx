@@ -11,6 +11,7 @@ import { rl } from '../../lib/rl';
 import { useApp } from '../../state/app-context';
 import { safeText } from '../library/safeText';
 import { ProjectDetailView } from './ProjectDetailView';
+import './projects.css';
 
 type Summary = ResponseOf<Channels, 'projects:list'>['items'][number];
 

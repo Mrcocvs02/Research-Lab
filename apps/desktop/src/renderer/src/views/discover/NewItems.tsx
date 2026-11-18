@@ -10,6 +10,8 @@ import { safeText } from '../library/safeText';
 import type { WatchSource } from './DiscoverView';
 import { sourceName } from './sourceName';
 import { useWatchOp } from './watchOps';
+import '../citations/citations.css';
+import './discover.css';
 
 type Items = ResponseOf<Channels, 'watch:items'>;
 type Item = Items['items'][number];

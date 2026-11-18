@@ -8,6 +8,7 @@ import { rl } from '../../lib/rl';
 import { safeText } from '../library/safeText';
 import { ACTION_COMMANDS, APP_ACTIONS, PREDEFINED_COMMANDS, type AppActionId, type PaletteItem } from './commands';
 import { filterItems, loadRecents, orderByRecent, rememberRecent } from './paletteModel';
+import './chat.css';
 
 /**
  * Command palette (Ctrl+K): app actions (views, backup, guide...) and the commands for Claude, predefined and the user's

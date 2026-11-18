@@ -8,6 +8,7 @@ import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
 import { RlError } from '../../lib/rl-error';
 import { useApp } from '../../state/app-context';
+import './notes.css';
 
 // The Markdown renderer is loaded when the preview is first shown.
 const Markdown = lazyRetry(() => import('../../lib/markdown').then((m) => ({ default: m.Markdown })));

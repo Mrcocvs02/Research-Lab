@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
   AppError,
+  contentHashOf,
   dataPath,
   defaultLibraryConfig,
   type DocumentId,
@@ -385,11 +386,11 @@ export class LibraryRuntime {
 
   /** Extracts one file under the worker's watchdog; the result says what became of it (never throws, except on cancel). */
   private extractOne(rec: DocumentRecord, signal: AbortSignal): Promise<ExtractResult> {
-    return this.extractAt(this.d.rootPath, rec.path, rec.hash, signal);
+    return this.extractAt(this.d.rootPath, rec.path, contentHashOf(rec), signal, rec.pdfWrite !== undefined);
   }
 
-  private async extractAt(rootPath: string, file: string, hash: string, signal: AbortSignal): Promise<ExtractResult> {
-    const item = { path: file, hash };
+  private async extractAt(rootPath: string, file: string, hash: string, signal: AbortSignal, annotated = false): Promise<ExtractResult> {
+    const item = { path: file, hash, ...(annotated ? { contentHash: hash } : {}) };
     try {
       return await this.d.worker.extract({ rootPath, cacheDir: this.d.textCacheDir, item }, { signal });
     } catch (e) {
@@ -484,7 +485,7 @@ export class LibraryRuntime {
       // Text extraction, one file at a time under the watchdog (the extractor caches by file hash), indexing each
       // document as soon as its text is ready. `textHash` is written only for a success or a permanent failure:
       // a transient failure leaves the document to be retried by the next scan.
-      const needText = records.filter((r) => !r.missing && (request.full || indexed.get(r.id)?.textHash !== r.hash));
+      const needText = records.filter((r) => !r.missing && (request.full || indexed.get(r.id)?.textHash !== contentHashOf(r)));
       this.update({ phase: 'extracting', total: needText.length, processed: 0 });
       let processed = 0;
       for (const rec of needText) {
@@ -497,7 +498,7 @@ export class LibraryRuntime {
             ? await store.documents.update(rec.id, (c) => enrichFromExtraction(c ?? before, meta) ?? c ?? before)
             : before;
           const doc = await buildIndexable(store, taxonomy, current, res.ok ? { abstract: meta?.abstract } : undefined);
-          const job: IndexJob = res.ok ? { doc, text: 'cache', hash: res.readHash ?? rec.hash } : res.permanent ? { doc, text: 'empty', hash: rec.hash } : { doc, text: 'keep' };
+          const job: IndexJob = res.ok ? { doc, text: 'cache', hash: res.readHash ?? contentHashOf(rec) } : res.permanent ? { doc, text: 'empty', hash: contentHashOf(rec) } : { doc, text: 'keep' };
           await worker.index({ rootPath: this.d.rootPath, cacheDir: this.d.textCacheDir, jobs: [job] });
           done.add(rec.id);
         });

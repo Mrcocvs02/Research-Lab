@@ -60,6 +60,9 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
     auth: 'claude-code' as 'claude-code' | 'api-key' | 'none',
     reason: undefined as undefined | 'no-access' | 'offline' | 'cap-reached' | 'error',
     monthUsd: 0,
+    /** Token monitor (D-442): tokens of the month and the cap; a send over the cap fails with AI_TOKEN_CAP_REACHED as main does. */
+    monthTokens: 0,
+    tokenCap: null as number | null,
     overCap: false,
     /** Ask for a confirmation on a send with documents (what `ai.confirmBeforeSend` does in main). */
     confirm: true,
@@ -90,6 +93,7 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
   const dirOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
   const enabled = (path: string) => state.config.aiEnabledFolders.some((f) => dirOf(path) === f || dirOf(path).startsWith(`${f}/`));
 
+  const tokenUsage = () => ({ month: '2026-11', monthTokens: state.monthTokens, tokenCap: state.tokenCap, pct: state.tokenCap === null ? null : Math.round((state.monthTokens / state.tokenCap) * 100), warnAtPct: 80 });
   const preview = (p: any) => {
     const agent = p.purpose === 'chat' || p.purpose === 'search';
     const allowed: string[] = [];
@@ -164,6 +168,13 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
       state.previews.push(p);
       return preview(p);
     },
+    'ai:tokenUsage': () => tokenUsage(),
+    'ai:setTokenCap': (p) => {
+      state.tokenCap = p.monthlyTokens;
+      const u = tokenUsage();
+      emitEvent('ai:usageChanged', { ...u, crossedWarn: false });
+      return u;
+    },
     'ai:usage': () => ({ month: '2026-11', usd: state.monthUsd, inputTokens: 0, outputTokens: 0, sends: state.log.length, byModel: [] }),
     'ai:log': (p) => ({ items: state.log.filter((s) => !p.before || s.at < p.before).slice(0, p.limit ?? 100) }),
     'chat:send': (p) => {
@@ -176,6 +187,7 @@ export function memoryAi(init: { config?: Partial<LibraryConfig>; docs?: Array<{
       if (p.mode === 'search' && p.conversationId) throw new AppError('INVALID_REQUEST', 'search starts a new conversation');
       if (!state.available) throw new AppError('AI_PROVIDER_ERROR', 'no access', { reason: state.reason ?? 'no-access' });
       if (state.overCap) throw new AppError('AI_BUDGET_EXCEEDED', 'cap');
+      if (state.tokenCap !== null && state.monthTokens >= state.tokenCap) throw new AppError('AI_TOKEN_CAP_REACHED', 'token cap', { monthTokens: state.monthTokens, tokenCap: state.tokenCap, estimatedTokens: 0 });
       if (state.oneTurn && state.activeTurn) throw new AppError('CONFLICT', 'Another answer is still being written', { reason: 'turn-running' });
       const wasConfirmed = Boolean(p.conversationId && state.confirmedConversations.has(p.conversationId));
       const pv = preview({ purpose: p.mode === 'search' ? 'search' : 'chat', model: p.model, docIds: p.contextDocIds ?? [], promptChars: String(p.text).length, confirmedConversation: wasConfirmed });

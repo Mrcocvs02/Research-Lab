@@ -120,7 +120,8 @@
       "indexRebuild": "Rebuild the index|reindex full scan",
       "exportPresets": "Export presets|export copies",
       "deviceId": "Device id|diagnostics",
-      "maintenance": "Maintenance and diagnostics|size clean logs memory processes limits cache"
+      "maintenance": "Maintenance and diagnostics|size clean logs memory processes limits cache",
+      "tokenCap": "Monthly token cap|limit consumption tokens budget account"
     },
     "search": {
       "label": "Search settings",

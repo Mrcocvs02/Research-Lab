@@ -130,7 +130,12 @@
       "sends_one": "{{count}} invio",
       "sends_other": "{{count}} invii",
       "usageAll": "Calcola il totale di tutte le librerie",
-      "usageAllResult": "Librerie: {{count}} · non raggiungibili: {{unreachable}} · totale {{usd}}"
+      "usageAllResult": "Librerie: {{count}} · non raggiungibili: {{unreachable}} · totale {{usd}}",
+      "tokenMonth": "Token del mese",
+      "tokenHelp": "Ingresso + uscita di tutte le librerie. Sopra il tetto le richieste non partono.",
+      "tokenOf": "{{used}} / {{cap}} ({{pct}}%)",
+      "tokenUsedNoCap": "{{used}} (nessun tetto)",
+      "tokenNoCap": "Nessun tetto"
     },
     "claude": {
       "title": "Claude",

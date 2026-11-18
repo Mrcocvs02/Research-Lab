@@ -190,6 +190,7 @@
 }
 .rl-toast {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   max-width: 360px;
@@ -203,6 +204,10 @@
   line-height: var(--lh-small);
   pointer-events: auto;
   animation: rl-toast-in var(--dur) var(--ease);
+}
+/* Several actions (the token cap, D-442): the text takes its own line. */
+.rl-toast:has(.rl-toast__action ~ .rl-toast__action) .rl-toast__text {
+  flex-basis: 100%;
 }
 @keyframes rl-toast-in {
   from {

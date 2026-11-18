@@ -102,6 +102,7 @@ export function memoryWork(ai: { handlers: Record<string, Handler>; state: { con
       emitEvent('jobs:progress', job);
       return { jobId };
     },
+    'jobs:restart': (p) => ({ jobId: state.jobs.find((j) => j.jobId === p.jobId)?.jobId ?? p.jobId }),
     'jobs:cancel': (p) => {
       state.cancelled.push(p.jobId);
       return { cancelled: true };

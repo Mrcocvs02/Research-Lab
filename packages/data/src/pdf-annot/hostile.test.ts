@@ -70,7 +70,7 @@ describe('hostile files: 500 deterministic mutations (§8.3.13)', () => {
       const t0 = Date.now();
       let res: SyncResult;
       try {
-        res = planSync({ path: p, mode: 'sync', annotations: [annot], otherIds: [], known: {}, now: annot.createdAt });
+        res = await planSync({ path: p, mode: 'sync', annotations: [annot], otherIds: [], known: {}, now: annot.createdAt });
       } catch (e) {
         throw new Error(`mutation ${i} threw: ${String(e)}`);
       }
@@ -90,7 +90,7 @@ describe('hostile files: 500 deterministic mutations (§8.3.13)', () => {
         }
       } else stats.refused++;
       // the read-only inspection of the same file never throws either
-      expect(() => inspectFile(p, Math.floor(buf.length / 2))).not.toThrow();
+      await expect(inspectFile(p, Math.floor(buf.length / 2))).resolves.toBeDefined();
     }
     expect(stats.ok + stats.refused).toBe(500);
     expect(stats.refused).toBeGreaterThan(50); // the mutations do break files
@@ -104,7 +104,7 @@ describe('hostile files: 500 deterministic mutations (§8.3.13)', () => {
     for (const [i, buf] of [selfRef, chain, missingPage].entries()) {
       const p = path.join(dir, `h${i}.pdf`);
       await writeFile(p, buf);
-      const res = planSync({ path: p, mode: 'sync', annotations: [annot], otherIds: [], known: {}, now: annot.createdAt });
+      const res = await planSync({ path: p, mode: 'sync', annotations: [annot], otherIds: [], known: {}, now: annot.createdAt });
       expect(res.ok === false || res.update === null || res.update.oldSize === buf.length).toBe(true);
     }
   });

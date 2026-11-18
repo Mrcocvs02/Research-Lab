@@ -63,9 +63,9 @@ describe('refusals, one per reason of §8.3.5 (nothing is written to a refused f
     expect(await plan(docPdf({ trailer: `/Encrypt 20 0 R ${idEntry}`, extraObjs: [{ n: 20, body: '<< /Filter /Custom /V 4 >>' }] }))).toMatchObject({ ok: false, reason: 'encrypted', detail: 'handler' });
   });
 
-  it('encrypted with an empty user password is recognised (and refused until G4c reads and writes encrypted objects)', async () => {
-    expect(await plan(docPdf(encryptedR2(-4)))).toMatchObject({ ok: false, reason: 'encrypted', detail: 'empty-password', emptyPassword: true });
-    expect(await plan(docPdf(encryptedR5(-4)))).toMatchObject({ ok: false, reason: 'encrypted', detail: 'empty-password', emptyPassword: true });
+  it('encrypted with an empty user password is written (G4c; the round trips are in crypt.test.ts)', async () => {
+    expect(refusal(await plan(docPdf(encryptedR2(-4))))).toBe('ok');
+    expect(refusal(await plan(docPdf(encryptedR5(-4))))).toBe('ok');
   });
 
   it('/P without the annotation bit (bit 6): permission, even with an empty password', async () => {

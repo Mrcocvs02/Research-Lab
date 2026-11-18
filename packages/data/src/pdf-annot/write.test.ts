@@ -40,7 +40,7 @@ async function file(buf: Buffer): Promise<string> {
 /** Runs the plan on `buf`; returns the result and the file after the update (the original bytes are checked to be its exact prefix). */
 async function sync(buf: Buffer, annotations: PlanAnnot[], over: Partial<SyncRequest> = {}): Promise<{ res: Plan; out: Buffer }> {
   const req: SyncRequest = { path: await file(buf), mode: 'sync', annotations, otherIds: [], known: {}, now: NOW, ...over };
-  const res = planSync(req);
+  const res = await planSync(req);
   if (!res.ok) throw new Error(`refused: ${res.reason} ${res.detail}`);
   if (!res.update) return { res, out: buf };
   expect(res.update.oldSize).toBe(buf.length);

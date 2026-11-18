@@ -22,15 +22,13 @@
       "daily": "Ogni giorno",
       "weekly": "Ogni settimana",
       "monthly": "Ogni mese",
-      "keep": "Backup automatici da conservare",
-      "keepHint": "I backup automatici più vecchi vengono rimossi; quelli fatti a mano non si rimuovono mai."
+      "keep": "Backup automatici da conservare"
     },
     "autoError": "L'ultimo backup automatico non è stato eseguito: {{reason}}",
     "autoErrorOther": "errore {{code}}",
     "now": {
       "title": "Esegui il backup ora",
       "button": "Esegui il backup ora",
-      "needsDestination": "Scegli prima una cartella di destinazione.",
       "needsLibrary": "Nessuna libreria attiva."
     },
     "last": "Ultimo backup di questa libreria: {{when}}",

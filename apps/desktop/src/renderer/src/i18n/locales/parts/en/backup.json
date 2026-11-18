@@ -22,15 +22,13 @@
       "daily": "Daily",
       "weekly": "Weekly",
       "monthly": "Monthly",
-      "keep": "Automatic backups to keep",
-      "keepHint": "Older automatic backups are removed; backups you make by hand are never removed."
+      "keep": "Automatic backups to keep"
     },
     "autoError": "The last automatic backup did not run: {{reason}}",
     "autoErrorOther": "error {{code}}",
     "now": {
       "title": "Back up now",
       "button": "Back up now",
-      "needsDestination": "Choose a destination folder first.",
       "needsLibrary": "No library is active."
     },
     "last": "Last backup of this library: {{when}}",

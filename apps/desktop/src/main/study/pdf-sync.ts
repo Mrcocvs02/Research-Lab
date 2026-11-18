@@ -211,17 +211,21 @@ export class PdfSync {
       const rec = await rt.getDocument(docId as DocumentId);
       // A big file is written only when the document closes (a write reloads the whole file in the sync service).
       if (rec.size > L.idleWriteMaxBytes) return;
-      await this.writeNow(docId, false);
+      await this.writeNow(docId, true);
     } catch {
       // another library is active, or the document is gone: the pending mark stays for the next start
     }
   }
 
-  /** Writes what is pending now (close of the document, retry, "write now"). Never throws for a refusal: the state says it. */
-  async writeNow(docId: string, _close = true): Promise<PdfState> {
+  /**
+   * Writes what is pending now (close of the document, "write now"). Never throws for a refusal: the state says it. A user's action
+   * (`auto` false) tries again even if the file was refused before and has not changed (the user may have fixed the cause);
+   * the timer and the flush at quit (`auto`) do not hammer a refused file.
+   */
+  async writeNow(docId: string, auto = false): Promise<PdfState> {
     const rt = await this.s.runtime.require();
     const id = docId as DocumentId;
-    await this.enqueue(rt.libraryId, docId, () => this.syncDoc(rt, id, 'sync').then(() => undefined));
+    await this.enqueue(rt.libraryId, docId, () => this.syncDoc(rt, id, 'sync', !auto).then(() => undefined));
     return this.stateOf(rt, id);
   }
 
@@ -233,7 +237,7 @@ export class PdfSync {
       for (const [libId, lib] of Object.entries(f.libs)) {
         const rt = await this.s.runtime.require(libId).catch(() => null);
         if (!rt) continue;
-        for (const [docId, d] of Object.entries(lib.docs)) if (d.pending) await this.writeNow(docId).catch(() => {});
+        for (const [docId, d] of Object.entries(lib.docs)) if (d.pending) await this.writeNow(docId, true).catch(() => {});
       }
     };
     await Promise.race([run().catch(() => {}), new Promise<void>((r) => setTimeout(r, ms).unref())]);

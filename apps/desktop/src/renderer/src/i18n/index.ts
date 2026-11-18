@@ -41,6 +41,7 @@ export type StringPart =
   | 'settings-wizard'
   | 'shortcuts'
   | 'taxonomy'
+  | 'tokenCap'
   | 'wizard';
 
 const CORE: Record<UiLanguage, () => Promise<{ default: Dictionary }>> = {

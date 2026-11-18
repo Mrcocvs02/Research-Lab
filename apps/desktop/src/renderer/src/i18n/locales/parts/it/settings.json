@@ -120,7 +120,8 @@
       "indexRebuild": "Ricostruisci l'indice|reindicizza scansione completa",
       "exportPresets": "Preset di esportazione|export copie",
       "deviceId": "Id del dispositivo|diagnostica",
-      "maintenance": "Manutenzione e diagnostica|dimensioni pulizia log memoria processi limiti cache"
+      "maintenance": "Manutenzione e diagnostica|dimensioni pulizia log memoria processi limiti cache",
+      "tokenCap": "Tetto mensile di token|limite consumo token budget account"
     },
     "search": {
       "label": "Cerca nelle impostazioni",

@@ -11,13 +11,13 @@ export interface Toast {
   id: number;
   kind: 'info' | 'error';
   text: string;
-  action?: { label: string; run(): void };
+  actions?: Array<{ label: string; run(): void }>;
   /** The view that was open when the toast was made: leaving it removes the toast (errors stay, D-358). */
   view: string;
 }
 
 interface NotifyValue {
-  info(text: string, action?: { label: string; run(): void }): void;
+  info(text: string, action?: { label: string; run(): void } | Array<{ label: string; run(): void }>): void;
   /** An error message that is not a thrown value (a refused action). */
   fail(text: string): void;
   /** Shows a localised message for any thrown value; a CONFLICT also offers to reload the data. */
@@ -78,11 +78,11 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<NotifyValue>(
     () => ({
-      info: (text, action) => push(action ? { kind: 'info', text, action } : { kind: 'info', text }),
+      info: (text, action) => push(action ? { kind: 'info', text, actions: [action].flat() } : { kind: 'info', text }),
       fail: (text) => push({ kind: 'error', text }),
       reportError: (error) => {
         const conflict = RlError.from(error).code === 'CONFLICT';
-        push(conflict ? { kind: 'error', text: errorMessage(error, t), action: { label: t('notify.reload'), run: invalidateAll } } : { kind: 'error', text: errorMessage(error, t) }, conflict);
+        push(conflict ? { kind: 'error', text: errorMessage(error, t), actions: [{ label: t('notify.reload'), run: invalidateAll }] } : { kind: 'error', text: errorMessage(error, t) }, conflict);
       },
       setView,
     }),
@@ -106,19 +106,20 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
               onBlur={() => x.kind !== 'error' && arm(x.id)}
             >
               <div className="rl-toast__text">{x.text}</div>
-              {x.action && (
+              {x.actions?.map((a) => (
                 <button
+                  key={a.label}
                   type="button"
                   className="rl-toast__action"
                   onClick={() => {
-                    x.action?.run();
+                    a.run();
                     dismiss(x.id);
                   }}
                   data-testid="toast-action"
                 >
-                  {x.action.label}
+                  {a.label}
                 </button>
-              )}
+              ))}
               <button type="button" className="rl-iconbtn rl-iconbtn--ghost rl-iconbtn--sm" aria-label={t('notify.dismiss')} title={t('notify.dismiss')} onClick={() => dismiss(x.id)}>
                 <Icon name="close" size={16} />
               </button>

@@ -16,6 +16,8 @@ export const ERROR_CODES = [
   'LIBRARY_NOT_ACTIVE',
   'FOLDER_NOT_AI_ENABLED',
   'AI_BUDGET_EXCEEDED',
+  /** The monthly token cap of the app is reached (D-442); `details`: { monthTokens, tokenCap, estimatedTokens }. */
+  'AI_TOKEN_CAP_REACHED',
   'AI_PROVIDER_ERROR',
   /** An online source (OpenAlex, arXiv, Semantic Scholar) could not be reached; `details.reason` says why. */
   'NETWORK_ERROR',

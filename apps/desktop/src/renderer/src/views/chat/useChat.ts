@@ -24,6 +24,8 @@ export interface SendRequest {
 export type Banner =
   | { kind: 'turnRunning' }
   | { kind: 'overCap' }
+  /** The monthly token cap refused the send (D-442): the request is kept to send it again after a raise. */
+  | { kind: 'tokenCap'; cap: number; req: SendRequest }
   | { kind: 'noAccess' }
   | { kind: 'offline' }
   | { kind: 'provider' }
@@ -220,6 +222,7 @@ export function useChat(onStarted: (mode: 'chat' | 'search') => void) {
         }
         if (err.code === 'CONFLICT' && err.details?.reason === 'turn-running') setBanner({ kind: 'turnRunning' });
         else if (err.code === 'AI_BUDGET_EXCEEDED') setBanner({ kind: 'overCap' });
+        else if (err.code === 'AI_TOKEN_CAP_REACHED') setBanner({ kind: 'tokenCap', cap: Number(err.details?.tokenCap ?? 0), req });
         else if (err.code === 'AI_PROVIDER_ERROR') {
           const reason = err.details?.reason;
           setBanner({ kind: reason === 'no-access' ? 'noAccess' : reason === 'offline' ? 'offline' : 'provider' });

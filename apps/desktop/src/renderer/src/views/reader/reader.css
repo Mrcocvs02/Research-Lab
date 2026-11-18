@@ -4,34 +4,168 @@
   flex-direction: column;
   min-height: 0;
 }
-.reader-bar,
-.reader-study {
+/* The bar of the reader (4.3, D-410): one 48 px row in the slot of the top bar; groups with 1 x 20 dividers, nothing wraps. */
+.rbar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 48px;
+  white-space: nowrap;
+}
+.rbar__grp {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+}
+.rbar__grp:not(:first-child)::before {
+  content: '';
+  width: 1px;
+  height: 20px;
+  margin-right: 6px;
+  background: var(--border);
+}
+.rbar__title {
+  flex: 0 1 auto;
+  min-width: 0;
+  gap: 6px;
+}
+.rbar__end {
+  margin-left: auto;
 }
 .reader-title {
   margin: 0;
-  font-size: 15px;
-  max-width: 28ch;
+  min-width: 0;
+  max-width: min(32ch, 24vw);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
 }
-.reader-group {
+.reader-title__root {
+  flex: none;
+  color: var(--text-muted);
+}
+@container (max-width: 1299px) {
+  .reader-title {
+    max-width: 16ch;
+  }
+}
+@container (max-width: 1099px) {
+  .reader-title__root {
+    display: none;
+  }
+}
+.rbar__tool {
+  position: relative;
   display: inline-flex;
-  align-items: center;
+}
+.rbar__cd {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ann);
+  border: 1.5px solid var(--surface);
+  box-sizing: content-box;
+}
+.rbar__pip,
+.ann-pip {
+  display: inline-block;
+  border-radius: 50%;
+  background: var(--ann);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.rbar__pip {
+  width: 16px;
+  height: 16px;
+}
+.ann-pip {
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+}
+.rbar__grp[data-away] button {
+  opacity: 0.6;
+}
+.rbar__colors,
+.ann-dots {
+  display: flex;
   gap: 4px;
 }
-.reader-page-input {
-  width: 4.5em;
+.rbar__colors {
+  padding: 8px 10px;
 }
-.reader-keys {
-  max-width: 60ch;
+.ann-dot-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+.ann-dot-btn span {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ann);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.ann-dot-btn[aria-checked='true'] span {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--text);
+}
+.rbar .reader-page-input {
+  width: 44px;
+  flex: none;
+  height: 28px;
+  padding: 0 4px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.reader-pages {
+  margin-left: 4px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.rbar__zoom,
+.rbar__study {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  font-weight: 500;
+}
+.rbar__zoom {
+  min-width: 64px;
+  font-variant-numeric: tabular-nums;
+}
+.rbar__zoom:hover:not(:disabled),
+.rbar__study:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.reader-hint {
+  position: absolute;
+  z-index: 7;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  background: var(--text);
+  color: var(--bg);
+  font-size: 13px;
+  pointer-events: none;
 }
 .reader-body {
   flex: 1;
@@ -53,7 +187,7 @@
   position: absolute;
   inset: 0;
   overflow: auto;
-  background: var(--surface-2);
+  background: var(--surface-3);
 }
 .reader-scroll[hidden] {
   display: none;
@@ -62,8 +196,14 @@
 .reader-scroll .pdfViewer .page {
   max-width: none;
   padding: 0;
+  margin: 0 auto 16px;
+  box-shadow: var(--page-shadow);
+  outline: 1px solid var(--page-edge);
   --scale-round-x: 1px !important;
   --scale-round-y: 1px !important;
+}
+.reader-scroll .pdfViewer {
+  padding-top: 16px;
 }
 .reader-find {
   position: relative;
@@ -71,7 +211,9 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
@@ -92,71 +234,6 @@
   padding: var(--space-3);
   background: var(--surface);
   border-left: 1px solid var(--border);
-}
-.ann-dock {
-  position: absolute;
-  z-index: 6;
-  left: var(--space-3);
-  right: var(--space-3);
-  bottom: var(--space-3);
-}
-.ann-bar {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: var(--space-2) var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.ann-bar-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-.ann-bar-text {
-  margin: 0;
-  color: var(--text-muted);
-  font-style: italic;
-}
-.ann-comment {
-  flex: 1;
-  min-width: 12em;
-}
-.ann-colors {
-  display: inline-flex;
-  gap: 6px;
-}
-.ann-swatch {
-  position: relative;
-  display: inline-block;
-  width: 22px;
-  height: 22px;
-  cursor: pointer;
-}
-.ann-swatch input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  margin: 0;
-  cursor: pointer;
-}
-.ann-swatch span {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: var(--ann);
-  border: 2px solid transparent;
-}
-.ann-swatch:has(input:checked) span {
-  border-color: var(--text);
-}
-.ann-swatch:has(input:focus-visible) span {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 .ann-yellow {
   --ann: var(--hl-yellow);
@@ -265,4 +342,70 @@
 }
 .notes-list-title {
   font-weight: 600;
+}
+.reader-find input[type='search'] {
+  width: 240px;
+}
+/* The popovers of the reader (annotation, selection, eraser confirmation): fixed to the window, 40 px rows (4.3). */
+.ann-pop {
+  position: fixed;
+  z-index: 70;
+  max-width: calc(100vw - 16px);
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--e-2);
+}
+.ann-pop__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}
+.ann-pop__text {
+  margin: 4px 4px 0;
+}
+.ann-comment {
+  flex: 1;
+  min-width: 14em;
+}
+.ann-more {
+  flex: none;
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+}
+.ann-list section:not(.ann-review) li {
+  display: flex;
+  align-items: flex-start;
+}
+.reader-info {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+}
+.reader-info dt {
+  color: var(--text-muted);
+}
+.reader-info dd {
+  margin: 0;
+}
+.reader-tabpanel > .rl-seg {
+  margin-bottom: var(--space-2);
+}
+/* The slot the shell leaves for the reader bar in its top bar (the reader replaces that bar). */
+.topbar--reader {
+  padding: 0 12px;
+}
+.reader-bar-slot {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* The reader scrolls its own pages: the view area keeps no scrollbar gutter beside it (the 15 px belong to the pages, W10). */
+.shell[data-reading] .main {
+  overflow: hidden;
+  scrollbar-gutter: auto;
 }

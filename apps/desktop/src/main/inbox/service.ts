@@ -26,6 +26,7 @@ import { applyTaxonomyOps, createTextExtractor, type OrganizerStore } from '@rl/
 import { availability, monthUsage, type AiCtx } from '../ai/service.js';
 import { JOB_EXCERPT_CHARS } from '../ai/jobs.js';
 import { trackAbort } from '../ai/abort-registry.js';
+import { assertTokenCap, noteSend } from '../ai/token-cap.js';
 import { monthOf, usdOfUsage } from '../ai/usage.js';
 import type { MainServices } from '../ipc/handlers/services.js';
 import type { LibraryRuntime } from '../library/library-runtime.js';
@@ -636,11 +637,13 @@ export async function proposeTags(s: MainServices, aiCtx: AiCtx, req: { id: stri
   const monthUsd = (await monthUsage(c.rt, monthOf(new Date()))).usd;
   const cap = cfg.ai.usageCap.monthlyUsd;
   if (cap !== null && monthUsd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached', { monthUsd, capUsd: cap });
+  await assertTokenCap(s, 0);
   const av = await availability(s, provider);
   if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
   const prep = await tagsPrep(c, req.id, req.folder);
   const { preview, est } = await previewOf(c, req.id, req.model, prep);
   if (cap !== null && preview.overCap) throw new AppError('AI_BUDGET_EXCEEDED', 'This send would go over the monthly AI spending cap', { monthUsd, capUsd: cap, estimatedUsd: preview.estimatedUsd });
+  await assertTokenCap(s, preview.approxInputTokens);
   if (preview.needsConfirmation && !req.confirmed) throw new AppError('CONFLICT', 'The send needs the confirmation of the user', { reason: 'needs-confirmation', preview });
   const deviceId = (await s.settings.get()).deviceId;
   const sendLog = (inTok: number, outTok: number | undefined, usd: number | null) =>
@@ -657,7 +660,7 @@ export async function proposeTags(s: MainServices, aiCtx: AiCtx, req: { id: stri
       ...(outTok !== undefined ? { approxOutputTokens: outTok } : {}),
       ...(usd !== null ? { estimatedCostUsd: usd } : {}),
       confirmed: req.confirmed,
-    });
+    }).then(() => noteSend(s, 'inbox:tags', inTok, outTok ?? 0));
   // Cancellable: the library switch, quit, and the removal of the item end the call (and the Claude process with it).
   const run = trackAbort();
   tagRuns.get(req.id)?.abort();

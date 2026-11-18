@@ -129,6 +129,11 @@ export const appSettingsSchema = z.object({
       claudeCodePath: z.string().min(1).max(1024).nullable().default(null),
       /** Changed only through `ai:setAuthMode` (never `settings:set`): it decides which secret the child process gets. */
       authMode: aiAuthModeSchema.default('auto'),
+      /**
+       * Monthly cap in tokens (input + output, every library, calendar month, D-442): protects the one Claude account.
+       * Null: no cap. Changed only through `ai:setTokenCap` (never `settings:set`). `warnAtPct`: the non-blocking warning.
+       */
+      tokenCap: z.object({ monthlyTokens: z.number().int().positive().max(1e12).nullable().default(null), warnAtPct: z.number().int().min(1).max(99).default(80) }).prefault({}),
     })
     .prefault({}),
   /** Look of the window (phase 8); 'system' follows the OS. */

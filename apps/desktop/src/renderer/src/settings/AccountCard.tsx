@@ -13,6 +13,7 @@ import { rl } from '../lib/rl';
 import { useApp } from '../state/app-context';
 import { Row, useSettings } from './rows';
 import { SecretControl } from './SavedKeys';
+import { TokenCapRow } from './TokenCapRow';
 import { useAutoSave } from './useAutoSave';
 
 /** What "usage of the month" shows: the active library (the unit of the cap, D-330) or, with `'all'`, the total of every library at once. The "all libraries" button works in both cases. */
@@ -296,6 +297,7 @@ export function AccountCard() {
       </Row>
 
       <Usage account={account} />
+      <TokenCapRow />
 
       {error ? (
         <p className="field-error" role="alert" data-testid="ai-account-error">

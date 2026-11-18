@@ -10,6 +10,7 @@ import { ChatStore } from '../../ai/chat-store.js';
 import { listUserCommands } from '../../ai/guide-files.js';
 import { abortAllChatTurns, cancelTurn, computePreview, computeStatus, discardConversationTurns, loadCtx, monthUsage, startChatTurn } from '../../ai/service.js';
 import { aiSends, monthOf } from '../../ai/usage.js';
+import { setTokenCap, tokenUsage } from '../../ai/token-cap.js';
 import { usageAll } from '../../ai/usage-all.js';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
@@ -25,6 +26,8 @@ export const aiHandlers = (s: MainServices): DomainHandlers<'ai'> => ({
   'ai:logout': () => accountService(s, s.claudeIo).logout(),
   'ai:test': () => accountService(s, s.claudeIo).test(),
   'ai:usageAll': () => usageAll(s),
+  'ai:tokenUsage': () => tokenUsage(s),
+  'ai:setTokenCap': ({ monthlyTokens }) => setTokenCap(s, monthlyTokens),
   'ai:chooseExecutable': async () => {
     // Only a dialog shown by main can name the program: the renderer never passes a path.
     const picked = await s.pickExecutable?.();

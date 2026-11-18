@@ -1,0 +1,18 @@
+.token-meter {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 72px;
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.token-meter .token-meter__bar {
+  height: 3px;
+}
+.token-meter[data-level='warn'] {
+  color: var(--warning, inherit);
+}
+.token-meter[data-level='over'] {
+  color: var(--danger, inherit);
+}

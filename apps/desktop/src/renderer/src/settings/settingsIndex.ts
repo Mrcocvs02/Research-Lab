@@ -41,6 +41,7 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   e('account', 'claude', 'account', ['ai:status']),
   e('secretAnthropic', 'claude', 'account', ['secret.anthropic-api-key']),
   e('usage', 'claude', 'account', ['ai:usage']),
+  e('tokenCap', 'claude', 'account', ['ai.tokenCap.monthlyTokens', 'ai:tokenUsage']),
   e('aiFolders', 'claude', 'reads', ['aiEnabledFolders']),
   e('defaultModel', 'claude', 'spend', ['ai.defaultModel']),
   e('defaultReasoning', 'claude', 'spend', ['ai.defaultReasoning']),

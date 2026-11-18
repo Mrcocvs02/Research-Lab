@@ -79,24 +79,41 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
     });
     expect(resources).toEqual([200, 200, 200]);
 
-    // Select text and highlight it in green with a comment.
+    // Choose the colour first (the dot of the bar), then select text with the Select tool and highlight it from the popover.
+    await window.getByTestId('ann-color').click();
+    await window.getByTestId('ann-color-green').click();
+    await expect(window.getByTestId('ann-color-green')).toHaveCount(0); // the popover closes after a choice
     const word = await selectLineWithWord(window, `${rowText} ${NOTE_WORD}`);
     test.skip(!word, 'page 1 has no word outside the title');
     await expect(window.getByTestId('annotation-bar')).toBeVisible({ timeout: 10_000 });
-    await window.getByTestId('ann-color-green').check({ force: true });
-    await window.getByTestId('ann-comment').fill('worth a second look');
     await window.getByTestId('ann-highlight').click();
     await expect(window.getByTestId('annotation-item')).toHaveCount(1);
-    await expect(window.getByTestId('annotation-mark').first()).toBeVisible();
-    await expect(window.getByTestId('reader-underlined')).toBeChecked();
+    const mark = window.getByTestId('annotation-mark').first();
+    await expect(mark).toBeVisible();
+    await expect(mark).toHaveAttribute('data-color', 'green');
+    // A click on the highlight opens its popover; the comment is added from there.
+    await mark.click({ force: true });
+    await window.getByTestId('ann-comment-open').click();
+    await window.getByTestId('ann-comment').fill('worth a second look');
+    await window.getByTestId('ann-comment').press('Enter');
+    await expect(window.getByTestId('annotation-item').getByText('worth a second look')).toBeVisible();
+    // The "underlined" flag is in the Info tab of the panel.
+    await window.getByTestId('reader-panel-info').click();
+    await expect(window.getByTestId('reader-underlined-origin')).toHaveAttribute('data-origin', 'annotations');
+    await window.getByTestId('reader-panel-annotations').click();
 
     // A note on the current page, and the study state.
+    await window.getByTestId('reader-panel-notes').click();
     await window.getByTestId('reader-tab-pageNote').click();
     await window.getByTestId('note-page-input').fill(`${NOTE_WORD} on the first page`);
     await window.getByTestId('note-page-save').click();
     await expect(window.getByTestId('note-page-state')).toHaveText('Saved');
-    await window.getByTestId('reader-study-reading').check({ force: true });
-    await expect(window.getByTestId('reader-study-reading')).toBeChecked();
+    await window.getByTestId('reader-study-menu').click();
+    await window.getByTestId('reader-study-reading').click();
+    await window.getByTestId('reader-study-menu').click();
+    await expect(window.getByTestId('reader-study-reading')).toHaveAttribute('aria-checked', 'true');
+    await expect(window.getByTestId('reader-pdf-status')).toHaveText("Only in the app"); // writing into the PDF is off
+    await window.keyboard.press('Escape');
 
     // Close the app, start it again on the same data.
     await ctx.app.close();
@@ -113,7 +130,10 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
     await openInReader(window, title);
     await expect(window.getByTestId('annotation-item')).toHaveCount(1, { timeout: 60_000 });
     await expect(window.getByTestId('annotation-mark').first()).toBeVisible({ timeout: 60_000 });
-    await expect(window.getByTestId('reader-study-reading')).toBeChecked();
+    await window.getByTestId('reader-study-menu').click();
+    await expect(window.getByTestId('reader-study-reading')).toHaveAttribute('aria-checked', 'true');
+    await window.keyboard.press('Escape');
+    await window.getByTestId('reader-panel-notes').click();
     await window.getByTestId('reader-tab-pageNote').click();
     await expect(window.getByTestId('note-page-input')).toHaveValue(`${NOTE_WORD} on the first page`);
     await window.getByTestId('reader-tab-notes').click();

@@ -49,7 +49,8 @@
     "STOPPED": "not tried: the sources before it kept failing",
     "PARTIAL": "more works than one check reads: check again to continue",
     "OWN_AUTHOR_UNKNOWN": "no OpenAlex author matches your profile: add your OpenAlex author id in Settings",
-    "OPENALEX_KEY_REQUIRED": "an OpenAlex API key is needed: add one in Settings"
+    "OPENALEX_KEY_REQUIRED": "an OpenAlex API key is needed: add one in Settings",
+    "AI_TOKEN_CAP_REACHED": "Request not run: the monthly token cap is reached."
   },
   "notices": {
     "settingsReset": "Your settings file could not be used ({{reason}}), so the app restarted with default settings. The damaged file was kept as \"{{backup}}\" in the app data folder; libraries must be added again.",
@@ -75,7 +76,8 @@
     "defaultModel": "Choose one of the models in the list.",
     "monthlyUsd": "Enter a positive amount or leave it empty for no cap.",
     "confirmBatchAboveUsd": "Enter an amount of zero or more.",
-    "citedDepth": "Enter a whole number from 0 to 3."
+    "citedDepth": "Enter a whole number from 0 to 3.",
+    "tokenCap": "Enter a positive whole number of tokens or leave it empty for no cap."
   },
   "sections": {
     "library": "Library",

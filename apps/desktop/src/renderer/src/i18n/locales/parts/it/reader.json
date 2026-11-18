@@ -87,6 +87,8 @@
       "samePage": "Seleziona il testo nella stessa pagina dell'annotazione.",
       "done_one": "{{count}} evidenziazione riposizionata dopo una correzione del lettore",
       "done_other": "{{count}} evidenziazioni riposizionate dopo una correzione del lettore",
+      "job_one": "Controllo delle evidenziazioni: {{count}} documento",
+      "job_other": "Controllo delle evidenziazioni: {{count}} documenti",
       "undo": "Annulla"
     }
   }

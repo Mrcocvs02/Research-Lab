@@ -19,10 +19,10 @@ import {
   type SearchResultPage,
   type TaxonomyFile,
 } from '@rl/core';
-import { createOrganizer, type Organizer, type OrganizerStore } from '@rl/data';
+import { createOrganizer, type Organizer, type OrganizerStore, type QuoteOutcome } from '@rl/data';
 import { enrichFromExtraction } from './enrich.js';
 import { buildIndexable, indexStamp, makeTaxonomyLookup, type TaxonomyLookup } from './indexable.js';
-import type { ExtractResult, IndexJob, LibraryWorker, RecordHost } from './worker-protocol.js';
+import type { ExtractResult, IndexJob, LibraryWorker, RecordHost, RepairArgs } from './worker-protocol.js';
 
 /** Where the machine-local, rebuildable files of a library live (never in the library folder). */
 export function localPaths(localDataDir: string, libraryId: string) {
@@ -370,6 +370,11 @@ export class LibraryRuntime {
    */
   extractFile(rootPath: string, file: string, hash: string, signal?: AbortSignal): Promise<ExtractResult> {
     return this.extractAt(rootPath, file, hash, signal ?? new AbortController().signal);
+  }
+
+  /** Recomputes the rectangles of the annotations of one library PDF from their quoted text, in the worker (the PDF is only read; D-373). */
+  repairAnnotations(args: RepairArgs, signal: AbortSignal): Promise<QuoteOutcome[]> {
+    return this.d.worker.repairAnnotations(args, { signal });
   }
 
   /** Extracts one file under the worker's watchdog; the result says what became of it (never throws, except on cancel). */

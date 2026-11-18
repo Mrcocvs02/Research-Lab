@@ -7,7 +7,7 @@ export interface Port {
   on(event: string, listener: (...args: any[]) => void): unknown;
 }
 
-type Method = 'openIndex' | 'resetIndex' | 'scan' | 'extract' | 'index' | 'remove' | 'dispose';
+type Method = 'openIndex' | 'resetIndex' | 'scan' | 'extract' | 'repairAnnotations' | 'index' | 'remove' | 'dispose';
 
 /** Worker side: answers the calls of `createWorkerClient` with `service`. */
 export function serveWorker(port: Port, service: LibraryWorker): void {
@@ -102,6 +102,7 @@ export function createWorkerClient(port: Port, onExit?: () => void): LibraryWork
     resetIndex: () => call('resetIndex', undefined),
     scan: (args, hooks) => call('scan', args, hooks),
     extract: (args, hooks) => call('extract', args, hooks),
+    repairAnnotations: (args, hooks) => call('repairAnnotations', args, hooks),
     index: (args) => call('index', args),
     remove: (ids) => call('remove', ids),
     dispose: () => call('dispose', undefined),

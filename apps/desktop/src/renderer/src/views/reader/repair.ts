@@ -147,6 +147,9 @@ const inputOf = (a: Annotation, over: Partial<AnnotationInput> = {}): Annotation
   ...over,
 });
 
+/** Undoing a repair restores the old rectangles AND clears `geom`: geom 2 is the gate for writing into the PDF. */
+export const undoInputOf = (old: Annotation): AnnotationInput => inputOf(old, { geom: null });
+
 /**
  * Runs the repair for every annotation without `geom` on the pages that are drawn, one at a time. Annotations that cannot
  * be placed (no text, text not found, ambiguous) are returned in `review`; `accept` and `reposition` settle them.
@@ -213,7 +216,8 @@ export function useRepair({ ready, loaded, annotations, layers, viewerRef, save,
         show(tr('reader.repair.done', { count: repaired }), {
           label: tr('reader.repair.undo'),
           run: () => {
-            for (const old of undo.current.splice(0)) void latest.current.save(inputOf(old));
+            // geom is cleared too: geom 2 is the gate for writing into the PDF, and the old rectangles are not trustworthy.
+            for (const old of undo.current.splice(0)) void latest.current.save(undoInputOf(old));
           },
         });
       }

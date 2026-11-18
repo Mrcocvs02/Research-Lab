@@ -9,6 +9,7 @@ import type { LibraryRuntime } from '../../library/library-runtime.js';
 import type { DomainHandlers } from '../types.js';
 
 import { listThumbs, nativeThumb, pruneThumbs, putThumb } from '../../thumbs.js';
+import { scheduleRepairJob } from '../../study/repair-job.js';
 import { openPdfHandle, presentPdf } from './doc-files.js';
 import type { MainServices } from './services.js';
 
@@ -152,6 +153,8 @@ type Underlined = { value: boolean; origin: 'annotations' | 'manual' };
 
 export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotations'> => {
   const queue = new KeyedQueue();
+  // Annotations saved while the page was stretched are measured again in the background (D-373), once per library.
+  scheduleRepairJob(s);
   /** The annotations of one document change one at a time, together with the flag that follows them. */
   const change = async <T>(docId: string, fn: (rt: LibraryRuntime) => Promise<{ value: T; changed: boolean; flagChanged: boolean; underlined: Underlined }>) => {
     const rt = await activeDocument(s, docId);
@@ -184,7 +187,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
         const file = await rt.store.annotations.update(docId as DocumentId, (current) => {
           const base = current ?? annotationFileSchema.parse({ docId });
           const list = [...base.annotations];
-          const { id, ...fields } = annotation;
+          const { id, geom, ...fields } = annotation;
           if (id !== undefined) {
             const i = list.findIndex((a) => a.id === id);
             const old = list[i];
@@ -197,10 +200,11 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
               rects: fields.rects,
               ...(fields.text !== undefined ? { text: fields.text } : {}),
               ...(fields.color !== undefined ? { color: fields.color } : {}),
-              ...(fields.geom !== undefined ? { geom: fields.geom } : {}),
+              ...(geom === 2 ? { geom } : {}),
               forHash: rec.hash,
               updatedAt: now,
             };
+            if (geom === null) delete saved.geom;
             if (fields.comment === undefined) delete saved.comment;
             else saved.comment = fields.comment;
             list[i] = saved;
@@ -208,7 +212,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
             if (list.length >= STUDY_LIMITS.annotationsPerDoc) {
               throw new AppError('INVALID_REQUEST', 'Too many annotations on this document', { reason: 'annotations-limit', limit: STUDY_LIMITS.annotationsPerDoc });
             }
-            saved = { ...fields, text: fields.text ?? '', color: fields.color ?? 'yellow', forHash: rec.hash, id: `a-${randomUUID().replace(/-/g, '').slice(0, 20)}`, createdAt: now, updatedAt: now } as Annotation;
+            saved = { ...fields, ...(geom === 2 ? { geom } : {}), text: fields.text ?? '', color: fields.color ?? 'yellow', forHash: rec.hash, id: `a-${randomUUID().replace(/-/g, '').slice(0, 20)}`, createdAt: now, updatedAt: now } as Annotation;
             list.push(saved);
           }
           // The file-level hash stays as first written; each annotation carries its own.

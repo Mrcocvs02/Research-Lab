@@ -1,3 +1,4 @@
+import type { QuoteOutcome, QuoteQuery } from '@rl/data';
 import type { DocumentRecord, ExtractedMeta, IndexableDocument, ScanOptions, ScanProgress, ScanResult } from '@rl/core';
 
 /**
@@ -29,6 +30,17 @@ export interface RecordHost {
    * (`null`: the record must not exist yet, `'any'`: no check). A `conflict` makes the caller re-read and retry.
    */
   commit(args: { id: string; expectedRevision: number | null | 'any'; record: DocumentRecord }): Promise<{ ok: true; record: DocumentRecord } | { ok: false; reason: 'conflict' }>;
+}
+
+/**
+ * Recomputes the rectangles of the annotations of ONE PDF from their quoted text, without drawing (D-373). One file per
+ * call, like `extract`: the PDF is only read; the caller writes the annotation store.
+ */
+export interface RepairArgs {
+  rootPath: string;
+  /** Relative to the library root. */
+  path: string;
+  queries: QuoteQuery[];
 }
 
 export interface ExtractItem {
@@ -99,6 +111,8 @@ export interface LibraryWorker {
   scan(args: ScanArgs, hooks?: WorkerHooks<ScanProgress>): Promise<ScanResult>;
   /** Extracts the text of one file into the cache. Never throws for a bad file: the failure is in the result. */
   extract(args: ExtractArgs, hooks?: WorkerHooks<ExtractProgress>): Promise<ExtractResult>;
+  /** One outcome per query, in order. Throws `AppError` for an unreadable file; one `ExtractProgress` event per page read. */
+  repairAnnotations(args: RepairArgs, hooks?: WorkerHooks<ExtractProgress>): Promise<QuoteOutcome[]>;
   index(args: { rootPath: string; cacheDir: string; jobs: IndexJob[] }): Promise<void>;
   remove(docIds: string[]): Promise<void>;
   dispose(): Promise<void>;
@@ -108,7 +122,7 @@ export interface LibraryWorker {
   alive?(): boolean;
 }
 
-type Op = 'openIndex' | 'resetIndex' | 'scan' | 'extract' | 'index' | 'remove' | 'dispose';
+type Op = 'openIndex' | 'resetIndex' | 'scan' | 'extract' | 'repairAnnotations' | 'index' | 'remove' | 'dispose';
 
 /** Messages over the thread boundary. */
 export type ToWorker =

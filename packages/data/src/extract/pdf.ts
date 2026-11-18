@@ -38,7 +38,7 @@ let pdfjsPromise: Promise<PdfjsModule> | undefined;
  * The "legacy" build of pdf.js runs in Node 22+ (and so in Electron's main process) without a worker thread:
  * pdf.js falls back to an in-process "fake worker". Loaded once, on first use.
  */
-function loadPdfjs(): Promise<PdfjsModule> {
+export function loadPdfjs(): Promise<PdfjsModule> {
   pdfjsPromise ??= import('pdfjs-dist/legacy/build/pdf.mjs').then((m) => m as unknown as PdfjsModule);
   return pdfjsPromise;
 }
@@ -83,7 +83,7 @@ const MAX_CONSECUTIVE_PAGE_FAILURES = 8;
 const MAX_PLAUSIBLE_PAGES = 1_000_000;
 
 /** Text extraction never draws: a canvas factory that refuses, so `@napi-rs/canvas` is never used for a document. */
-class NoCanvasFactory {
+export class NoCanvasFactory {
   create(): never {
     throw new Error('Canvas is disabled: text extraction does not render');
   }
@@ -91,6 +91,33 @@ class NoCanvasFactory {
     throw new Error('Canvas is disabled: text extraction does not render');
   }
   destroy(): void {}
+}
+
+/** `getDocument` parameters for reading text only: no scripting, images, canvas or wasm decoders. */
+export function textOnlyParams(data: Uint8Array): Record<string, unknown> {
+  return {
+    // pdf.js refuses Node Buffers (it may take ownership of the memory): hand it a plain Uint8Array view.
+    data: new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+    verbosity: 0,
+    isEvalSupported: false,
+    enableXfa: false,
+    useSystemFonts: false,
+    disableFontFace: true,
+    stopAtErrors: false,
+    useWorkerFetch: false,
+    // Text only: no scripting, no images, no canvas, no wasm image decoders, no streaming or range requests.
+    enableScripting: false,
+    isOffscreenCanvasSupported: false,
+    isImageDecoderSupported: false,
+    maxImageSize: 1,
+    canvasMaxAreaInBytes: 1,
+    useWasm: false,
+    CanvasFactory: NoCanvasFactory,
+    disableStream: true,
+    disableRange: true,
+    disableAutoFetch: true,
+    ...pdfAssets(),
+  };
 }
 
 /** Reads the text items of a page, stopping once `maxChars` of text have been seen. */
@@ -168,29 +195,7 @@ const fail = (reason: string, message: string, cause?: unknown) => new AppError(
 /** Extracts text per page and metadata. Throws `AppError('IO_ERROR', ..., { reason })` for malformed, encrypted or too slow files. */
 export async function extractPdf(data: Uint8Array, limits: PdfLimits, signal?: AbortSignal): Promise<PdfExtraction> {
   const pdfjs = await loadPdfjs();
-  const task = pdfjs.getDocument({
-    // pdf.js refuses Node Buffers (it may take ownership of the memory): hand it a plain Uint8Array view.
-    data: new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
-    verbosity: 0,
-    isEvalSupported: false,
-    enableXfa: false,
-    useSystemFonts: false,
-    disableFontFace: true,
-    stopAtErrors: false,
-    useWorkerFetch: false,
-    // Text only: no scripting, no images, no canvas, no wasm image decoders, no streaming or range requests.
-    enableScripting: false,
-    isOffscreenCanvasSupported: false,
-    isImageDecoderSupported: false,
-    maxImageSize: 1,
-    canvasMaxAreaInBytes: 1,
-    useWasm: false,
-    CanvasFactory: NoCanvasFactory,
-    disableStream: true,
-    disableRange: true,
-    disableAutoFetch: true,
-    ...pdfAssets(),
-  });
+  const task = pdfjs.getDocument(textOnlyParams(data));
   let timer: NodeJS.Timeout | undefined;
   let onAbort: (() => void) | undefined;
   const guard = new Promise<never>((_, reject) => {

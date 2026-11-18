@@ -350,6 +350,7 @@ describe('worker transport', () => {
         return {} as never;
       },
       extract: async (a) => ({ path: a.item.path, hash: a.item.hash, ok: true, cached: true }),
+      repairAnnotations: async () => [],
       index: async () => {},
       remove: async () => {},
       dispose: async () => {},

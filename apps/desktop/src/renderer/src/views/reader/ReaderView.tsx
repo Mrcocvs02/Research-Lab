@@ -16,6 +16,7 @@ import { safeText } from '../library/safeText';
 import { AnnotationBar, AnnotationLayers, AnnotationList } from './AnnotationParts';
 import { createViewer, ViewerError, type FindState, type SelectionPiece, type Viewer } from './engine';
 import { annotationAt, colorOf, type AnnotationColor } from './geometry';
+import { useRepair } from './repair';
 import { useAnnotations } from './useAnnotations';
 import { useReaderDoc } from './useReaderDoc';
 
@@ -39,7 +40,7 @@ interface Props {
  */
 export function ReaderView({ target, onClose }: Props) {
   const { t } = useTranslation();
-  const { reportError, fail } = useNotify();
+  const { reportError, fail, info: notifyInfo } = useNotify();
   const docId = target.docId;
   const ids = { page: useId(), find: useId() };
 
@@ -79,6 +80,8 @@ export function ReaderView({ target, onClose }: Props) {
 
   const { doc, setStudyState, setUnderlined, applyUnderlined } = useReaderDoc(docId, reportError);
   const ann = useAnnotations(docId, applyUnderlined, reportError);
+  const [repositionId, setRepositionId] = useState<string | null>(null);
+  const repair = useRepair({ ready, loaded: ann.loaded, annotations: ann.annotations, layers, viewerRef, save: ann.save, info: notifyInfo, docId });
   const selected = ann.annotations.find((a) => a.id === selectedId) ?? null;
   const annotationsRef = useRef<readonly Annotation[]>([]);
   annotationsRef.current = ann.annotations;
@@ -227,7 +230,7 @@ export function ReaderView({ target, onClose }: Props) {
       const note = comment.trim();
       for (const [i, piece] of pieces.entries()) {
         const text = piece.text.slice(0, STUDY_LIMITS.annotationText);
-        const saved = await ann.save({ kind, page: piece.page, rects: piece.rects, text, color, ...(note ? { comment: note } : {}) });
+        const saved = await ann.save({ kind, page: piece.page, rects: piece.rects, text, color, geom: 2, ...(note ? { comment: note } : {}) });
         if (!saved) {
           // `ann.save` already showed why; say where it stopped.
           fail(t('reader.createStopped', { page: piece.page }));
@@ -239,6 +242,16 @@ export function ReaderView({ target, onClose }: Props) {
       if (keepBar) closeBar();
     } finally {
       setBusy(false);
+    }
+  };
+  /** "Riposiziona": the text selected again replaces the rectangles of the annotation under review (same page). */
+  const applyReposition = async () => {
+    const target = ann.annotations.find((a) => a.id === repositionId);
+    const piece = pending?.find((p) => p.page === target?.page);
+    if (!target || !piece) return fail(t('reader.repair.samePage'));
+    if (await repair.reposition(target, piece.rects, piece.text.slice(0, STUDY_LIMITS.annotationText))) {
+      setRepositionId(null);
+      closeBar();
     }
   };
   const create = (kind: 'highlight' | 'underline') => (pending ? createFrom(kind, pending, true) : Promise.resolve());
@@ -506,6 +519,7 @@ export function ReaderView({ target, onClose }: Props) {
                   onColor={setColor}
                   onComment={setComment}
                   onCreate={(k) => void create(k)}
+                  onReposition={repositionId ? () => void applyReposition() : undefined}
                   onClose={closeBar}
                 />
               ) : (
@@ -541,7 +555,19 @@ export function ReaderView({ target, onClose }: Props) {
               ))}
             </div>
             <div role="tabpanel" id={`reader-tabpanel-${tab}`} aria-labelledby={`reader-tab-${tab}`} className="reader-tabpanel">
-              {tab === 'annotations' && <AnnotationList annotations={ann.annotations} selectedId={selectedId} staleIds={ann.staleIds} onPick={pick} />}
+              {tab === 'annotations' && <AnnotationList
+                  annotations={ann.annotations}
+                  selectedId={selectedId}
+                  staleIds={ann.staleIds}
+                  onPick={pick}
+                  review={repair.review}
+                  repositioning={repositionId}
+                  onReposition={(a) => {
+                    setRepositionId(a.id);
+                    pick(a);
+                  }}
+                  onAccept={(a) => void repair.accept(a)}
+                />}
               {tab === 'pageNote' && <NoteEditor key={`page-${page}`} docId={docId} page={page} testId="note-page" />}
               {tab === 'fileNote' && <NoteEditor key="file" docId={docId} testId="note-file" />}
               {tab === 'notes' && (

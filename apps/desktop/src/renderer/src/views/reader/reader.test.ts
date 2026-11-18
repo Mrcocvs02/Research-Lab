@@ -34,6 +34,7 @@ const fake = vi.hoisted(() => {
     readSelection: vi.fn((): any => ({ pieces: [], skipped: 0 })),
     readFindMatch: vi.fn((): any => ({ pieces: [], skipped: 0 })),
     pointAt: vi.fn((): any => null),
+    locateText: vi.fn(async (): Promise<any> => ({ status: 'none' })),
     destroy: vi.fn(),
   };
   const createViewer = vi.fn(async (_c: unknown, _v: unknown, handlers: unknown) => {
@@ -258,7 +259,7 @@ describe('ReaderView: annotations', () => {
     await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(1));
     expect(callsTo('annotations:save')[0]).toEqual({
       docId: DOC,
-      annotation: { kind: 'highlight', page: 2, rects: SEL[0]!.rects, text: 'selected words', color: 'green', comment: 'check this' },
+      annotation: { kind: 'highlight', page: 2, rects: SEL[0]!.rects, text: 'selected words', color: 'green', geom: 2, comment: 'check this' },
     });
     await waitFor(() => expect(layer.querySelectorAll('[data-testid="annotation-mark"]')).toHaveLength(1));
     const mark = layer.querySelector<HTMLElement>('[data-testid="annotation-mark"]')!;
@@ -449,7 +450,7 @@ describe('ReaderView: annotations', () => {
       await openFindWithMatch();
       fireEvent.click(screen.getByTestId('reader-find-highlight'));
       await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(1));
-      expect(callsTo('annotations:save')[0]).toEqual({ docId: DOC, annotation: { kind: 'highlight', page: 3, rects: MATCH.pieces[0]!.rects, text: 'the match', color: 'yellow' } });
+      expect(callsTo('annotations:save')[0]).toEqual({ docId: DOC, annotation: { kind: 'highlight', page: 3, rects: MATCH.pieces[0]!.rects, text: 'the match', color: 'yellow', geom: 2 } });
       fireEvent.click(screen.getByTestId('reader-find-underline'));
       await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(2));
       expect(callsTo('annotations:save')[1].annotation.kind).toBe('underline');

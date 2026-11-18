@@ -73,6 +73,8 @@ interface NewProps {
   onColor(c: AnnotationColor): void;
   onComment(v: string): void;
   onCreate(kind: 'highlight' | 'underline'): void;
+  /** Set while an annotation under review waits for its text to be selected again: offers to move it to this selection. */
+  onReposition?: () => void;
   onClose(): void;
 }
 interface EditProps {
@@ -130,6 +132,11 @@ export function AnnotationBar(props: NewProps | EditProps) {
             <button type="button" className="primary" disabled={props.busy} onClick={() => props.onCreate('underline')} data-testid="ann-underline">
               {t('reader.kind.underline')}
             </button>
+            {props.onReposition && (
+              <button type="button" disabled={props.busy} onClick={props.onReposition} data-testid="ann-reposition-apply">
+                {t('reader.repair.apply')}
+              </button>
+            )}
           </>
         ) : (
           <div className="radio-row" role="radiogroup" aria-label={t('reader.ann.kind')}>
@@ -183,7 +190,26 @@ export function AnnotationBar(props: NewProps | EditProps) {
 }
 
 /** The annotations of the document by page; each entry takes the reader to it. */
-export function AnnotationList({ annotations, selectedId, staleIds, onPick }: { annotations: readonly Annotation[]; selectedId: string | null; staleIds: ReadonlySet<string>; onPick(a: Annotation): void }) {
+export function AnnotationList({
+  annotations,
+  selectedId,
+  staleIds,
+  onPick,
+  review,
+  repositioning,
+  onReposition,
+  onAccept,
+}: {
+  annotations: readonly Annotation[];
+  selectedId: string | null;
+  staleIds: ReadonlySet<string>;
+  onPick(a: Annotation): void;
+  /** Annotations the repair could not place ("Da controllare"). */
+  review?: ReadonlySet<string>;
+  repositioning?: string | null;
+  onReposition?(a: Annotation): void;
+  onAccept?(a: Annotation): void;
+}) {
   const { t } = useTranslation();
   const pages = useMemo(() => {
     const m = new Map<number, Annotation[]>();
@@ -197,8 +223,36 @@ export function AnnotationList({ annotations, selectedId, staleIds, onPick }: { 
       </p>
     );
   }
+  const toCheck = annotations.filter((a) => review?.has(a.id));
   return (
     <div className="ann-list" data-testid="annotation-list">
+      {toCheck.length > 0 && (
+        <section aria-label={t('reader.repair.heading')} className="ann-review" data-testid="annotation-review">
+          <h4>{t('reader.repair.heading')}</h4>
+          <p className="hint">{t('reader.repair.hint')}</p>
+          <ul>
+            {toCheck.map((a) => (
+              <li key={a.id} data-testid="annotation-review-item" data-annotation-id={a.id}>
+                <button type="button" className={`ann-item${a.id === selectedId ? ' on' : ''}`} onClick={() => onPick(a)} aria-label={t('reader.ann.jump', { kind: t(`reader.kind.${a.kind}`), page: a.page })}>
+                  <span className={`ann-dot ann-${colorOf(a.color)}`} aria-hidden="true" />
+                  <span className="ann-item-body">
+                    <span className="ann-item-text">{safeText(excerpt(a.text, 100)) || t(`reader.kind.${a.kind}`)}</span>
+                    <span className="hint">{t('reader.ann.pageHeading', { page: a.page })}</span>
+                  </span>
+                </button>
+                <div className="ann-review-actions">
+                  <button type="button" className={repositioning === a.id ? 'toggle on' : 'toggle'} aria-pressed={repositioning === a.id} onClick={() => onReposition?.(a)} data-testid="ann-reposition">
+                    {t('reader.repair.reposition')}
+                  </button>
+                  <button type="button" onClick={() => onAccept?.(a)} data-testid="ann-accept">
+                    {t('reader.repair.accept')}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {pages.map(([page, items]) => (
         <section key={page} aria-label={t('reader.ann.pageHeading', { page })}>
           <h4>{t('reader.ann.pageHeading', { page })}</h4>

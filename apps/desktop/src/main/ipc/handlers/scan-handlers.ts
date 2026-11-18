@@ -7,6 +7,8 @@ import type { MainServices } from './services.js';
 export const scanHandlers = (s: MainServices): DomainHandlers<'scan'> => ({
   'scan:start': async ({ libraryId, full }) => (await s.runtime.require(libraryId, { retry: true })).startScan({ full }),
   'scan:cancel': async ({ libraryId }) => (await s.runtime.require(libraryId)).cancel(),
+  // TODO(B1): the report of the last scan (`<localData>/scan/<libraryId>-report.json`, written by library-runtime); until then no scan has a report.
+  'scan:report': async () => ({ finishedAt: null, summary: null, firstScan: false, added: [], changed: [], moved: [], missing: [], failed: [], truncated: false }),
   'scan:status': async ({ libraryId }) => {
     await s.runtime.sync();
     const status = s.runtime.status();

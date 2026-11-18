@@ -14,8 +14,20 @@ import type { MainServices } from './services.js';
 
 export { abortAllChatTurns };
 
+/** TODO(B1): contract stubs of the Claude account channels (§10.3-§10.4, D-431); B1 replaces them with `main/ai/account.ts` and `usage-all.ts`. */
+const notYet = (channel: string) => (): never => {
+  throw new AppError('NOT_IMPLEMENTED', `${channel} is not implemented yet`);
+};
+
 export const aiHandlers = (s: MainServices): DomainHandlers<'ai'> => ({
   'ai:status': () => computeStatus(s),
+  'ai:account': notYet('ai:account'),
+  'ai:setAuthMode': notYet('ai:setAuthMode'),
+  'ai:login': notYet('ai:login'),
+  'ai:loginDone': notYet('ai:loginDone'),
+  'ai:logout': notYet('ai:logout'),
+  'ai:test': notYet('ai:test'),
+  'ai:usageAll': notYet('ai:usageAll'),
   'ai:chooseExecutable': async () => {
     // Only a dialog shown by main can name the program: the renderer never passes a path.
     const picked = await s.pickExecutable?.();

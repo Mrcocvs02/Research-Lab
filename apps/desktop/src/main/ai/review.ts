@@ -288,12 +288,15 @@ export async function reviewStats(rt: LibraryRuntime) {
   const pending = Object.fromEntries(REVIEW_FIELDS.map((f) => [f, 0])) as Record<ReviewField, number>;
   const tags = { proposed: 0, accepted: 0 };
   const newTags = { proposed: 0, accepted: 0 };
+  let pendingDocs = 0;
   for (const rec of await rt.store.documents.list()) {
+    let hasProposal = false;
     for (const field of REVIEW_FIELDS) {
       const f = fieldOf(rec, REVIEW_KEY[field]);
       if (!f) continue;
       if (f.review.status === 'proposed') {
         pending[field]++;
+        hasProposal = true;
         continue;
       }
       if (field !== 'tags' && field !== 'newTags') continue;
@@ -304,6 +307,7 @@ export async function reviewStats(rt: LibraryRuntime) {
       if (field === 'tags') target.accepted += (f.value as string[]).filter((t) => proposal.includes(t)).length;
       else target.accepted += (f.value as unknown[]).length;
     }
+    if (hasProposal) pendingDocs++;
   }
-  return { pending, tags: { ...tags, rate: tags.proposed > 0 ? tags.accepted / tags.proposed : null }, newTags };
+  return { pending, pendingDocs, tags: { ...tags, rate: tags.proposed > 0 ? tags.accepted / tags.proposed : null }, newTags };
 }

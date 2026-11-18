@@ -6,6 +6,7 @@ import { formatTokens, formatUsd } from './format';
 import type { AiPreview } from './useChat';
 import { useDocTitle } from './useLabels';
 import './chat.css';
+import './dialogs.css';
 
 function DocLine({ docId, reason, label }: { docId: string; reason?: AiPreview['refused'][number]['reason']; label?: string | undefined }) {
   const { t } = useTranslation();
@@ -24,7 +25,7 @@ export function PreviewDialog({ preview, models, onConfirm, onCancel, busy, labe
   const model = models.find((m) => m.id === preview.model)?.label ?? preview.model;
   return (
     <Dialog title={title ?? t('chat.preview.title')} onClose={onCancel} testId="send-preview">
-      <div className="dialog-body">
+      <div className="dlg-scroll">
         <p data-testid="preview-intro">{agent && preview.allowed.length === 0 ? t('chat.preview.introAgent', { model }) : t('chat.preview.intro', { model })}</p>
         {!(agent && preview.allowed.length === 0) && <h3>{t('chat.preview.allowed', { count: preview.allowed.length })}</h3>}
         {preview.allowed.length === 0 ? (
@@ -57,7 +58,7 @@ export function PreviewDialog({ preview, models, onConfirm, onCancel, busy, labe
         </p>
         <p className="hint">{t('chat.preview.note')}</p>
       </div>
-      <div className="actions">
+      <div className="actions dlg-foot">
         <button type="button" onClick={onCancel} data-testid="preview-cancel">
           {t('common.cancel')}
         </button>

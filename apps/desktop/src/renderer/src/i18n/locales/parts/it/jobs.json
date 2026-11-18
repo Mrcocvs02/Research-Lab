@@ -31,6 +31,8 @@
       "nothing": "Con queste scelte non c’è nulla da inviare.",
       "note": "Di ogni documento viene inviato solo un estratto (dati e prime pagine) e ogni invio compare nel registro dell’AI.",
       "confirm": "Avvia"
-    }
+    },
+    "noFolders": "Claude non può leggere nessuna cartella: abilita prima almeno una cartella per l'AI.",
+    "enableFolders": "Abilita le cartelle"
   }
 }

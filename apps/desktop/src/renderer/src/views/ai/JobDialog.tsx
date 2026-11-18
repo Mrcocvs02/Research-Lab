@@ -3,11 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { AI_LIMITS, type AiJobField, type Channels, type ReasoningLevel, type ResponseOf } from '@rl/core';
 import { Dialog } from '../../components/Dialog';
 import { CheckField, ErrorNote } from '../../components/ui';
+import { useAiUi } from '../../lib/aiUi';
 import { useJobs } from '../../lib/jobs';
 import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
 import { useApp } from '../../state/app-context';
 import { formatTokens, formatUsd } from '../chat/format';
+import '../chat/dialogs.css';
 import { safeText } from '../library/safeText';
 import { aiErrorText } from './aiErrors';
 import { useAiAvailability } from './useAiAvailability';
@@ -26,6 +28,7 @@ export function JobDialog({ docIds, onClose }: { docIds: string[]; onClose(): vo
   const { config } = useApp();
   const { refresh } = useJobs();
   const { info } = useNotify();
+  const { goTo } = useAiUi();
   const ids = { model: useId(), reasoning: useId() };
   const models = config?.ai.models ?? [];
   const [fields, setFields] = useState<AiJobField[]>(['tags', 'description']);
@@ -39,8 +42,16 @@ export function JobDialog({ docIds, onClose }: { docIds: string[]; onClose(): vo
   const [starting, setStarting] = useState(false);
   const ticket = useRef(0);
   // The estimate needs no network, but the job does: say it at once instead of after the confirmation.
-  const { reason: unavailable } = useAiAvailability();
+  const { loading, reason: unavailable } = useAiAvailability();
   const blocked = unavailable !== null && unavailable !== 'no-folders';
+  // Without an enabled folder nothing could be sent (D-339): the dialog does not open, a notice leads to the settings.
+  const noFolders = unavailable === 'no-folders';
+  useEffect(() => {
+    if (!noFolders) return;
+    info(t('jobs.noFolders'), { label: t('jobs.enableFolders'), run: () => goTo('settings', { focus: 'aiFolders' }) });
+    onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noFolders]);
 
   const tooMany = docIds.length > AI_LIMITS.jobDocs;
   const request = useMemo(() => ({ kind: 'suggest' as const, docIds, fields, model, reasoning, regenerate }), [docIds, fields, model, reasoning, regenerate]);
@@ -74,9 +85,10 @@ export function JobDialog({ docIds, onClose }: { docIds: string[]; onClose(): vo
     }
   };
 
+  if (loading || noFolders) return null;
   return (
     <Dialog title={t('jobs.dialog.title')} onClose={onClose} testId="job-dialog">
-      <div className="dialog-body">
+      <div className="dlg-scroll">
         <p>{t('jobs.dialog.intro', { count: docIds.length })}</p>
         <fieldset className="group">
           <legend>{t('jobs.dialog.fields')}</legend>
@@ -148,7 +160,7 @@ export function JobDialog({ docIds, onClose }: { docIds: string[]; onClose(): vo
         </section>
         <p className="hint">{t('jobs.dialog.note')}</p>
       </div>
-      <div className="actions">
+      <div className="actions dlg-foot">
         <button type="button" onClick={onClose} data-testid="job-cancel-dialog">
           {t('common.cancel')}
         </button>

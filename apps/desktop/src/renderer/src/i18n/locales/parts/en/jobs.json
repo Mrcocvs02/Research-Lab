@@ -31,6 +31,8 @@
       "nothing": "Nothing to send with these choices.",
       "note": "Only an excerpt of each document (details and first pages) is sent, and every send is listed in the AI log.",
       "confirm": "Start"
-    }
+    },
+    "noFolders": "Claude cannot read any folder yet: enable at least one folder for AI first.",
+    "enableFolders": "Enable folders"
   }
 }

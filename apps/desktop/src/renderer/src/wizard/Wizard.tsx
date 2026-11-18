@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DEFAULT_DATA_DIR_NAME, dataDirNameSchema, userProfileSchema, type ImportJobStatus, type Language } from '@rl/core';
-import { CheckField, ErrorNote, LanguageSelect, ProgressBar, TextAreaField, TextField } from '../components/ui';
+import { DEFAULT_DATA_DIR_NAME, dataDirNameSchema, userProfileSchema, type ImportJobStatus, type Language, type ScanStatus } from '@rl/core';
+import { Button } from '../components/Button';
+import { Switch } from '../components/Switch';
+import { CheckField, ErrorNote, LanguageSelect, ProgressBar, TextField } from '../components/ui';
 import { FolderTree, type FolderEntry } from '../components/FolderTree';
 import { flushAll } from '../lib/dirtyEditors';
 import { errorMessage } from '../lib/errors';
 import { rl } from '../lib/rl';
-import { splitLines, validateWith, validationKey } from '../lib/validate';
+import { validateWith, validationKey } from '../lib/validate';
 import { useApp } from '../state/app-context';
 import './wizard.css';
 
-type StepId = 'language' | 'profile' | 'folder' | 'details' | 'legacy' | 'taxonomy' | 'aiFolders' | 'summary';
+type StepId = 'language' | 'folder' | 'details' | 'legacy' | 'taxonomy' | 'aiFolders' | 'summary';
 type Taxonomy = 'empty' | 'file' | 'claude';
-type Phase = 'form' | 'creating' | 'importing';
+type Phase = 'form' | 'creating' | 'importing' | 'scanning';
 
 interface Picked {
   path: string;
@@ -43,7 +45,7 @@ export function Wizard({ onFinished, onCancel }: Props) {
 
   // Step data
   const [uiLanguage, setUiLanguage] = useState<Language>(app.settings?.uiLanguage ?? 'it');
-  const [profile, setProfile] = useState({ name: '', variants: '', email: '', orcid: '', openAlexId: '' });
+  const [userName, setUserName] = useState('');
   const [root, setRoot] = useState<Picked | null>(null);
   const [libName, setLibName] = useState('');
   const [docLanguage, setDocLanguage] = useState<Language>(app.settings?.uiLanguage ?? 'it');
@@ -53,7 +55,10 @@ export function Wizard({ onFinished, onCancel }: Props) {
   const [taxonomy, setTaxonomy] = useState<Taxonomy>('empty');
   const [taxonomyFile, setTaxonomyFile] = useState<Picked | null>(null);
   const [aiFolders, setAiFolders] = useState<string[]>([]);
-  const [aiConfirmed, setAiConfirmed] = useState(false);
+  // D-348: completing the wizard with the switch on is the library's consent to write highlights into the PDFs. The build does not write
+  // into PDFs yet (PDF_WRITE_ENABLED is false), so the choice is only kept here: `library:create` has no field for it until the writer lands.
+  const [writeToPdf, setWriteToPdf] = useState(true);
+  const [scan, setScan] = useState<ScanStatus | null>(null);
 
   // Import progress
   const [createdId, setCreatedId] = useState<string | null>(null);
@@ -63,7 +68,7 @@ export function Wizard({ onFinished, onCancel }: Props) {
 
   const steps = useMemo<StepId[]>(() => {
     const s: StepId[] = [];
-    if (includeUserSteps) s.push('language', 'profile');
+    if (includeUserSteps) s.push('language');
     s.push('folder', 'details');
     if (legacy?.found) s.push('legacy');
     s.push('taxonomy', 'aiFolders', 'summary');
@@ -77,38 +82,33 @@ export function Wizard({ onFinished, onCancel }: Props) {
   }, [step, phase]);
 
   useEffect(() => rl.on('import:progress', (s) => setStatuses((prev) => ({ ...prev, [s.jobId]: s }))), []);
+  useEffect(() => {
+    if (phase !== 'scanning' || !createdId) return;
+    return rl.on('scan:progress', (s) => {
+      if (s.libraryId === createdId) setScan(s);
+    });
+  }, [phase, createdId]);
 
-  const profileValue = useMemo(
-    () => ({
-      name: profile.name,
-      authorVariants: splitLines(profile.variants),
-      email: profile.email.trim(),
-      orcid: profile.orcid.trim(),
-      openAlexId: profile.openAlexId.trim(),
-    }),
-    [profile],
-  );
+  const profileValue = useMemo(() => ({ name: userName, authorVariants: [] as string[], email: '', orcid: '', openAlexId: '' }), [userName]);
   const profileCheck = useMemo(() => validateWith(userProfileSchema, profileValue), [profileValue]);
   const dirCheck = useMemo(() => validateWith(dataDirNameSchema, dataDirName.trim()), [dataDirName]);
   const nameValid = libName.trim().length > 0 && libName.trim().length <= 120;
-  const fieldError = (errors: Record<string, string>, key: string) => (errors[key] ? t(validationKey(key)) : undefined);
+  const nameError = profileCheck.errors['name'] ? t(validationKey('name')) : undefined;
 
   const canNext = (() => {
     switch (step) {
       case 'language':
         return true;
-      case 'profile':
-        return profileCheck.data !== null;
       case 'folder':
-        return root !== null;
+        return root !== null && dirCheck.data !== null;
       case 'details':
-        return nameValid && dirCheck.data !== null;
+        return nameValid && dirCheck.data !== null && (!includeUserSteps || profileCheck.data !== null);
       case 'legacy':
         return true;
       case 'taxonomy':
         return taxonomy !== 'claude' && (taxonomy !== 'file' || taxonomyFile !== null);
       case 'aiFolders':
-        return aiConfirmed;
+        return true;
       case 'summary':
         return false;
     }
@@ -131,7 +131,6 @@ export function Wizard({ onFinished, onCancel }: Props) {
       setRoot(picked);
       setLibName((cur) => (cur.trim() ? cur : picked.name));
       setAiFolders([]);
-      setAiConfirmed(false);
       setImportLegacy(false);
       const probe = await rl.invoke('import:probeLegacy', { rootPath: picked.path }).catch(() => null);
       setLegacy(probe);
@@ -198,7 +197,10 @@ export function Wizard({ onFinished, onCancel }: Props) {
       if (importLegacy && legacy?.found) {
         await startImport(profileRecord.id, root.path);
       } else {
-        onFinished(profileRecord.id);
+        // The last step (4.9): the first scan runs here and is seen, not waited for.
+        setScan(null);
+        setPhase('scanning');
+        void rl.invoke('scan:start', {}).then((st) => setScan((cur) => cur ?? st), () => {});
       }
     } catch (e) {
       setError(e);
@@ -250,6 +252,14 @@ export function Wizard({ onFinished, onCancel }: Props) {
     );
   }
 
+  if (phase === 'scanning') {
+    return (
+      <WizardFrame title={t('wizard.steps.scan')} headingRef={headingRef} progress={{ current: steps.length + 1, total: steps.length + 1 }}>
+        <FirstScan status={scan} onOpen={() => createdId && onFinished(createdId)} />
+      </WizardFrame>
+    );
+  }
+
   const isLast = step === 'summary';
   const back = () => setStepIndex((i) => Math.max(0, i - 1));
   const next = () => setStepIndex((i) => Math.min(steps.length - 1, i + 1));
@@ -258,21 +268,39 @@ export function Wizard({ onFinished, onCancel }: Props) {
     <WizardFrame
       title={t(`wizard.steps.${step}`)}
       headingRef={headingRef}
-      progress={{ current: stepIndex + 1, total: steps.length }}
-      onCancel={onCancel}
+      progress={{ current: stepIndex + 1, total: steps.length + 1 }}
       footer={
-        <div className="actions">
-          <button type="button" onClick={back} disabled={stepIndex === 0 || phase === 'creating'} data-testid="wizard-back">
+        <div className="wizard-foot">
+          {onCancel && (
+            <Button variant="ghost" onClick={onCancel} disabled={phase === 'creating'} data-testid="wizard-cancel">
+              {t('wizard.cancel')}
+            </Button>
+          )}
+          <span className="wizard-foot__spacer" />
+          {step === 'taxonomy' && !importLegacy && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setTaxonomy('empty');
+                setTaxonomyFile(null);
+                next();
+              }}
+              data-testid="wizard-skip"
+            >
+              {t('wizard.skip')}
+            </Button>
+          )}
+          <Button onClick={back} disabled={stepIndex === 0 || phase === 'creating'} data-testid="wizard-back">
             {t('wizard.back')}
-          </button>
+          </Button>
           {isLast ? (
-            <button type="button" className="primary" onClick={() => void create()} disabled={phase === 'creating'} data-testid="wizard-create">
+            <Button variant="primary" onClick={() => void create()} disabled={phase === 'creating'} busy={phase === 'creating'} data-testid="wizard-create">
               {phase === 'creating' ? t('wizard.creating') : t('wizard.create')}
-            </button>
+            </Button>
           ) : (
-            <button type="button" className="primary" onClick={next} disabled={!canNext} data-testid="wizard-next">
+            <Button variant="primary" onClick={next} disabled={!canNext} data-testid="wizard-next">
               {t('wizard.next')}
-            </button>
+            </Button>
           )}
         </div>
       }
@@ -284,41 +312,32 @@ export function Wizard({ onFinished, onCancel }: Props) {
         </>
       )}
 
-      {step === 'profile' && (
-        <>
-          <p>{t('wizard.profile.intro')}</p>
-          <TextField label={t('profile.name')} placeholder={t('profile.namePlaceholder')} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} data-testid="wizard-profile-name" />
-          <TextAreaField
-            label={t('profile.variants')}
-            hint={t('profile.variantsHint')}
-            placeholder={t('profile.variantsPlaceholder')}
-            rows={3}
-            value={profile.variants}
-            onChange={(e) => setProfile({ ...profile, variants: e.target.value })}
-            data-testid="wizard-profile-variants"
-          />
-          <TextField label={t('profile.email')} type="email" placeholder="name@example.org" value={profile.email} error={fieldError(profileCheck.errors, 'email')} onChange={(e) => setProfile({ ...profile, email: e.target.value })} />
-          <TextField label={t('profile.orcid')} placeholder="0000-0000-0000-0000" value={profile.orcid} error={fieldError(profileCheck.errors, 'orcid')} onChange={(e) => setProfile({ ...profile, orcid: e.target.value })} />
-          <TextField label={t('profile.openAlexId')} placeholder="A1234567890" value={profile.openAlexId} error={fieldError(profileCheck.errors, 'openAlexId')} onChange={(e) => setProfile({ ...profile, openAlexId: e.target.value })} />
-          <p className="hint">{t('wizard.profile.optional')}</p>
-        </>
-      )}
-
       {step === 'folder' && (
         <>
           <p>{t('wizard.folder.intro')}</p>
-          <div className="actions start">
-            <button type="button" className="primary" onClick={() => void chooseRoot()} data-testid="wizard-choose-folder">
+          <div className="wizard-folder">
+            {root ? (
+              <p className="chosen" data-testid="wizard-folder-chosen" title={root.path}>
+                <strong>{root.name}</strong>
+                <span className="path">{abbreviatePath(root.path)}</span>
+              </p>
+            ) : null}
+            <Button variant={root ? 'secondary' : 'primary'} onClick={() => void chooseRoot()} data-testid="wizard-choose-folder">
               {root ? t('wizard.folder.change') : t('wizard.folder.choose')}
-            </button>
+            </Button>
           </div>
-          {root && (
-            <p className="chosen" data-testid="wizard-folder-chosen">
-              <strong>{root.name}</strong>
-              <span className="path">{root.path}</span>
-            </p>
-          )}
           <p className="hint">{t('wizard.folder.safe')}</p>
+          <details className="wizard-advanced" data-testid="wizard-advanced">
+            <summary>{t('wizard.folder.advanced')}</summary>
+            <TextField
+              label={t('library.dataDirName')}
+              hint={t('library.dataDirNameHint')}
+              value={dataDirName}
+              error={dirCheck.data === null ? t('validation.dataDirName') : undefined}
+              onChange={(e) => setDataDirName(e.target.value)}
+              data-testid="wizard-data-dir"
+            />
+          </details>
         </>
       )}
 
@@ -326,14 +345,7 @@ export function Wizard({ onFinished, onCancel }: Props) {
         <>
           <TextField label={t('library.name')} value={libName} maxLength={120} onChange={(e) => setLibName(e.target.value)} data-testid="wizard-lib-name" />
           <LanguageSelect label={t('library.language')} hint={t('library.languageHint')} value={docLanguage} onChange={setDocLanguage} testId="wizard-doc-language" />
-          <TextField
-            label={t('library.dataDirName')}
-            hint={t('library.dataDirNameHint')}
-            value={dataDirName}
-            error={dirCheck.data === null ? t('validation.dataDirName') : undefined}
-            onChange={(e) => setDataDirName(e.target.value)}
-            data-testid="wizard-data-dir"
-          />
+          {includeUserSteps && <TextField label={t('wizard.details.yourName')} hint={t('wizard.details.yourNameHint')} placeholder={t('profile.namePlaceholder')} value={userName} error={nameError} onChange={(e) => setUserName(e.target.value)} data-testid="wizard-profile-name" />}
         </>
       )}
 
@@ -382,15 +394,11 @@ export function Wizard({ onFinished, onCancel }: Props) {
       {step === 'aiFolders' && (
         <>
           <p>{t('wizard.ai.intro')}</p>
-          <p className="callout">{t('wizard.ai.why')}</p>
-          <FolderTree load={loadFolders} value={aiFolders} onChange={(v) => { setAiFolders(v); setAiConfirmed(false); }} ariaLabel={t('wizard.ai.treeLabel')} testId="wizard-ai-tree" />
-          <p className="hint">{aiFolders.length === 0 ? t('wizard.ai.noneSelected') : t('wizard.ai.selected', { count: aiFolders.length })}</p>
-          <CheckField
-            label={aiFolders.length === 0 ? t('wizard.ai.confirmNone') : t('wizard.ai.confirmSome', { count: aiFolders.length })}
-            checked={aiConfirmed}
-            onChange={(e) => setAiConfirmed(e.target.checked)}
-            data-testid="wizard-ai-confirm"
-          />
+          <FolderTree load={loadFolders} value={aiFolders} onChange={setAiFolders} ariaLabel={t('wizard.ai.treeLabel')} testId="wizard-ai-tree" />
+          <p className="hint" data-testid="wizard-ai-note">
+            {aiFolders.length === 0 ? t('wizard.ai.noneSelected') : t('wizard.ai.selected', { count: aiFolders.length })}
+          </p>
+          <p className="hint">{t('wizard.ai.why')}</p>
         </>
       )}
 
@@ -404,8 +412,6 @@ export function Wizard({ onFinished, onCancel }: Props) {
             <dd className="path">{root?.path}</dd>
             <dt>{t('library.language')}</dt>
             <dd>{t(`languages.${docLanguage}`)}</dd>
-            <dt>{t('library.dataDirName')}</dt>
-            <dd>{dataDirName.trim()}</dd>
             <dt>{t('wizard.summary.import')}</dt>
             <dd>{importLegacy ? t('wizard.summary.importYes', { count: legacy?.documents ?? 0 }) : t('common.no')}</dd>
             <dt>{t('wizard.summary.taxonomy')}</dt>
@@ -413,6 +419,13 @@ export function Wizard({ onFinished, onCancel }: Props) {
             <dt>{t('wizard.summary.ai')}</dt>
             <dd>{aiFolders.length === 0 ? t('wizard.summary.aiNone') : aiFolders.join(', ')}</dd>
           </dl>
+          <div className="wizard-consent" data-testid="wizard-consent">
+            <Switch checked={writeToPdf} onChange={setWriteToPdf} label={t('wizard.summary.writeToPdf')} data-testid="wizard-write-to-pdf" />
+            <p className="hint">{t('wizard.summary.writeToPdfHint')}</p>
+          </div>
+          <p className="wizard-createnote" data-testid="wizard-create-note">
+            {writeToPdf ? t('wizard.summary.willWrite') : t('wizard.summary.appOnly')}
+          </p>
         </>
       )}
 
@@ -425,14 +438,12 @@ function WizardFrame({
   title,
   headingRef,
   progress,
-  onCancel,
   footer,
   children,
 }: {
   title: string;
   headingRef: RefObject<HTMLHeadingElement | null>;
   progress?: { current: number; total: number };
-  onCancel?: (() => void) | undefined;
   footer?: ReactNode;
   children: ReactNode;
 }) {
@@ -441,26 +452,79 @@ function WizardFrame({
     <div className="wizard-backdrop">
       <section className="wizard" role="dialog" aria-modal="true" aria-labelledby="wizard-title" data-testid="wizard">
         <header>
-          <p className="eyebrow">{t('wizard.title')}</p>
+          <p className="eyebrow" data-testid="wizard-progress">
+            {progress ? t('wizard.progress', { current: progress.current, total: progress.total }) : t('wizard.title')}
+          </p>
           <h1 id="wizard-title" ref={headingRef} tabIndex={-1} data-testid="wizard-step-title">
             {title}
           </h1>
-          {progress && (
-            <p className="hint" data-testid="wizard-progress">
-              {t('wizard.progress', { current: progress.current, total: progress.total })}
-            </p>
-          )}
         </header>
         <div className="wizard-body">{children}</div>
-        <footer>
-          {footer}
-          {onCancel && (
-            <button type="button" className="link" onClick={onCancel} data-testid="wizard-cancel">
-              {t('wizard.cancel')}
-            </button>
-          )}
-        </footer>
+        <footer>{footer}</footer>
       </section>
+    </div>
+  );
+}
+
+/** A path for the screen: the drive or first folder, an ellipsis and the last two folders (the full path stays in the tooltip). */
+export function abbreviatePath(p: string): string {
+  const parts = p.split(/[\\/]+/).filter(Boolean);
+  if (parts.length <= 4) return p;
+  const lead = /^[A-Za-z]:$/.test(parts[0] ?? '') ? `${parts[0]}\\` : `/${parts[0] ?? ''}/`;
+  return `${lead}…/${parts.slice(-2).join('/')}`;
+}
+
+const SCAN_PHASES = ['walking', 'hashing', 'extracting', 'indexing'] as const;
+
+/** The last step: the first scan with what it is doing, and the two ways out (4.9). */
+function FirstScan({ status, onOpen }: { status: ScanStatus | null; onOpen(): void }) {
+  const { t } = useTranslation();
+  const ended = status !== null && (status.state === 'done' || status.state === 'failed' || status.state === 'cancelled');
+  const current = status?.state === 'running' && status.phase ? SCAN_PHASES.indexOf(status.phase) : ended ? SCAN_PHASES.length : 0;
+  const count = (p: (typeof SCAN_PHASES)[number]): string => {
+    if (!status) return '';
+    if (p === 'walking') return status.seen > 0 ? t('wizard.scan.files', { count: status.seen }) : '';
+    if (p === 'hashing') return status.phase === 'hashing' && status.total !== undefined ? `${status.seen} / ${status.total}` : '';
+    if (p === 'extracting') return status.phase === 'extracting' && status.total !== undefined ? `${status.processed} / ${status.total}` : '';
+    return '';
+  };
+  const failed = status?.summary?.failed ?? 0;
+  return (
+    <div data-testid="wizard-scan" data-state={status?.state ?? 'starting'}>
+      <p>{t('wizard.scan.intro')}</p>
+      <ul className="wizard-scan__steps">
+        {SCAN_PHASES.map((p, i) => {
+          const state = i < current ? 'done' : i === current ? 'now' : 'next';
+          return (
+            <li key={p} className="wizard-scan__step" data-state={state} data-phase={p}>
+              <span className="wizard-scan__mark" aria-hidden="true">
+                {state === 'done' ? '✓' : state === 'now' ? '⟳' : '○'}
+              </span>
+              <span className="wizard-scan__name">{t(`wizard.scan.phase_${p}`)}</span>
+              <span className="wizard-scan__count">{count(p)}</span>
+            </li>
+          );
+        })}
+      </ul>
+      {status?.state === 'running' && status.phase === 'extracting' && status.total ? <ProgressBar value={status.processed} max={status.total} label={t('scan.label')} /> : null}
+      {status?.state === 'done' && (
+        <p data-testid="wizard-scan-result" aria-live="polite">
+          {failed > 0 ? t('wizard.scan.resultFailed', { count: status.indexed, failed }) : t('wizard.scan.result', { count: status.indexed })}
+        </p>
+      )}
+      {status?.state === 'failed' && <ErrorNote testId="wizard-scan-failed">{t('scan.failed')}</ErrorNote>}
+      <p className="hint">{t('wizard.scan.background')}</p>
+      <div className="wizard-foot">
+        <span className="wizard-foot__spacer" />
+        {!ended && (
+          <Button onClick={onOpen} data-testid="wizard-scan-background">
+            {t('wizard.scan.continue')}
+          </Button>
+        )}
+        <Button variant="primary" onClick={onOpen} disabled={!ended} disabledReason={t('wizard.scan.wait')} data-testid="wizard-scan-open">
+          {t('wizard.scan.open')}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -30,6 +30,7 @@ export type StringPart =
   | 'inbox'
   | 'export'
   | 'jobs'
+  | 'library'
   | 'mcp'
   | 'network'
   | 'palette'

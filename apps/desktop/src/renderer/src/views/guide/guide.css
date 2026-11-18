@@ -15,28 +15,51 @@
   margin: 0;
 }
 .welcome-card {
-  margin: var(--space-3) var(--space-4) 0;
-  padding: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-height: 96px;
+  overflow: hidden;
+  margin: 0;
+  padding: 12px var(--space-4);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--r-md);
 }
 .welcome-card h2 {
-  margin: 0 0 var(--space-2);
-  font-size: 16px;
+  flex: none;
+  margin: 0;
+  font-size: var(--fs-heading);
 }
 .welcome-tips {
-  list-style: none;
-  margin: var(--space-3) 0;
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 4px var(--space-4);
+  margin: 0;
   padding: 0;
-  display: grid;
-  gap: var(--space-2);
+  list-style: none;
 }
 .welcome-tips li {
   display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
 }
-.welcome-tips li > span {
-  flex: 1;
+.welcome-tips li[data-done='true'] {
+  color: var(--text);
+}
+.welcome-tips__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--on-accent);
+}
+.welcome-tips li[data-done='true'] .welcome-tips__mark {
+  border-color: var(--accent);
+  background: var(--accent);
 }

@@ -121,7 +121,9 @@
     "crumbReader": "Reader",
     "crumbFiles": "New files",
     "crumbProposals": "Claude's proposals",
-    "searchLibrary": "Search the library…"
+    "searchLibrary": "Search the library…",
+    "searchSyntax": "Search syntax",
+    "searchWithClaude": "Search with Claude"
   },
   "chat": {
     "title": "Claude",
@@ -245,7 +247,6 @@
       "read": "Read"
     },
     "sort": "Sort by",
-    "showMissing": "Show missing documents",
     "sorts": {
       "relevance": "Relevance",
       "title": "Title",
@@ -277,7 +278,6 @@
     "cancelled": "Scan cancelled",
     "start": "Scan now",
     "cancel": "Cancel scan",
-    "rebuild": "Rebuild index",
     "label": "Library scan and index"
   },
   "settings": {
@@ -327,8 +327,7 @@
     "navigation": "Browse",
     "tabs": {
       "folders": "Folders",
-      "tags": "Tags",
-      "filters": "Filters"
+      "tags": "Tags"
     },
     "listLabel": "Documents",
     "selected_one": "{{count}} selected",
@@ -345,7 +344,6 @@
     "read": "Read"
   },
   "filter": {
-    "tags": "Tags:",
     "include": "Filter by tag",
     "includePlaceholder": "Filter by tag…",
     "exclude": "Exclude tag",
@@ -425,7 +423,7 @@
     "cancel": "Cancel",
     "review": "Review",
     "dismiss": "Hide",
-    "propose": "Propose with AI…"
+    "propose": "Propose with Claude…"
   },
   "citations": {
     "inLibrary": "In library",

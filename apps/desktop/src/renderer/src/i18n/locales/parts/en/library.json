@@ -1,0 +1,48 @@
+{
+  "library": {
+    "addPdf": "Add PDF",
+    "viewSummary": "View: {{view}} · {{sort}}",
+    "viewPanel": "View and sort order",
+    "more": "More",
+    "rowMore": "More actions",
+    "detailToggle": "Show or hide the card",
+    "detailEmpty": "Select a document to see its card.",
+    "navOpen": "Folders and tags",
+    "manageTags": "Manage tags",
+    "facet": {
+      "studyStates": "Status",
+      "types": "Type",
+      "years": "Year",
+      "venues": "Venue",
+      "authors": "Authors",
+      "tags": "Tags"
+    },
+    "facetEmpty": "No values in these results.",
+    "clear": "Clear",
+    "missing": "Show missing files",
+    "selTag": "Tags",
+    "selProject": "Project",
+    "selClaude": "Claude",
+    "selectionActions": "Actions on the selected documents",
+    "askClaude": "Ask Claude…",
+    "openDefault": "Open with the default program",
+    "openManyMax": "At most {{count}} documents open at once.",
+    "open": "Open",
+    "emptyTitle": "No documents yet",
+    "noResultsTitle": "No results",
+    "scanReport": {
+      "title": "Report of the last scan",
+      "when": "Finished {{when}}",
+      "none": "No scan has finished yet.",
+      "failed": "Unreadable",
+      "first": "This was the first scan: the files found are your library, not news to look at.",
+      "added": "New",
+      "changed": "Changed",
+      "moved": "Moved",
+      "missing": "Missing",
+      "failedHint": "Their text cannot be read: they are searched by name.",
+      "more": "and {{count}} more",
+      "truncated": "The list is partial: the counts are complete."
+    }
+  }
+}

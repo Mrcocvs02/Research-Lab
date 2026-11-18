@@ -55,6 +55,11 @@
     "types": "Types",
     "venues": "Venues",
     "addType": "New type",
-    "addVenue": "New venue"
+    "addVenue": "New venue",
+    "pageTitle": "Tags",
+    "sectionName": "Name and colour",
+    "sectionAliases": "Alternative names",
+    "sectionRelations": "Relations",
+    "sectionMerge": "Merge and retire"
   }
 }

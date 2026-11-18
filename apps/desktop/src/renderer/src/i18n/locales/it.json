@@ -121,7 +121,9 @@
     "crumbReader": "Lettore",
     "crumbFiles": "Nuovi file",
     "crumbProposals": "Proposte di Claude",
-    "searchLibrary": "Cerca nella libreria…"
+    "searchLibrary": "Cerca nella libreria…",
+    "searchSyntax": "Sintassi di ricerca",
+    "searchWithClaude": "Cerca con Claude"
   },
   "chat": {
     "title": "Claude",
@@ -245,7 +247,6 @@
       "read": "Letto"
     },
     "sort": "Ordina per",
-    "showMissing": "Mostra documenti mancanti",
     "sorts": {
       "relevance": "Pertinenza",
       "title": "Titolo",
@@ -277,7 +278,6 @@
     "cancelled": "Scansione annullata",
     "start": "Scansiona ora",
     "cancel": "Annulla la scansione",
-    "rebuild": "Ricostruisci l'indice",
     "label": "Scansione e indice della libreria"
   },
   "settings": {
@@ -327,8 +327,7 @@
     "navigation": "Esplora",
     "tabs": {
       "folders": "Cartelle",
-      "tags": "Tag",
-      "filters": "Filtri"
+      "tags": "Tag"
     },
     "listLabel": "Documenti",
     "selected_one": "{{count}} selezionato",
@@ -345,7 +344,6 @@
     "read": "Leggi"
   },
   "filter": {
-    "tags": "Tag:",
     "include": "Filtra per tag",
     "includePlaceholder": "Filtra per tag…",
     "exclude": "Escludi un tag",
@@ -425,7 +423,7 @@
     "cancel": "Annulla",
     "review": "Rivedi",
     "dismiss": "Nascondi",
-    "propose": "Proponi con l’AI…"
+    "propose": "Proponi con Claude…"
   },
   "citations": {
     "inLibrary": "In libreria",

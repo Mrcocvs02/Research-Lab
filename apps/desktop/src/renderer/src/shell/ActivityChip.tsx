@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { Lazy, lazyView } from '../components/Lazy';
 import { useAiUi } from '../lib/aiUi';
 import { useCitationJob } from '../lib/citationJobs';
+import { rl } from '../lib/rl';
 import { useJobs } from '../lib/jobs';
 import { scanText } from '../views/library/ScanStatusText';
 import type { useScanStatus } from '../views/library/useScanStatus';
 import { jobGroup, scanGroup, summarize, useGenericActivity } from './activityModel';
 
 // The list of activities is only needed when the chip is clicked.
+const ScanReport = lazyView(() => import('../views/library/ScanReport').then((m) => ({ default: m.ScanReport })), ['library']);
 const ActivityPopover = lazyView(() => import('./ActivityPopover').then((m) => ({ default: m.ActivityPopover })), ['activity']);
 
 /** The ring of the chip: full when idle, an arc of `value` (0..1) while a job reports progress, spinning when it does not. */
@@ -38,6 +40,7 @@ export function ActivityChip({ scan: scanApi }: { scan: ReturnType<typeof useSca
   const generic = useGenericActivity();
   const anchor = useRef<HTMLButtonElement>(null);
   const [unseen, setUnseen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const sum = useMemo(() => summarize({ scan, job, citation: citations, generic }), [scan, job, citations, generic]);
 
@@ -50,7 +53,12 @@ export function ActivityChip({ scan: scanApi }: { scan: ReturnType<typeof useSca
     if (job) now.set(`job:${job.jobId}`, jobGroup(job));
     if (citations) now.set(`cit:${citations.jobId}`, jobGroup(citations));
     for (const g of generic) now.set(`g:${g.id}`, g.group);
-    for (const [k, g] of now) if (before.current.get(k) === 'running' && g !== 'running') setUnseen(true);
+    for (const [k, g] of now) {
+      if (before.current.get(k) !== 'running' || g === 'running') continue;
+      // The first scan of a library is the library itself, not a result to look at (W17, as the badge of 'To review', 7.1).
+      if (k === 'scan') void rl.invoke('scan:report', {}).then((r) => !r.firstScan && setUnseen(true), () => setUnseen(true));
+      else setUnseen(true);
+    }
     before.current = now;
   }, [scan, job, citations, generic]);
   useEffect(() => {
@@ -89,7 +97,12 @@ export function ActivityChip({ scan: scanApi }: { scan: ReturnType<typeof useSca
       </button>
       {activityOpen && (
         <Lazy>
-          <ActivityPopover anchor={anchor} onClose={() => setActivityOpen(false)} scan={scan} startScan={() => void start(false)} cancelScan={() => void cancel()} />
+          <ActivityPopover anchor={anchor} onClose={() => setActivityOpen(false)} scan={scan} startScan={() => void start(false)} cancelScan={() => void cancel()} onReport={() => { setActivityOpen(false); setReportOpen(true); }} />
+        </Lazy>
+      )}
+      {reportOpen && (
+        <Lazy>
+          <ScanReport onClose={() => setReportOpen(false)} />
         </Lazy>
       )}
     </>

@@ -11,6 +11,7 @@
     "noScan": "No scan in this session",
     "scanSummary": "+{{added}} new · {{changed}} changed · {{missing}} missing",
     "scanRunning": "A scan is already running",
-    "needsLibrary": "Open a library first"
+    "needsLibrary": "Open a library first",
+    "seeReport": "See the report"
   }
 }

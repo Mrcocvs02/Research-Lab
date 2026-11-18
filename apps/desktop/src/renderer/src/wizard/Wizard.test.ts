@@ -46,54 +46,69 @@ afterEach(() => {
   cleanup();
 });
 
+const SCAN_START = () => ({ libraryId: 'lib-test', state: 'running', phase: 'walking', seen: 0, processed: 0, indexed: 0 });
+
 describe('Wizard', () => {
-  it('walks every step, defaults AI folders to none, and creates the library with relative data only', async () => {
+  it('walks the seven steps, enables no folder for Claude, keeps the PDF consent on, and ends in the first scan', async () => {
     const { handlers } = memoryBackend();
-    setHandlers({ ...handlers, 'dialog:chooseFolder': () => ROOT, 'import:probeLegacy': () => NO_LEGACY });
+    setHandlers({ ...handlers, 'dialog:chooseFolder': () => ROOT, 'import:probeLegacy': () => NO_LEGACY, 'scan:start': SCAN_START });
     const onFinished = mount();
-    await untilStep('Welcome');
+    await untilStep('Welcome and language');
+    expect(screen.getByTestId('wizard-progress').textContent).toBe('Step 1 of 7');
 
     fireEvent.change(screen.getByTestId('wizard-ui-language'), { target: { value: 'it' } });
     await waitFor(() => expect(callsTo('settings:set')).toContainEqual({ uiLanguage: 'it' }));
-    await untilStep('Benvenuto');
+    await untilStep('Benvenuto e lingua');
     fireEvent.change(screen.getByTestId('wizard-ui-language'), { target: { value: 'en' } });
-    await untilStep('Welcome');
+    await untilStep('Welcome and language');
     next();
 
-    await untilStep('About you');
-    fireEvent.change(screen.getByTestId('wizard-profile-name'), { target: { value: 'Jane Doe' } });
-    fireEvent.change(screen.getByTestId('wizard-profile-variants'), { target: { value: 'Doe, J.\nDoe, Jane\nDoe, J.' } });
-    next();
-
-    await untilStep('Library folder');
+    await untilStep('Folder');
     expect(isDisabled('wizard-next')).toBe(true);
     await chooseFolder();
-    next();
-
-    await untilStep('Library details');
-    expect((screen.getByTestId('wizard-lib-name') as HTMLInputElement).value).toBe('example-root');
-    fireEvent.change(screen.getByTestId('wizard-doc-language'), { target: { value: 'it' } });
     expect((screen.getByTestId('wizard-data-dir') as HTMLInputElement).value).toBe('.lab');
     next();
 
-    await untilStep('Starting taxonomy');
-    expect((screen.getByLabelText(/Proposed by Claude/) as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByText('Available after connecting Claude.')).toBeTruthy();
+    await untilStep('Details');
+    expect((screen.getByTestId('wizard-lib-name') as HTMLInputElement).value).toBe('example-root');
+    fireEvent.change(screen.getByTestId('wizard-doc-language'), { target: { value: 'it' } });
+    fireEvent.change(screen.getByTestId('wizard-profile-name'), { target: { value: 'Jane Doe' } });
     next();
 
-    await untilStep('Folders enabled for Claude');
-    expect(screen.getByText(/No folder enabled/)).toBeTruthy();
-    expect(isDisabled('wizard-next')).toBe(true);
-    fireEvent.click(screen.getByTestId('wizard-ai-confirm'));
+    await untilStep('Starting tags');
+    expect((screen.getByLabelText(/Proposed by Claude/) as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByText('Available after connecting Claude.')).toBeTruthy();
+    expect(screen.getByTestId('wizard-skip')).toBeTruthy();
+    next();
+
+    // Claude: nothing is mandatory, nothing is sent until a folder is enabled.
+    await untilStep('Claude');
+    expect(screen.getByText(/Until you enable a folder, nothing is sent/)).toBeTruthy();
+    expect(screen.getByTestId('wizard-ai-note').textContent).toContain('No folder enabled');
+    expect(isDisabled('wizard-next')).toBe(false);
     next();
 
     await untilStep('Summary');
+    expect(screen.getByTestId('wizard-write-to-pdf').getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByTestId('wizard-create-note').textContent).toContain('inside the PDFs');
     fireEvent.click(screen.getByTestId('wizard-create'));
-    await waitFor(() => expect(onFinished).toHaveBeenCalledWith('lib-test'));
+
+    // The seventh step: the first scan, seen and not waited for.
+    await screen.findByTestId('wizard-scan');
+    await waitFor(() => expect(callsTo('scan:start')).toEqual([{}]));
+    expect(screen.getByTestId('wizard-step-title').textContent).toBe('First scan');
+    expect(isDisabled('wizard-scan-open')).toBe(true);
+    act(() => emitEvent('scan:progress', { libraryId: 'lib-test', state: 'running', phase: 'extracting', seen: 12, processed: 4, total: 10, indexed: 0 }));
+    await waitFor(() => expect(screen.getByTestId('wizard-scan').querySelector('[data-phase="extracting"]')?.getAttribute('data-state')).toBe('now'));
+    act(() => emitEvent('scan:progress', { libraryId: 'lib-test', state: 'done', seen: 12, processed: 10, total: 10, indexed: 12, summary: { added: 12, changed: 0, moved: 0, missing: 0, unchanged: 0, extracted: 9, failed: 3 } }));
+    expect((await screen.findByTestId('wizard-scan-result')).textContent).toContain('Found 12 documents · 3 unreadable');
+    expect(isDisabled('wizard-scan-open')).toBe(false);
+    fireEvent.click(screen.getByTestId('wizard-scan-open'));
+    expect(onFinished).toHaveBeenCalledWith('lib-test');
 
     expect(callsTo('settings:set')).toContainEqual({
       uiLanguage: 'en',
-      user: expect.objectContaining({ name: 'Jane Doe', authorVariants: ['Doe, J.', 'Doe, Jane'] }),
+      user: expect.objectContaining({ name: 'Jane Doe', authorVariants: [] }),
     });
     expect(callsTo('library:create')).toEqual([{ name: 'example-root', rootPath: ROOT.path, language: 'it', dataDirName: '.lab', aiEnabledFolders: [] }]);
     expect(callsTo('library:setActive')).toEqual([{ libraryId: 'lib-test' }]);
@@ -101,27 +116,40 @@ describe('Wizard', () => {
     expect(callsTo('import:startLegacy')).toEqual([]);
   });
 
-  it('shows inline validation for the profile and blocks Next', async () => {
-    setHandlers(memoryBackend().handlers);
+  it('can be left running: Continue in the background opens the library at once', async () => {
+    const { handlers } = memoryBackend({ settings: { firstRunDone: true } });
+    setHandlers({ ...handlers, 'dialog:chooseFolder': () => ROOT, 'import:probeLegacy': () => NO_LEGACY, 'scan:start': SCAN_START });
+    const onFinished = mount();
+    await untilStep('Folder');
+    await chooseFolder();
+    await advanceThrough(['Details', 'Starting tags', 'Claude', 'Summary']);
+    expect(screen.getByTestId('wizard-progress').textContent).toBe('Step 5 of 6');
+    fireEvent.click(screen.getByTestId('wizard-create'));
+    fireEvent.click(await screen.findByTestId('wizard-scan-background'));
+    expect(onFinished).toHaveBeenCalledWith('lib-test');
+  });
+
+  it('skips the starting tags with Skip, and turns the PDF consent off from the summary', async () => {
+    const { handlers } = memoryBackend({ settings: { firstRunDone: true } });
+    setHandlers({ ...handlers, 'dialog:chooseFolder': () => ROOT, 'import:probeLegacy': () => NO_LEGACY, 'scan:start': SCAN_START });
     mount();
-    await untilStep('Welcome');
-    next();
-    await untilStep('About you');
-    fireEvent.change(screen.getByLabelText('ORCID'), { target: { value: 'nope' } });
-    expect(screen.getByText('Use the format 0000-0000-0000-0000.')).toBeTruthy();
-    expect(isDisabled('wizard-next')).toBe(true);
-    fireEvent.change(screen.getByLabelText('ORCID'), { target: { value: '0000-0002-1825-0097' } });
-    expect(isDisabled('wizard-next')).toBe(false);
+    await untilStep('Folder');
+    await chooseFolder();
+    await advanceThrough(['Details', 'Starting tags']);
+    fireEvent.click(screen.getByTestId('wizard-skip'));
+    await untilStep('Claude');
+    await advanceThrough(['Summary']);
+    fireEvent.click(screen.getByTestId('wizard-write-to-pdf'));
+    expect(screen.getByTestId('wizard-write-to-pdf').getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByTestId('wizard-create-note').textContent).toContain('app only');
   });
 
   it('skips the user steps when first run is done and rejects bad data folder names', async () => {
     const { handlers } = memoryBackend({ settings: { firstRunDone: true } });
     setHandlers({ ...handlers, 'dialog:chooseFolder': () => ROOT, 'import:probeLegacy': () => NO_LEGACY });
     mount();
-    await untilStep('Library folder');
+    await untilStep('Folder');
     await chooseFolder();
-    next();
-    await untilStep('Library details');
     fireEvent.change(screen.getByTestId('wizard-data-dir'), { target: { value: '../escape' } });
     expect(screen.getByText(/plain folder name/)).toBeTruthy();
     expect(isDisabled('wizard-next')).toBe(true);
@@ -136,14 +164,12 @@ describe('Wizard', () => {
       'import:startLegacy': () => ({ jobId: 'job-1' }),
     });
     const onFinished = mount();
-    await untilStep('Library folder');
+    await untilStep('Folder');
     await chooseFolder();
-    await advanceThrough(['Library details', 'Existing index found']);
+    await advanceThrough(['Details', 'Existing index found']);
     expect(screen.getByTestId('legacy-preview').textContent).toContain('21 documents');
     expect(screen.getByTestId('legacy-preview').textContent).toContain('7 taxonomy entries');
-    await advanceThrough(['Starting taxonomy', 'Folders enabled for Claude']);
-    fireEvent.click(screen.getByTestId('wizard-ai-confirm'));
-    await advanceThrough(['Summary']);
+    await advanceThrough(['Starting tags', 'Claude', 'Summary']);
     fireEvent.click(screen.getByTestId('wizard-create'));
 
     await screen.findByTestId('import-progress');
@@ -171,11 +197,9 @@ describe('Wizard', () => {
       },
     });
     const onFinished = mount();
-    await untilStep('Library folder');
+    await untilStep('Folder');
     await chooseFolder();
-    await advanceThrough(['Library details', 'Existing index found', 'Starting taxonomy', 'Folders enabled for Claude']);
-    fireEvent.click(screen.getByTestId('wizard-ai-confirm'));
-    await advanceThrough(['Summary']);
+    await advanceThrough(['Details', 'Existing index found', 'Starting tags', 'Claude', 'Summary']);
     fireEvent.click(screen.getByTestId('wizard-create'));
     const failed = await screen.findByTestId('import-failed');
     expect(failed.textContent).toContain('This feature is not available yet.');
@@ -183,24 +207,22 @@ describe('Wizard', () => {
     expect(onFinished).toHaveBeenCalledWith('lib-test');
   });
 
-  it('asks for the confirmation again after the folder selection changes', async () => {
+  it('enables the folders ticked in the tree for Claude without any confirmation box', async () => {
     const { handlers } = memoryBackend({ settings: { firstRunDone: true } });
     setHandlers({
       ...handlers,
       'dialog:chooseFolder': () => ROOT,
       'import:probeLegacy': () => NO_LEGACY,
+      'scan:start': SCAN_START,
       'library:listFolders': () => ({ folders: [{ path: 'papers', name: 'papers', hasChildren: false }] }),
     });
     mount();
-    await untilStep('Library folder');
+    await untilStep('Folder');
     await chooseFolder();
-    await advanceThrough(['Library details', 'Starting taxonomy', 'Folders enabled for Claude']);
-    fireEvent.click(screen.getByTestId('wizard-ai-confirm'));
-    expect(isDisabled('wizard-next')).toBe(false);
+    await advanceThrough(['Details', 'Starting tags', 'Claude']);
+    expect(screen.queryByTestId('wizard-ai-confirm')).toBeNull();
     fireEvent.click(await screen.findByLabelText('papers'));
-    expect((screen.getByTestId('wizard-ai-confirm') as HTMLInputElement).checked).toBe(false);
-    expect(isDisabled('wizard-next')).toBe(true);
-    fireEvent.click(screen.getByTestId('wizard-ai-confirm'));
+    expect(isDisabled('wizard-next')).toBe(false);
     await advanceThrough(['Summary']);
     fireEvent.click(screen.getByTestId('wizard-create'));
     await waitFor(() => expect(callsTo('library:create')).toHaveLength(1));

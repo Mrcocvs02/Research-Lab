@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ErrorBoundary, Lazy, lazyView } from './components/Lazy';
+import { loadStrings } from './i18n';
 import { ErrorNote } from './components/ui';
 import { errorMessage } from './lib/errors';
 import { installWindowGuard } from './lib/dirtyEditors';
@@ -15,12 +16,12 @@ import { JobsProvider } from './lib/jobs';
 import { NotifyProvider } from './lib/notify';
 import { ReaderProvider, useReader } from './lib/reader';
 import { WatchProvider } from './lib/watch';
-import { LibraryView } from './views/library/LibraryView';
 import { Shell, type SectionId } from './shell/Shell';
 import { useReviewDocs } from './shell/useReviewDocs';
 import { AppProvider, useApp } from './state/app-context';
 
-// Only the Library view is part of the first screen; the others load when they are opened (docs/RULES.md, lightness).
+// No view is part of the first chunk (docs/RULES.md, lightness). The Library is the first screen: it starts loading with the app (see `App`).
+const LibraryView = lazyView(() => import('./views/library/LibraryView').then((m) => ({ default: m.LibraryView })), ['library']);
 const Settings = lazyView(() => import('./settings/Settings').then((m) => ({ default: m.Settings })), ['settings', 'settings-wizard']);
 const ProjectsView = lazyView(() => import('./views/projects/ProjectsView').then((m) => ({ default: m.ProjectsView })), ['doc-projects-reader', 'projects']);
 // The reader (and pdf.js with it) loads the first time a document is opened in it.
@@ -33,6 +34,11 @@ const WelcomeCard = lazyView(() => import('./views/guide/WelcomeCard').then((m) 
 const Wizard = lazyView(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })), ['settings-wizard', 'wizard']);
 
 export function App() {
+  // The Library chunk and its strings are fetched at once, while the app reads its settings: the first screen waits for neither alone.
+  useEffect(() => {
+    void import('./views/library/LibraryView').catch(() => {});
+    void loadStrings(['library']).catch(() => {});
+  }, []);
   return (
     <ErrorBoundary>
       <AppProvider>

@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RlError } from '../../lib/rl-error';
+import { Button } from '../../components/Button';
+import { IconButton } from '../../components/IconButton';
+import { IconChevronRight, IconClose, IconMore } from '../../components/icons';
+import { IconClaude } from '../../components/icons-shell';
+import { KeyValue } from '../../components/KeyValue';
+import { Menu, type MenuGroups } from '../../components/Menu';
+import { Segmented } from '../../components/Segmented';
+import { useAiUi } from '../../lib/aiUi';
 import { SEARCH_LIMITS, type Channels, type DocumentPatch, type ResponseOf, type StudyState } from '@rl/core';
 
 type DocumentView = ResponseOf<Channels, 'documents:get'>;
@@ -14,7 +22,8 @@ import { Lazy, lazyView } from '../../components/Lazy';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { NoteEditor } from '../notes/NoteEditor';
-import { baseName, TypeIcon } from './DocViews';
+import { baseName } from './fileName';
+import { formatSize } from './formatSize';
 import { safeText } from './safeText';
 import { TagChip, TagPicker } from './TagParts';
 import { resolveId } from './taxonomyModel';
@@ -284,7 +293,39 @@ export function AiArea({ doc }: { doc: DocumentView }) {
   );
 }
 
-/** The card of one document: editable metadata, study state, tags, and the AI area (read-only). */
+/** Sections of the card the user opened stay open from one document to the next, for the session (4.14). */
+const openSections = new Set<string>();
+
+/** A section of the card: a row of 36 px with its title and a short text on the right; it opens in place. */
+function CardSection({ id, title, hint, action, testId, toggleTestId, forceOpen, children }: { id: string; title: string; hint?: ReactNode; action?: ReactNode; testId?: string; toggleTestId?: string; forceOpen?: boolean; children: ReactNode }) {
+  const [shown, setOpen] = useState(() => openSections.has(id));
+  const open = shown || forceOpen === true;
+  const bodyId = useId();
+  const toggle = () => {
+    if (open) openSections.delete(id);
+    else openSections.add(id);
+    setOpen(!open);
+  };
+  return (
+    <section className="card-section" data-testid={testId} data-open={open}>
+      <div className="card-section__head">
+        <button type="button" className="card-section__toggle" aria-expanded={open} aria-controls={bodyId} onClick={toggle} data-testid={toggleTestId}>
+          <IconChevronRight size={16} className="card-section__chev" />
+          <span className="card-section__title">{title}</span>
+          {hint !== undefined && <span className="card-section__hint">{hint}</span>}
+        </button>
+        {action}
+      </div>
+      {open && (
+        <div id={bodyId} className="card-section__body">
+          {children}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** The card of one document (4.14): reading view with the actions, state and tags; data, notes, citations, similar and file in sections. */
 export function DocumentCard({ docId, onClose }: { docId: string; onClose(): void }) {
   const { t } = useTranslation();
   const version = useChangeVersion('documents');
@@ -292,6 +333,7 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
   const { reportError, fail } = useNotify();
   const { view, model } = useTaxonomy();
   const { tag, createAndAdd } = useTagActions();
+  const { setChatOpen } = useAiUi();
   const [doc, setDoc] = useState<DocumentView | null>(null);
   const [error, setError] = useState<unknown>(null);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
@@ -300,8 +342,9 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
   const venueListId = useId();
   const { openReader } = useReader();
   const [jobOpen, setJobOpen] = useState(false);
-  const [citationsOpen, setCitationsOpen] = useState(false);
-  const [similarOpen, setSimilarOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreAnchor = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -356,107 +399,80 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
     const known = venues.find((v) => v.name.toLowerCase() === q || v.aliases.some((a) => a.toLowerCase() === q));
     save(known ? { venue: known.name, venueId: known.id } : { venue: trimmed, venueId: null });
   };
+  const readable = canRead(doc.path, doc.missing);
+  const byline = [safeText(doc.authors.slice(0, 3).join(', ')) + (doc.authors.length > 3 ? ' …' : ''), doc.year, doc.ref.venue ? safeText(doc.ref.venue) : null].filter((x) => x !== '' && x !== null && x !== undefined).join(' · ');
+  const why = t('docs.missing');
+  const more: MenuGroups = [
+    {
+      id: 'file',
+      items: [
+        doc.missing ? { id: 'open', label: t('docs.openDefault'), disabled: true, disabledReason: why, onSelect: openFile } : { id: 'open', label: t('docs.openDefault'), onSelect: () => void openFile() },
+        doc.missing ? { id: 'reveal', label: t('docs.reveal'), disabled: true, disabledReason: why, onSelect: reveal } : { id: 'reveal', label: t('docs.reveal'), onSelect: () => void reveal() },
+      ],
+    },
+    {
+      id: 'ai',
+      items: [doc.missing ? { id: 'propose', label: t('doc.propose'), icon: <IconClaude size={16} />, disabled: true, disabledReason: why, onSelect: () => setJobOpen(true) } : { id: 'propose', label: t('doc.propose'), icon: <IconClaude size={16} />, onSelect: () => setJobOpen(true) }],
+    },
+  ];
+  const ai = doc.ai;
+  const noAi = !ai.summary && !ai.description && !ai.keywords && !ai.synonyms && !ai.suggestedTags && !ai.suggestedNewTags && !ai.suggestedType && !ai.relations;
 
   return (
     <div className="doc-card-panel" data-testid="doc-panel" data-doc-id={docId}>
-      <header className="panel-head">
-        <TypeIcon path={doc.path} />
-        <div className="panel-title">
-          <h2 data-testid="panel-title">{safeText(title)}</h2>
-          <p className="result-path">{safeText(doc.path)}</p>
-        </div>
-        <button type="button" className="icon-button" aria-label={t('common.close')} onClick={onClose} data-testid="panel-close">
-          <span aria-hidden="true">×</span>
-        </button>
+      <header className="card-head">
+        <span className="card-head__caption">{t('docs.details')}</span>
+        <IconButton label={t('common.close')} size="sm" onClick={onClose} data-testid="panel-close">
+          <IconClose size={16} />
+        </IconButton>
       </header>
-      <div className="panel-actions">
-        {canRead(doc.path, doc.missing) && (
-          <button type="button" className="primary" onClick={() => openReader(docId)} title={t('docs.readHint')} data-testid="open-reader">
+      <h2 className="card-title" data-testid="panel-title" title={safeText(title)}>
+        {safeText(title)}
+      </h2>
+      {byline && <p className="card-byline">{byline}</p>}
+      <div className="card-actions">
+        {readable ? (
+          <Button variant="primary" onClick={() => openReader(docId)} title={t('docs.readHint')} data-testid="open-reader">
             {t('docs.read')}
-          </button>
+          </Button>
+        ) : (
+          <Button variant="primary" onClick={() => void openFile()} disabled={doc.missing} disabledReason={why} data-testid="open-file">
+            {t('docs.open')}
+          </Button>
         )}
-        <button type="button" onClick={() => void openFile()} disabled={doc.missing} data-testid="open-file">
-          {t('docs.openFile')}
-        </button>
-        <button type="button" onClick={() => void reveal()} disabled={doc.missing} data-testid="reveal-file">
-          {t('docs.reveal')}
-        </button>
-        <button type="button" onClick={() => setJobOpen(true)} disabled={doc.missing} data-testid="doc-ai-propose">
-          {t('jobs.proposeOne')}
-        </button>
+        <Button className="card-actions__ai" icon={<IconClaude size={16} />} onClick={() => setChatOpen(true)} data-testid="doc-ask-claude">
+          {t('doc.askClaude')}
+        </Button>
+        <span ref={moreAnchor}>
+          <IconButton label={t('docs.moreActions')} variant="secondary" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)} data-testid="doc-more">
+            <IconMore size={20} />
+          </IconButton>
+        </span>
+        <Menu anchor={moreAnchor} open={moreOpen} onClose={() => setMoreOpen(false)} groups={more} label={t('docs.moreActions')} width={280} />
         {doc.missing && <span className="badge badge-warn">{t('docs.missing')}</span>}
       </div>
 
-      <Section title={t('doc.metadata')} testId="doc-metadata">
-        <p className="hint">{t('doc.metadataHint')}</p>
-        <Field label={t('doc.title')} value={doc.title ?? ''} extracted={isExtracted(doc, 'title')} onCommit={(v) => save({ title: v.trim() === '' ? null : v.trim() })} testId="field-title" />
-        <Field
-          label={t('doc.authors')}
-          hint={t('doc.authorsHint')}
-          value={doc.authors.join('\n')}
-          extracted={isExtracted(doc, 'authors')}
-          multiline
-          rows={3}
-          onCommit={(v) => save({ authors: splitLines(v) })}
-          testId="field-authors"
+      <div className="card-state" data-testid="doc-study">
+        <span className="card-state__label">{t('doc.stateLabel')}</span>
+        <Segmented<StudyState>
+          label={t('doc.studyState')}
+          size="sm"
+          value={doc.study.state}
+          onChange={(s) => save({ studyState: s })}
+          options={STUDY.map((s) => ({ value: s, label: t(`study.${s}`), testId: `study-${s}` }))}
         />
-        <div className="two-col">
-          <Field label={t('doc.year')} type="number" value={doc.year === null ? '' : String(doc.year)} extracted={isExtracted(doc, 'year')} onCommit={(v) => save({ year: num(v) })} testId="field-year" />
-          <div className="field">
-            <label htmlFor={`${venueListId}-type`}>{t('doc.type')}</label>
-            <select id={`${venueListId}-type`} value={doc.type ?? ''} onChange={(e) => save({ type: e.target.value === '' ? null : e.target.value })} data-testid="field-type">
-              <option value="">{t('doc.noType')}</option>
-              {types.map((ty) => (
-                <option key={ty.id} value={ty.id}>
-                  {safeText(ty.label)}
-                </option>
-              ))}
-              {doc.type !== null && !types.some((ty) => ty.id === doc.type) && <option value={doc.type}>{safeText(doc.type)}</option>}
-            </select>
-          </div>
-        </div>
-        <Field label={t('doc.venue')} list={venueListId} value={venueText} onCommit={commitVenue} testId="field-venue" />
-        <datalist id={venueListId}>
-          {venues.map((v) => (
-            <option key={v.id} value={v.name} />
-          ))}
-        </datalist>
-        <Field label={t('doc.venueRef')} value={doc.ref.venueRef ?? ''} onCommit={(v) => save({ venueRef: v.trim() === '' ? null : v.trim() })} testId="field-venueRef" />
-        <div className="two-col">
-          <Field label={t('doc.doi')} value={doc.doi ?? ''} extracted={isExtracted(doc, 'doi')} onCommit={(v) => save({ doi: v.trim() === '' ? null : v.trim() })} testId="field-doi" />
-          <Field label={t('doc.arxiv')} value={doc.arxivId ?? ''} extracted={isExtracted(doc, 'arxivId')} onCommit={(v) => save({ arxivId: v.trim() === '' ? null : v.trim() })} testId="field-arxiv" />
-        </div>
-      </Section>
+      </div>
+      <div className="card-underlined">
+        <input id={`${venueListId}-ul`} type="checkbox" checked={doc.study.underlined.value} onChange={(e) => save({ underlined: e.target.checked })} data-testid="field-underlined" />
+        <label htmlFor={`${venueListId}-ul`}>{t('doc.underlined')}</label>
+        <span className="badge" data-testid="underlined-origin" data-origin={doc.study.underlined.origin}>
+          {doc.study.underlined.origin === 'annotations' ? t('reader.underlinedOrigin_annotations') : t('reader.underlinedOrigin_manual')}
+        </span>
+      </div>
+      {doc.study.underlined.origin === 'annotations' && <p className="hint">{t('doc.underlinedFromAnnotations')}</p>}
 
-      <Section title={t('doc.study')} testId="doc-study">
-        <div className="radio-row" role="radiogroup" aria-label={t('doc.studyState')}>
-          {STUDY.map((s) => (
-            <label key={s} className="radio-chip">
-              <input type="radio" name={`study-${docId}`} checked={doc.study.state === s} onChange={() => save({ studyState: s })} data-testid={`study-${s}`} />
-              <span>{t(`study.${s}`)}</span>
-            </label>
-          ))}
-        </div>
-        <div className="check">
-          <input id={`${venueListId}-ul`} type="checkbox" checked={doc.study.underlined.value} onChange={(e) => save({ underlined: e.target.checked })} data-testid="field-underlined" />
-          <label htmlFor={`${venueListId}-ul`}>{t('doc.underlined')}</label>
-          <span className="badge" data-testid="underlined-origin" data-origin={doc.study.underlined.origin}>
-            {doc.study.underlined.origin === 'annotations' ? t('reader.underlinedOrigin_annotations') : t('reader.underlinedOrigin_manual')}
-          </span>
-          {doc.study.underlined.origin === 'annotations' && <p className="hint">{t('doc.underlinedFromAnnotations')}</p>}
-        </div>
-      </Section>
-
-      <Section title={t('doc.notes')} testId="doc-notes">
-        <p className="hint">{t('doc.notesHint')}</p>
-        <NoteEditor docId={docId} testId="card-note" />
-      </Section>
-
-      <Section title={t('doc.description')} testId="doc-description">
-        <Field label={t('doc.userDescription')} hint={t('doc.userDescriptionHint')} multiline rows={3} value={doc.userDescription ?? ''} onCommit={(v) => save({ userDescription: v })} testId="field-description" />
-      </Section>
-
-      <Section title={t('doc.tags')} testId="doc-tags-section">
+      <div className="card-tags" data-testid="doc-tags-section">
+        <span className="card-state__label">{t('doc.tags')}</span>
         <div className="tag-list" data-testid="doc-tag-list">
           {doc.tags.length === 0 && <span className="hint">{t('doc.noTags')}</span>}
           {doc.tags.map((id) => {
@@ -475,55 +491,130 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
           onCreate={(label) => createAndAdd([docId], label)}
           testId="tag-input"
         />
-      </Section>
+      </div>
 
-      <Section title={t('citations.title')} testId="doc-citations">
-        <button type="button" aria-expanded={citationsOpen} onClick={() => setCitationsOpen(!citationsOpen)} data-testid="citations-toggle">
-          {citationsOpen ? t('citations.hide') : t('citations.show')}
-        </button>
-        {citationsOpen && (
-          <Lazy>
-            <CitationsPanel docId={docId} />
-          </Lazy>
+      {noAi ? (
+        <p className="card-ai-none" data-testid="ai-area">
+          <IconClaude size={16} />
+          <span>{t('doc.aiNone')}</span>
+          <button type="button" className="link" onClick={() => !doc.missing && setJobOpen(true)} disabled={doc.missing}>
+            {t('doc.propose')}
+          </button>
+        </p>
+      ) : (
+        <AiArea doc={doc} />
+      )}
+
+      <CardSection
+        id="data"
+        forceOpen={editing}
+        title={t('doc.dataTitle')}
+        testId="doc-metadata"
+        action={
+          <button
+            type="button"
+            className="link card-section__action"
+            data-testid="detail-edit-data"
+            onClick={() => {
+              openSections.add('data');
+              setEditing(!editing);
+            }}
+          >
+            {editing ? t('doc.doneEditing') : t('doc.editData')}
+          </button>
+        }
+      >
+        {editing ? (
+          <div className="card-edit">
+            <p className="hint">{t('doc.metadataHint')}</p>
+            <Field label={t('doc.title')} value={doc.title ?? ''} extracted={isExtracted(doc, 'title')} onCommit={(v) => save({ title: v.trim() === '' ? null : v.trim() })} testId="field-title" />
+            <Field
+              label={t('doc.authors')}
+              hint={t('doc.authorsHint')}
+              value={doc.authors.join('\n')}
+              extracted={isExtracted(doc, 'authors')}
+              multiline
+              rows={3}
+              onCommit={(v) => save({ authors: splitLines(v) })}
+              testId="field-authors"
+            />
+            <div className="two-col">
+              <Field label={t('doc.year')} type="number" value={doc.year === null ? '' : String(doc.year)} extracted={isExtracted(doc, 'year')} onCommit={(v) => save({ year: num(v) })} testId="field-year" />
+              <div className="field">
+                <label htmlFor={`${venueListId}-type`}>{t('doc.type')}</label>
+                <select id={`${venueListId}-type`} value={doc.type ?? ''} onChange={(e) => save({ type: e.target.value === '' ? null : e.target.value })} data-testid="field-type">
+                  <option value="">{t('doc.noType')}</option>
+                  {types.map((ty) => (
+                    <option key={ty.id} value={ty.id}>
+                      {safeText(ty.label)}
+                    </option>
+                  ))}
+                  {doc.type !== null && !types.some((ty) => ty.id === doc.type) && <option value={doc.type}>{safeText(doc.type)}</option>}
+                </select>
+              </div>
+            </div>
+            <Field label={t('doc.venue')} list={venueListId} value={venueText} onCommit={commitVenue} testId="field-venue" />
+            <datalist id={venueListId}>
+              {venues.map((v) => (
+                <option key={v.id} value={v.name} />
+              ))}
+            </datalist>
+            <Field label={t('doc.venueRef')} value={doc.ref.venueRef ?? ''} onCommit={(v) => save({ venueRef: v.trim() === '' ? null : v.trim() })} testId="field-venueRef" />
+            <div className="two-col">
+              <Field label={t('doc.doi')} value={doc.doi ?? ''} extracted={isExtracted(doc, 'doi')} onCommit={(v) => save({ doi: v.trim() === '' ? null : v.trim() })} testId="field-doi" />
+              <Field label={t('doc.arxiv')} value={doc.arxivId ?? ''} extracted={isExtracted(doc, 'arxivId')} onCommit={(v) => save({ arxivId: v.trim() === '' ? null : v.trim() })} testId="field-arxiv" />
+            </div>
+          </div>
+        ) : (
+          <KeyValue
+            items={[
+              { label: t('doc.title'), value: safeText(title) },
+              { label: t('doc.authors'), value: doc.authors.length > 0 ? safeText(doc.authors.join(', ')) : '—' },
+              { label: t('doc.year'), value: doc.year ?? '—' },
+              { label: t('doc.venue'), value: venueText ? safeText(venueText) : '—' },
+              ...(doc.type ? [{ label: t('doc.type'), value: safeText(types.find((ty) => ty.id === doc.type)?.label ?? doc.type) }] : []),
+              ...(doc.doi ? [{ label: t('doc.doi'), value: safeText(doc.doi) }] : []),
+              ...(doc.arxivId ? [{ label: t('doc.arxiv'), value: safeText(doc.arxivId) }] : []),
+            ]}
+          />
         )}
-      </Section>
+      </CardSection>
 
-      <Section title={t('similarPanel.title')} testId="doc-similar">
-        <button type="button" aria-expanded={similarOpen} onClick={() => setSimilarOpen(!similarOpen)} data-testid="similar-toggle">
-          {similarOpen ? t('similarPanel.hide') : t('similarPanel.show')}
-        </button>
-        {similarOpen && (
-          <Lazy>
-            <SimilarPanel docId={docId} tagLabel={(id) => model.byId.get(resolveId(model, id))?.label ?? id} onOpen={openReader} />
-          </Lazy>
-        )}
-      </Section>
+      <CardSection id="notes" title={t('doc.notes')} testId="doc-notes">
+        <p className="hint">{t('doc.notesHint')}</p>
+        <NoteEditor docId={docId} testId="card-note" />
+        <Field label={t('doc.userDescription')} hint={t('doc.userDescriptionHint')} multiline rows={3} value={doc.userDescription ?? ''} onCommit={(v) => save({ userDescription: v })} testId="field-description" />
+      </CardSection>
 
-      <AiArea doc={doc} />
+      <CardSection id="citations" title={t('citations.title')} testId="doc-citations" toggleTestId="citations-toggle">
+        <Lazy>
+          <CitationsPanel docId={docId} />
+        </Lazy>
+      </CardSection>
+
+      <CardSection id="similar" title={t('doc.similarTitle')} testId="doc-similar" toggleTestId="similar-toggle">
+        <Lazy>
+          <SimilarPanel docId={docId} tagLabel={(id) => model.byId.get(resolveId(model, id))?.label ?? id} onOpen={openReader} />
+        </Lazy>
+      </CardSection>
+
+      <CardSection id="file" title={t('doc.file')} hint={`${safeText(doc.path)} · ${formatSize(doc.size)}`} testId="doc-file">
+        <KeyValue
+          items={[
+            { label: t('doc.path'), value: safeText(doc.path) },
+            { label: t('doc.size'), value: formatSize(doc.size) },
+            { label: t('doc.added'), value: safeText(doc.addedAt.slice(0, 10)) },
+          ]}
+        />
+      </CardSection>
+
       {jobOpen && (
         <Lazy>
           <JobDialog docIds={[docId]} onClose={() => setJobOpen(false)} />
         </Lazy>
       )}
-
-      <Section title={t('doc.file')} className="panel-file">
-        <dl className="facts">
-          <dt>{t('doc.path')}</dt>
-          <dd>{safeText(doc.path)}</dd>
-          <dt>{t('doc.size')}</dt>
-          <dd>{formatSize(doc.size)}</dd>
-          <dt>{t('doc.added')}</dt>
-          <dd>{safeText(doc.addedAt.slice(0, 10))}</dd>
-        </dl>
-      </Section>
     </div>
   );
-}
-
-export function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 /** Editing the tags of several documents at once: add one, or remove one of those the selection carries. */

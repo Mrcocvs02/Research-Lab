@@ -8,6 +8,7 @@ export interface SegmentedOption<T extends string> {
   disabled?: boolean;
   /** Why this option is unavailable (tooltip). */
   disabledReason?: string;
+  testId?: string;
 }
 
 /** 2-5 exclusive options (replaces radio-chip and the `toggle on` buttons). One radiogroup; arrows move and select. */
@@ -55,6 +56,7 @@ export function Segmented<T extends string>({
             aria-disabled={o.disabled || undefined}
             disabled={o.disabled}
             title={o.disabled ? o.disabledReason : undefined}
+            data-testid={o.testId}
             tabIndex={on ? 0 : -1}
             className={cx('rl-seg__opt', on && 'is-on')}
             onClick={() => onChange(o.value)}

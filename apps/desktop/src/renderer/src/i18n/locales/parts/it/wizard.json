@@ -15,29 +15,26 @@
     "creating": "Creazione in corso…",
     "cancel": "Annulla",
     "steps": {
-      "language": "Benvenuto",
-      "profile": "Chi sei",
-      "folder": "Cartella della libreria",
-      "details": "Dettagli della libreria",
+      "language": "Benvenuto e lingua",
+      "folder": "Cartella",
+      "details": "Dettagli",
       "legacy": "Indice esistente trovato",
-      "taxonomy": "Tassonomia di partenza",
-      "aiFolders": "Cartelle abilitate a Claude",
-      "summary": "Riepilogo"
+      "taxonomy": "Tag di partenza",
+      "aiFolders": "Claude",
+      "summary": "Riepilogo",
+      "scan": "Prima scansione"
     },
     "language": {
       "intro": "Benvenuto in Research Lab. Scegli la lingua dell'interfaccia. Potrai cambiarla poi dalle impostazioni.",
       "label": "Lingua dell'interfaccia"
-    },
-    "profile": {
-      "intro": "Questi dati aiutano l'app a riconoscere i tuoi paper e a interrogare i servizi di citazioni. Tutto qui è facoltativo.",
-      "optional": "Puoi lasciare tutti i campi vuoti e compilarli più avanti dalle impostazioni."
     },
     "folder": {
       "intro": "Scegli la cartella che contiene i tuoi documenti. Può essere una cartella qualsiasi, anche una già sincronizzata da un servizio cloud.",
       "choose": "Scegli cartella…",
       "change": "Scegli un'altra cartella…",
       "dialogTitle": "Scegli la cartella della libreria",
-      "safe": "I tuoi documenti non vengono mai modificati, spostati o cancellati. L'app scrive solo nella propria cartella dati."
+      "safe": "I tuoi documenti non vengono mai modificati, spostati o cancellati. L'app scrive solo nella propria cartella dati.",
+      "advanced": "Opzioni avanzate"
     },
     "legacy": {
       "intro": "In questa cartella è stato trovato un indice creato dallo strumento precedente. Puoi importarlo una volta sola.",
@@ -74,15 +71,12 @@
       "claudeNote": "Disponibile dopo aver collegato Claude."
     },
     "ai": {
-      "intro": "I documenti vengono inviati a Claude solo dalle cartelle che abiliti qui. Per impostazione predefinita nessuna cartella è abilitata.",
-      "why": "Perché: alcuni materiali possono essere riservati. L'invio si abilita cartella per cartella, ogni invio mostra prima un'anteprima ed è registrato in un elenco. Prima di abilitare cartelle con materiale non pubblico controlla le condizioni del tuo piano Claude sull'uso dei dati.",
+      "intro": "Claude legge i documenti solo dalle cartelle che abiliti qui. Finché non abiliti una cartella non viene inviato nulla.",
+      "why": "Alcuni materiali possono essere riservati: ogni invio mostra prima un'anteprima ed è registrato in un elenco. Prima di abilitare cartelle con materiale non pubblico controlla le condizioni del tuo piano Claude sull'uso dei dati.",
       "treeLabel": "Cartelle della libreria",
       "noneSelected": "Nessuna cartella abilitata: nulla verrà inviato a Claude.",
       "selected_one": "{{count}} cartella abilitata, comprese le sue sottocartelle.",
-      "selected_other": "{{count}} cartelle abilitate, comprese le loro sottocartelle.",
-      "confirmNone": "Ho capito che per ora nulla verrà inviato a Claude",
-      "confirmSome_one": "Confermo che i documenti della cartella selezionata ({{count}}) possono essere inviati a Claude",
-      "confirmSome_other": "Confermo che i documenti delle {{count}} cartelle selezionate possono essere inviati a Claude"
+      "selected_other": "{{count}} cartelle abilitate, comprese le loro sottocartelle."
     },
     "summary": {
       "intro": "Controlla i dettagli e crea la libreria.",
@@ -92,7 +86,33 @@
       "taxonomy": "Tassonomia di partenza",
       "taxonomyImport": "Dall'indice importato",
       "ai": "Cartelle abilitate a Claude",
-      "aiNone": "Nessuna"
+      "aiNone": "Nessuna",
+      "writeToPdf": "Salva le evidenziazioni anche dentro i PDF",
+      "writeToPdfHint": "Le vedrai in Chrome e negli altri lettori; il testo del PDF non cambia. In questa versione restano solo nell'app: il consenso vale per quando la scrittura sarà attiva. Si cambia in Impostazioni › Libreria.",
+      "willWrite": "Le evidenziazioni si salveranno anche dentro i PDF.",
+      "appOnly": "Le evidenziazioni restano solo nell'app."
+    },
+    "skip": "Salta",
+    "details": {
+      "yourName": "Il tuo nome",
+      "yourNameHint": "Facoltativo. Aiuta a riconoscere i tuoi lavori; il resto del profilo è in Impostazioni."
+    },
+    "scan": {
+      "intro": "Sto leggendo la cartella della libreria.",
+      "files_one": "{{count}} file",
+      "files_other": "{{count}} file",
+      "phase_walking": "Elenco dei file",
+      "phase_hashing": "Impronte",
+      "phase_extracting": "Estrazione del testo",
+      "phase_indexing": "Indice",
+      "result_one": "Trovato {{count}} documento.",
+      "result_other": "Trovati {{count}} documenti.",
+      "resultFailed_one": "Trovato {{count}} documento · {{failed}} non leggibili (si cercano per nome).",
+      "resultFailed_other": "Trovati {{count}} documenti · {{failed}} non leggibili (si cercano per nome).",
+      "background": "Puoi chiudere: la scansione continua e la vedi in alto.",
+      "continue": "Continua in background",
+      "open": "Apri la libreria",
+      "wait": "La scansione non è ancora finita"
     }
   }
 }

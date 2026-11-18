@@ -138,3 +138,10 @@ export function encryptDictR3(P: number, userPassword = ''): string {
   if (userPassword) U[0] = U[0]! ^ 0xff;
   return `<< /Filter /Standard /V 2 /R 3 /Length 128 /P ${P} /O <${O.toString('hex')}> /U <${U.toString('hex')}> >>`;
 }
+
+/** A page that already carries a foreign Highlight (object 5, appearance 6) written by "another program". */
+export function handForeignHighlight(): Buffer {
+  const ap = '<< /Type /XObject /Subtype /Form /BBox [10 10 60 30] /Length 33 >>\nstream\n0 1 0 rg 10 10 50 20 re f     \nendstream';
+  const annot = '<< /Type /Annot /Subtype /Highlight /Rect [10 10 60 30] /QuadPoints [10 30 60 30 10 10 60 10] /C [0 1 0] /F 4 /NM (other-9) /P 3 0 R /AP << /N 6 0 R >> >>';
+  return assemble(['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', PAGE('/Annots [5 0 R]'), CONTENT, annot, ap], {});
+}

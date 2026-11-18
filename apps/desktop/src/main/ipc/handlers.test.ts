@@ -137,6 +137,8 @@ describe('library handlers', () => {
     const cfg = JSON.parse(await readFile(path.join(root, '.lab', 'library.json'), 'utf8'));
     expect(cfg.language).toBe('en');
     expect(cfg.aiEnabledFolders).toEqual([]);
+    // Without the wizard's switch the library asks at the first highlight (D-348): writing is on by default but not confirmed.
+    expect(cfg.annotations).toMatchObject({ writeToPdf: true, writeToPdfConfirmedAt: null });
     expect(JSON.stringify(cfg)).not.toContain(tmp.replaceAll('\\', '\\\\')); // no absolute path in library.json
 
     expect(errCode(await call('library:create', { name: 'Again', rootPath: root }))).toBe('ALREADY_EXISTS');
@@ -282,6 +284,27 @@ describe('first-run helpers', () => {
     const p = data(await call('library:create', { name: 'L', rootPath: root }));
     const r = data(await call('library:listFolders', { libraryId: p.id })).folders;
     expect(r.map((f: { path: string }) => f.path)).toEqual(['one']);
+  });
+
+  it("stores the wizard's PDF consent: on is the library's confirmation (D-348), off turns writing off", async () => {
+    const { call } = setup();
+    const on = path.join(tmp, 'consent-on');
+    await mkdir(on);
+    await choose(call, on);
+    await call('library:create', { name: 'On', rootPath: on, writeToPdf: true });
+    const cfgOn = JSON.parse(await readFile(path.join(on, '.lab', 'library.json'), 'utf8'));
+    expect(cfgOn.annotations.writeToPdf).toBe(true);
+    expect(typeof cfgOn.annotations.writeToPdfConfirmedAt).toBe('string');
+    const off = path.join(tmp, 'consent-off');
+    await mkdir(off);
+    await choose(call, off);
+    const profileOff = data(await call('library:create', { name: 'Off', rootPath: off, writeToPdf: false }));
+    const cfgOff = JSON.parse(await readFile(path.join(off, '.lab', 'library.json'), 'utf8'));
+    expect(cfgOff.annotations).toMatchObject({ writeToPdf: false, writeToPdfConfirmedAt: null });
+    // `library:setConfig` cannot set the confirmation (it is not in the patch): whatever the answer, the value stays empty
+    await call('library:setConfig', { libraryId: profileOff.id, patch: { annotations: { writeToPdfConfirmedAt: '2026-01-01T00:00:00.000Z' } } });
+    const after = JSON.parse(await readFile(path.join(off, '.lab', 'library.json'), 'utf8'));
+    expect(after.annotations.writeToPdfConfirmedAt).toBeNull();
   });
 
   it('creates a library with AI folders and a starting taxonomy from an approved file', async () => {

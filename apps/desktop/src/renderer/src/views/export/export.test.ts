@@ -9,7 +9,7 @@ import { AppProvider } from '../../state/app-context';
 import { callsTo, emitEvent, memoryBackend, setHandlers } from '../../testing/mockRl';
 import { Palette } from '../chat/Palette';
 import { ExportDialog } from './ExportDialog';
-import { folderNameValid, fromSelection, loadPast, rememberExport, sanitizeFolderName, toSelection, emptyDraft } from './exportModel';
+import { folderNameValid, fromSelection, loadPast, rememberExport, roundTokens, sanitizeFolderName, shortPath, sizeClass, toSelection, emptyDraft } from './exportModel';
 
 vi.mock('../../lib/rl', async () => (await import('../../testing/mockRl')).rlModule);
 
@@ -114,6 +114,20 @@ describe('export model', () => {
   });
 });
 
+describe('export model: display helpers', () => {
+  it('shortens a long path once in the middle and keeps a short one', () => {
+    expect(shortPath('/tmp/out')).toBe('/tmp/out');
+    const long = `/${'a'.repeat(40)}/${'b'.repeat(40)}/end`;
+    expect(shortPath(long).length).toBeLessThanOrEqual(56);
+    expect(shortPath(long)).toContain('…');
+    expect(shortPath(long).endsWith('/end')).toBe(true);
+  });
+  it('names the size for an AI assistant and rounds the figure to two digits', () => {
+    expect([sizeClass(1_100), sizeClass(20_000), sizeClass(250_000)]).toEqual(['small', 'medium', 'large']);
+    expect([roundTokens(1_095), roundTokens(5_000), roundTokens(48_432), roundTokens(42)]).toEqual([1_100, 5_000, 48_000, 42]);
+  });
+});
+
 describe('ExportDialog', () => {
   it('starts from the entry point, estimates before running and needs a destination from the folder dialog', async () => {
     setup();
@@ -130,6 +144,27 @@ describe('ExportDialog', () => {
     await waitFor(() => expect(screen.getByTestId('export-target-note').getAttribute('data-state')).toBe('new'));
     expect(callsTo('export:preview').at(-1).target).toEqual({ destination: '/tmp/out', folderName: 'Thesis' });
     expect(runButton().disabled).toBe(false);
+  });
+
+  it('shows the size for an AI assistant as a word with the rounded figure, and the shortened destination once', async () => {
+    setup();
+    expect((await screen.findByTestId('est-size')).textContent).toBe('small (about 5,000 tokens)');
+    expect(screen.getByTestId('est-size').getAttribute('title')).toContain('Index: 900 tokens');
+    await chooseDestination();
+    await waitFor(() => expect(screen.getByTestId('export-dest-path').getAttribute('title')).toBe('/tmp/out/Thesis'));
+    expect(screen.getAllByText('/tmp/out')).toHaveLength(1);
+  });
+
+  it('keeps the footer with the buttons outside the scrolling body, and moves the focus to the next main button', async () => {
+    setup();
+    await chooseDestination();
+    await waitFor(() => expect(runButton().disabled).toBe(false));
+    const dialog = screen.getByTestId('export-dialog');
+    expect(runButton().closest('.dlg-foot')).not.toBeNull();
+    expect(dialog.querySelector('.dlg-scroll')!.contains(runButton())).toBe(false);
+    fireEvent.click(runButton());
+    await screen.findByTestId('export-progress-panel');
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('export-cancel')));
   });
 
   it('asks for something to export when the selection is empty', async () => {
@@ -227,7 +262,10 @@ describe('ExportDialog', () => {
     await waitFor(() => expect(runButton().disabled).toBe(false));
     fireEvent.click(runButton());
     const confirm = await screen.findByTestId('export-confirm');
-    expect(confirm.textContent).toContain('anyone who opens the export folder with an agent');
+    expect(confirm.textContent).toContain('There are 4 documents not enabled for Claude');
+    // The confirmation lives in the fixed footer and the focus is on its main button (4.15, N7).
+    expect(confirm.closest('.dlg-foot')).not.toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('export-confirm-yes')));
     expect(callsTo('export:run')).toHaveLength(1);
     expect(callsTo('export:run')[0].confirmed).toBe(false);
     fireEvent.click(screen.getByTestId('export-confirm-yes'));
@@ -360,7 +398,7 @@ describe('ExportDialog', () => {
     fireEvent.click(runButton());
     const confirm = await screen.findByTestId('export-confirm');
     expect(screen.getByTestId('export-confirm-copy').textContent).toContain('3');
-    expect(confirm.textContent).not.toContain('not enabled for AI');
+    expect(confirm.textContent).not.toContain('not enabled for Claude');
     fireEvent.click(screen.getByTestId('export-confirm-yes'));
     await screen.findByTestId('export-progress-panel');
     expect(callsTo('export:run')[1].confirmed).toBe(true);

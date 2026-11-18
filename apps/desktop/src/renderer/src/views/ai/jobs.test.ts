@@ -29,14 +29,14 @@ function Probe() {
   return createElement('div', { 'data-testid': 'probe' }, ui.navigation?.to ?? '');
 }
 
-function setup(o: { ids?: string[]; tweak?(ai: ReturnType<typeof memoryAi>, work: ReturnType<typeof memoryWork>): void; dialog?: boolean } = {}) {
-  const ai = memoryAi({ docs: DOCS, config: { aiEnabledFolders: ['alpha'] } });
+function setup(o: { ids?: string[]; tweak?(ai: ReturnType<typeof memoryAi>, work: ReturnType<typeof memoryWork>): void; dialog?: boolean; folders?: string[]; onClose?(): void } = {}) {
+  const ai = memoryAi({ docs: DOCS, config: { aiEnabledFolders: o.folders ?? ['alpha'] } });
   const work = memoryWork(ai);
   o.tweak?.(ai, work);
   const { handlers } = memoryBackend({ profiles: [profile] });
   setHandlers({ ...handlers, ...ai.handlers, ...work.handlers, 'documents:get': (p: any) => ({ id: p.docId, title: 'Paper' }) });
   const kids: any[] = [createElement(JobIndicator, { key: 'i' }), createElement(Probe, { key: 'p' })];
-  if (o.dialog !== false) kids.push(createElement(JobDialog, { key: 'd', docIds: o.ids ?? [D1, D2], onClose: () => {} }));
+  if (o.dialog !== false) kids.push(createElement(JobDialog, { key: 'd', docIds: o.ids ?? [D1, D2], onClose: o.onClose ?? (() => {}) }));
   render(createElement(AppProvider, null, createElement(NotifyProvider, null, createElement(AiUiProvider, null, createElement(JobsProvider, null, ...kids)))));
   return { ai, work };
 }
@@ -45,6 +45,24 @@ beforeEach(async () => {
   await i18n.changeLanguage('en');
 });
 afterEach(() => cleanup());
+
+describe('bulk AI job: no enabled folder (D-339)', () => {
+  it('does not open: it closes at once with a notice that leads to the settings', async () => {
+    const onClose = vi.fn();
+    setup({ folders: [], onClose });
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('job-dialog')).toBeNull();
+  });
+});
+
+describe('bulk AI job: dialog layout (4.15)', () => {
+  it('keeps the buttons in the fixed footer, outside the scrolling body', async () => {
+    setup();
+    const confirm = await screen.findByTestId('job-confirm');
+    expect(confirm.closest('.dlg-foot')).not.toBeNull();
+    expect(screen.getByTestId('job-dialog').querySelector('.dlg-scroll')!.contains(confirm)).toBe(false);
+  });
+});
 
 describe('bulk AI job: unavailable AI', () => {
   it.each(['offline', 'no-access'] as const)('says why at once (%s) and does not allow starting', async (reason) => {

@@ -11,6 +11,7 @@ import { memoryAi, type StreamEvent } from '../../testing/memoryAi';
 import { callsTo, memoryBackend, setHandlers } from '../../testing/mockRl';
 import { ChatPanel } from './ChatPanel';
 import { Palette } from './Palette';
+import { coveredBy } from './useChat';
 import { clearLabels } from './useLabels';
 
 vi.mock('../../lib/rl', async () => (await import('../../testing/mockRl')).rlModule);
@@ -178,6 +179,26 @@ describe('chat: cards and lab:// links', () => {
     await waitFor(() => expect(chips[0]!.textContent).toBe('Paper One'));
     fireEvent.click(chips[1]!);
     expect(probe().reader).toEqual({ docId: D2, page: null, panel: null });
+  });
+
+  it('shows a known tool as a translated block, with the technical English text closed and wrapping', async () => {
+    setup({
+      tweak: (a) =>
+        (a.state.script = () => [
+          { type: 'card', card: { id: 'c1', name: 'search_library', status: 'done', summary: 'Searched the library for "a very long unbroken query string": 1 document(s)', docIds: [D1] } },
+          { type: 'done' },
+        ]),
+    });
+    await ready();
+    await sendText('find');
+    const card = await screen.findByTestId('chat-card');
+    expect(card.getAttribute('data-tool')).toBe('search_library');
+    expect(within(card).getByText('Library search')).toBeTruthy();
+    expect(within(card).getByText('Documents found: 1')).toBeTruthy();
+    const tech = card.querySelector('details')!;
+    expect(tech.open).toBe(false);
+    expect(tech.textContent).toContain('Technical details');
+    expect(tech.textContent).toContain('Searched the library');
   });
 
   const TEXT = [
@@ -678,5 +699,74 @@ describe('chat: one confirmation per conversation (D-227)', () => {
     await waitFor(() => expect(callsTo('chat:send')).toHaveLength(3));
     expect(screen.queryByTestId('send-preview')).toBeNull();
     expect(callsTo('chat:send')[2]).toMatchObject({ conversationId: 'conv-1', confirmed: false });
+  });
+});
+
+describe('chat: inline preview after the first confirmation (D-339, D-364)', () => {
+  async function confirmFirst() {
+    await sendText('first');
+    fireEvent.click(within(await screen.findByTestId('send-preview')).getByTestId('preview-confirm'));
+    await waitFor(() => expect(aiTurns()[0]!.textContent).toContain('Hello world'));
+    await waitFor(() => expect(screen.queryByTestId('chat-cancel')).toBeNull());
+  }
+
+  it('sends the next turn with the same documents without the dialog and shows what goes above the field', async () => {
+    setup({ selection: [D1] });
+    await ready();
+    expect(screen.queryByTestId('chat-inline-preview')).toBeNull();
+    await confirmFirst();
+    const line = await screen.findByTestId('chat-inline-preview');
+    expect(line.textContent).toContain('Will be sent: the question + 1 document');
+    expect(line.getAttribute('data-asks')).toBeNull();
+    await sendText('second');
+    await waitFor(() => expect(callsTo('chat:send')).toHaveLength(2));
+    expect(callsTo('chat:send')[1]).toMatchObject({ confirmed: true, contextDocIds: [D1] });
+    expect(screen.queryByTestId('send-preview')).toBeNull();
+  });
+
+  it('brings the dialog back when the model changes, and says so before sending', async () => {
+    setup({ selection: [D1] });
+    await ready();
+    await confirmFirst();
+    fireEvent.change(screen.getByTestId('chat-model'), { target: { value: 'claude-opus-5-5' } });
+    await waitFor(() => expect(screen.getByTestId('chat-inline-preview').getAttribute('data-asks')).toBe('true'));
+    await sendText('second');
+    await screen.findByTestId('send-preview');
+    expect(callsTo('chat:send')).toHaveLength(1);
+  });
+
+  it('a new conversation starts unconfirmed: the dialog comes back', async () => {
+    setup({ selection: [D1] });
+    await ready();
+    await confirmFirst();
+    fireEvent.click(screen.getByTestId('chat-new'));
+    await waitFor(() => expect(screen.queryByTestId('chat-inline-preview')).toBeNull());
+    await sendText('again');
+    await screen.findByTestId('send-preview');
+  });
+
+  it('opens the details of what goes from the inline line', async () => {
+    setup({ selection: [D1] });
+    await ready();
+    await confirmFirst();
+    await screen.findByTestId('chat-inline-preview');
+    fireEvent.click(screen.getByTestId('inline-details'));
+    const dialog = await screen.findByTestId('send-preview');
+    expect(within(dialog).queryByTestId('preview-cancel')).toBeNull();
+    fireEvent.click(within(dialog).getByTestId('preview-confirm'));
+    await waitFor(() => expect(screen.queryByTestId('send-preview')).toBeNull());
+    expect(callsTo('chat:send')).toHaveLength(1);
+  });
+
+  it('coveredBy: any new document, any refusal, another model or the cap brings the dialog back', () => {
+    const pv = (over: Record<string, unknown> = {}) => ({ model: 'm', allowed: ['a'], refused: [], folders: [], approxInputTokens: 1, estimatedUsd: 0, needsConfirmation: true, overCap: false, ...over }) as any;
+    const c = { model: 'm', docs: new Set(['a', 'b']) };
+    expect(coveredBy(c, pv(), 'm')).toBe(true);
+    expect(coveredBy(c, pv({ allowed: [] }), 'm')).toBe(true);
+    expect(coveredBy(c, pv({ allowed: ['a', 'z'] }), 'm')).toBe(false);
+    expect(coveredBy(c, pv({ refused: [{ docId: 'q', reason: 'unknown' }] }), 'm')).toBe(false);
+    expect(coveredBy(c, pv(), 'other')).toBe(false);
+    expect(coveredBy(c, pv({ overCap: true }), 'm')).toBe(false);
+    expect(coveredBy(null, pv(), 'm')).toBe(false);
   });
 });

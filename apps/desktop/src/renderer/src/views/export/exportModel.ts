@@ -118,3 +118,18 @@ export function rememberExport(libraryId: string, e: PastExport): void {
     // per-viewer convenience only
   }
 }
+
+/** A long path shortened once in the middle, for display (the full path goes in a tooltip). */
+export function shortPath(p: string, max = 56): string {
+  return p.length <= max ? p : `${p.slice(0, 18)}…${p.slice(p.length - (max - 19))}`;
+}
+
+/** The size of the export for an AI assistant, as a word (the exact figure is rounded to two digits for the sentence). */
+export function sizeClass(tokens: number): 'small' | 'medium' | 'large' {
+  return tokens < 20_000 ? 'small' : tokens < 100_000 ? 'medium' : 'large';
+}
+export function roundTokens(tokens: number): number {
+  if (tokens < 100) return Math.round(tokens);
+  const mag = 10 ** (Math.floor(Math.log10(tokens)) - 1);
+  return Math.round(tokens / mag) * mag;
+}

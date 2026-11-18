@@ -1,5 +1,5 @@
 /* In-app guide and welcome card (lazy). */
-.dialog:has(.guide-dialog) {
+.rl-dialog:has(.guide-dialog) {
   width: min(720px, 94vw);
 }
 .guide-dialog {

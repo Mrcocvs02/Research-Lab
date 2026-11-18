@@ -210,3 +210,6 @@
   max-height: 160px;
   overflow-y: auto;
 }
+.rl-dialog:has(.preview-docs) {
+  width: min(560px, 94vw);
+}

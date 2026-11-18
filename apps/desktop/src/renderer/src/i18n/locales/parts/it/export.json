@@ -73,14 +73,19 @@
       "documents": "Documenti",
       "cited": "Opere citate aggiunte",
       "files": "File da scrivere",
-      "tokens": "Dimensione per un agente",
-      "tokensValue": "circa {{tokens}} token (indice {{index}})",
+      "tokens": "Dimensione per un assistente AI",
+      "tokensValue": "{{size}} (circa {{tokens}} token)",
       "copy": "File copiati",
       "missing": "File mancanti",
       "missingValue_one": "{{count}} documento non ha il file su disco (la scheda viene scritta, il file non viene copiato)",
       "missingValue_other": "{{count}} documenti non hanno il file su disco (le schede vengono scritte, i file non vengono copiati)",
       "aiDisabled_one": "{{count}} documento selezionato è in una cartella non abilitata all'AI. Esportarlo chiederà la tua conferma.",
-      "aiDisabled_other": "{{count}} documenti selezionati sono in cartelle non abilitate all'AI. Esportarli chiederà la tua conferma."
+      "aiDisabled_other": "{{count}} documenti selezionati sono in cartelle non abilitate all'AI. Esportarli chiederà la tua conferma.",
+      "size_small": "piccola",
+      "size_medium": "media",
+      "size_large": "grande",
+      "tokensTip": "Quanto testo dovrebbe leggere un assistente AI per leggere tutta l'esportazione. Di solito ne basta una parte: parte dall'indice.",
+      "tokensIndex": "Indice: {{index}} token."
     },
     "target": {
       "new": "{{name}} non esiste ancora: verrà creata.",
@@ -99,10 +104,10 @@
     },
     "confirm": {
       "title": "Conferma richiesta",
-      "body_one": "{{count}} documento selezionato è in una cartella che non hai abilitato all'AI. Una volta esportato, chiunque apra la cartella dell'esportazione con un agente (come Claude Code) può leggerlo. Esportarlo comunque?",
-      "body_other": "{{count}} documenti selezionati sono in cartelle che non hai abilitato all'AI. Una volta esportati, chiunque apra la cartella dell'esportazione con un agente (come Claude Code) può leggerli. Esportarli comunque?",
       "bodyCopy": "Le copie dei file originali occupano circa {{size}}. Verifica che la destinazione abbia abbastanza spazio libero. Copiarli comunque?",
-      "yes": "Esporta comunque"
+      "yes": "Esporta comunque",
+      "footer_one": "C'è {{count}} documento non abilitato a Claude: una volta esportato, chiunque apra la cartella con un assistente AI può leggerlo.",
+      "footer_other": "Ci sono {{count}} documenti non abilitati a Claude: una volta esportati, chiunque apra la cartella con un assistente AI può leggerli."
     },
     "result": {
       "done": "L'esportazione è completa.",

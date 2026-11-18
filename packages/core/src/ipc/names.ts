@@ -3,12 +3,19 @@
  * of the registry (the preload runs in every window at start). Kept equal to the registry by `names.test.ts`.
  */
 export const CHANNEL_NAMES: readonly string[] = [
+  'ai:account',
   'ai:chooseExecutable',
   'ai:clearExecutable',
   'ai:log',
+  'ai:login',
+  'ai:loginDone',
+  'ai:logout',
   'ai:preview',
+  'ai:setAuthMode',
   'ai:status',
+  'ai:test',
   'ai:usage',
+  'ai:usageAll',
   'annotations:list',
   'annotations:remove',
   'annotations:save',
@@ -126,6 +133,7 @@ export const CHANNEL_NAMES: readonly string[] = [
   'review:list',
   'review:stats',
   'scan:cancel',
+  'scan:report',
   'scan:start',
   'scan:status',
   'search:facets',
@@ -154,6 +162,7 @@ export const CHANNEL_NAMES: readonly string[] = [
 ];
 
 export const EVENT_NAMES: readonly string[] = [
+  'ai:accountChanged',
   'app:notice',
   'backup:progress',
   'chat:event',

@@ -4,11 +4,13 @@
     "intro": "Cambia, spegni o ripristina i tasti dei comandi. Un tasto richiede Ctrl o Alt (da F1 a F12 possono stare da soli). Premi Esc durante la registrazione per annullare.",
     "scope": {
       "global": "Ovunque nell'app",
-      "reader": "Nel lettore PDF"
+      "reader": "Nel lettore PDF",
+      "reader-tool": "Strumenti del lettore"
     },
     "scopeHint": {
       "global": "Funzionano in ogni vista.",
-      "reader": "Funzionano solo con il lettore in primo piano; possono riusare un tasto di un altro ambito ma non dello stesso."
+      "reader": "Funzionano solo con il lettore in primo piano; possono riusare un tasto di un altro ambito ma non dello stesso.",
+      "reader-tool": "Tasti singoli senza Ctrl o Alt; funzionano solo con le pagine del lettore in primo piano e non possono ripetere un tasto del lettore o dello stesso gruppo."
     },
     "command": "Comando",
     "key": "Tasto",
@@ -37,15 +39,29 @@
       "search.focus": "Vai alla casella di ricerca",
       "nav.library": "Vai alla Libreria",
       "nav.projects": "Vai ai Progetti",
-      "nav.network": "Vai alla Rete",
-      "nav.inbox": "Vai agli Arrivi",
-      "nav.review": "Vai alle proposte dell'AI da rivedere",
+      "nav.discover": "Vai a Scopri",
+      "nav.map": "Vai alla Mappa",
+      "nav.review": "Vai a Da rivedere",
       "nav.settings": "Apri le impostazioni",
       "guide.open": "Apri la guida",
       "shortcuts.show": "Mostra le scorciatoie da tastiera",
       "reader.find": "Cerca nel documento",
       "reader.highlight": "Evidenzia il risultato corrente",
-      "reader.underline": "Sottolinea il risultato corrente"
+      "reader.underline": "Sottolinea il risultato corrente",
+      "reader.close": "Chiudi il lettore",
+      "reader.tool.select": "Strumento: Seleziona",
+      "reader.tool.highlight": "Strumento: Evidenzia",
+      "reader.tool.underline": "Strumento: Sottolinea",
+      "reader.tool.crop": "Strumento: Ritaglia",
+      "reader.tool.eraser": "Strumento: Gomma",
+      "reader.tool.swap": "Scambia lo strumento attuale con l'ultimo",
+      "reader.color.1": "Colore 1",
+      "reader.color.2": "Colore 2",
+      "reader.color.3": "Colore 3",
+      "reader.color.4": "Colore 4",
+      "reader.color.5": "Colore 5",
+      "reader.comment": "Commenta l'annotazione selezionata",
+      "reader.annotation.delete": "Elimina l'annotazione selezionata"
     },
     "conflictRefused": "Impossibile salvare: la scorciatoia è già usata da un altro comando ({{commands}}). Risolvi il conflitto e salva di nuovo."
   }

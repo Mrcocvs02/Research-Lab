@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { isoDateSchema, itemIdSchema } from '../../common.js';
+import { documentIdSchema, isoDateSchema, itemIdSchema } from '../../common.js';
 import { serializedErrorSchema } from '../../errors.js';
+import { SCAN_LIMITS } from '../../limits.js';
 import { defineChannels, defineEvents } from '../registry.js';
 
 export const scanStateSchema = z.enum(['idle', 'running', 'done', 'failed', 'cancelled']);
@@ -36,6 +37,26 @@ export const scanStatusSchema = z.object({
   finishedAt: isoDateSchema.optional(),
   error: serializedErrorSchema.optional(),
 });
+const reportIds = z.array(documentIdSchema).max(SCAN_LIMITS.reportIds);
+/**
+ * Outcome of the last finished scan of a library (§9, the popover Attività and the first-scan summary). The main keeps
+ * it per library in `<localData>/scan/<libraryId>-report.json`; before any scan `finishedAt` and `summary` are null and
+ * the lists empty. Each list holds at most `SCAN_LIMITS.reportIds` ids (`truncated` says some were left out).
+ */
+export const scanReportSchema = z.object({
+  finishedAt: isoDateSchema.nullable(),
+  summary: scanSummarySchema.nullable(),
+  /** The scan was the first of the library (its new files are the library, not arrivals: they stay out of the badge). */
+  firstScan: z.boolean(),
+  added: reportIds,
+  changed: reportIds,
+  moved: reportIds,
+  missing: reportIds,
+  failed: reportIds,
+  truncated: z.boolean(),
+});
+export type ScanReport = z.infer<typeof scanReportSchema>;
+
 export type ScanStatus = z.infer<typeof scanStatusSchema>;
 export type ScanSummary = z.infer<typeof scanSummarySchema>;
 
@@ -50,6 +71,8 @@ export const scanChannels = defineChannels('scan', {
   start: { request: target.extend({ full: z.boolean().optional() }), response: scanStatusSchema },
   cancel: { request: target, response: scanStatusSchema },
   status: { request: target, response: scanStatusSchema },
+  /** Report of the last finished scan (§9). Reads a small file of the local data folder; never starts a scan. */
+  report: { request: target, response: scanReportSchema },
 });
 
 export const scanEvents = defineEvents('scan', {

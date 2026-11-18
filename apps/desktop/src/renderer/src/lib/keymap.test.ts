@@ -55,7 +55,7 @@ describe('resolveShortcut', () => {
   it('finds the command of a scope with the defaults', () => {
     const eff = effectiveShortcuts([]);
     expect(resolveShortcut(press('k', { ctrlKey: true }), eff, 'global')).toBe('palette.open');
-    expect(resolveShortcut(press('3', { altKey: true }), eff, 'global')).toBe('nav.network');
+    expect(resolveShortcut(press('5', { altKey: true }), eff, 'global')).toBe('nav.map');
     expect(resolveShortcut(press('f', { ctrlKey: true }), eff, 'global')).toBeNull();
     expect(resolveShortcut(press('f', { ctrlKey: true }), eff, 'reader')).toBe('reader.find');
   });

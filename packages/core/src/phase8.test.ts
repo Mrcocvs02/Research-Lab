@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { channels } from './ipc/channels/index.js';
 import { BACKUP_FORMAT_VERSION, backupManifestSchema } from './ipc/channels/backup.js';
 import { appSettingsPatchSchema, defaultAppSettings } from './settings.js';
-import { SHORTCUT_COMMANDS, SHORTCUT_IDS, effectiveShortcuts, findShortcutConflicts, normalizeAccelerator, shortcutOverridesSchema } from './shortcuts.js';
+import { SHORTCUT_COMMANDS, SHORTCUT_IDS, effectiveShortcuts, findShortcutConflicts, normalizeAccelerator, normalizeReaderToolKey, shortcutOverridesSchema } from './shortcuts.js';
 
 describe('shortcuts', () => {
   it('normalizes accelerators and refuses unsafe ones', () => {
@@ -14,7 +14,10 @@ describe('shortcuts', () => {
   });
 
   it('every default is canonical and the defaults do not conflict', () => {
-    for (const id of SHORTCUT_IDS) expect(normalizeAccelerator(SHORTCUT_COMMANDS[id].default)).toBe(SHORTCUT_COMMANDS[id].default);
+    for (const id of SHORTCUT_IDS) {
+      const { scope, default: key } = SHORTCUT_COMMANDS[id];
+      expect((scope === 'reader-tool' ? normalizeReaderToolKey : normalizeAccelerator)(key)).toBe(key);
+    }
     expect(findShortcutConflicts(effectiveShortcuts([]))).toEqual([]);
   });
 

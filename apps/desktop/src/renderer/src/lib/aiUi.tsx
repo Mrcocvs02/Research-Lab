@@ -26,7 +26,7 @@ export interface SearchRequest {
   nonce: number;
 }
 export interface Navigation {
-  to: 'settings' | 'project' | 'inbox' | 'review' | 'library' | 'projects' | 'network' | 'newLibrary';
+  to: 'settings' | 'project' | 'inbox' | 'review' | 'library' | 'projects' | 'network' | 'discover' | 'newLibrary';
   projectId?: string;
   /** Where to put the focus once the view is shown (`search`: the library search box; `backup`: the backup section of the settings). */
   focus?: 'search' | 'backup';
@@ -161,9 +161,10 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   useShortcut('palette.open', () => setPaletteOpen(true));
   useShortcut('search.focus', () => goTo('library', { focus: 'search' }));
   useShortcut('nav.library', () => goTo('library'));
+  // TODO(A2): the shell is rebuilt with the new sidebar order; until then the new ids reach the old views.
   useShortcut('nav.projects', () => goTo('projects'));
-  useShortcut('nav.network', () => goTo('network'));
-  useShortcut('nav.inbox', () => goTo('inbox'));
+  useShortcut('nav.map', () => goTo('network'));
+  useShortcut('nav.discover', () => goTo('discover'));
   useShortcut('nav.review', () => goTo('review'));
   useShortcut('nav.settings', () => goTo('settings'));
   useShortcut('guide.open', () => openGuide('guide'), { inModal: true });

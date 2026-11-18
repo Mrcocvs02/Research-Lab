@@ -339,7 +339,7 @@ async function enrich(c: Ctx, target: { kind: 'dropped'; id: string } | { kind: 
  * The badge: dropped items of the local queue plus the flagged library files remembered from the last listing or
  * recount. Reads no document (unless `recount`) and never looks anything up online.
  */
-export async function countInbox(s: MainServices, recount: boolean): Promise<{ count: number }> {
+export async function countInbox(s: MainServices, recount: boolean): Promise<{ count: number; dropped: number; library: number }> {
   const c = await openCtx(s);
   const file = await c.store.read();
   let flagged = file.flagged ?? 0;
@@ -347,7 +347,7 @@ export async function countInbox(s: MainServices, recount: boolean): Promise<{ c
     flagged = (await c.rt.store.documents.list()).filter((r) => r.inbox && !r.missing).length;
     if (file.flagged !== flagged) await c.store.update((d) => void (d.flagged = flagged));
   }
-  return { count: Math.min(INBOX_LIMITS.items, file.items.length + flagged) };
+  return { count: Math.min(INBOX_LIMITS.items, file.items.length + flagged), dropped: file.items.length, library: flagged };
 }
 
 /** Lists the inbox. Online lookups of flagged library files start here, so only when the Inbox view is open or on an explicit action. */

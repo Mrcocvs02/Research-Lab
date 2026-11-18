@@ -594,13 +594,13 @@ describe('inbox security and robustness (review fixes)', () => {
     const og = store.documents.get.bind(store.documents);
     store.documents.list = (async () => (reads.list++, ol())) as never;
     store.documents.get = (async (i: never) => (reads.get++, og(i))) as never;
-    expect(ok(await call('inbox:count', {}))).toEqual({ count: 1 });
+    expect(ok(await call('inbox:count', {}))).toMatchObject({ count: 1 });
     expect(reads).toEqual({ list: 0, get: 0 });
     await whenInboxIdle();
     expect(fetched).toEqual([]);
     // After a scan the renderer asks for a recount: one pass over the records, still no lookup.
-    expect(ok(await call('inbox:count', { recount: true }))).toEqual({ count: 2 });
-    expect(ok(await call('inbox:count', {}))).toEqual({ count: 2 });
+    expect(ok(await call('inbox:count', { recount: true }))).toMatchObject({ count: 2 });
+    expect(ok(await call('inbox:count', {}))).toMatchObject({ count: 2 });
     await whenInboxIdle();
     expect(fetched).toEqual([]);
   });

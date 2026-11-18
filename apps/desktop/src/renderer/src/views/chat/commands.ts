@@ -16,8 +16,8 @@ export type PredefinedCommand = (typeof PREDEFINED_COMMANDS)[number];
 export const APP_ACTIONS = [
   { id: 'goLibrary', shortcut: 'nav.library' },
   { id: 'goProjects', shortcut: 'nav.projects' },
-  { id: 'goNetwork', shortcut: 'nav.network' },
-  { id: 'goInbox', shortcut: 'nav.inbox' },
+  { id: 'goNetwork', shortcut: 'nav.map' },
+  { id: 'goInbox' },
   { id: 'goReview', shortcut: 'nav.review' },
   { id: 'goSettings', shortcut: 'nav.settings' },
   { id: 'newLibrary' },

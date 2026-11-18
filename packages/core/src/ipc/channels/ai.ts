@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { documentIdSchema, isoDateSchema, relativePathSchema } from '../../common.js';
+import { documentIdSchema, isoDateSchema, itemIdSchema, relativePathSchema } from '../../common.js';
 import { AI_LIMITS } from '../../limits.js';
-import { aiProviderIdSchema } from '../../settings.js';
-import { defineChannels } from '../registry.js';
+import { aiAuthModeSchema, aiProviderIdSchema } from '../../settings.js';
+import { defineChannels, defineEvents } from '../registry.js';
 
 /** How the provider reaches Claude: the user's Claude Code login, an API key in the OS secure store, or nothing. */
 export const aiAuthSchema = z.enum(['claude-code', 'api-key', 'none']);
@@ -31,6 +31,27 @@ export const aiStatusSchema = z.object({
     .object({ path: z.string().nullable(), source: z.enum(['settings', 'path', 'local-bin', 'sdk', 'none']) })
     .optional(),
 });
+
+/**
+ * The Claude account as the Account card needs it (§10.3). `account` comes only from `claude auth status` (never from a
+ * credentials file) and the raw output of that command is never logged or returned. `loggedIn` null: not determinable.
+ */
+export const aiAccountSchema = z.object({
+  authMode: aiAuthModeSchema,
+  /** What the child process would use now. */
+  effective: aiAuthSchema,
+  apiKey: z.object({ stored: z.boolean(), envVar: z.boolean() }),
+  claudeCode: z.object({
+    path: z.string().nullable(),
+    source: z.enum(['settings', 'path', 'local-bin', 'sdk', 'none']),
+    version: z.string().max(64).nullable(),
+    loggedIn: z.boolean().nullable(),
+    account: z.object({ email: z.string().max(320).optional(), organization: z.string().max(200).optional(), plan: z.string().max(100).optional() }).nullable(),
+    /** The installed CLI has `auth status|login|logout`; when false the card falls back to the instructions. */
+    supportsAuthCommands: z.boolean(),
+  }),
+});
+export type AiAccount = z.infer<typeof aiAccountSchema>;
 
 /** What a send would include, before it happens (plan §5, privacy): shown to the user, who confirms. */
 export const aiPreviewSchema = z.object({
@@ -102,6 +123,38 @@ export const aiChannels = defineChannels('ai', {
    * (`ai.claudeCodePath`). Null when the dialog was cancelled; INVALID_REQUEST when the file is not a regular file.
    */
   chooseExecutable: { request: z.object({}), response: z.object({ path: z.string().nullable() }) },
+  /** The account card (§10.3). Runs `claude auth status` (fixed arguments, 10 s) at most; never returns a credential. */
+  account: { request: z.object({}), response: aiAccountSchema },
+  /** Sets which credentials are used (`settings.ai.authMode`); answers with the new account state. */
+  setAuthMode: { request: z.object({ mode: aiAuthModeSchema }), response: aiAccountSchema },
+  /**
+   * Opens a visible console with `claude auth login --claudeai` (D-431); no argument comes from the renderer. Where
+   * the CLI has no `auth` commands: the plain executable and the instruction to type /login.
+   */
+  login: { request: z.object({}), response: z.object({ started: z.literal(true) }) },
+  /** Manual re-check after the login ("I'm done, check"): runs `auth status` again. */
+  loginDone: { request: z.object({}), response: aiAccountSchema },
+  /** `claude auth logout` without interaction (20 s), then the status again. */
+  logout: { request: z.object({}), response: aiAccountSchema },
+  /** Minimal request to Haiku, logged as `connection-test` (§10.2 point 6). Failures are an `ok: false` result, not an error. */
+  test: { request: z.object({}), response: z.object({ ok: z.boolean(), ms: z.number().nonnegative(), model: z.string(), usd: z.number().nonnegative().nullable(), error: z.object({ code: z.string() }).optional() }) },
+  /**
+   * Spending of the known libraries this month, on click only (§10.4, D-330). Unreachable libraries are skipped and
+   * reported (`reachable: false`, `usd: null`).
+   */
+  usageAll: {
+    request: z.object({}),
+    response: z.object({
+      totalUsd: z.number().nonnegative(),
+      sends: z.number().int().nonnegative(),
+      libraries: z.array(z.object({ libraryId: itemIdSchema, usd: z.number().nonnegative().nullable(), reachable: z.boolean() })),
+    }),
+  },
   /** Forgets the chosen executable: back to automatic discovery. */
   clearExecutable: { request: z.object({}), response: z.object({ ok: z.literal(true) }) },
+});
+
+export const aiEvents = defineEvents('ai', {
+  /** The account state changed: after `setAuthMode`, `logout`, or a change seen by the login watcher (§10.3). */
+  accountChanged: aiAccountSchema,
 });

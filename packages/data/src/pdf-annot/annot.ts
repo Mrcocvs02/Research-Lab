@@ -48,25 +48,27 @@ export interface Sem { s: string; q: number[]; c: number[]; t: string; a: string
 export const semOf = (a: Pick<AnnotSpec, 'subtype' | 'rects' | 'color' | 'contents' | 'author'>): Sem => ({ s: a.subtype, q: quadsOf(a.rects), c: a.color.map(r2), t: a.contents ? cutContents(a.contents) : '', a: a.author ?? '' });
 export const revOf = (m: Sem): string => createHash('sha256').update(JSON.stringify([m.s, m.q, m.c, m.t, m.a])).digest('hex');
 
-function appearance(a: AnnotSpec, box: Rect): Buffer {
+function appearance(a: AnnotSpec, box: Rect, seal?: (b: Buffer) => Buffer): Buffer {
   const [r, g, b] = a.color.map(f2);
   let ops: string;
   if (a.subtype === 'Highlight') ops = `/G0 gs ${r} ${g} ${b} rg\n` + a.rects.map((q) => `${f2(q[0])} ${f2(q[1])} ${f2(q[2] - q[0])} ${f2(q[3] - q[1])} re f`).join('\n');
   else ops = `${r} ${g} ${b} RG\n` + a.rects.map((q) => { const h = q[3] - q[1]; return `${f2(Math.max(0.75, h / 14))} w ${f2(q[0])} ${f2(q[1] + h / 7)} m ${f2(q[2])} ${f2(q[1] + h / 7)} l S`; }).join('\n');
-  const dict = `<< /Type /XObject /Subtype /Form /BBox [${box.map(f2).join(' ')}] /Resources << /ExtGState << /G0 << /BM /Multiply /CA 1 /ca 1 >> >> >> /Length ${Buffer.byteLength(ops)} >>`;
-  return Buffer.from(`${dict}\nstream\n${ops}\nendstream`, 'latin1');
+  const data = seal ? seal(Buffer.from(ops, 'latin1')) : Buffer.from(ops, 'latin1');
+  const dict = `<< /Type /XObject /Subtype /Form /BBox [${box.map(f2).join(' ')}] /Resources << /ExtGState << /G0 << /BM /Multiply /CA 1 /ca 1 >> >> >> /Length ${data.length} >>`;
+  return Buffer.concat([Buffer.from(`${dict}\nstream\n`, 'latin1'), data, Buffer.from('\nendstream')]);
 }
 
-/** Dictionary text and appearance stream of an annotation; `page` is the page object, `ap` the object number of the appearance. */
-export function annotObjects(a: AnnotSpec, page: Ref, ap: number, now: string): { dict: string; ap: Buffer } {
+/** Dictionary text and appearance stream of an annotation; `page` is the page object, `ap` the object number of the appearance. `seal` (encrypted files): the strings of the dictionary and the data of the appearance, each with the key of its object. */
+export function annotObjects(a: AnnotSpec, page: Ref, ap: number, now: string, seal?: { str: (b: Buffer) => Buffer; stream: (b: Buffer) => Buffer }): { dict: string; ap: Buffer } {
+  const txt = (s: string) => pdfText(s, seal?.str);
   const box = union(a.rects);
   const q = quadsOf(a.rects).map(f2);
   const quads = Array.from({ length: a.rects.length }, (_, i) => q.slice(i * 8, i * 8 + 8).join(' ')).join(' ');
   const dict =
     `<< /Type /Annot /Subtype /${a.subtype} /Rect [${box.map(f2).join(' ')}] /QuadPoints [${quads}] /C [${a.color.map((n) => f2(r2(n))).join(' ')}] /CA 1 /F 4 /P ${page.n} ${page.g} R` +
-    ` /NM ${pdfText(a.nm)}${a.author ? ' /T ' + pdfText(a.author) : ''}${a.contents ? ' /Contents ' + pdfText(cutContents(a.contents)) : ''}` +
-    ` /CreationDate (${pdfDate(a.created)}) /M (${pdfDate(now)}) /AP << /N ${ap} 0 R >> >>`;
-  return { dict, ap: appearance(a, box) };
+    ` /NM ${txt(a.nm)}${a.author ? ' /T ' + txt(a.author) : ''}${a.contents ? ' /Contents ' + txt(cutContents(a.contents)) : ''}` +
+    ` /CreationDate ${txt(pdfDate(a.created))} /M ${txt(pdfDate(now))} /AP << /N ${ap} 0 R >> >>`;
+  return { dict, ap: appearance(a, box, seal?.stream) };
 }
 
 const textOf = (v: Val | undefined): string => {

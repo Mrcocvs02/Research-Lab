@@ -182,15 +182,16 @@ export class Lexer {
 }
 
 const NAME_BAD = /[^!-~]|[()<>[\]{}/%#]/;
-export function ser(v: Val, out: string[] = []): string {
+/** `enc` seals the strings (the object's key of an encrypted file). */
+export function ser(v: Val, out: string[] = [], enc?: (b: Buffer) => Buffer): string {
   if (v === null) out.push('null');
   else if (typeof v === 'boolean') out.push(v ? 'true' : 'false');
   else if (typeof v === 'number') out.push(Number.isInteger(v) ? String(v) : v.toFixed(6).replace(/\.?0+$/, ''));
   else if (v instanceof Name) out.push('/' + [...v.v].map((ch) => (NAME_BAD.test(ch) ? '#' + ch.charCodeAt(0).toString(16).padStart(2, '0') : ch)).join(''));
   else if (v instanceof Ref) out.push(`${v.n} ${v.g} R`);
-  else if (v instanceof Str) out.push('<' + v.b.toString('hex') + '>');
-  else if (Array.isArray(v)) { out.push('['); v.forEach((x, i) => { if (i) out.push(' '); ser(x, out); }); out.push(']'); }
-  else { out.push('<<'); for (const [k, x] of v) { ser(new Name(k), out); out.push(' '); ser(x, out); out.push(' '); } out.push('>>'); }
+  else if (v instanceof Str) out.push('<' + (enc ? enc(v.b) : v.b).toString('hex') + '>');
+  else if (Array.isArray(v)) { out.push('['); v.forEach((x, i) => { if (i) out.push(' '); ser(x, out, enc); }); out.push(']'); }
+  else { out.push('<<'); for (const [k, x] of v) { ser(new Name(k), out); out.push(' '); ser(x, out, enc); out.push(' '); } out.push('>>'); }
   return out.join('');
 }
 
@@ -199,8 +200,9 @@ export const asNum = (v: Val | undefined): number | undefined => (typeof v === '
 export const nameOf = (v: Val | undefined): string | undefined => (v instanceof Name ? v.v : undefined);
 
 /** Text string to PDF syntax: literal for ASCII, UTF-16BE with BOM otherwise. */
-export function pdfText(s: string): string {
-  if (/^[\x20-\x7e]*$/.test(s)) return '(' + s.replace(/[\\()]/g, '\\$&') + ')';
-  const b = Buffer.from('﻿' + s, 'utf16le').swap16();
-  return '<' + b.toString('hex') + '>';
+export function pdfText(s: string, enc?: (b: Buffer) => Buffer): string {
+  const ascii = /^[\x20-\x7e]*$/.test(s);
+  if (ascii && !enc) return '(' + s.replace(/[\\()]/g, '\\$&') + ')';
+  const b = ascii ? Buffer.from(s, 'latin1') : Buffer.from('﻿' + s, 'utf16le').swap16();
+  return '<' + (enc ? enc(b) : b).toString('hex') + '>';
 }

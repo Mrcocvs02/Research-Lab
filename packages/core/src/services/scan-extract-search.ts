@@ -163,6 +163,10 @@ export interface SearchFilters {
    */
   folder?: RelativePath;
   includeSubfolders?: boolean;
+  /** Restrict to an explicit set of documents (an empty list matches nothing). */
+  docIds?: string[];
+  /** Documents of one graph topic (cluster id); resolved to `docIds` by the main process before the index sees it. */
+  topic?: string;
   yearFrom?: number;
   yearTo?: number;
 }

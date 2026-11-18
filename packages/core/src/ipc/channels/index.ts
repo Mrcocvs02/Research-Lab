@@ -61,7 +61,7 @@ export { reviewFieldSchema, reviewItemSchema, type ReviewField, type ReviewItem 
 export { inboxItemSchema, inboxMetadataSchema, type InboxItem, type InboxMetadata } from './inbox.js';
 export { citationLinkViewSchema, citationViewSchema, citationJobStatusSchema, readNextItemSchema, CITATION_LIMITS, type CitationView } from './citations.js';
 export { watchSourceViewSchema, publishedProposalSchema } from './watch.js';
-export { clusterViewSchema, exploreDimensionSchema, exploreNodeSchema, graphStatusSchema, similarityReasonSchema, GRAPH_LIMITS } from './graph.js';
+export { authorAliasesSchema, clusterViewSchema, exploreDimensionSchema, exploreNodeSchema, graphStatusSchema, similarityReasonSchema, GRAPH_LIMITS } from './graph.js';
 export { exportEstimateSchema, exportJobStatusSchema, exportResultSchema, exportSelectionSchema, exportTargetSchema, EXPORT_LIMITS, type ExportSelection } from './export.js';
 export { mcpLogItemSchema, mcpStatusSchema, mcpToolNameSchema, MCP_LIMITS, MCP_TOOL_NAMES, type McpStatus } from './mcp.js';
 export { backupInfoSchema, backupJobStatusSchema, backupManifestSchema, backupPreviewSchema, backupResultSchema, backupSettingsSchema, BACKUP_FORMAT_VERSION, BACKUP_LIMITS, type BackupInfo, type BackupJobStatus, type BackupManifest, type BackupSettings } from './backup.js';

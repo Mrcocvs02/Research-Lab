@@ -170,6 +170,10 @@ describe('search', () => {
     expect(await q({ folders: ['x'] })).toEqual([a, b]);
     expect(await q({ folders: ['x/y'] })).toEqual([a]);
     expect(await q({ folders: ['x/'] })).toEqual([a, b]);
+    expect(await q({ docIds: [a!, c!] })).toEqual([a, c]);
+    expect(await q({ docIds: [b!], yearFrom: 2022 })).toEqual([]);
+    expect(await q({ docIds: [] })).toEqual([]);
+    expect(await q({ docIds: [a!, b!, c!], folders: ['x'] })).toEqual([a, b]);
     expect(await q({ yearFrom: 2020 })).toEqual([b, c]);
     expect(await q({ yearTo: 2020 })).toEqual([a]);
     expect(await q({ tags: ['t1', 't2'] })).toEqual([b]);

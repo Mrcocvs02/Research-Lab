@@ -80,6 +80,8 @@ export const CHANNEL_NAMES: readonly string[] = [
   'export:status',
   'graph:build',
   'graph:cancel',
+  'graph:editAuthorAliases',
+  'graph:entityNetwork',
   'graph:labelClusters',
   'graph:map',
   'graph:neighbors',

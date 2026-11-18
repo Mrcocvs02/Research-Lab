@@ -6,7 +6,11 @@ import { defineChannels, defineEvents } from '../registry.js';
 import { aiPreviewSchema } from './ai.js';
 
 /** Upper bounds of the phase 6 channels. */
-export const GRAPH_LIMITS = { mapPoints: 50_000, buildDocuments: 60_000, citationKeys: 200, similar: 50, surprising: 200, neighbors: 300, exploreNodes: 500, labelClusters: 100, topTerms: 12 } as const;
+export const GRAPH_LIMITS = { mapPoints: 50_000, buildDocuments: 60_000, citationKeys: 200, similar: 50, surprising: 200, neighbors: 300, exploreNodes: 500, labelClusters: 100, topTerms: 12, entityNodes: 800, entityEdges: 6400 } as const;
+
+const authorKeySchema = z.string().min(1).max(600);
+/** `merge`: key -> key it was merged into; `split`: keys shown as one node per written form. */
+export const authorAliasesSchema = z.object({ merge: z.record(authorKeySchema, authorKeySchema), split: z.array(authorKeySchema).max(5000) });
 
 /** Why two documents are close (plan §4 phase 6): text (TF-IDF), shared citations, shared tags. */
 export const similarityReasonSchema = z.enum(['text', 'citations', 'tags']);
@@ -101,6 +105,61 @@ export const graphChannels = defineChannels('graph', {
       /** `from` / `to` are node KEYS `<kind>:<id>` (a folder and a tag may share the same id). */
       edges: z.array(z.object({ from: z.string().max(1100), to: z.string().max(1100), kind: z.enum(['similar', 'cites', 'tagged', 'contains']), weight: z.number().min(0).max(1) })),
     }),
+  },
+  /**
+   * Entity networks of the Map (D-387, D-454): tags (co-occurrence), topics (affinity of the model's clusters at a level)
+   * and authors (co-authorship, consortia excluded), computed locally from the records and the model. At most `limit`
+   * (800) nodes, the biggest, and the 8 heaviest edges of each. Ids are the ones of Explore (`author:<key>`, a taxonomy node,
+   * a cluster id). Topics without a built model are an empty network, not an error.
+   */
+  entityNetwork: {
+    request: z.object({
+      mode: z.enum(['tag', 'topic', 'author']),
+      /** Topic level (0 = the coarsest). */
+      level: z.number().int().min(0).max(8).optional(),
+      scope: z.object({ folder: relativePathSchema.optional(), projectId: z.string().max(100).optional(), tagId: itemIdSchema.optional() }).optional(),
+      /** First and last year (a pair: `z.tuple` would add its machinery to the main bundle). */
+      years: z.array(z.number().int().min(1000).max(3000)).length(2).optional(),
+      minDocs: z.number().int().min(1).max(1000).default(2),
+      minWeight: z.number().min(0).max(1).default(0),
+      limit: z.number().int().min(1).max(GRAPH_LIMITS.entityNodes).default(GRAPH_LIMITS.entityNodes),
+    }),
+    response: z.object({
+      nodes: z.array(
+        z.object({
+          id: z.string().max(1100),
+          label: z.string().max(300),
+          count: z.number().int().nonnegative(),
+          /** Ten bins of publication years over `yearRange`. */
+          years: z.array(z.number().int().nonnegative()).length(10),
+          colorKey: z.string().max(200),
+          group: z.string().max(1100),
+          groupLabel: z.string().max(300).optional(),
+          variants: z.array(z.string().max(300)).max(50).optional(),
+        }),
+      ).max(GRAPH_LIMITS.entityNodes),
+      edges: z.array(z.object({ a: z.string().max(1100), b: z.string().max(1100), w: z.number().min(0).max(1), n: z.number().int().nonnegative(), implies: z.boolean().optional() })).max(GRAPH_LIMITS.entityEdges),
+      /** Entities before the cap. */
+      total: z.number().int().nonnegative(),
+      truncated: z.boolean(),
+      /** First and last year of the ten bins (absent when no document in the scope has a year). */
+      yearRange: z.array(z.number().int()).length(2).optional(),
+      /** Documents of the scope that the network was computed from. */
+      documents: z.number().int().nonnegative(),
+    }),
+  },
+  /**
+   * The user's corrections to the authors, kept in `<dataDir>/graph/author-aliases.json` (keys are the part of an id after `author:`):
+   * merges an author key into another, or splits one into a node per written form; answers the new corrections.
+   */
+  editAuthorAliases: {
+    request: z.discriminatedUnion('action', [
+      z.object({ action: z.literal('merge'), from: authorKeySchema, to: authorKeySchema }),
+      z.object({ action: z.literal('split'), key: authorKeySchema }),
+      /** One-time import of what an older version kept in the browser; existing corrections win. */
+      z.object({ action: z.literal('import'), aliases: authorAliasesSchema }),
+    ]),
+    response: authorAliasesSchema,
   },
   /**
    * Cluster labels written by Claude (plan §5 use 6): sends the clusters' top terms and the titles of their documents

@@ -136,9 +136,21 @@ export class PdfSync {
     return { plan, otherIds, needsRepair };
   }
 
-  async state(docId: string): Promise<PdfState> {
+  async state(docId: string, inspect = false): Promise<PdfState> {
     const rt = await this.s.runtime.require();
-    return this.stateOf(rt, docId as DocumentId);
+    const id = docId as DocumentId;
+    if (inspect) {
+      // How many annotations of other programs a byte-exact restore would drop (§8.3.8): reads the file, so only on request.
+      const rec = await rt.getDocument(id);
+      const w = rec.pdfWrite;
+      if (w && !rec.missing && PDF_EXT.test(rec.path)) {
+        const profile = await this.s.libraries.profile(rt.libraryId);
+        const abs = await resolveInRoot(profile.rootPath, rec.path).catch(() => null);
+        const ins = abs ? await rt.pdf.pdfInspect({ path: abs, baseSize: w.base.size }).catch(() => null) : null;
+        if (ins?.ok && ins.externalAtBase !== null) this.memOf(rt.libraryId, docId).dropped = { hash: rec.hash, n: Math.max(0, ins.external - ins.externalAtBase) };
+      }
+    }
+    return this.stateOf(rt, id);
   }
 
   private async stateOf(rt: LibraryRuntime, docId: DocumentId): Promise<PdfState> {

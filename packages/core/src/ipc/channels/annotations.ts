@@ -92,7 +92,14 @@ export const annotationsChannels = defineChannels('annotations', {
     response: z.object({ removed: z.boolean(), underlined: underlinedSchema }),
   },
   /** State of the PDF of a document: what is written, what waits, why a file is refused. Reads only. */
-  pdfState: { request: z.object({ docId: documentIdSchema }), response: pdfStateSchema },
+  pdfState: {
+    request: z.object({
+      docId: documentIdSchema,
+      /** Also count the annotations of other programs that a byte-exact restore would drop (reads the file: only before the restore dialog). */
+      inspect: z.boolean().optional(),
+    }),
+    response: pdfStateSchema,
+  },
   /** Writes the pending changes now (the reader sends it when it closes a document). Never throws for a refusal: the state says it. */
   writeNow: { request: z.object({ docId: documentIdSchema }), response: pdfStateSchema },
   /** "Keep only in the app for this document" / "Write again". */

@@ -409,3 +409,24 @@
   overflow: hidden;
   scrollbar-gutter: auto;
 }
+
+/* Dialogs and banner of the PDF writing (G4a): consent, take out, restore. */
+.pdf-dialog {
+  display: grid;
+  gap: var(--sp-4);
+  padding-top: var(--sp-3);
+}
+.pdf-dialog p {
+  margin: 0;
+}
+.pdf-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+}
+.pdf-info-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}

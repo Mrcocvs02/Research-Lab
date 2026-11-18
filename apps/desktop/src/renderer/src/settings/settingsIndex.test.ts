@@ -27,6 +27,7 @@ const ROWS_6_2 = [
   'ai.models', 'ai.models.prices', 'ai.provider', 'ai.claudeCodePath', 'ai.authMode', 'secret.anthropic-api-key', 'ai:status', 'ai:log', 'ai:usage', 'secret.gemini-api-key',
   'mcp.enabled', 'mcp.writeEnabled', 'mcp.port', 'mcp.copy', 'mcp.rotateToken', 'mcp.log',
   'backup.destination', 'backup.auto', 'backup.keep', 'backup.includeLocal', 'backup:create', 'restore', 'backup.list', 'shortcuts[]', 'maintenance', 'limits',
+  'annotations.writeToPdf', 'annotations.author', 'annotations.backupLocation', 'annotations.copies', 'pdfMode',
   ...HIDDEN_ROWS,
   ...PENDING_ROWS,
 ];

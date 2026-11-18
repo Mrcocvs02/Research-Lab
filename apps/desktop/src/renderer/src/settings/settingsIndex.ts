@@ -37,6 +37,11 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   e('libraryLanguage', 'library', 'thisOne', ['language']),
   e('excludedFolders', 'library', 'thisOne', ['excludedFolders']),
   e('scanNow', 'library', 'thisOne', ['scan:start']),
+  e('annotWrite', 'library', 'annotations', ['annotations.writeToPdf']),
+  e('annotMigrate', 'library', 'annotations', []),
+  e('annotAuthor', 'library', 'annotations', ['annotations.author']),
+  e('annotBackupLocation', 'library', 'annotations', ['annotations.backupLocation']),
+  e('annotCopies', 'library', 'annotations', ['annotations.copies', 'pdfMode']),
   e('authMode', 'claude', 'account', ['ai.authMode']),
   e('account', 'claude', 'account', ['ai:status']),
   e('secretAnthropic', 'claude', 'account', ['secret.anthropic-api-key']),
@@ -80,8 +85,8 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
 /** 6.2 rows with no control by design (internal or environment): they are not in the index. */
 export const HIDDEN_ROWS = ['firstRunDone', 'RL_* variables', 'rl.libraryView', 'rl.libraryTab', 'rl.chatOpen', 'rl.readerSide', 'rl.paletteRecent', 'rl.detailOpen', 'rl.readerTool'] as const;
 
-/** 6.2 rows whose controls belong to a later task (the PDF annotations group is written with the writer, G4a): reported, not yet in the index. */
-export const PENDING_ROWS = ['annotations.writeToPdf', 'annotations.author', 'annotations.backupLocation', 'annotations.copies', 'pdfMode'] as const;
+/** 6.2 rows whose controls belong to a later task: none left (the PDF annotations group of the library section, G4a). */
+export const PENDING_ROWS: readonly string[] = [];
 
 export const entryById = (id: string): SettingsEntry | undefined => SETTINGS_ENTRIES.find((x) => x.id === id);
 

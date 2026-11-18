@@ -110,7 +110,7 @@ describe('Wizard', () => {
       uiLanguage: 'en',
       user: expect.objectContaining({ name: 'Jane Doe', authorVariants: [] }),
     });
-    expect(callsTo('library:create')).toEqual([{ name: 'example-root', rootPath: ROOT.path, language: 'it', dataDirName: '.lab', aiEnabledFolders: [] }]);
+    expect(callsTo('library:create')).toEqual([{ name: 'example-root', rootPath: ROOT.path, language: 'it', dataDirName: '.lab', aiEnabledFolders: [], writeToPdf: true }]);
     expect(callsTo('library:setActive')).toEqual([{ libraryId: 'lib-test' }]);
     expect(callsTo('settings:set')).toContainEqual({ firstRunDone: true });
     expect(callsTo('import:startLegacy')).toEqual([]);

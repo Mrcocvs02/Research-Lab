@@ -88,7 +88,7 @@
       "ai": "Folders enabled for Claude",
       "aiNone": "None",
       "writeToPdf": "Save highlights inside the PDFs too",
-      "writeToPdfHint": "You will see them in Chrome and other readers; the PDF text does not change. In this version they stay in the app only: the consent applies for when writing is on. Change it in Settings › Library.",
+      "writeToPdfHint": "You will see them in Chrome and other readers; the PDF text does not change. It is written when you close the document, and you can always take them out. Change it in Settings › Library.",
       "willWrite": "Highlights will be saved inside the PDFs too.",
       "appOnly": "Highlights stay in the app only."
     },

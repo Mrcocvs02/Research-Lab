@@ -244,7 +244,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
       });
       return { removed: r.value, underlined: r.underlined };
     },
-    'annotations:pdfState': async ({ docId }) => pdf.state(docId),
+    'annotations:pdfState': async ({ docId, inspect }) => pdf.state(docId, inspect === true),
     'annotations:writeNow': async ({ docId }) => pdf.writeNow(docId),
     'annotations:setPdfMode': async ({ docId, mode }) => pdf.setMode(docId, mode),
     'annotations:confirmPdfWrite': async ({ choice }) => pdf.confirm(choice),

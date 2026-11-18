@@ -88,7 +88,7 @@
       "ai": "Cartelle abilitate a Claude",
       "aiNone": "Nessuna",
       "writeToPdf": "Salva le evidenziazioni anche dentro i PDF",
-      "writeToPdfHint": "Le vedrai in Chrome e negli altri lettori; il testo del PDF non cambia. In questa versione restano solo nell'app: il consenso vale per quando la scrittura sarà attiva. Si cambia in Impostazioni › Libreria.",
+      "writeToPdfHint": "Le vedrai in Chrome e negli altri lettori; il testo del PDF non cambia. Si scrivono quando chiudi il documento e puoi sempre toglierle. Si cambia in Impostazioni › Libreria.",
       "willWrite": "Le evidenziazioni si salveranno anche dentro i PDF.",
       "appOnly": "Le evidenziazioni restano solo nell'app."
     },

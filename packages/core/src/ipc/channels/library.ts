@@ -37,6 +37,11 @@ export const libraryChannels = defineChannels('library', {
        * `dialog:chooseFile` in this session. Omitted: empty taxonomy.
        */
       taxonomyFilePath: z.string().min(1).optional(),
+      /**
+       * The wizard's summary switch (D-348): `true` writes `annotations.writeToPdfConfirmedAt` (the library's consent to write
+       * highlights into the PDFs), `false` turns `writeToPdf` off. Omitted: the library asks at the first highlight.
+       */
+      writeToPdf: z.boolean().optional(),
     }),
     response: libraryProfileSchema,
   },

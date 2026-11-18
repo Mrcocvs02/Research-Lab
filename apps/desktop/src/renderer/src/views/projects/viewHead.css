@@ -1,0 +1,54 @@
+/* the header of the secondary views (Projects, Discover) */
+.vhead {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  flex-wrap: wrap;
+}
+.vhead h1 {
+  margin: 0;
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.vhead__sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+}
+.vhead__acts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.vbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.vbar--selection {
+  padding: 0 8px 0 12px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+}
+.vbar__count {
+  margin-right: 4px;
+  color: var(--accent-text);
+  font-variant-numeric: tabular-nums;
+}
+.vbar__spacer {
+  flex: 1;
+}

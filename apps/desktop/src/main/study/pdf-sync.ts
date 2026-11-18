@@ -589,6 +589,53 @@ export class PdfSync {
     return this.stateOf(rt, id);
   }
 
+  /* ----------------------------------------------------------------- annotated copy, other programs' annotations (J5, lazy chunk) */
+
+  /** The document's record, its absolute path (confined to the library root) and its annotations: what the J5 functions work on. */
+  private async docFiles(docId: string) {
+    const rt = await this.s.runtime.require();
+    const id = docId as DocumentId;
+    const [rec, file] = await Promise.all([rt.getDocument(id), rt.store.annotations.get(id)]);
+    if (rec.missing || !PDF_EXT.test(rec.path)) throw new AppError('INVALID_REQUEST', 'The PDF is not available', { reason: 'unavailable' });
+    const abs = await resolveInRoot((await this.s.libraries.profile(rt.libraryId)).rootPath, rec.path);
+    return { rt, id, rec, file, abs };
+  }
+
+  /** "Export an annotated copy" (§8.3.14): the original is only read; works with `PDF_WRITE_ENABLED` off, without consent, for refused files. */
+  async exportCopy(docId: string, destination: string): Promise<{ file: string; annotations: number; skipped: number }> {
+    const { rt, rec, file, abs } = await this.docFiles(docId);
+    const cfg = await this.config(rt);
+    const user = cfg.annotations.author === 'profile' ? (await this.s.settings.get()).user.name.trim() : '';
+    // After a write on this document, never during it.
+    return this.enqueue(rt.libraryId, docId, async () => {
+      const { plan } = this.split(file, rec);
+      return (await import('./pdf-copy.js')).exportCopy({
+        s: this.s, rt, rec, abs, dir: path.join(this.dir, 'copies'), journal: this.journal, destination,
+        plan: plan.map(({ pdf: _p, ...a }) => a),
+        skipped: (file?.annotations.length ?? 0) - plan.length,
+        ...(user ? { author: user } : {}),
+      });
+    });
+  }
+
+  async externalList(docId: string) {
+    const { rt, file, abs } = await this.docFiles(docId);
+    return (await import('./pdf-copy.js')).externalList(rt, abs, file);
+  }
+
+  /** "Import into the app": new app annotations; the PDF is not touched (the usual write moments then apply to them). */
+  async externalImport(docId: string, keys: string[]): Promise<{ imported: number; skipped: number }> {
+    const { rt, id, rec, abs } = await this.docFiles(docId);
+    const r = await this.enqueue(rt.libraryId, docId, async () => (await import('./pdf-copy.js')).externalImport(rt, rec, abs, keys));
+    if (r.imported > 0) {
+      await rt.organizer.syncUnderlined(docId, true).catch(() => {});
+      this.s.emit('library:changed', { kind: 'annotations', ids: [id] });
+      this.s.emit('library:changed', { kind: 'documents', ids: [id] });
+      this.touch(rt.libraryId, docId);
+    }
+    return r;
+  }
+
   /* ----------------------------------------------------------------- the library (jobs, copies) */
 
   private async documentsWithPdf(rt: LibraryRuntime): Promise<Array<{ rec: DocumentRecord; file: AnnotationFile }>> {

@@ -662,7 +662,7 @@ export function ReaderView({ target, onClose }: Props) {
         />
       )}
       {pdf.ask === 'consent' && <PdfConsentDialog onChoose={pdf.choose} onClose={() => pdf.setAsk(null)} />}
-      <PdfConfirmDialogs pdf={pdf} />
+      <PdfConfirmDialogs pdf={pdf} docId={docId} />
       <div className={sideOpen ? 'reader-body with-side' : 'reader-body'}>
         <div className="reader-main">
           {findOpen && (

@@ -149,8 +149,8 @@ export function createWorkerService(deps: WorkerDeps): LibraryWorker {
       return (await loadWriter()).verifyFile(args);
     },
 
-    async pdfInspect({ path, baseSize }) {
-      return (await loadWriter()).inspectFile(path, baseSize);
+    async pdfInspect({ path, baseSize, list }) {
+      return (await loadWriter()).inspectFile(path, baseSize, list);
     },
 
     async index({ rootPath, cacheDir, jobs }: { rootPath: string; cacheDir: string; jobs: IndexJob[] }) {

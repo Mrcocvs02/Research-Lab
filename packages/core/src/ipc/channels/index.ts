@@ -52,7 +52,7 @@ export { taxonomyOpSchema, taxonomyViewSchema, taxonomyNodeViewSchema, nodeCount
 export { historyItemSchema, historyResultSchema } from './history.js';
 export { projectDetailSchema, projectSummarySchema, projectMemberViewSchema, readingPlanItemViewSchema, studyCountsSchema, type ProjectDetail } from './projects.js';
 export { noteViewSchema, noteListItemSchema, type NoteView } from './notes.js';
-export { annotationColorSchema, annotationInputSchema, pdfReasonSchema, pdfStateSchema, type AnnotationInput, type PdfReason, type PdfState } from './annotations.js';
+export { annotationColorSchema, annotationInputSchema, externalItemSchema, pdfReasonSchema, pdfStateSchema, type AnnotationInput, type ExternalItem, type PdfReason, type PdfState } from './annotations.js';
 export { thumbItemSchema } from './thumbs.js';
 export { aiAccountSchema, aiAuthSchema, aiPreviewSchema, aiSendViewSchema, aiStatusSchema, type AiAccount, type AiTokenUsage, aiTokenUsageSchema } from './ai.js';
 export { chatCardSchema, chatConversationSummarySchema, chatTurnSchema, chatUsageSchema } from './chat.js';

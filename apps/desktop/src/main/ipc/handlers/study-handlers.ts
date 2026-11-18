@@ -257,6 +257,9 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
     'annotations:backups': async () => pdf.backups(),
     'annotations:deleteBackups': async () => pdf.deleteBackups(),
     'annotations:migrationPlan': async () => pdf.migrationPlan(),
+    'annotations:exportCopy': async ({ docId, destination }) => pdf.exportCopy(docId, destination),
+    'annotations:externalList': async ({ docId }) => pdf.externalList(docId),
+    'annotations:externalImport': async ({ docId, keys }) => pdf.externalImport(docId, keys),
   };
 };
 

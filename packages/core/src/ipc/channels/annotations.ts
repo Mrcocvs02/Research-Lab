@@ -32,6 +32,19 @@ export const pdfStateSchema = z.object({
 });
 export type PdfState = z.infer<typeof pdfStateSchema>;
 
+/** An annotation made by another program, as the reader lists it for the import (J5). `inApp`: an equal one already exists in the app. */
+export const externalItemSchema = z.object({
+  key: z.string().min(1).max(40),
+  kind: z.enum(['highlight', 'underline']),
+  page: z.number().int().positive(),
+  rects: z.array(normRectSchema).min(1).max(STUDY_LIMITS.rectsPerAnnotation),
+  color: z.string().max(20).optional(),
+  comment: z.string().max(STUDY_LIMITS.annotationComment).optional(),
+  author: z.string().max(200).optional(),
+  inApp: z.boolean(),
+});
+export type ExternalItem = z.infer<typeof externalItemSchema>;
+
 const jobId = z.object({ jobId: z.string().min(1).max(100) });
 
 export const annotationColorSchema = z.enum(ANNOTATION_COLORS);
@@ -120,6 +133,26 @@ export const annotationsChannels = defineChannels('annotations', {
   /** Safety copies of the originals (Advanced): how many, how much space, where. */
   backups: { request: z.object({}), response: z.object({ count: z.number().int().nonnegative(), bytes: z.number().nonnegative(), location: z.enum(['data', 'local']) }) },
   deleteBackups: { request: z.object({}), response: z.object({ deleted: z.number().int().nonnegative() }) },
+  /**
+   * "Export an annotated copy" (§8.3.14): a copy of the PDF with the annotations of the app written in, in the folder the user picked
+   * with `dialog:chooseFolder` (purpose `export-destination`). Works also when writing into the original is off or refused (read-only
+   * file, too many revisions, "only in the app"): it writes only the copy and never touches the original. `PERMISSION_DENIED` with
+   * `details.reason` when the file cannot be annotated; `CONFLICT` when the file changed meanwhile or the folder is inside the library.
+   */
+  exportCopy: {
+    request: z.object({ docId: documentIdSchema, destination: z.string().min(1).max(4096) }),
+    response: z.object({ file: z.string(), annotations: z.number().int().nonnegative(), skipped: z.number().int().nonnegative() }),
+  },
+  /** Highlights and underlines that other programs wrote into the PDF (read only; none of ours). */
+  externalList: {
+    request: z.object({ docId: documentIdSchema }),
+    response: z.object({ items: z.array(externalItemSchema), truncated: z.boolean() }),
+  },
+  /** "Import into the app": creates app annotations from the listed items (`key` of `externalList`); the PDF is not touched. */
+  externalImport: {
+    request: z.object({ docId: documentIdSchema, keys: z.array(z.string().min(1).max(40)).min(1).max(500) }),
+    response: z.object({ imported: z.number().int().nonnegative(), skipped: z.number().int().nonnegative() }),
+  },
   /** What `migrate` would do: files, estimated space of the copies, documents skipped (annotations to check). */
   migrationPlan: { request: z.object({}), response: z.object({ files: z.number().int().nonnegative(), bytes: z.number().nonnegative(), skipped: z.number().int().nonnegative(), written: z.number().int().nonnegative() }) },
 });

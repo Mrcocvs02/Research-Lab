@@ -34,6 +34,8 @@ export interface SyncRequest {
   /** Name for `/T` (only with `annotations.author = 'profile'`). */
   author?: string | undefined;
   now: string;
+  /** A copy for the user ("Export an annotated copy", §8.3.14): a file with many revisions is accepted, since only the copy is written. */
+  forCopy?: boolean | undefined;
 }
 
 /** What the verification (§8.3.3 step 6) expects on a touched page (0-based): the other references in order, and all of ours with their `rev`. */
@@ -106,7 +108,7 @@ export async function planSync(req: SyncRequest): Promise<SyncResult> {
   const src = fileSource(req.path);
   setDeadline(LIM.workerTimeoutMs);
   try {
-    const a = await analyze(src);
+    const a = await analyze(src, { allowManyRevisions: req.forCopy === true });
     if (!a.ok) return { ok: false, reason: a.reason, detail: a.detail, emptyPassword: a.emptyPassword };
     const doc = a.doc;
     const total = pageCountOf(doc);

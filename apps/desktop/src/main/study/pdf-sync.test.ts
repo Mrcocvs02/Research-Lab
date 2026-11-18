@@ -95,7 +95,7 @@ async function world(over: { pdf?: Buffer; confirmed?: boolean } = {}): Promise<
         await w.hooks.beforeVerify?.();
         return verifyFile(a);
       },
-      pdfInspect: async (a: { path: string; baseSize?: number }) => inspectFile(a.path, a.baseSize),
+      pdfInspect: async (a: { path: string; baseSize?: number; list?: boolean }) => inspectFile(a.path, a.baseSize, a.list),
     },
   };
   w.s = {
@@ -562,5 +562,88 @@ describe('the library: migration of the annotations that already exist (D-347)',
   it('refuses to start without the consent of the library', async () => {
     w.cfg.annotations.writeToPdfConfirmedAt = null;
     await expect(new PdfSync(w.s, true).migrate()).rejects.toMatchObject({ code: 'PERMISSION_DENIED' });
+  });
+});
+
+describe('an annotated copy and the annotations of other programs (J5, §8.3.14)', () => {
+  let out: string;
+  beforeEach(async () => {
+    out = path.join(w.dir, 'out');
+    await mkdir(out, { recursive: true });
+    (w.s as unknown as { approved: unknown }).approved = { resolve: (p: string, purpose: string) => (purpose === 'export-destination' && p === out ? p : null) };
+  });
+
+  it('writes only a copy: the original is untouched, the copy has the original as prefix and the annotations, nothing is left behind', async () => {
+    // writing into the original is off for this document and in this build, and still the copy is made
+    const ps = new PdfSync(w.s, false);
+    const r = await ps.exportCopy(DOC, out);
+    expect(r).toEqual({ file: 'paper (annotated).pdf', annotations: 2, skipped: 0 });
+    expect((await bytes(w)).equals(w.original)).toBe(true);
+    expect((await readdir(w.root)).sort()).toEqual(['.lab', 'paper.pdf']);
+    const copy = await readFile(path.join(out, r.file));
+    expect(copy.subarray(0, w.original.length).equals(w.original)).toBe(true);
+    expect(annotsCount(copy)).toBe(2);
+    expect((await readdir(out)).filter((n) => n.endsWith('.tmp'))).toEqual([]);
+    expect(w.anns.get(DOC)!.annotations.every((a) => !a.pdf)).toBe(true); // the app's records are not marked: nothing was written into the original
+    // a second export never replaces the first
+    expect((await ps.exportCopy(DOC, out)).file).toBe('paper (annotated 2).pdf');
+  });
+
+  it('refuses a folder that was not picked with the dialog, and one inside the library', async () => {
+    const ps = new PdfSync(w.s, false);
+    await expect(ps.exportCopy(DOC, path.join(w.dir, 'elsewhere'))).rejects.toMatchObject({ code: 'INVALID_REQUEST', details: { reason: 'destination-not-approved' } });
+    const inside = path.join(w.root, 'sub');
+    await mkdir(inside);
+    (w.s as unknown as { approved: unknown }).approved = { resolve: (p: string) => p };
+    await expect(ps.exportCopy(DOC, inside)).rejects.toMatchObject({ code: 'CONFLICT', details: { reason: 'inside-library' } });
+  });
+
+  it('a file with many revisions (refused for writing) can be copied', async () => {
+    let pdf = docPdf({ pages: 1 });
+    for (let i = 0; i < 205; i++) pdf = appendRevision(pdf, [[30 + (i % 3), '<< /K 1 >>']]);
+    await fresh({ pdf });
+    w.anns.set(DOC, annotationFileSchema.parse({ docId: DOC, annotations: [ann('a1')] }));
+    const o2 = path.join(w.dir, 'out2');
+    await mkdir(o2);
+    (w.s as unknown as { approved: unknown }).approved = { resolve: (p: string) => p };
+    const ps = new PdfSync(w.s, true);
+    expect((await ps.writeNow(DOC)).reason).toBe('too-many-revisions');
+    const r = await ps.exportCopy(DOC, o2);
+    const copy = await readFile(path.join(o2, r.file));
+    expect(copy.subarray(0, pdf.length).equals(pdf)).toBe(true);
+    expect((await bytes(w)).equals(pdf)).toBe(true);
+  });
+
+  it('nothing to put in a copy is said, not silently copied', async () => {
+    w.anns.set(DOC, annotationFileSchema.parse({ docId: DOC, annotations: [] }));
+    await expect(new PdfSync(w.s, false).exportCopy(DOC, out)).rejects.toMatchObject({ details: { reason: 'no-annotations' } });
+  });
+
+  it('lists the highlights of other programs (not ours) and imports the chosen ones into the app; the PDF is not touched', async () => {
+    const hl = (nm: string, sub: string, q: string) => `<< /Type /Annot /Subtype /${sub} /Rect [20 150 120 170] /QuadPoints [${q}] /C [1 0.92 0.23] /NM (${nm}) /Contents (from a reader) /T (Ann) >>`;
+    const other = appendRevision(docPdf({ pages: 1 }), [
+      [30, hl('x-1', 'Highlight', '20 170 120 170 20 150 120 150')],
+      [31, hl('rl-mine', 'Highlight', '20 100 120 100 20 80 120 80')],
+      [32, hl('x-2', 'Underline', '20 60 120 60 20 40 120 40')],
+      [3, '<< /Type /Page /Parent 2 0 R /Contents 4 0 R /MediaBox [0 0 200 200] /Annots [30 0 R 31 0 R 32 0 R] >>'],
+    ]);
+    await fresh({ pdf: other });
+    const ps = new PdfSync(w.s, false);
+    const list = await ps.externalList(DOC);
+    expect(list.items.map((i) => [i.kind, i.page, i.color, i.comment, i.author, i.inApp])).toEqual([
+      ['highlight', 1, 'yellow', 'from a reader', 'Ann', false],
+      ['underline', 1, 'yellow', 'from a reader', 'Ann', false],
+    ]);
+    const first = list.items[0]!;
+    expect(first.rects[0]!.y).toBeCloseTo(0.15, 2);
+    const r = await ps.externalImport(DOC, [first.key, 'nonsense']);
+    expect(r).toEqual({ imported: 1, skipped: 1 });
+    const saved = w.anns.get(DOC)!.annotations;
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ kind: 'highlight', page: 1, color: 'yellow', geom: 2, comment: 'from a reader' });
+    expect((await bytes(w)).equals(other)).toBe(true);
+    // the same one again is "already in the app" and is not imported twice
+    expect((await ps.externalList(DOC)).items[0]!.inApp).toBe(true);
+    expect(await ps.externalImport(DOC, [first.key])).toEqual({ imported: 0, skipped: 1 });
   });
 });

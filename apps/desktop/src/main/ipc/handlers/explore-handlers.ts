@@ -7,7 +7,11 @@ import type { MainServices } from './services.js';
 const unknown = () => new AppError('NOT_FOUND', 'Unknown node');
 
 export const exploreHandlers = (s: MainServices): DomainHandlers<'explore'> => {
-  const index = async () => (await loadView(await s.runtime.require())).explore();
+  const index = async () => {
+    const rt = await s.runtime.require();
+    const { aliases, key } = await (await import('../../graph/author-aliases.js')).readAuthorAliases(rt);
+    return (await loadView(rt)).explore(aliases, key);
+  };
   return {
     'explore:level': async ({ dimension, parentId }) => (await index()).level(dimension, parentId) ?? Promise.reject(unknown()),
     'explore:documents': async ({ dimension, id, limit, offset }) => (await index()).documents(dimension, id, limit, offset) ?? Promise.reject(unknown()),

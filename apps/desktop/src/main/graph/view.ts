@@ -1,5 +1,5 @@
 import { AppError, type DocumentRecord, type TaxonomyFile } from '@rl/core';
-import { createExploreIndex, type ExploreIndex } from '@rl/graph';
+import { createExploreIndex, type AuthorAliases, type ExploreIndex } from '@rl/graph';
 import { documentsKey } from '../citations/context.js';
 import type { LibraryRuntime } from '../library/library-runtime.js';
 import { makeTaxonomyLookup, type TaxonomyLookup } from '../library/indexable.js';
@@ -20,7 +20,8 @@ export interface LibraryView {
   /** Documents that carry a tag (implied tags included); counted once per view. */
   tagCount(tag: string): number;
   folders(): Map<string, { direct: number; total: number }>;
-  explore(): ExploreIndex;
+  /** Explore's index; `aliasKey` names the author corrections it was built with (a new key builds a new index). */
+  explore(aliases?: AuthorAliases, aliasKey?: string): ExploreIndex;
 }
 
 const views = new WeakMap<object, LibraryView>();
@@ -37,7 +38,7 @@ export async function loadView(rt: LibraryRuntime): Promise<LibraryView> {
   const tagMemo = new Map<string, string[]>();
   let tagCounts: Map<string, number> | undefined;
   let folderMap: ReturnType<LibraryView['folders']> | undefined;
-  let exploreIndex: ExploreIndex | undefined;
+  let exploreIndex: { key: string; index: ExploreIndex } | undefined;
   const view: LibraryView = {
     key,
     records,
@@ -83,12 +84,17 @@ export async function loadView(rt: LibraryRuntime): Promise<LibraryView> {
       }
       return folderMap;
     },
-    explore() {
-      exploreIndex ??= createExploreIndex(
-        records.map((r) => ({ id: r.id, title: titleOf(r), year: r.year, authors: r.authors, venue: r.ref.venue, venueId: r.ref.venueId, tags: tagsOfMemo(r) })),
-        { nodes: tax?.nodes ?? [], venues: tax?.venues ?? [] },
-      );
-      return exploreIndex;
+    explore(aliases, aliasKey = '') {
+      if (exploreIndex?.key !== aliasKey)
+        exploreIndex = {
+          key: aliasKey,
+          index: createExploreIndex(
+            records.map((r) => ({ id: r.id, title: titleOf(r), year: r.year, authors: r.authors, venue: r.ref.venue, venueId: r.ref.venueId, tags: tagsOfMemo(r) })),
+            { nodes: tax?.nodes ?? [], venues: tax?.venues ?? [] },
+            aliases,
+          ),
+        };
+      return exploreIndex.index;
     },
   };
   const tagsOfMemo = (r: DocumentRecord) => view.tagsOf(r);

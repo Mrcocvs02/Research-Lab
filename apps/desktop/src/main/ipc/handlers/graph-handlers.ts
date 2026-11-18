@@ -12,6 +12,9 @@ export const graphHandlers = (s: MainServices): DomainHandlers<'graph'> => ({
   'graph:similar': async ({ docId, limit }) => ({ items: await similar(s, docId, limit) }),
   'graph:surprising': ({ docId, limit }) => surprising(s, docId, limit),
   'graph:neighbors': (req) => neighbors(s, req),
+  // Computed in a chunk of its own, loaded on first use: the start of the app does not carry it (D-449).
+  'graph:entityNetwork': async (req) => (await import('../../graph/entity-run.js')).runEntityNetwork(s, req),
+  'graph:editAuthorAliases': async (edit) => (await import('../../graph/author-aliases.js')).editAuthorAliases(await s.runtime.require(), edit),
   'graph:previewLabels': ({ clusterIds, model }) => previewLabels(s, { clusterIds, model }),
   'graph:labelClusters': ({ clusterIds, model, reasoning, confirmed }) => labelClusters(s, { clusterIds, model, reasoning, confirmed }),
 });

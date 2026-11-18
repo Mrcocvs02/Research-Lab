@@ -640,3 +640,80 @@ describe('concurrency, limits and housekeeping', () => {
     expect(({} as any).text).toBeUndefined();
   });
 });
+
+describe('graph:entityNetwork and the author corrections (N4)', () => {
+  const net = (mode: 'tag' | 'topic' | 'author', more: Record<string, unknown> = {}) => ({ mode, minDocs: 1, minWeight: 0, limit: 800, ...more });
+
+  it('answers tags and authors without a model, and an empty topic network until one is built', async () => {
+    const call = harness();
+    const tags = ok(await call('graph:entityNetwork', net('tag')));
+    expect(tags.nodes.map((n: any) => n.id)).toEqual(expect.arrayContaining(['tag0', 'tag1', 'science']));
+    expect(tags.documents).toBe(COUNT);
+    expect(tags.yearRange).toEqual([2000, 2019]);
+    expect(tags.nodes[0].years).toHaveLength(10);
+    expect(ok(await call('graph:entityNetwork', net('author'))).nodes.length).toBeGreaterThan(0);
+    expect(ok(await call('graph:entityNetwork', net('topic')))).toMatchObject({ nodes: [], total: 0, truncated: false });
+  });
+
+  it('uses the clusters of the model for topics, with the ids of the Panorama, and leaves out excluded folders', async () => {
+    const call = harness();
+    await built(call);
+    const m = ok(await call('graph:map', {}));
+    const top = new Set(m.clusters.filter((c: any) => c.level === 0).map((c: any) => c.id));
+    const t = ok(await call('graph:entityNetwork', net('topic')));
+    expect(t.nodes.length).toBe(top.size);
+    expect(t.nodes.every((n: any) => top.has(n.id))).toBe(true);
+    expect(t.nodes.reduce((s: number, n: any) => s + n.count, 0)).toBe(COUNT);
+    await store.writeConfig(config({ excludedFolders: ['folder0'] }));
+    const without = ok(await call('graph:entityNetwork', net('topic')));
+    expect(without.documents).toBeLessThan(COUNT);
+  });
+
+  it('computes once per library state and again after a change', async () => {
+    harness();
+    const { runEntityNetwork } = await import('./entity-run.js');
+    const a = await runEntityNetwork(services, net('author') as any);
+    expect(await runEntityNetwork(services, net('author') as any)).toBe(a);
+    expect(await runEntityNetwork(services, net('author', { minDocs: 2 }) as any)).not.toBe(a);
+    generation++;
+    await store.documents.put(record(COUNT + 1, { authors: ['Zed Zelda'] }));
+    rt = makeRuntime();
+    const b = await runEntityNetwork(services, net('author') as any);
+    expect(b).not.toBe(a);
+    expect(b.nodes.some((n) => n.id === 'author:zelda z')).toBe(true);
+  });
+
+  it('keeps Separate and Merge in author-aliases.json, applies them to the network and to Explore', async () => {
+    const call = harness();
+    await store.documents.put(record(COUNT + 2, { authors: ['Rina Okoye'] }));
+    await store.documents.put(record(COUNT + 3, { authors: ['Rosa Okoye'] }));
+    generation++;
+    rt = makeRuntime();
+    const before = ok(await call('graph:entityNetwork', net('author')));
+    expect(before.nodes.find((n: any) => n.id === 'author:okoye r').variants).toEqual(expect.arrayContaining(['Rina Okoye', 'Rosa Okoye']));
+
+    const split = ok(await call('graph:editAuthorAliases', { action: 'split', key: 'okoye r' }));
+    expect(split.split).toEqual(['okoye r']);
+    const file = JSON.parse(await readFile(path.join(store.dataDir, 'graph', 'author-aliases.json'), 'utf8'));
+    expect(file).toEqual({ merge: {}, split: ['okoye r'] });
+    const after = ok(await call('graph:entityNetwork', net('author')));
+    expect(after.nodes.map((n: any) => n.id)).toEqual(expect.arrayContaining(['author:okoye r|rina okoye', 'author:okoye r|rosa okoye']));
+    expect(ok(await call('explore:documents', { dimension: 'author', id: 'author:okoye r|rina okoye', limit: 10, offset: 0 })).total).toBe(1);
+
+    ok(await call('graph:editAuthorAliases', { action: 'merge', from: 'okoye r|rosa okoye', to: 'okoye r|rina okoye' }));
+    const merged = ok(await call('graph:entityNetwork', net('author')));
+    expect(merged.nodes.find((n: any) => n.id === 'author:okoye r|rina okoye').count).toBe(2);
+    expect(merged.nodes.some((n: any) => n.id === 'author:okoye r|rosa okoye')).toBe(false);
+  });
+
+  it('turns a topic filter into the documents of that topic', async () => {
+    const call = harness();
+    await built(call);
+    const m = ok(await call('graph:map', {}));
+    const id = m.clusters.find((c: any) => c.level === 0).id as string;
+    const { topicDocIds } = await import('./entity-run.js');
+    const ids = await topicDocIds(services, id);
+    expect(ids.sort()).toEqual(m.points.filter((p: any) => p.clusters.includes(id)).map((p: any) => p.docId).sort());
+    expect(await topicDocIds(services, 'c9.9')).toEqual([]);
+  });
+});

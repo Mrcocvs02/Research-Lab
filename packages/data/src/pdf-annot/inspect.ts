@@ -5,11 +5,13 @@ import { Ref } from './objects.js';
 import { fileSource, getPage, loadDoc, resolve, setDeadline, tick, type SyncSource } from './doc.js';
 import { readAnnot } from './annot.js';
 import { pageCountOf } from './plan.js';
+import { unlock } from './refuse.js';
 
 export type InspectResult = { ok: true; external: number; externalAtBase: number | null; pages: number } | { ok: false };
 
-function countExternal(src: SyncSource): { n: number; pages: number } {
+async function countExternal(src: SyncSource): Promise<{ n: number; pages: number }> {
   const doc = loadDoc(src);
+  if (doc.trailer.has('Encrypt') && !(await unlock(doc)).ok) throw new Error('locked');
   const pages = Math.min(pageCountOf(doc), 5000);
   let n = 0;
   for (let i = 0; i < pages; i++) {
@@ -21,15 +23,15 @@ function countExternal(src: SyncSource): { n: number; pages: number } {
   return { n, pages };
 }
 
-export function inspectFile(path: string, baseSize?: number): InspectResult {
+export async function inspectFile(path: string, baseSize?: number): Promise<InspectResult> {
   const src = fileSource(path);
   setDeadline(LIM.workerTimeoutMs);
   try {
-    const now = countExternal(src);
+    const now = await countExternal(src);
     let externalAtBase: number | null = null;
     if (baseSize !== undefined && baseSize > 0 && baseSize < src.size) {
       try {
-        externalAtBase = countExternal({ size: baseSize, read: (o, l) => src.read(o, Math.max(0, Math.min(l, baseSize - o))) }).n;
+        externalAtBase = (await countExternal({ size: baseSize, read: (o, l) => src.read(o, Math.max(0, Math.min(l, baseSize - o))) })).n;
       } catch {
         externalAtBase = null;
       }

@@ -2,7 +2,7 @@
 import { PDF_WRITE_LIMITS as LIM } from '@rl/core';
 import { closeSync, openSync, readSync, fstatSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
-import { Eof, Lexer, PdfError, Ref, asDict, asNum, damaged, nameOf, type Dict, type Indirect, type Val } from './objects.js';
+import { Eof, Lexer, PdfError, Ref, Str, asDict, asNum, damaged, nameOf, type Dict, type Indirect, type Val } from './objects.js';
 
 export interface SyncSource { size: number; read(off: number, len: number): Buffer }
 export const bufSyncSource = (b: Buffer): SyncSource => ({ size: b.length, read: (o, l) => b.subarray(o, Math.min(b.length, o + l)) });
@@ -28,6 +28,27 @@ let deadline = 0;
 export const setDeadline = (ms: number): void => { deadline = ms > 0 ? Date.now() + ms : 0; };
 export const tick = (): void => { if (deadline > 0 && Date.now() > deadline) damaged('timeout'); };
 
+/** What the Standard security handler gives the reader of an encrypted file (crypt.ts, loaded only for those). Bytes only: the walk over values is here. */
+export interface Crypt {
+  /** The object number of /Encrypt when it is indirect: that object is never encrypted. */
+  skip: number | undefined;
+  str(b: Buffer, n: number, g: number): Buffer;
+  /** `type`: the /Type of the stream dictionary (xref streams, and metadata when it is not encrypted, are in the clear). */
+  stream(raw: Buffer, n: number, g: number, type: string | undefined): Buffer;
+  encStr(b: Buffer, n: number, g: number): Buffer;
+  encStream(b: Buffer, n: number, g: number): Buffer;
+}
+export type CryptMethod = 'none' | 'rc4' | 'aes128' | 'aes256';
+/** The Encrypt dictionary as refuse.ts read it: `n` key bytes, the methods of streams and strings, the entries the empty password is checked against. */
+export interface CryptParams { R: number; P: number; n: number; stm: CryptMethod; str: CryptMethod; O: Buffer; U: Buffer; UE: Buffer; id0: Buffer; noMetadata: boolean }
+
+/** The strings of a value read from object `n g`, decrypted. */
+function unseal(c: Crypt, v: Val, n: number, g: number): Val {
+  if (v instanceof Str) return new Str(c.str(v.b, n, g));
+  if (Array.isArray(v)) return v.map((x) => unseal(c, x, n, g));
+  return v instanceof Map ? new Map([...v].map(([k, x]) => [k, unseal(c, x, n, g)] as [string, Val])) : v;
+}
+
 export type XEnt = { t: 0 } | { t: 1; off: number; gen: number } | { t: 2; stm: number; idx: number };
 export interface Doc {
   src: SyncSource;
@@ -40,6 +61,8 @@ export interface Doc {
   size: number;
   trailing: number;
   objstm: Map<number, { objs: Buffer; nums: number[]; offs: number[]; first: number }>;
+  /** Set by `unlock` (refuse.ts) once the empty user password opened the file. */
+  crypt?: Crypt;
 }
 
 /** Parse one value at `off`, doubling the window until the token fits. */
@@ -97,6 +120,7 @@ export function streamData(doc: Pick<Doc, 'src' | 'xref'> & Partial<Doc>, ind: I
     if (rest[end - 1] === 13) end--;
     raw = rest.subarray(0, end);
   }
+  if (doc.crypt) raw = doc.crypt.stream(raw, ind.num, ind.gen, nameOf(d.get('Type')));
   const f = d.get('Filter');
   const parms: Val | undefined = d.get('DecodeParms');
   const filters = Array.isArray(f) ? f : f === undefined ? [] : [f];
@@ -207,7 +231,7 @@ export function resolveObj(doc: Doc, n: number): Indirect | undefined {
   if (e.t === 1) {
     const ind = readIndirectAt(doc.src, e.off);
     if (ind.num !== n) return damaged('obj-mismatch');
-    return ind;
+    return doc.crypt && ind.num !== doc.crypt.skip ? { ...ind, val: unseal(doc.crypt, ind.val, ind.num, ind.gen) } : ind;
   }
   let os = doc.objstm.get(e.stm);
   if (!os) {

@@ -16,6 +16,8 @@ export interface GenOpts {
   junk?: string;
   /** PNG "Up" predictor on the xref stream. */
   predictor?: boolean;
+  /** Encrypted files: seals the data of the object stream (number, deflated data). */
+  sealStm?: (n: number, data: Buffer) => Buffer;
 }
 
 const pad = (n: number, w: number) => String(n).padStart(w, '0');
@@ -46,7 +48,8 @@ export function assemble(objs: GenObj[], o: GenOpts = {}): Buffer {
       data += `${x.body as string}\n`;
       idx.set(x.n, i++);
     }
-    const z = deflateSync(Buffer.from(head + data, 'latin1'));
+    const deflated = deflateSync(Buffer.from(head + data, 'latin1'));
+    const z = o.sealStm ? o.sealStm(stmNum, deflated) : deflated;
     put(stmNum, Buffer.concat([Buffer.from(`<< /Type /ObjStm /N ${i} /First ${head.length} /Filter /FlateDecode /Length ${z.length} >>\nstream\n`), z, Buffer.from('\nendstream')]));
   }
   const extra = o.trailer ? ` ${o.trailer}` : '';

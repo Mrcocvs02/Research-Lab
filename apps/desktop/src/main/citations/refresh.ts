@@ -91,6 +91,8 @@ async function refreshFile(s: MainServices, rt: LibraryRuntime, docId: DocumentI
   const file = await service.refresh(doc, index ?? (await ownedIndex(rt, true)), signal, { what, previous });
   // Merged inside the store's per-file queue: the half this refresh did not fetch is re-read, not taken from `previous`.
   const stored = await rt.store.citations.update(docId, (cur) => mergeFile(cur, file, what));
+  // References in order of relevance to the work (D-446 g): local, lazy, and never a reason for the refresh to fail.
+  if (what.includes('references')) await import('../analysis/cite-rank.js').then((m) => m.rankCitationsFor(s, rt, docId)).catch((e: unknown) => s.log.warn('citation ranking failed', { error: e }));
   bumpCitations(rt);
   return stored;
 }

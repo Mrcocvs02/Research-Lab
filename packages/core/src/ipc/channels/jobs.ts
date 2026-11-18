@@ -26,6 +26,11 @@ export const aiJobRequestSchema = z.object({
    * accepted and edited ones are NEVER overwritten.
    */
   regenerate: z.boolean().default(false),
+  /**
+   * `direct`: one call per document from the first pages (the original job). `analysis` (D-446): extraction, then the
+   * literature note, then tags, description, summary and keywords derived FROM the note.
+   */
+  pipeline: z.enum(['direct', 'analysis']).default('direct'),
 });
 
 export const aiJobStateSchema = z.enum(['queued', 'running', 'done', 'cancelled', 'failed']);
@@ -83,6 +88,16 @@ export const jobsChannels = defineChannels('jobs', {
   },
   /** Starts again a job of this session with its own request (after the token cap was raised, D-442); documents already done are skipped by the plan. */
   restart: { request: z.object({ jobId: z.string().max(100) }), response: z.object({ jobId: z.string() }) },
+  /**
+   * Builds (`build`) or extends (`extend`) the domain taxonomy from the library (D-446): titles, literature notes and keywords of
+   * the AI-enabled folders go to the stronger model, which proposes hierarchical nodes (field, subfield, topic, method) with alias and
+   * definition. The nodes land as CANDIDATES (`origin: ai`) for one review in the taxonomy manager. CONFLICT 'needs-confirmation'
+   * (with the preview) until `confirmed`; AI_BUDGET_EXCEEDED and AI_PROVIDER_ERROR as `start`.
+   */
+  taxonomy: {
+    request: z.object({ mode: z.enum(['build', 'extend']), model: z.string().min(1).max(100), reasoning: reasoningLevelSchema, confirmed: z.boolean().default(false) }),
+    response: z.object({ added: z.number().int().nonnegative(), calls: z.number().int().nonnegative() }),
+  },
   /** Stops a job; documents already done keep their proposals. */
   cancel: { request: z.object({ jobId: z.string().max(100) }), response: z.object({ cancelled: z.boolean() }) },
   /** Jobs of this session, newest first. */

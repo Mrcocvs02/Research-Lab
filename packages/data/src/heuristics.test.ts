@@ -54,3 +54,25 @@ describe('abstractFromText without an Abstract heading', () => {
     expect(abstractFromText(labelled)).toContain('synthetic lattice');
   });
 });
+
+describe('abstractFromText on a thesis', () => {
+  const para = [
+    'This thesis studies synthetic lattice models of interacting particles and proves that the ground state is gapped.',
+    'Introduction of a new numerical scheme allows us to reach sizes far beyond previous work, and the results',
+    'agree with a mean-field argument. The final part discusses open problems and perspectives for later work.',
+  ];
+  it('keeps the whole abstract when a wrapped line starts with "Introduction"', () => {
+    const a = abstractFromText(['Abstract', ...para, 'Keywords: lattice', 'Contents'].join('\n'))!;
+    expect(a).toContain('open problems and perspectives');
+    expect(a).not.toContain('Keywords');
+  });
+  it('stops at a short "Contents" heading but not at a numbered chapter inside the abstract', () => {
+    const a = abstractFromText(['Riassunto', ...para, 'Indice', '1 Introduzione'].join('\n'))!;
+    expect(a).toContain('perspectives');
+    expect(a).not.toContain('Introduzione');
+  });
+  it('is longer than a paper abstract limit allows', () => {
+    const long = Array.from({ length: 60 }, (_, i) => `Sentence number ${i} about the synthetic lattice model and its properties.`).join('\n');
+    expect(abstractFromText(['Abstract', long, 'Keywords: x'].join('\n'))!.length).toBeGreaterThan(3000);
+  });
+});

@@ -36,6 +36,7 @@
     "restore": "Restore",
     "deprecated": "deprecated",
     "candidate": "candidate",
+    "acceptCandidate": "Accept the proposed node",
     "counts": "Documents: {{direct}} direct, {{implied}} with implications, {{subtree}} with sub-tags",
     "merge": "Merge into another tag",
     "mergeInto": "Merge into",

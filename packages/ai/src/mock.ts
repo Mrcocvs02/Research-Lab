@@ -32,6 +32,8 @@ export interface MockScript {
   available?: boolean;
   /** Result of `completeStructured` (validated against the schema, like a real answer). */
   structured?: unknown;
+  /** Like `structured`, as a function of the request (calls with different prompts, e.g. the analysis pipeline). */
+  structuredFn?: (request: { system: string; prompt: string; source: string }) => unknown;
   models?: ModelConfig[];
   now?: () => Date;
 }
@@ -178,7 +180,7 @@ export function createMockAiProvider(script: MockScript = {}): AiProviderEx {
     },
     async completeStructured<T>(request: StructuredRequest<T>): Promise<StructuredResult<T>> {
       if (script.fail) throw new AppError(script.fail.code, script.fail.message, script.fail.sent === undefined ? undefined : { sent: script.fail.sent });
-      const parsed = request.schema.safeParse(script.structured !== undefined ? script.structured : mockStructured(request));
+      const parsed = request.schema.safeParse(script.structuredFn ? script.structuredFn(request) : script.structured !== undefined ? script.structured : mockStructured(request));
       if (!parsed.success) throw new AppError('AI_PROVIDER_ERROR', 'The mock answer does not match the schema');
       const usage: TokenUsageWithCost = script.usage ?? { inputTokens: approxTokens(request.system.length + request.prompt.length), outputTokens: 50 };
       return { value: parsed.data, usage, meta: { model: request.model, provider: 'mock', date: now(), source: request.source } };

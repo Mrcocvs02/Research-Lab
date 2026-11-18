@@ -25,6 +25,10 @@ export const taxonomyNodeSchema = z.object({
   aliases: aliasList.default([]),
   /** Tagging with this node implies tagging with these nodes (ids). */
   implies: z.array(itemIdSchema).max(L.links).default([]),
+  /** One line saying what the node covers (AI-built taxonomies, D-446): feeds the candidate retrieval of the tagging. */
+  definition: z.string().max(400).optional(),
+  /** Level of an AI-built node: field, subfield, topic, or method/object (D-446). Free for the user's own nodes. */
+  level: z.enum(['field', 'subfield', 'topic', 'method']).optional(),
   status: taxonomyNodeStatusSchema.default('active'),
   origin: taxonomyOriginSchema.default('user'),
   /** Display colour, `#rrggbb`. */

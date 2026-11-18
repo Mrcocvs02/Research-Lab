@@ -12,6 +12,8 @@ export const dataPath = {
   guide: 'CLAUDE.md',
   documents: 'documents',
   document: (id: DocumentId | string) => `documents/${id}.json`,
+  /** The AI literature note of a document (D-405); AI-owned, apart from the user's notes. */
+  literature: (id: DocumentId | string) => `literature/${id}.md`,
   fileNote: (id: DocumentId | string) => `notes/${id}.md`,
   pageNote: (id: DocumentId | string, page: number) => `notes/${id}/p${page}.md`,
   annotations: (id: DocumentId | string) => `annotations/${id}.json`,

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
-import { AppError, GRAPH_LIMITS, type DocumentId, type DocumentRecord } from '@rl/core';
+import { AppError, GRAPH_LIMITS, contentHashOf, type DocumentId, type DocumentRecord } from '@rl/core';
 import { readCachedText, createLibraryStore } from '@rl/data';
 import { STORE_K, countTerms, createPlacer, decodeModel, modelVector, neighborsOf, reasonsOf, sharedTerms, surprisingPairs, type GraphModel, type Reason } from '@rl/graph';
 import type { MainServices } from '../ipc/handlers/services.js';
@@ -260,7 +260,7 @@ export async function whenBuilt(s: MainServices): Promise<void> {
 const clusterId = (m: GraphModel, c: number): string => (m.clusters[c] as { id: string }).id;
 
 async function counts(rt: LibraryRuntime, view: LibraryView, rec: DocumentRecord, light: boolean) {
-  const cached = light ? null : await readCachedText(rt.textCacheDir, rec.hash, GRAPH_PAGES);
+  const cached = light ? null : await readCachedText(rt.textCacheDir, contentHashOf(rec), GRAPH_PAGES);
   return countTerms(toGraphDoc(rec, view.lookup, { abstract: cached?.meta.abstract, text: cached ? cached.pages.map((p) => p.text).join('\n').slice(0, GRAPH_TEXT_CHARS) : undefined }));
 }
 

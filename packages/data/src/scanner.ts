@@ -16,6 +16,7 @@ import {
 } from '@rl/core';
 import { isInside, normalizeRelativePath, resolveInRoot, sha256File, sha256Of, toRelativePath } from '@rl/core/node';
 import { mapLimit, pathKey, toFsPath } from './fs-util.js';
+import { withFileSource, classifyIncrement } from './pdf-annot/classify.js';
 import { withRetry, type RetryOptions } from './retry.js';
 
 export interface ScannerOptions {
@@ -25,6 +26,8 @@ export interface ScannerOptions {
   hashFile?: (file: string, signal?: AbortSignal) => Promise<string>;
   /** Retry policy for locked files (cloud sync, antivirus). */
   retry?: RetryOptions;
+  /** Hash of the first `bytes` bytes of a file, for tests (default: streamed SHA-256). */
+  hashPrefix?: (file: string, bytes: number, signal?: AbortSignal) => Promise<string>;
   /** Files hashed at the same time (default 4). */
   hashConcurrency?: number;
   /** Reports a warning-level event (never contains absolute paths). */
@@ -58,6 +61,7 @@ const sameStat = (d: { size: number; mtimeMs: number }, f: { size: number; mtime
 export function createScannerImpl(opts: ScannerOptions = {}): Scanner {
   const clock = opts.now ?? (() => new Date());
   const hashFile = opts.hashFile ?? ((file: string, signal?: AbortSignal) => sha256File(toFsPath(file), signal));
+  const hashPrefix = opts.hashPrefix ?? ((file: string, bytes: number, signal?: AbortSignal) => sha256File(toFsPath(file), signal, bytes));
   const hashConcurrency = opts.hashConcurrency ?? 4;
 
   return {
@@ -368,6 +372,17 @@ export function createScannerImpl(opts: ScannerOptions = {}): Scanner {
         ...(hash ? { hash } : {}),
         ...(docId ? { docId } : {}),
       });
+      /** `pdfWrite` to store when the file at `f` (hash `h`) is still the same content as `pd`, else null. */
+      const sameContent = async (pd: DocumentRecord, f: Found, h: string): Promise<DocumentRecord['pdfWrite'] | null> => {
+        const w = pd.pdfWrite;
+        if (w && (h === w.base.hash || w.own.some((o) => o.hash === h))) return w;
+        for (const p of [{ hash: pd.hash, size: pd.size }, ...(w ? [w.base] : [])]) {
+          if (f.size <= p.size || (await hashPrefix(f.abs, p.size, signal)) !== p.hash) continue;
+          if ((await withFileSource(toFsPath(f.abs), (s) => classifyIncrement(s, p.size))) === 'annotations') return w ?? { base: p, own: [] };
+          return null;
+        }
+        return null;
+      };
       const pushHistory = (d: DocumentRecord, oldPath: string): DocumentRecord['pathHistory'] =>
         [...d.pathHistory, { path: oldPath, seenUntil: nowIso }].slice(-L.pathHistory);
 
@@ -411,9 +426,18 @@ export function createScannerImpl(opts: ScannerOptions = {}): Scanner {
             result.unchanged++;
             return;
           }
+          // Content identity (§8.3.6): our own appends, the restored base and annotation-only updates by any program
+          // keep the document the same content (`pdfWrite.base`); only the file hash follows.
+          const kept = extOf(f.rel) === 'pdf' ? await withRetry(() => sameContent(pd, f, h), opts.retry).catch(() => null) : null;
+          if (kept) {
+            await write(pid, (cur) => ({ ...cur, hash: h, size: f.size, mtimeMs: f.mtimeMs, missing: false, pdfWrite: kept, updatedAt: nowIso }));
+            result.unchanged++;
+            return;
+          }
           await write(pid, (cur) => ({
             ...cur,
-            previousHashes: cur.previousHashes.includes(cur.hash) ? cur.previousHashes : [...cur.previousHashes, cur.hash].slice(-L.hashes),
+            previousHashes: [...new Set([...cur.previousHashes, ...(cur.pdfWrite ? [cur.pdfWrite.base.hash] : []), cur.hash])].slice(-L.hashes),
+            pdfWrite: undefined,
             hash: h,
             size: f.size,
             mtimeMs: f.mtimeMs,

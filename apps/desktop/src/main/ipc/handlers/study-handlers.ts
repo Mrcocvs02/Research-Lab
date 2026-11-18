@@ -4,7 +4,7 @@
  * Everything is written to the data folder of the library; the PDF itself is only ever read.
  */
 import { randomUUID } from 'node:crypto';
-import { AppError, STUDY_LIMITS, annotationFileSchema, type Annotation, type DocumentId, type Note } from '@rl/core';
+import { AppError, STUDY_LIMITS, annotationFileSchema, contentHashOf, type Annotation, type DocumentId, type Note } from '@rl/core';
 import type { LibraryRuntime } from '../../library/library-runtime.js';
 import type { DomainHandlers } from '../types.js';
 
@@ -175,7 +175,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
       // Each annotation counts with its own hash; old files (no per-annotation hash) inherit the file-level one (D-198).
       const staleIds = (file?.annotations ?? []).filter((a) => {
         const h = a.forHash ?? file?.forHash;
-        return h !== undefined && h !== rec.hash;
+        return h !== undefined && h !== contentHashOf(rec);
       }).map((a) => a.id);
       return { annotations: file?.annotations ?? [], stale: staleIds.length > 0, staleIds };
     },
@@ -201,7 +201,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
               ...(fields.text !== undefined ? { text: fields.text } : {}),
               ...(fields.color !== undefined ? { color: fields.color } : {}),
               ...(geom === 2 ? { geom } : {}),
-              forHash: rec.hash,
+              forHash: contentHashOf(rec),
               updatedAt: now,
             };
             if (geom === null) delete saved.geom;
@@ -212,11 +212,11 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
             if (list.length >= STUDY_LIMITS.annotationsPerDoc) {
               throw new AppError('INVALID_REQUEST', 'Too many annotations on this document', { reason: 'annotations-limit', limit: STUDY_LIMITS.annotationsPerDoc });
             }
-            saved = { ...fields, ...(geom === 2 ? { geom } : {}), text: fields.text ?? '', color: fields.color ?? 'yellow', forHash: rec.hash, id: `a-${randomUUID().replace(/-/g, '').slice(0, 20)}`, createdAt: now, updatedAt: now } as Annotation;
+            saved = { ...fields, ...(geom === 2 ? { geom } : {}), text: fields.text ?? '', color: fields.color ?? 'yellow', forHash: contentHashOf(rec), id: `a-${randomUUID().replace(/-/g, '').slice(0, 20)}`, createdAt: now, updatedAt: now } as Annotation;
             list.push(saved);
           }
           // The file-level hash stays as first written; each annotation carries its own.
-          const next = { ...base, forHash: base.forHash ?? rec.hash, annotations: list };
+          const next = { ...base, forHash: base.forHash ?? contentHashOf(rec), annotations: list };
           // Refused before anything is written: a file above the cap would make list and save fail for good.
           if (Buffer.byteLength(JSON.stringify(next, null, 2)) > STUDY_LIMITS.annotationsFileBytes) {
             throw new AppError('INVALID_REQUEST', 'The annotations of this document are too large', { reason: 'annotations-size', limit: STUDY_LIMITS.annotationsFileBytes });

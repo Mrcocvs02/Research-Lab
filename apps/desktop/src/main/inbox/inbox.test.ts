@@ -259,6 +259,31 @@ describe('duplicates and proposals', () => {
     expect(r.added).toHaveLength(5);
   });
 
+  it('identity (G4b): the unannotated version of an annotated document is a duplicate; a conflict copy of it is recognised', async () => {
+    const call = harness();
+    // The document was annotated by us: its content before the append is `base`, the file on disk is `base` plus a revision.
+    const f1 = await pdf('plain.pdf', { title: 'Annotated one', doi: undefined });
+    const baseBytes = await readFile(f1);
+    const grown = Buffer.concat([baseBytes, Buffer.from('\n% appended revision\n')]);
+    await writeFile(path.join(root, 'misc', 'annotated.pdf'), grown);
+    const pdfWrite = { base: { hash: sha(baseBytes), size: baseBytes.length }, own: [{ hash: sha(grown), size: grown.length, at: NOW }] };
+    await store.documents.put(doc(40, 'misc/annotated.pdf', { hash: sha(grown), size: grown.length, title: 'Annotated one', pdfWrite }));
+    // Dropping the unannotated version: same file.
+    ok(await call('inbox:add', { paths: [f1] }));
+    await whenInboxIdle();
+    expect(ok(await call('inbox:list')).items.find((i: any) => i.fileName === 'plain.pdf').duplicate).toMatchObject({ kind: 'same-file', docId: hex(40) });
+    // A copy made by a sync conflict: same prefix, other tail, a name that contains the document's name; flagged as new by the scan.
+    const other = Buffer.concat([baseBytes, Buffer.from('\n% revision written on another computer\n')]);
+    await writeFile(path.join(root, 'misc', 'annotated (conflicted copy).pdf'), other);
+    await store.documents.put(doc(41, 'misc/annotated (conflicted copy).pdf', { hash: sha(other), size: other.length, inbox: { since: NOW, reason: 'new' } }));
+    const item = ok(await call('inbox:list')).items.find((i: any) => i.id === hex(41));
+    expect(item.conflictOf).toEqual({ docId: hex(40), title: 'Annotated one' });
+    // An unrelated new file with a similar name but another prefix is not a conflict copy.
+    await writeFile(path.join(root, 'misc', 'annotated (2).pdf'), Buffer.from('something else entirely, longer than the base file bytes at all, yes'.repeat(20)));
+    await store.documents.put(doc(42, 'misc/annotated (2).pdf', { size: 1300, inbox: { since: NOW, reason: 'new' } }));
+    expect(ok(await call('inbox:list')).items.find((i: any) => i.id === hex(42)).conflictOf).toBeUndefined();
+  });
+
   it('proposes a name, tags of similar documents and the folder that holds most of them', async () => {
     const call = harness();
     metadataFile = path.join(local, 'meta.json');

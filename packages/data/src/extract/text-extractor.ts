@@ -185,7 +185,9 @@ export function createTextExtractorImpl(options: TextExtractorOptions = {}): Tex
       }
       // The text and the hash both come from `data`, the bytes read once above: they cannot disagree, whatever happens
       // to the file meanwhile. The cache entry is written under THIS hash, never under the caller's.
-      const hash = sha256Of(data);
+      const fileHash = sha256Of(data);
+      // Annotations we appended: the content keeps the identity it had (D-350); the entry lives under both hashes.
+      const hash = o.contentHash ?? fileHash;
       const mismatch = o.hash !== undefined && o.hash !== hash;
       if (o.hash === undefined || mismatch) {
         const hit = await readCache(hash, maxPages);
@@ -196,6 +198,7 @@ export function createTextExtractorImpl(options: TextExtractorOptions = {}): Tex
       if (format === 'pdf') result = await fromPdf(data, hash, maxPages, signal, o.onPage);
       else result = fromOther(format, data, hash);
       await writeCache(hash, maxPages, result);
+      if (hash !== fileHash) await writeCache(fileHash, maxPages, { ...result, hash: fileHash });
       return mismatch ? { ...result, hashMismatch: true } : result;
     },
   };

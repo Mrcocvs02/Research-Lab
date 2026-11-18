@@ -99,6 +99,19 @@ export const extractedMetaSchema = z.object({
 });
 export type ExtractedFields = z.infer<typeof extractedMetaSchema>;
 
+/**
+ * What Research Lab itself appended to a PDF (ARCHITETTURA-UI §8.3.6). `base` is the content before the first append
+ * (or the last full save by another program): it stays the identity of the content while `hash` follows the file.
+ */
+export const pdfWriteSchema = z.object({
+  base: z.object({ hash: sha256Schema, size: z.number().int().nonnegative() }),
+  /** Files produced by our own writes, newest last (at most 20). */
+  own: z.array(z.object({ hash: sha256Schema, size: z.number().int().nonnegative(), at: isoDateSchema })).max(20).default([]),
+  /** Copy of the file as it was before the first write. */
+  backup: z.object({ file: relativePathSchema, hash: sha256Schema, location: z.enum(['data', 'local']) }).optional(),
+});
+export type PdfWrite = z.infer<typeof pdfWriteSchema>;
+
 /** `<dataDir>/documents/<id>.json` */
 export const documentRecordSchema = z.object({
   schemaVersion: schemaVersionSchema,
@@ -108,6 +121,8 @@ export const documentRecordSchema = z.object({
   hash: sha256Schema,
   /** Previous content hashes, oldest first, so a changed file is still recognised. */
   previousHashes: z.array(sha256Schema).max(L.hashes).default([]),
+  /** Set once Research Lab appended annotations to the file: the identity of the content is then `pdfWrite.base.hash`. */
+  pdfWrite: pdfWriteSchema.optional(),
   /** Current path, relative to the library root, `/` separators. */
   path: relativePathSchema,
   pathHistory: z
@@ -164,3 +179,6 @@ export const documentRecordSchema = z.object({
   extracted: extractedMetaSchema.optional(),
 });
 export type DocumentRecord = z.infer<typeof documentRecordSchema>;
+
+/** The hash that means "same content" (text cache, thumbnails, graph, AI, annotations): unchanged by our own appends. */
+export const contentHashOf = (d: Pick<DocumentRecord, 'hash' | 'pdfWrite'>): string => d.pdfWrite?.base.hash ?? d.hash;

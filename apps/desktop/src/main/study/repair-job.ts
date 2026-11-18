@@ -7,7 +7,7 @@
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { AppError, type Annotation, type DocumentId, type DocumentRecord, type LibraryStore, type Logger } from '@rl/core';
+import { AppError, contentHashOf, type Annotation, type DocumentId, type DocumentRecord, type LibraryStore, type Logger } from '@rl/core';
 import type { QuoteOutcome } from '@rl/data';
 import type { MainServices } from '../ipc/handlers/services.js';
 import type { RepairArgs } from '../library/worker-protocol.js';
@@ -50,7 +50,7 @@ export async function runRepair(d: RepairDeps, signal: AbortSignal): Promise<Rep
       const file = await d.store.annotations.get(id as DocumentId);
       const rec = file?.annotations.some((a) => a.geom !== 2) ? await d.store.documents.get(id) : null;
       // Text to look for, and made on the file as it is now.
-      const todo = file && rec ? file.annotations.filter((a) => a.geom !== 2 && a.text.trim() !== '' && (a.forHash ?? file.forHash ?? rec.hash) === rec.hash) : [];
+      const todo = file && rec ? file.annotations.filter((a) => a.geom !== 2 && a.text.trim() !== '' && (a.forHash ?? file.forHash ?? rec.hash) === contentHashOf(rec)) : [];
       if (rec && !rec.missing && rec.path.toLowerCase().endsWith('.pdf') && todo.length > 0) plan.push({ rec, todo });
     } catch (e) {
       d.log?.warn('annotation check skipped a document', { error: e });

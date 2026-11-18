@@ -1,4 +1,4 @@
-import { AppError, type DocumentRecord, type ExtractOptions, type LibraryStore, type ScanProgress, type Scanner, type SearchIndex, type TextExtractor } from '@rl/core';
+import { AppError, contentHashOf, type DocumentRecord, type ExtractOptions, type LibraryStore, type ScanProgress, type Scanner, type SearchIndex, type TextExtractor } from '@rl/core';
 import { classifyExtractError, repairQuotes } from '@rl/data';
 import type { ExtractArgs, ExtractProgress, ExtractResult, IndexJob, LibraryWorker, RecordHost, RepairArgs, ScanArgs, WorkerHooks } from './worker-protocol.js';
 
@@ -121,7 +121,7 @@ export function createWorkerService(deps: WorkerDeps): LibraryWorker {
       const extractor = extractorFor(cacheDir);
       try {
         // Each page the extractor reports is a sign of life for the watchdog in the main process.
-        const options: ExtractOptions = { hash: item.hash, signal: hooks.signal, onPage: (page) => hooks.onEvent?.({ page }) };
+        const options: ExtractOptions = { hash: item.hash, ...(item.contentHash ? { contentHash: item.contentHash } : {}), signal: hooks.signal, onPage: (page) => hooks.onEvent?.({ page }) };
         const text = await extractor.extract(rootPath, item.path, options);
         return { path: item.path, hash: item.hash, ok: true, cached: Boolean(text.fromCache), readHash: text.hash ?? item.hash, meta: text.meta, hasText: text.hasText };
       } catch (e) {
@@ -143,7 +143,7 @@ export function createWorkerService(deps: WorkerDeps): LibraryWorker {
       for (const job of jobs) {
         const base = { ...job.doc };
         const rec: DocumentRecord = job.doc.record;
-        const hash = job.hash ?? rec.hash;
+        const hash = job.hash ?? contentHashOf(rec);
         if (job.text === 'empty') {
           docs.push({ ...base, pages: [], textHash: hash });
         } else if (job.text === 'cache' && !rec.missing) {

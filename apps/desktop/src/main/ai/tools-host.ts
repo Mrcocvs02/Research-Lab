@@ -1,5 +1,5 @@
 import { createTextExtractor } from '@rl/data';
-import { AppError, documentIdSchema, type DocumentId, type DocumentRecord, type TextExtractor } from '@rl/core';
+import { AppError, contentHashOf, documentIdSchema, type DocumentId, type DocumentRecord, type TextExtractor } from '@rl/core';
 import type { AiProviderId } from '@rl/core';
 import type { LibraryToolsHost } from '@rl/ai';
 import type { LibraryRuntime } from '../library/library-runtime.js';
@@ -40,7 +40,7 @@ export function createToolsHost(c: ToolsHostContext): LibraryToolsHost {
     },
     async pageTexts(doc: DocumentRecord, pages) {
       try {
-        const text = await extractor().extract(await rootPath(), doc.path, { hash: doc.hash, maxPages: Math.max(...pages) });
+        const text = await extractor().extract(await rootPath(), doc.path, { hash: contentHashOf(doc), ...(doc.pdfWrite ? { contentHash: contentHashOf(doc) } : {}), maxPages: Math.max(...pages) });
         const wanted = new Set(pages);
         return text.pages.filter((p) => wanted.has(p.page)).map((p) => ({ page: p.page, text: p.text }));
       } catch (e) {

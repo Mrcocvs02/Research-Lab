@@ -3,10 +3,11 @@ import { createReadStream } from 'node:fs';
 import { AppError } from '../errors.js';
 
 /** SHA-256 (lowercase hex) of a file, streamed (constant memory). Read-only. */
-export async function sha256File(file: string, signal?: AbortSignal): Promise<string> {
+/** SHA-256 of a file, or of its first `prefix` bytes when given. */
+export async function sha256File(file: string, signal?: AbortSignal, prefix?: number): Promise<string> {
   const hash = createHash('sha256');
   try {
-    const stream = createReadStream(file, { signal });
+    const stream = createReadStream(file, { signal, ...(prefix !== undefined ? { start: 0, end: prefix - 1 } : {}) });
     for await (const chunk of stream) hash.update(chunk as Buffer);
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw new AppError('CANCELLED', 'Hashing cancelled');

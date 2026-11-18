@@ -1,4 +1,4 @@
-import { AppError, GRAPH_LIMITS, type AiField, type DocumentRecord, type LibraryStore, type TaxonomyFile } from '@rl/core';
+import { AppError, GRAPH_LIMITS, contentHashOf, type AiField, type DocumentRecord, type LibraryStore, type TaxonomyFile } from '@rl/core';
 import { readCachedText } from '@rl/data';
 import { MAX_COUNTS_PER_DOC, TermDictionary, citationSignals, countTerms, packCounts, type GraphDoc } from '@rl/graph';
 import { makeTaxonomyLookup, type TaxonomyLookup } from '../library/indexable.js';
@@ -14,7 +14,7 @@ const usable = <T>(f: AiField<T> | undefined): T | undefined => (f && f.review.s
 export const folderOfPath = (p: string): string => p.slice(0, Math.max(0, p.lastIndexOf('/')));
 
 /** Changes whenever the record is written or its file changes: what the model's staleness is measured by. */
-export const docSig = (r: Pick<DocumentRecord, 'revision' | 'hash'>): string => `${r.revision}.${r.hash.slice(0, 8)}`;
+export const docSig = (r: Pick<DocumentRecord, 'revision' | 'hash' | 'pdfWrite'>): string => `${r.revision}.${contentHashOf(r).slice(0, 8)}`;
 
 export interface GraphTextSource {
   abstract?: string | undefined;
@@ -74,7 +74,7 @@ export async function loadGraphDocs(store: Pick<LibraryStore, 'documents' | 'cit
   const out: GraphDoc[] = [];
   for (const rec of present) {
     if (options.signal?.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
-    const cached = options.cacheDir ? await readCachedText(options.cacheDir, rec.hash, GRAPH_PAGES) : undefined;
+    const cached = options.cacheDir ? await readCachedText(options.cacheDir, contentHashOf(rec), GRAPH_PAGES) : undefined;
     const doc = toGraphDoc(rec, lookup, {
       abstract: cached?.meta.abstract,
       text: cached ? cached.pages.map((p) => p.text).join('\n').slice(0, GRAPH_TEXT_CHARS) : undefined,

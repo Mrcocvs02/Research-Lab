@@ -6,6 +6,7 @@ import { activeTagNodes, cleanSuggestion, estimateCostFromModels, folderOf, inEn
 import { fetchWorkMetadata, WorkLookupError } from '@rl/citations';
 import {
   AppError,
+  contentHashOf,
   documentIdFromHash,
   documentRecordSchema,
   INBOX_LIMITS,
@@ -93,7 +94,32 @@ async function snapshot(c: Ctx): Promise<Snap> {
     if (r.arxivId) push(snap.byArxiv, arxivBase(r.arxivId), r);
     if (r.title && r.authors[0]) push(snap.byTitle, `${norm(r.title)}|${familyOf(r.authors[0])}`, r);
   }
+  // Older versions and the content before our annotations are the same file for the user (§8.3.6); a current hash wins.
+  for (const r of records) for (const h of [...r.previousHashes, ...(r.pdfWrite ? [contentHashOf(r), ...r.pdfWrite.own.map((o) => o.hash)] : [])]) if (!snap.byHash.has(h)) snap.byHash.set(h, r);
   return snap;
+}
+
+/** Memo of conflict-copy checks per file (id and hash): the answer cannot change until the file does. */
+const conflictMemo = new Map<string, InboxItem['conflictOf'] | null>();
+
+/** Is `r` (new in the library) a sync-conflict copy of a document we annotated? Candidates by name, then the hash of the prefix decides. */
+async function conflictOf(c: Ctx, snap: Snap, r: DocumentRecord): Promise<InboxItem['conflictOf']> {
+  const key = `${r.id}:${r.hash}`;
+  if (conflictMemo.has(key)) return conflictMemo.get(key) ?? undefined;
+  let found: InboxItem['conflictOf'] | null = null;
+  const name = path.posix.basename(r.path).toLowerCase();
+  const stem = (p: string) => path.posix.basename(p, path.posix.extname(p)).toLowerCase();
+  const near = snap.records.filter((d) => d.pdfWrite && d.id !== r.id && !d.missing && r.size > d.pdfWrite.base.size && stem(d.path).length > 0 && name.includes(stem(d.path)));
+  for (const d of near.slice(0, 5)) {
+    const w = d.pdfWrite!;
+    const abs = await resolveInRoot(c.root, r.path).catch(() => null);
+    if (abs && (await sha256File(abs, undefined, w.base.size).catch(() => null)) === w.base.hash) {
+      found = { docId: d.id, title: d.title };
+      break;
+    }
+  }
+  conflictMemo.set(key, found);
+  return found ?? undefined;
 }
 
 /** Windows folders are case-insensitive: `private` is the excluded `Private`. */
@@ -373,7 +399,8 @@ export async function listInbox(s: MainServices): Promise<{ items: InboxItem[] }
         () => c.store.update((d) => void (d.cache[r.id] ??= { lookup: { state: 'error', checkedAt: new Date().toISOString() }, metadata: null, similar: [] })),
       );
     }
-    items.push(libraryView(snap, r, entry));
+    const conflict = r.inbox?.reason === 'new' ? await conflictOf(c, snap, r) : undefined;
+    items.push({ ...libraryView(snap, r, entry), ...(conflict ? { conflictOf: conflict } : {}) });
   }
   const total = Math.min(INBOX_LIMITS.items, items.length);
   if (file.flagged !== flagged.length) await c.store.update((d) => void (d.flagged = flagged.length));
@@ -557,7 +584,7 @@ async function dataBlock(c: Ctx, f: { dropped?: Dropped; rec?: DocumentRecord },
   else {
     try {
       const ex = createTextExtractor({ cacheDir: c.rt.textCacheDir });
-      const text = f.dropped ? await ex.extract(path.dirname(f.dropped.srcPath), path.basename(f.dropped.srcPath), { hash: f.dropped.hash }) : await ex.extract(c.root, f.rec!.path, { hash: f.rec!.hash });
+      const text = f.dropped ? await ex.extract(path.dirname(f.dropped.srcPath), path.basename(f.dropped.srcPath), { hash: f.dropped.hash }) : await ex.extract(c.root, f.rec!.path, { hash: contentHashOf(f.rec!), ...(f.rec!.pdfWrite ? { contentHash: contentHashOf(f.rec!) } : {}) });
       let budget = JOB_EXCERPT_CHARS;
       const parts: string[] = [];
       for (const p of text.pages.slice(0, 3)) {

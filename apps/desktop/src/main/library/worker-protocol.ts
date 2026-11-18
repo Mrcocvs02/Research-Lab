@@ -46,8 +46,10 @@ export interface RepairArgs {
 export interface ExtractItem {
   /** Relative to the library root. */
   path: string;
-  /** SHA-256 of the file (the cache key). */
+  /** SHA-256 of the content (the cache key): `contentHashOf` the record. */
   hash: string;
+  /** Set when the file carries annotations we appended: the text belongs to this content, not to the file's bytes. */
+  contentHash?: string;
 }
 
 /** One file per call: the main process watches each call (watchdog) and moves on to the next file. */

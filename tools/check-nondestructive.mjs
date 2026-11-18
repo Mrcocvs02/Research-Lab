@@ -3,10 +3,15 @@
 //   node tools/check-nondestructive.mjs <root> [--exclude <path>]... --snapshot <file> --save
 //   node tools/check-nondestructive.mjs <root> [--exclude <path>]... --snapshot <file>       (compare)
 //   node tools/check-nondestructive.mjs <root> [--exclude <path>]... --run "<command>"        (save, run, compare)
+//   add --allow-pdf-append to accept PDF files that only GREW: the old bytes are an exact prefix of the new file and
+//   the appended bytes carry an annotation of ours (/NM (rl-...)), the one write the app may do (D-316).
 //
 // --exclude paths are relative to <root> (typically .lab and the export folders). Exit code 1 when a
 // file was added, removed or modified; mtime-only changes are listed as warnings.
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { createReadStream } from 'node:fs';
+import { open } from 'node:fs/promises';
 import path from 'node:path';
 import { diffSnapshots, formatDiff, loadSnapshot, saveSnapshot, snapshotTree } from '../packages/testkit/src/snapshot.ts';
 
@@ -15,12 +20,14 @@ const positional = [];
 const exclude = [];
 let snapshotFile;
 let save = false;
+let allowPdfAppend = false;
 let runCmd;
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === '--exclude') exclude.push(args[++i] ?? '');
   else if (a === '--snapshot') snapshotFile = args[++i];
   else if (a === '--save') save = true;
+  else if (a === '--allow-pdf-append') allowPdfAppend = true;
   else if (a === '--run') runCmd = args[++i];
   else positional.push(a);
 }
@@ -48,7 +55,35 @@ if (runCmd) {
   base = await loadSnapshot(snapshotFile);
 }
 
-const diff = diffSnapshots(base, await snapshotTree(absRoot, { exclude }));
+const after = await snapshotTree(absRoot, { exclude });
+const diff = diffSnapshots(base, after);
+
+/** Did the PDF only grow, keeping every old byte, with an annotation of ours in the added bytes? */
+async function onlyAppended(rel) {
+  const before = base[rel];
+  const now = after[rel];
+  if (!/\.pdf$/i.test(rel) || before?.type !== 'file' || now?.type !== 'file' || now.size <= before.size) return false;
+  const file = path.join(absRoot, rel);
+  const h = createHash('sha256');
+  for await (const c of createReadStream(file, { start: 0, end: before.size - 1 })) h.update(c);
+  if (h.digest('hex') !== before.sha256) return false;
+  const fh = await open(file, 'r');
+  try {
+    const tail = Buffer.alloc(now.size - before.size);
+    await fh.read(tail, 0, tail.length, before.size);
+    return tail.includes('/NM (rl-');
+  } finally {
+    await fh.close();
+  }
+}
+if (allowPdfAppend) {
+  const kept = [];
+  for (const rel of diff.modified) if (!(await onlyAppended(rel))) kept.push(rel);
+  const allowed = diff.modified.length - kept.length;
+  if (allowed > 0) console.log(`nondestructive: ${allowed} PDF file(s) grew by an append of ours (prefix identical)`);
+  diff.modified = kept;
+  diff.clean = diff.added.length === 0 && diff.removed.length === 0 && kept.length === 0;
+}
 if (diff.touched.length > 0) {
   console.warn(`nondestructive: warning, ${diff.touched.length} file(s) rewritten with identical content:\n${diff.touched.map((p) => '  touched: ' + p).join('\n')}`);
 }

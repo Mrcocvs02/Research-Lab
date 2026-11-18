@@ -1,5 +1,7 @@
 import { loadPdfjs, pdfDocumentParams } from '../../lib/pdfjs';
 import './pdfjs-viewer.css';
+import type { Rect } from './geometry';
+import { locateInTextLayer } from './repair';
 import { readFindMatch, readRange, type SelectionRead } from './selection';
 
 export type { SelectionPiece, SelectionRead } from './selection';
@@ -19,6 +21,9 @@ export class ViewerError extends Error {
     this.kind = kind;
   }
 }
+
+/** Where a quote was found on a page: its rectangles (fractions of the page), or why it was not placed. */
+export type Located = { status: 'found'; rects: Rect[]; text: string } | { status: 'ambiguous' } | { status: 'none' };
 
 export interface FindState {
   state: 'idle' | 'found' | 'notfound' | 'pending' | 'wrapped';
@@ -48,6 +53,8 @@ export interface Viewer {
   readSelection(): SelectionRead;
   /** The current find match (the one pdf.js marks in the text layer), measured exactly like a selection. */
   readFindMatch(): SelectionRead;
+  /** Measures a quoted text on the drawn text layer of a page (waits for the layer); the occurrence nearest to `savedCenter` (fraction of the page height) wins. */
+  locateText(page: number, quote: string, savedCenter: number, line: number): Promise<Located>;
   /** The page and position (fractions) under a mouse event, or `null` outside a page. */
   pointAt(event: { target: EventTarget | null; clientX: number; clientY: number }): { page: number; x: number; y: number } | null;
   destroy(): void;
@@ -232,6 +239,24 @@ export async function createViewer(container: HTMLDivElement, viewerEl: HTMLDivE
     },
     readFindMatch() {
       return readFindMatch(container, frameOf);
+    },
+    async locateText(page, quote, savedCenter, line) {
+      // The text layer is drawn after the page: wait until it has text and has stopped growing (about 4 s at most).
+      let textLayer: Element | null = null;
+      let seen = -1;
+      for (let i = 0; i < 40; i++) {
+        const el = pageDivOf(page)?.querySelector('.textLayer') ?? null;
+        const count = el?.querySelectorAll('span').length ?? 0;
+        if (el && count > 0 && count === seen) {
+          textLayer = el;
+          break;
+        }
+        seen = count;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const div = pageDivOf(page);
+      if (!textLayer || !div || destroyed) return { status: 'none' };
+      return locateInTextLayer(textLayer, page, frameOf(page, div), quote, savedCenter, line);
     },
     pointAt(event) {
       const pageDiv = (event.target as Element | null)?.closest?.<HTMLElement>('.page');

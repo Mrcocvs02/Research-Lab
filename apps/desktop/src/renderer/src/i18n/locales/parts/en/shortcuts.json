@@ -57,7 +57,8 @@
       "reader.color.4": "Color 4",
       "reader.color.5": "Color 5",
       "reader.comment": "Comment on the selected annotation",
-      "reader.annotation.delete": "Delete the selected annotation"
+      "reader.annotation.delete": "Delete the selected annotation",
+      "resume.open": "Resume reading"
     },
     "conflictRefused": "Could not save: the shortcut is already used by another command ({{commands}}). Fix the conflict and save again.",
     "actionsFor": "Actions for: {{command}}",

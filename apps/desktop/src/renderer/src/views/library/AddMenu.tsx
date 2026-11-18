@@ -5,6 +5,7 @@ import { IconButton } from '../../components/IconButton';
 import { IconChevronDown, IconPlus } from '../../components/icons';
 import { Lazy, lazyView } from '../../components/Lazy';
 import { Menu, type MenuGroups } from '../../components/Menu';
+import { requestAdd } from '../../lib/addRequest';
 import { useInbox } from '../../lib/inbox';
 
 // The import dialog (and its strings) load the first time it is asked for.
@@ -12,7 +13,7 @@ const ImportDialog = lazyView(() => import('../import/ImportDialog'), ['import']
 
 /**
  * "+ Add" (17.4.1): a split button. The body adds a PDF as it always did; the arrow opens the menu of the other ways in.
- * Later waves add their entries (DOI, arXiv or URL; a resource or link) to this list.
+ * DOI, arXiv or URL and Resource or link open dialogs the shell shows (`lib/addRequest`), so their code loads on first use.
  */
 export function AddMenu() {
   const { t } = useTranslation();
@@ -25,7 +26,9 @@ export function AddMenu() {
       id: 'add',
       items: [
         { id: 'pdf', testId: 'add-menu-pdf', label: t('library.addMenu.pdf'), onSelect: () => void inbox.choose() },
+        { id: 'id', testId: 'add-menu-id', label: t('library.addMenu.id'), onSelect: () => requestAdd({ kind: 'id' }) },
         { id: 'zotero', testId: 'add-menu-zotero', label: t('library.addMenu.zotero'), onSelect: () => setImporting(true) },
+        { id: 'resource', testId: 'add-menu-resource', label: t('library.addMenu.resource'), onSelect: () => requestAdd({ kind: 'resource' }) },
       ],
     },
   ];

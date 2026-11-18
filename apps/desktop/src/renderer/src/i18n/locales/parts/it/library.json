@@ -43,13 +43,17 @@
       "failedHint": "Il testo non si legge: si cercano per nome.",
       "more": "e altri {{count}}",
       "truncated": "L'elenco è parziale: i conteggi sono completi."
-    }
-  },
-  "addMenu": {
-    "more": "Altri modi per aggiungere",
-    "pdf": "PDF…",
-    "zotero": "Da Zotero o BibTeX…"
-  },
-  "copyBib": "Copia i riferimenti BibTeX",
-  "copiedBib": "Riferimenti BibTeX copiati negli appunti ({{count}})."
+    },
+    "addMenu": {
+      "more": "Altri modi per aggiungere",
+      "pdf": "PDF…",
+      "zotero": "Da Zotero o BibTeX…",
+      "id": "Da DOI, arXiv o URL…",
+      "resource": "Risorsa o link…"
+    },
+    "copyBib": "Copia i riferimenti BibTeX",
+    "copiedBib": "Riferimenti BibTeX copiati negli appunti ({{count}}).",
+    "facetResources": "Risorse",
+    "facetResourcesHint": "Mostra le risorse (codice, dati, pagine web, notebook, cartelle) invece dei documenti"
+  }
 }

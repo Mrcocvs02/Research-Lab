@@ -57,7 +57,8 @@
       "reader.color.4": "Colore 4",
       "reader.color.5": "Colore 5",
       "reader.comment": "Commenta l'annotazione selezionata",
-      "reader.annotation.delete": "Elimina l'annotazione selezionata"
+      "reader.annotation.delete": "Elimina l'annotazione selezionata",
+      "resume.open": "Riprendi la lettura"
     },
     "conflictRefused": "Impossibile salvare: la scorciatoia è già usata da un altro comando ({{commands}}). Risolvi il conflitto e salva di nuovo.",
     "actionsFor": "Azioni per: {{command}}",

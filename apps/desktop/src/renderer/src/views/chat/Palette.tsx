@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { ShortcutId } from '@rl/core';
 import { Dialog } from '../../components/Dialog';
 import { Kbd } from '../../components/Kbd';
+import { requestAdd } from '../../lib/addRequest';
 import { useAiUi } from '../../lib/aiUi';
 import { useHistory } from '../../lib/history';
 import { useInbox } from '../../lib/inbox';
@@ -52,6 +53,8 @@ export function Palette({ onClose }: { onClose(): void }) {
   const [recents, setRecents] = useState<string[]>(loadRecents);
   const [custom, setCustom] = useState<Item[]>([]);
   const [docs, setDocs] = useState<Item[]>([]);
+  // "Resume reading" is offered only when there is something to resume.
+  const [resume, setResume] = useState<{ docId: string; page: number | null } | null>(null);
   const [query, setQuery] = useState('');
   const [at, setAt] = useState(0);
   const listId = useId();
@@ -73,6 +76,18 @@ export function Palette({ onClose }: { onClose(): void }) {
       live = false;
     };
   }, []);
+
+  useEffect(() => {
+    let live = true;
+    if (app.activeProfile)
+      rl.invoke('resume:get', {}).then(
+        (r) => live && setResume(r.last ? { docId: r.last.docId, page: r.last.page } : null),
+        () => {},
+      );
+    return () => {
+      live = false;
+    };
+  }, [app.activeProfile]);
 
   // Documents: from two characters, 150 ms after the last key, at most 8 (local search only).
   useEffect(() => {
@@ -98,10 +113,10 @@ export function Palette({ onClose }: { onClose(): void }) {
     const reason = (id: PaletteActionId): string | undefined => {
       if (id === 'undo') return !hasLibrary ? noLibrary : history.canUndo ? undefined : t('history.nothingToUndo');
       if (id === 'redo') return !hasLibrary ? noLibrary : history.canRedo ? undefined : t('history.nothingToRedo');
-      if (['scanNow', 'backupNow', 'addPdf', 'goReview', 'goProjects', 'goDiscover', 'goMap'].includes(id) && !hasLibrary) return noLibrary;
+      if (['scanNow', 'backupNow', 'addPdf', 'addFromId', 'addResource', 'goReview', 'goProjects', 'goDiscover', 'goMap'].includes(id) && !hasLibrary) return noLibrary;
       return undefined;
     };
-    const actions: Item[] = PALETTE_ACTIONS.map((a) => ({
+    const actions: Item[] = PALETTE_ACTIONS.filter((a) => a.id !== 'resume' || resume !== null).map((a) => ({
       id: `app-${a.id}`,
       label: t(`chat.commands.${a.id}.label`, { language: t(`languages.${other}`) }),
       prompt: '',
@@ -119,7 +134,7 @@ export function Palette({ onClose }: { onClose(): void }) {
     // Settings (3.4): any entry of the index whose label, synonyms, section or group matches (at most 5).
     const settings: Item[] = searchSettings(query, (k) => t(k), 5).map((m) => ({ id: `set-${m.entry.id}`, label: `${m.label} · ${m.where}`, group: 'settings' as const, prompt: '', custom: false, settingId: m.entry.id }));
     return groupItems(filterItems(orderByRecent([...actions, ...prompts], recents), query), { query, recents, docs: [...docs, ...settings] });
-  }, [t, custom, docs, query, recents, app.settings?.uiLanguage, hasLibrary, noLibrary, history.canUndo, history.canRedo]);
+  }, [t, custom, docs, query, recents, app.settings?.uiLanguage, hasLibrary, noLibrary, history.canUndo, history.canRedo, resume]);
 
   useEffect(() => setAt(0), [query]);
   useEffect(() => {
@@ -148,6 +163,12 @@ export function Palette({ onClose }: { onClose(): void }) {
         return goTo('settings', { focus: 'backup', run: 'backupNow' });
       case 'addPdf':
         return void inbox.choose();
+      case 'addFromId':
+        return requestAdd({ kind: 'id' });
+      case 'addResource':
+        return requestAdd({ kind: 'resource' });
+      case 'resume':
+        return resume ? openReader(resume.docId, resume.page ?? undefined) : undefined;
       case 'newLibrary':
         return goTo('newLibrary');
       case 'undo':

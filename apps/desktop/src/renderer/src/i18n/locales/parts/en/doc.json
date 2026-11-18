@@ -65,7 +65,8 @@
     "askClaude": "Ask Claude",
     "aiNone": "No AI content.",
     "propose": "Propose with Claude…",
-    "similarTitle": "Similar in content"
+    "similarTitle": "Similar in content",
+    "resources": "Linked resources"
   },
   "jobs": {
     "proposeOne": "Propose with Claude…"

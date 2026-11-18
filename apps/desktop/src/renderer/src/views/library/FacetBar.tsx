@@ -102,13 +102,16 @@ interface Props {
   onTags(next: BrowseState['tags']): void;
   onFolder(path: string | null): void;
   onClearAll(): void;
+  /** The Type facet "Resources" (17.4.4): resources are shown in place of the documents. */
+  resources: boolean;
+  onResources(on: boolean): void;
 }
 
 /**
  * The one row of filters (4.2, 17.3): six facet chips with their popovers, the active filters as removable chips, "Clear"
  * and "Show missing files". 8 controls at rest; the selection bar takes the place of the whole row.
  */
-export function FacetBar({ facets, browse, anything, onFilters, onTags, onFolder, onClearAll }: Props) {
+export function FacetBar({ facets, browse, anything, onFilters, onTags, onFolder, onClearAll, resources, onResources }: Props) {
   const { t } = useTranslation();
   const { model, colorOf, labelOf } = useTaxonomy();
   const missingId = useId();
@@ -195,6 +198,11 @@ export function FacetBar({ facets, browse, anything, onFilters, onTags, onFolder
             {id === 'tags' ? <TagPopover tags={tags} onChange={onTags} /> : <ValueList facet={id} data={facets} filters={filters} onChange={onFilters} />}
           </FacetChip>
         ))}
+        <Chip selected={resources} onClick={() => onResources(!resources)} className="facet-resources">
+          <span data-testid="facet-resources" title={t('library.facetResourcesHint')}>
+            {t('library.facetResources')}
+          </span>
+        </Chip>
         <div className="active-filters" data-testid="active-filters">
           {tags.include.map((id) => tagChip(id, false))}
           {tags.exclude.map((id) => tagChip(id, true))}

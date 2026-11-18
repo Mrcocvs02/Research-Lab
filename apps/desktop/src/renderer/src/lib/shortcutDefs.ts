@@ -21,6 +21,7 @@ export const SHORTCUT_COMMANDS: Record<ShortcutId, { scope: ShortcutScope; defau
   'nav.settings': { scope: 'global', default: 'Ctrl+,' },
   'guide.open': { scope: 'global', default: 'F1' },
   'shortcuts.show': { scope: 'global', default: 'Ctrl+/' },
+  'resume.open': { scope: 'global', default: 'Ctrl+Shift+R' },
   'reader.find': { scope: 'reader', default: 'Ctrl+F' },
   'reader.highlight': { scope: 'reader', default: 'Ctrl+Shift+H' },
   'reader.underline': { scope: 'reader', default: 'Ctrl+Shift+U' },

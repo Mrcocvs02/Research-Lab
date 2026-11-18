@@ -33,6 +33,7 @@ const DocumentCard = lazyView(() => import('./DocPanel').then((m) => ({ default:
 const BulkTagEditor = lazyView(() => import('./DocPanel').then((m) => ({ default: m.BulkTagEditor })), ['doc', 'doc-projects-reader', 'doc-reader', 'doc-review']);
 const TaxonomyManager = lazyView(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })), ['taxonomy']);
 const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);
+const ResourcesPane = lazyView(() => import('../resources/ResourcesPane'), ['resources']);
 const AddToProject = lazyView(() => import('./AddToProject').then((m) => ({ default: m.AddToProject })), ['addToProject']);
 
 type PaneTab = 'folders' | 'tags';
@@ -68,6 +69,7 @@ function LibraryInner() {
   const [navOpen, setNavOpen] = useState(false);
   const [mode, setMode] = useState<'browse' | 'taxonomy'>('browse');
   const [addOpen, setAddOpen] = useState(false);
+  const [showResources, setShowResources] = useState(false);
   const [jobOpen, setJobOpen] = useState(false);
   const set = (patch: Partial<Omit<BrowseState, 'text'>>) => setState((b) => ({ ...b, ...patch }));
 
@@ -187,7 +189,7 @@ function LibraryInner() {
               tagEditor={(close) => <BulkTagEditor docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onClose={close} />}
             />
           ) : (
-            <FacetBar facets={list.facets} browse={browse} anything={anything} onFilters={(filters) => set({ filters })} onTags={(tags) => set({ tags })} onFolder={(folder) => set({ folder })} onClearAll={clearAll} />
+            <FacetBar facets={list.facets} browse={browse} anything={anything} onFilters={(filters) => set({ filters })} onTags={(tags) => set({ tags })} onFolder={(folder) => set({ folder })} onClearAll={clearAll} resources={showResources} onResources={setShowResources} />
           )}
           <div className={`library-grid${detailOpen ? ' with-detail' : ''}${navOpen ? ' nav-open' : ''}`}>
             <aside className="library-nav" aria-label={t('docs.navigation')}>
@@ -225,7 +227,12 @@ function LibraryInner() {
 
             <section className="results-pane" aria-live="polite" aria-busy={list.loading} data-testid="results-pane" data-query={list.forText ?? ''}>
               {list.error ? <ErrorNote testId="search-error">{errorMessage(list.error, t)}</ErrorNote> : null}
-              {list.total > 0 && (
+              {showResources && (
+                <Lazy>
+                  <ResourcesPane />
+                </Lazy>
+              )}
+              {!showResources && list.total > 0 && (
                 <DocViews
                   list={list}
                   view={view}
@@ -238,7 +245,7 @@ function LibraryInner() {
                   showSize={browse.sort === 'size-desc' || browse.sort === 'size-asc'}
                 />
               )}
-              {list.total === 0 && !list.loading && list.forText !== undefined && (
+              {!showResources && list.total === 0 && !list.loading && list.forText !== undefined && (
                 <div className="library-empty" data-testid="search-empty">
                   {anything ? (
                     <EmptyState icon={<IconLibrary size={24} />} title={t('library.noResultsTitle')} action={<Button onClick={clearAll}>{t('library.clear')}</Button>}>

@@ -55,11 +55,12 @@ export function orderByRecent<T extends { id: string }>(items: readonly T[], rec
 }
 
 /** The groups of the palette, in the order they are shown (3.4). */
-export const PALETTE_GROUPS = ['recent', 'docs', 'goto', 'settings', 'actions', 'claude'] as const;
+export const PALETTE_GROUPS = ['resume', 'recent', 'docs', 'goto', 'settings', 'actions', 'claude'] as const;
 export type PaletteGroup = (typeof PALETTE_GROUPS)[number];
 
 /** Palette actions that are not prompts: go to a view, do something. `shortcut` is the command whose key is shown. */
 export const PALETTE_ACTIONS = [
+  { id: 'resume', group: 'resume', shortcut: 'resume.open' },
   { id: 'goLibrary', group: 'goto', shortcut: 'nav.library' },
   { id: 'goReview', group: 'goto', shortcut: 'nav.review' },
   { id: 'goProjects', group: 'goto', shortcut: 'nav.projects' },
@@ -70,6 +71,8 @@ export const PALETTE_ACTIONS = [
   { id: 'scanNow', group: 'actions' },
   { id: 'backupNow', group: 'actions' },
   { id: 'addPdf', group: 'actions' },
+  { id: 'addFromId', group: 'actions' },
+  { id: 'addResource', group: 'actions' },
   { id: 'newLibrary', group: 'actions' },
   { id: 'undo', group: 'actions', shortcut: 'history.undo' },
   { id: 'redo', group: 'actions', shortcut: 'history.redo' },

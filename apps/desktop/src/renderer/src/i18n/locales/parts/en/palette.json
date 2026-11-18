@@ -90,6 +90,15 @@
       },
       "theme": {
         "label": "Change theme (light or dark)"
+      },
+      "resume": {
+        "label": "Resume reading"
+      },
+      "addFromId": {
+        "label": "Add from DOI, arXiv or URL…"
+      },
+      "addResource": {
+        "label": "Add a resource…"
       }
     },
     "paletteGroups": {
@@ -98,7 +107,8 @@
       "goto": "Go to",
       "actions": "Actions",
       "claude": "Ask Claude",
-      "settings": "Settings"
+      "settings": "Settings",
+      "resume": "Reading"
     },
     "paletteNoLibrary": "Open a library first"
   }

@@ -65,7 +65,8 @@
     "askClaude": "Chiedi a Claude",
     "aiNone": "Nessun contenuto AI.",
     "propose": "Proponi con Claude…",
-    "similarTitle": "Simili nel contenuto"
+    "similarTitle": "Simili nel contenuto",
+    "resources": "Risorse collegate"
   },
   "jobs": {
     "proposeOne": "Proponi con Claude…"

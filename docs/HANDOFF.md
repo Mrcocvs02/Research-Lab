@@ -9,7 +9,7 @@ Stato di passaggio per riprendere il lavoro. Prima di fare qualunque cosa, legge
 1. `CLAUDE.md` (regole di lavoro, modelli per compito, commit, comandi);
 2. `docs/STATUS.md` (fase, onda, fatto, in corso, bloccato, prossimo);
 3. `docs/HANDOFF.md` (questo file);
-4. `docs/DECISIONS.md` (le ultime voci: D-429..D-457);
+4. `docs/DECISIONS.md` (le ultime voci: D-429..D-461);
 5. `docs/design/ARCHITETTURA-UI.md` §14 e §14.1 (ondate di implementazione e funzioni nuove);
 6. `docs/HISTORY.md` (facoltativo: cronologia).
 
@@ -17,11 +17,11 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 
 ## 2. Aggiornato
 
-- Data: 2026-11-18 (sera).
-- Ultimo merge su `main`: `a584868` (merge `n4`), con `9a1cf94` (tetto del main a 1110 KiB) come ultimo commit. Questo aggiornamento è un commit dopo `9a1cf94`.
-- Branch uniti e pubblicati: `h0`, `r0`, `s1`, `s2`, `w1-contracts`, `a1`, `b1`, `c2`, `a2`, `audit2`, `r2`, `fix-real`, `f4`, `tokcap`, `d3`, `g4b`, `e3`, `g4a`, `m4`, `g4c`, `n4`.
-- Rami aperti: nessuno.
-- Worktree ancora su disco sotto `C:\dev\rl-wt`: tutti rimuovibili.
+- Data: 2026-11-19.
+- Ultimo merge su `main`: `0d63cdb` (merge `t1`). Ultimo commit: dopo `0d63cdb` (questo aggiornamento).
+- Branch uniti e pubblicati: `h0`, `r0`, `s1`, `s2`, `w1-contracts`, `a1`, `b1`, `c2`, `a2`, `audit2`, `r2`, `fix-real`, `f4`, `tokcap`, `d3`, `g4b`, `e3`, `g4a`, `m4`, `g4c`, `n4`, `h5`, `i5`, `j5`, `t1`.
+- Rami aperti: `x1` (wave 7, Zotero e BibTeX gestito; subagent Sonnet in corso, worktree `C:\dev\rl-wt\x1`).
+- Worktree ancora su disco sotto `C:\dev\rl-wt`: tutti rimuovibili tranne `x1`.
 - Tag: `phase-0`..`phase-3`, `phase-6`, `phase-7` pubblicati; `phase-4`, `phase-5`, `phase-8` senza tag.
 - Installer di rilascio costruito prima della riprogettazione (131 MB, non firmato): da rifare dopo le ondate.
 
@@ -38,6 +38,10 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
   - M4 unita (`m4`, poi `38415f0`): Mappa giocabile, simulazione Barnes-Hut, archi, contorni, etichette, minimappa, ricerca, schede, reti, Separa/Unisci, tastiera, movimento ridotto. Totali del renderer alzati (D-452). Lacune di M4 in sezione 5, passo 5.
   - G4c unita (`g4c`, merge `87a4848`): PDF cifrati con password utente vuota (`crypt.ts`, chunk pigro; D-455). Punti di revisione in sezione 4.
   - N4 unita (`n4`, merge `a584868`): reti di entità in `main` con `graph:entityNetwork`, alias in `author-aliases.json`, filtro `topic` e `docIds` (D-456). Tetto del main alzato a 1110 KiB (D-457). Punti di revisione in sezione 4.
+- Onda 5 unita (D-459, D-460): H5 (progetti e Scopri, merge `a7e8d21`), I5 (chat, export, guida in 10 sezioni, finestre, merge `ee36263`), J5 (copia annotata e importazione di annotazioni esterne, merge `44558e0`).
+- T1 unita (`t1`, merge `0d63cdb`; D-446, D-461): pipeline di analisi con tassonomia a candidati, tag pesati, chiusura gerarchica, nota di letteratura v0.2 in `literature/<id>.md`, citazioni per rilevanza.
+- J5 e T1 si sono fermate una volta per il limite d'uso e sono riprese.
+- Tetti del renderer alzati per le ondate 5-12 (D-458).
 - Revisioni e test rimandati alla verifica finale (D-443).
 
 ## 4. Test: eseguiti
@@ -57,22 +61,27 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
   2. calcolo che può bloccare il main fino a ~1,5 s con 10 000 documenti (valutare lo spostamento nel worker grafico);
   3. documenti più recenti del modello senza tema.
 - M4 (D-443): test scritti e non eseguiti: `views/network/m4.test.ts`, `useCanvasView.test.ts`, `e2e/network.spec.ts` aggiornato.
+- Ondata 5 (D-459, D-460; test non eseguiti, D-443). Punti per la verifica finale:
+  1. H5: `design-audit.spec.ts` deve cliccare `project-new` prima di `project-create-name`; `project-back`, `discover-tab-sources` e il rinomina inline non esistono più.
+  2. J5 (sicurezza): le annotazioni esterne importate possono duplicarsi quando la scrittura è attiva; il rinomino finale nella cartella di destinazione non è sicuro rispetto alle corse (race).
+  3. I5: i riepiloghi degli strumenti da `packages/ai` sono solo in inglese, tradotti per nome dello strumento.
+- T1 (D-446, D-461; test non eseguiti, D-443). Lasciti: nessuna UI per avviare il lavoro `jobs:taxonomy`; pesi non mostrati né portati ai tag dell'utente (Map, fasce); nessuna UI per rivedere la nota di letteratura.
 - Se la RAM libera non basta, la suite si ferma da sola: rieseguire solo i test mancanti, mai due pesanti insieme.
 
 ## 5. Stato e prossimi passi
 
-In corso: nulla. Wave 4 chiusa (M4 con `38415f0`; G4c e N4 con `9a1cf94` e il merge `a584868`). Nessun ramo aperto.
+In corso: X1 (wave 7, Zotero e BibTeX gestito) in un subagent Sonnet, worktree `C:\dev\rl-wt\x1`, branch `x1`. Wave 5 e T1 chiuse (`0d63cdb`).
 
 Passi, in ordine:
-1. Ondata 5: I5 (chat, export, viste secondarie) ∥ H5 (progetti e Scopri), poi J5. Il responsabile della guida i18n dell'ondata 5 applica le frasi in sospeso dai rapporti di F4 ed E3 (D-444, D-446): strumenti prima del lettore, Spazio, colori 1-5, barra laterale che si riduce durante la lettura, conferma della gomma oltre 3 annotazioni, "Solo nell'app" in Studio; schede "Nuovi file" e "Proposte di Claude" di Da rivedere, chip Modello e Ragionamento, Ignora/Conferma, "Segna tutti come visti", copie di conflitto, ✓/✗ per campo, "Accettate finora".
-2. T1 pipeline di analisi (D-446).
-3. Ondate 7-10: funzioni nuove X1..X8 (§14.1).
-4. Ondata 12: funzioni confermate (PRISMA, D-439; copia BibTeX/RIS, D-436; funzione 49).
-5. Lacune di M4 e revisione a vista della coppia di design (D-379): trascinamento dell'etichetta di un tema e dei punti in un tema aperto; contorni e colore dei temi in modalità documenti; ⋯ "Dimensione per" e "Mostra temi in comune"; "Vai a" per i nodi tagliati dal limite di 800; "ultimo letto" come documento di partenza; volo reale di 300 ms tra le modalità (ora la simulazione si assesta dai centroidi del Panorama); probe di fps pesanti (solo con `RL_HEAVY_TESTS=1`).
-6. Verifica finale, una sola volta: revisione indipendente e revisione di sicurezza dedicata a G4a, G4b e G4c; correzioni; poi attivare `PDF_WRITE_ENABLED`; tutti i test, quelli pesanti uno alla volta, con RAM libera controllata (sezione 4). Punti aperti di G4a e punti di revisione di G4c e N4: in sezione 4.
+1. Ondata 7: X1 (in corso) ∥ X2.
+2. Ondate 8-10: funzioni nuove (§14.1).
+3. Lacune di M4 e revisione a vista della coppia di design (D-379): trascinamento dell'etichetta di un tema e dei punti in un tema aperto; contorni e colore dei temi in modalità documenti; ⋯ "Dimensione per" e "Mostra temi in comune"; "Vai a" per i nodi tagliati dal limite di 800; "ultimo letto" come documento di partenza; volo reale di 300 ms tra le modalità (ora la simulazione si assesta dai centroidi del Panorama); probe di fps pesanti (solo con `RL_HEAVY_TESTS=1`).
+4. Ondata 11: funzioni nuove (§14.1).
+5. Ondata 12: funzioni confermate (PRISMA, D-439; copia BibTeX/RIS, D-436; funzione 49).
+6. Verifica finale, una sola volta: revisione indipendente e revisione di sicurezza dedicata a G4a, G4b e G4c; correzioni; poi attivare `PDF_WRITE_ENABLED`; tutti i test, quelli pesanti uno alla volta, con RAM libera controllata (sezione 4). Punti aperti di G4a e punti di revisione di G4c, N4, J5, T1 e le correzioni delle spec di H5: in sezione 4.
 7. Fase 8: prova di installazione fatta dall'agente (installazione silenziosa in cartella temporanea, avvio, disinstallazione, controllo dei dati, con le impostazioni dell'account dell'utente salvate e ripristinate prima). Poi tag `phase-8` e versione 1.0.0 (D-262).
 
-Budget (`check:budget` verde): JS iniziale del renderer 353/396 KiB; JS totale 1843,4/1870 KiB; totale 1958,7/1990 KiB; main entry 1099,3/1110 KiB (alzato da 1096, D-457); main lazy 63/120 KiB (`writer` 42,7/44, `entity` 13,3, `crypt` 3,9, `author` 3,1; ciascuno ≤ 30 tranne `writer`); preload 3,8/8 KiB.
+Budget (`check:budget` verde): JS iniziale del renderer 353,2/396 KiB; JS totale e totale entro i tetti 2050/2170 KiB (alzati in 8bff2e7, D-458); main entry 1108,9/1110 KiB (quasi pieno, D-461); main lazy: `writer` 43,7/45 KiB, gli altri ≤ 30 KiB; preload sotto 8 KiB.
 
 ## 6. Come lavorare (regole di lavoro dell'utente)
 

@@ -110,6 +110,8 @@ export function planSync(req: SyncRequest): SyncResult {
     if (!a.ok) return { ok: false, reason: a.reason, detail: a.detail, emptyPassword: a.emptyPassword };
     const doc = a.doc;
     const total = pageCountOf(doc);
+    // A `/Count` that the tree does not bear out means a damaged file (§8.3.13): nothing is written to it.
+    if (total === 0 || !getPage(doc, total - 1) || getPage(doc, total)) return { ok: false, reason: 'damaged', detail: 'page-count' };
     const wanted = new Set<number>();
     if (req.mode === 'remove-all') for (let i = 0; i < Math.min(total, 100_000); i++) wanted.add(i);
     else {

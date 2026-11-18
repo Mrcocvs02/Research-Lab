@@ -4,7 +4,7 @@ import { ERASE_LIMIT, initialCtx, step, type Ctx, type Env, type Ev, type Mode }
 const env: Env = { inTextField: false, overlayOpen: false, findOpen: false };
 const idle: Mode = { m: 'idle', hasSelection: false };
 const down = (on: 'text' | 'annotation' | 'empty', extra: Partial<Extract<Ev, { e: 'down' }>> = {}): Ev => ({ e: 'down', on, pointerId: 1, pen: 'mouse', eraserButton: false, ...extra });
-const run = (ctx: Ctx, mode: Mode, ev: Ev, e: Partial<Env> = {}, root: 'hint' | 'close' = 'close') => step(ctx, mode, ev, { ...env, ...e }, root);
+const run = (ctx: Ctx, mode: Mode, ev: Ev, e: Partial<Env> = {}, root?: 'hint' | 'close') => step(ctx, mode, ev, { ...env, ...e }, root);
 const ctxOf = (tool: Ctx['tool'], prev: Ctx['tool'] = 'highlight', color: Ctx['color'] = 1): Ctx => ({ tool, prev, color });
 
 /** One test per row of the table of 8.2.4 (and the row of 8.2.7), in the order of the table. */
@@ -153,9 +153,9 @@ describe('tool machine: the rows of 8.2.4', () => {
   it('row 28: idle, Select, find open + esc -> close-find', () => {
     expect(run(ctxOf('select'), idle, { e: 'esc' }, { findOpen: true }).effects).toEqual(['close-find']);
   });
-  it('row 29: idle, Select, nothing open + esc -> close-reader (hint when ESC_AT_ROOT is "hint")', () => {
-    expect(run(ctxOf('select'), idle, { e: 'esc' }).effects).toEqual(['close-reader']);
-    expect(run(ctxOf('select'), idle, { e: 'esc' }, {}, 'hint').effects).toEqual(['root-hint']);
+  it('row 29: idle, Select, nothing open + esc -> root-hint by default (D-329), close-reader when ESC_AT_ROOT is "close"', () => {
+    expect(run(ctxOf('select'), idle, { e: 'esc' }).effects).toEqual(['root-hint']);
+    expect(run(ctxOf('select'), idle, { e: 'esc' }, {}, 'close').effects).toEqual(['close-reader']);
   });
   it('row 30: blur or doc-change -> idle, strokes and popovers dropped, tool, prev and colour stay', () => {
     const c = ctxOf('underline', 'select', 4);

@@ -130,6 +130,7 @@
       "yes": "Yes",
       "no": "No",
       "pdf": "In the PDF"
-    }
+    },
+    "rootHint": "To close: Alt+← or Ctrl+W"
   }
 }

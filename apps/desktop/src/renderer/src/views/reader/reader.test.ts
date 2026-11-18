@@ -282,7 +282,7 @@ describe('ReaderView: opening and errors', () => {
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(screen.queryByTestId('reader-find')).toBeNull();
     expect(onClose).not.toHaveBeenCalled();
-    fireEvent.keyDown(screen.getByTestId('reader-pages-area'), { key: 'Escape' });
+    fireEvent.keyDown(screen.getByTestId('reader-pages-area'), { key: 'w', ctrlKey: true });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
@@ -793,7 +793,11 @@ describe('ReaderView: the bar and the tools', () => {
     press('Escape');
     expect(pressed()).toEqual(['select']);
     expect(onClose).not.toHaveBeenCalled();
-    press('Escape'); // Select with nothing open: leaves the reader (D-329)
+    // Select with nothing open: Escape does not leave the reader (D-329); once per session it says how, Ctrl+W closes.
+    press('Escape');
+    expect(screen.getByTestId('reader-tool-hint').textContent).toBe('To close: Alt+← or Ctrl+W');
+    expect(onClose).not.toHaveBeenCalled();
+    press('w', { ctrlKey: true });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

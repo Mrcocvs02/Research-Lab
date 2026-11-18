@@ -56,8 +56,8 @@ export interface Result {
   effects: Effect[];
 }
 
-/** What Escape does with nothing open and the Select tool: `close` leaves the reader (D-329), `hint` only says how. */
-export const ESC_AT_ROOT: 'hint' | 'close' = 'close';
+/** What Escape does with nothing open and the Select tool: `hint` only says how to close (D-329, provisional default), `close` leaves the reader. */
+export const ESC_AT_ROOT: 'hint' | 'close' = 'hint';
 /** More than this many annotations under one eraser stroke are deleted only after a confirmation. */
 export const ERASE_LIMIT = 3;
 const KEYBOARD = new Set<Ev['e']>(['tool', 'swap', 'color', 'comment', 'delete', 'esc']);

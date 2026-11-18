@@ -217,8 +217,13 @@ test.describe.serial('reader geometry (H0)', () => {
     await window.getByTestId('sidebar-toggle').click();
     await expect.poll(width).toBeLessThanOrEqual(64);
     await openReader();
-    await window.getByTestId('reader-close').click();
+    await window.getByTestId('reader-pages-area').click({ position: { x: 5, y: 5 } });
+    await window.keyboard.press('Control+w'); // Ctrl+W closes the reader (Escape does not, D-329)
+    await expect(window.getByTestId('reader')).toHaveCount(0);
     await expect.poll(width).toBeLessThanOrEqual(64);
+    await openReader();
+    await window.keyboard.press('Alt+ArrowLeft'); // and so does Alt+Left
+    await expect(window.getByTestId('reader')).toHaveCount(0);
     await window.getByTestId('sidebar-toggle').click();
     await expect.poll(width).toBe(full);
   });

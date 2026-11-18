@@ -39,6 +39,9 @@ const SPACE_KEY = 'rl.readerSpaceHint';
 const OVERLAY = '.rl-popover, [role="dialog"][aria-modal="true"]';
 const TOOL_OF: Partial<Record<string, Tool>> = { 'reader.tool.select': 'select', 'reader.tool.highlight': 'highlight', 'reader.tool.underline': 'underline', 'reader.tool.eraser': 'eraser' };
 
+/** The "how to close" hint of Escape was shown in this session. */
+let rootHinted = false;
+
 const isEditable = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
 const colorName = (n: ColorNo): AnnotationColor => ANNOTATION_COLORS[n - 1]!;
 
@@ -315,11 +318,12 @@ export function ReaderView({ target, onClose }: Props) {
     }
   };
 
-  const showHint = (tool: Tool) => {
-    setHint(t(`reader.tools.${tool}`));
+  const showText = (text: string, ms: number) => {
+    setHint(text);
     clearTimeout(hintTimer.current);
-    hintTimer.current = setTimeout(() => setHint(''), 1000);
+    hintTimer.current = setTimeout(() => setHint(''), ms);
   };
+  const showHint = (tool: Tool) => showText(t(`reader.tools.${tool}`), 1000);
   /** The first time (per profile) Space switches the tool: say that it does not scroll, and how to. */
   const spaceHint = () => {
     try {
@@ -388,6 +392,13 @@ export function ReaderView({ target, onClose }: Props) {
           break;
         case 'close-reader':
           onClose();
+          break;
+        case 'root-hint':
+          // Escape does not close the reader (D-329): once per session it says how.
+          if (!rootHinted) {
+            rootHinted = true;
+            showText(t('reader.rootHint'), 4000);
+          }
           break;
         default:
           break;

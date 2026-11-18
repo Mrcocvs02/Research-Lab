@@ -8,6 +8,7 @@ import type { Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import {
   AppError,
   DEFAULT_MODELS,
+  type AiAuthMode,
   type AiMeta,
   type ChatEvent,
   type ChatRequest,
@@ -94,8 +95,13 @@ export function bundledExecutable(): string | null {
   }
 }
 
+/** The file where Claude Code keeps its login on this machine: only watched for changes, never read. */
+export const claudeCredentialsFile = (home: string = os.homedir()) => path.join(home, '.claude', '.credentials.json');
+
 export interface AccessLookup {
   apiKey: string | null;
+  /** Which credentials may be used (settings `ai.authMode`, default `auto`). */
+  authMode?: AiAuthMode;
   env?: NodeJS.ProcessEnv;
   home?: string;
   exists?: (p: string) => boolean;
@@ -108,10 +114,11 @@ export interface AccessLookup {
 export function detectAccess(o: AccessLookup): AiAccess {
   const env = o.env ?? process.env;
   const exists = o.exists ?? ((p: string) => existsSync(p));
-  if (o.apiKey) return { auth: 'api-key' };
-  if (env.ANTHROPIC_API_KEY) return { auth: 'api-key' };
+  const mode = o.authMode ?? 'auto';
+  if (mode !== 'claude-code' && (o.apiKey || env.ANTHROPIC_API_KEY)) return { auth: 'api-key' };
+  if (mode === 'api-key') return { auth: 'none' };
   if (env.CLAUDE_CODE_OAUTH_TOKEN) return { auth: 'claude-code' };
-  if (exists(path.join(o.home ?? os.homedir(), '.claude', '.credentials.json'))) return { auth: 'claude-code' };
+  if (exists(claudeCredentialsFile(o.home))) return { auth: 'claude-code' };
   return { auth: 'none' };
 }
 
@@ -129,6 +136,8 @@ export interface QueryOptionsInput {
   toolNames?: readonly string[];
   /** Key from the secure store: goes ONLY to the child process, through `env`. */
   apiKey: string | null;
+  /** `claude-code`: no API key reaches the child; `api-key`: no login token does; `auto` (default): as the user's environment is. */
+  authMode?: AiAuthMode;
   baseEnv: NodeJS.ProcessEnv;
   executable?: string | null;
   clientApp?: string;
@@ -165,12 +174,24 @@ export function childEnv(base: NodeJS.ProcessEnv): Record<string, string | undef
 }
 
 /**
+ * The child's environment for an auth mode: `claude-code` takes the API key variable away, `api-key` takes the login
+ * token away (so the mode is what the process actually sees, whatever the user's shell exports). Also used by the
+ * `claude auth ...` commands.
+ */
+export function childEnvFor(base: NodeJS.ProcessEnv, mode: AiAuthMode = 'auto'): Record<string, string | undefined> {
+  const env = childEnv(base);
+  if (mode === 'claude-code') for (const k of Object.keys(env)) if (k.toUpperCase() === 'ANTHROPIC_API_KEY') delete env[k];
+  if (mode === 'api-key') for (const k of Object.keys(env)) if (k.toUpperCase() === 'CLAUDE_CODE_OAUTH_TOKEN') delete env[k];
+  return env;
+}
+
+/**
  * Builds the options of `query()`. Pure, so that it is unit-tested: this is where "only our tools, no user settings, no
  * terminal prompt, empty cwd, key only in env" is decided.
  */
 export function buildQueryOptions(i: QueryOptionsInput): Options {
-  const env = childEnv(i.baseEnv);
-  if (i.apiKey) env.ANTHROPIC_API_KEY = i.apiKey;
+  const env = childEnvFor(i.baseEnv, i.authMode);
+  if (i.apiKey && i.authMode !== 'claude-code') env.ANTHROPIC_API_KEY = i.apiKey;
   env.CLAUDE_AGENT_SDK_CLIENT_APP = i.clientApp ?? 'research-lab';
   const options: Options = {
     abortController: i.abortController,
@@ -213,6 +234,8 @@ export interface ClaudeProviderOptions {
   models?: ModelConfig[];
   /** Empty folder used as the agent's cwd (created when missing). */
   workDir: string;
+  /** The auth mode of the settings, read at each call (the user may change it between two turns). */
+  getAuthMode?: () => AiAuthMode;
   /** Explicit Claude Code path from the settings, if any (the user's choice, see `ai:chooseExecutable`). */
   configuredExecutable?: () => string | null;
   clientApp?: string;
@@ -287,7 +310,9 @@ const AUTH_ERRORS = new Set(['authentication_failed', 'oauth_org_not_allowed', '
 export function createClaudeProvider(options: ClaudeProviderOptions): AiProviderEx {
   const models = options.models ?? DEFAULT_MODELS;
   const env = () => options.env ?? process.env;
-  const getKey = async () => (options.getApiKey ? await options.getApiKey().catch(() => null) : null);
+  const mode = (): AiAuthMode => options.getAuthMode?.() ?? 'auto';
+  /** In `claude-code` mode the stored key is not even read. */
+  const getKey = async () => (options.getApiKey && mode() !== 'claude-code' ? await options.getApiKey().catch(() => null) : null);
   const executableInfo = () =>
     findClaudeExecutable({
       configured: options.configuredExecutable?.() ?? null,
@@ -309,7 +334,7 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
   };
 
   const access = async (): Promise<AiAccess> =>
-    detectAccess({ apiKey: await getKey(), env: env(), ...(options.home ? { home: options.home } : {}), ...(options.exists ? { exists: options.exists } : {}) });
+    detectAccess({ apiKey: await getKey(), authMode: mode(), env: env(), ...(options.home ? { home: options.home } : {}), ...(options.exists ? { exists: options.exists } : {}) });
 
   /** The in-process server with the request's tools (each wrapped so that results and errors become compact JSON). */
   function buildServer(sdk: SdkModule, tools: ToolSpec[], signal: AbortSignal, completed: Map<string, Array<{ ok: boolean; summary: string }>>) {
@@ -364,6 +389,7 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
           ...(tools.length > 0 ? { mcpServer: buildServer(sdk, tools, abort.signal, completed), toolNames: tools.map((t) => mcpToolName(t.name)) } : {}),
           apiKey: key,
           baseEnv: env(),
+          authMode: mode(),
           executable: executable(),
           ...(options.clientApp ? { clientApp: options.clientApp } : {}),
           maxTurns: 12,
@@ -464,6 +490,7 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
             abortController: abort,
             apiKey: key,
             baseEnv: env(),
+            authMode: mode(),
             executable: executable(),
             ...(options.clientApp ? { clientApp: options.clientApp } : {}),
             maxTurns: 3,

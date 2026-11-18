@@ -72,6 +72,13 @@ describe('runtime switches are development-only', () => {
     expect(packaged.warnings.join(' ')).toContain('RL_E2E_NET_FIXTURES');
   });
 
+  it('the simulated Claude Code folder is honoured only in a development run with RL_E2E=1', () => {
+    const env = { RL_E2E_CLAUDE_SIM: ABS('sim') };
+    expect(resolveRuntimeConfig(env, false).claudeSimDir).toBeNull();
+    expect(resolveRuntimeConfig({ ...env, RL_E2E: '1' }, false).claudeSimDir).toBe(ABS('sim'));
+    expect(resolveRuntimeConfig({ ...env, RL_E2E: '1' }, true).claudeSimDir).toBeNull();
+  });
+
   it('a dev server URL that is not plain localhost is ignored with a warning, even in development', () => {
     const rt = resolveRuntimeConfig({ ELECTRON_RENDERER_URL: 'https://evil.example/app' }, false);
     expect(rt.rendererDevUrl).toBeNull();

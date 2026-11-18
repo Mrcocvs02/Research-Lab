@@ -68,6 +68,8 @@ describe('review:list and review:stats', () => {
     expect(ok(await call('review:list', { fields: ['summary'] })).items.map((i: any) => i.docId)).toEqual([hex(2)]);
     expect(ok(await call('review:list', { docIds: [hex(2)] })).total).toBe(1);
     expect(ok(await call('review:stats')).pending).toMatchObject({ tags: 1, newTags: 1, description: 1, keywords: 1, summary: 1, synonyms: 0, relations: 0 });
+    // Documents with at least one proposal waiting (the dot next to the badge of Review), not proposals.
+    expect(ok(await call('review:stats')).pendingDocs).toBeGreaterThan(0);
   });
 });
 

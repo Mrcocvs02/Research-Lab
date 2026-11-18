@@ -11,6 +11,8 @@ import {
   type LibraryConfig,
   type LibraryStore,
   type Logger,
+  SCAN_LIMITS,
+  type ScanReport,
   type ScanStatus,
   type ScanSummary,
   type SearchFacets,
@@ -19,6 +21,7 @@ import {
   type SearchResultPage,
   type TaxonomyFile,
 } from '@rl/core';
+import { atomicWriteJson } from '@rl/core/node';
 import { createOrganizer, type Organizer, type OrganizerStore, type QuoteOutcome } from '@rl/data';
 import { enrichFromExtraction } from './enrich.js';
 import { buildIndexable, indexStamp, makeTaxonomyLookup, type TaxonomyLookup } from './indexable.js';
@@ -31,6 +34,9 @@ export function localPaths(localDataDir: string, libraryId: string) {
     textCacheDir: path.join(localDataDir, 'cache', 'text'),
   };
 }
+
+/** Where the report of the last scan of a library lives (machine-local, `scan:report` reads it). */
+export const scanReportFile = (localDataDir: string, libraryId: string) => path.join(localDataDir, 'scan', `${libraryId}-report.json`);
 
 export interface FileWatcher {
   close(): void | Promise<void>;
@@ -426,6 +432,7 @@ export class LibraryRuntime {
       }
     };
     let touchedDocs: string[] = [];
+    let report: ScanReport | null = null;
     try {
       this.scanConfig = await store.readConfig();
       const known = await store.documents.listIds();
@@ -456,6 +463,17 @@ export class LibraryRuntime {
       summary.unchanged = result.unchanged;
       touchedDocs = [...result.changed.map((c) => c.docId), ...result.moved.map((m) => m.docId), ...result.missing, ...result.restored, ...result.duplicates.map((d) => d.docId)];
       if (result.errors.length > 0) log.warn('some files or folders could not be scanned', { count: result.errors.length });
+      report = {
+        finishedAt: null,
+        summary: null,
+        firstScan: known.length === 0,
+        added: result.added.flatMap((f) => (f.docId ? [f.docId] : [])),
+        changed: result.changed.map((c) => c.docId),
+        moved: result.moved.map((m) => m.docId),
+        missing: result.missing,
+        failed: [],
+        truncated: false,
+      };
       if (signal.aborted || result.cancelled) throw abortError();
 
       const records = await store.documents.list();
@@ -525,6 +543,7 @@ export class LibraryRuntime {
       const indexedCount = await index.count();
       // The records the scan wrote are visible to the organizer before anybody hears the scan is over.
       this.recordsWritten();
+      await this.saveReport(report, summary, failedDocs, request.paths !== null);
       this.update({ state: 'done', phase: undefined, summary, indexed: indexedCount, finishedAt: this.nowIso(), total: undefined, processed: 0 });
       this.announceDocuments();
       await this.announceProjects(touchedDocs);
@@ -544,6 +563,31 @@ export class LibraryRuntime {
         });
       }
       this.announceDocuments();
+    }
+  }
+
+  /**
+   * Keeps the outcome of a finished scan for `scan:report` (atomic write, at most `SCAN_LIMITS.reportIds` ids per list).
+   * A targeted scan (the watcher) that changed nothing leaves the previous report: it would wipe what the user has not seen.
+   */
+  private async saveReport(report: ScanReport | null, summary: ScanSummary, failed: ReadonlySet<string>, targeted: boolean): Promise<void> {
+    if (!report) return;
+    const cap = SCAN_LIMITS.reportIds;
+    const lists = { ...report, failed: [...failed] as DocumentId[] };
+    const total = lists.added.length + lists.changed.length + lists.moved.length + lists.missing.length + lists.failed.length;
+    if (targeted && total === 0) return;
+    const out: ScanReport = { ...lists, finishedAt: this.nowIso(), summary, truncated: false };
+    for (const k of ['added', 'changed', 'moved', 'missing', 'failed'] as const) {
+      if (out[k].length > cap) {
+        out[k] = out[k].slice(0, cap);
+        out.truncated = true;
+      }
+    }
+    try {
+      const localDataDir = path.dirname(path.dirname(this.d.indexFile));
+      await atomicWriteJson(scanReportFile(localDataDir, this.d.libraryId), out);
+    } catch (e) {
+      this.d.log.warn('could not save the scan report', { error: AppError.from(e).toJSON() });
     }
   }
 

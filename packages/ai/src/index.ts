@@ -10,6 +10,8 @@ export {
   MCP_SERVER_NAME,
   buildQueryOptions,
   bundledExecutable,
+  childEnvFor,
+  claudeCredentialsFile,
   createClaudeProvider,
   detectAccess,
   findClaudeExecutable,

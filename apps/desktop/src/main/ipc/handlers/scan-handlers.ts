@@ -1,4 +1,6 @@
-import { AppError } from '@rl/core';
+import { AppError, scanReportSchema, type ScanReport } from '@rl/core';
+import { readJsonFile } from '@rl/core/node';
+import { scanReportFile } from '../../library/library-runtime.js';
 import { clearThumbs } from '../../thumbs.js';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
@@ -7,8 +9,13 @@ import type { MainServices } from './services.js';
 export const scanHandlers = (s: MainServices): DomainHandlers<'scan'> => ({
   'scan:start': async ({ libraryId, full }) => (await s.runtime.require(libraryId, { retry: true })).startScan({ full }),
   'scan:cancel': async ({ libraryId }) => (await s.runtime.require(libraryId)).cancel(),
-  // TODO(B1): the report of the last scan (`<localData>/scan/<libraryId>-report.json`, written by library-runtime); until then no scan has a report.
-  'scan:report': async () => ({ finishedAt: null, summary: null, firstScan: false, added: [], changed: [], moved: [], missing: [], failed: [], truncated: false }),
+  // The report of the last finished scan, written by the library runtime; none yet (or unreadable): the empty report.
+  'scan:report': async ({ libraryId }) => {
+    const id = libraryId ?? (await s.settings.get()).activeLibraryId;
+    const empty: ScanReport = { finishedAt: null, summary: null, firstScan: false, added: [], changed: [], moved: [], missing: [], failed: [], truncated: false };
+    if (!id) return empty;
+    return readJsonFile(scanReportFile(s.localDataDir, id), scanReportSchema).catch(() => empty);
+  },
   'scan:status': async ({ libraryId }) => {
     await s.runtime.sync();
     const status = s.runtime.status();

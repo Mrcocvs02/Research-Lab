@@ -5,29 +5,26 @@
 import { realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError } from '@rl/core';
+import { accountService } from '../../ai/account.js';
 import { ChatStore } from '../../ai/chat-store.js';
 import { listUserCommands } from '../../ai/guide-files.js';
 import { abortAllChatTurns, cancelTurn, computePreview, computeStatus, discardConversationTurns, loadCtx, monthUsage, startChatTurn } from '../../ai/service.js';
 import { aiSends, monthOf } from '../../ai/usage.js';
+import { usageAll } from '../../ai/usage-all.js';
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
 
 export { abortAllChatTurns };
 
-/** TODO(B1): contract stubs of the Claude account channels (§10.3-§10.4, D-431); B1 replaces them with `main/ai/account.ts` and `usage-all.ts`. */
-const notYet = (channel: string) => (): never => {
-  throw new AppError('NOT_IMPLEMENTED', `${channel} is not implemented yet`);
-};
-
 export const aiHandlers = (s: MainServices): DomainHandlers<'ai'> => ({
   'ai:status': () => computeStatus(s),
-  'ai:account': notYet('ai:account'),
-  'ai:setAuthMode': notYet('ai:setAuthMode'),
-  'ai:login': notYet('ai:login'),
-  'ai:loginDone': notYet('ai:loginDone'),
-  'ai:logout': notYet('ai:logout'),
-  'ai:test': notYet('ai:test'),
-  'ai:usageAll': notYet('ai:usageAll'),
+  'ai:account': () => accountService(s, s.claudeIo).account(),
+  'ai:setAuthMode': ({ mode }) => accountService(s, s.claudeIo).setAuthMode(mode),
+  'ai:login': () => accountService(s, s.claudeIo).login(),
+  'ai:loginDone': () => accountService(s, s.claudeIo).loginDone(),
+  'ai:logout': () => accountService(s, s.claudeIo).logout(),
+  'ai:test': () => accountService(s, s.claudeIo).test(),
+  'ai:usageAll': () => usageAll(s),
   'ai:chooseExecutable': async () => {
     // Only a dialog shown by main can name the program: the renderer never passes a path.
     const picked = await s.pickExecutable?.();

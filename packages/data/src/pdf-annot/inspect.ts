@@ -6,8 +6,9 @@ import { fileSource, getPage, loadDoc, resolve, setDeadline, tick, type SyncSour
 import { readAnnot } from './annot.js';
 import { pageCountOf } from './plan.js';
 import { unlock } from './refuse.js';
+import type { ExternalItem } from './external.js';
 
-export type InspectResult = { ok: true; external: number; externalAtBase: number | null; pages: number } | { ok: false };
+export type InspectResult = { ok: true; external: number; externalAtBase: number | null; pages: number; items?: ExternalItem[]; truncated?: boolean } | { ok: false };
 
 async function countExternal(src: SyncSource): Promise<{ n: number; pages: number }> {
   const doc = loadDoc(src);
@@ -23,10 +24,18 @@ async function countExternal(src: SyncSource): Promise<{ n: number; pages: numbe
   return { n, pages };
 }
 
-export async function inspectFile(path: string, baseSize?: number): Promise<InspectResult> {
+/** `list`: instead of counting, reads the highlights and underlines of other programs (§8.3.14). */
+export async function inspectFile(path: string, baseSize?: number, list?: boolean): Promise<InspectResult> {
   const src = fileSource(path);
   setDeadline(LIM.workerTimeoutMs);
   try {
+    if (list) {
+      const doc = loadDoc(src);
+      if (doc.trailer.has('Encrypt') && !(await unlock(doc)).ok) throw new Error('locked');
+      // A chunk of its own: the writer chunk stays within its cap and the listing loads only when the user asks for it.
+      const r = (await import('./external.js')).listExternal(doc);
+      return { ok: true, external: r.items.length, externalAtBase: null, pages: 0, items: r.items, truncated: r.truncated };
+    }
     const now = await countExternal(src);
     let externalAtBase: number | null = null;
     if (baseSize !== undefined && baseSize > 0 && baseSize < src.size) {

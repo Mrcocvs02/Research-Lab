@@ -123,8 +123,8 @@ export interface LibraryWorker {
   pdfSync?(args: SyncRequest, hooks?: WorkerHooks<never>): Promise<SyncResult>;
   /** Verifies a written temporary file before it replaces the original (§8.3.3 step 6). */
   pdfVerify?(args: VerifyRequest, hooks?: WorkerHooks<never>): Promise<VerifyResult>;
-  /** Counts the annotations of other programs in a file and in its original prefix. */
-  pdfInspect?(args: { path: string; baseSize?: number }, hooks?: WorkerHooks<never>): Promise<InspectResult>;
+  /** Counts the annotations of other programs in a file and in its original prefix; with `list`, reads them (§8.3.14). */
+  pdfInspect?(args: { path: string; baseSize?: number; list?: boolean }, hooks?: WorkerHooks<never>): Promise<InspectResult>;
   index(args: { rootPath: string; cacheDir: string; jobs: IndexJob[] }): Promise<void>;
   remove(docIds: string[]): Promise<void>;
   dispose(): Promise<void>;

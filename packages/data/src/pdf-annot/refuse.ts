@@ -69,7 +69,7 @@ function hasSignature(doc: Doc, root: Dict): boolean {
   return form ? walk(form.get('Fields'), undefined, 0) : false;
 }
 
-export async function analyze(src: SyncSource): Promise<Classification> {
+export async function analyze(src: SyncSource, opts: { allowManyRevisions?: boolean } = {}): Promise<Classification> {
   let doc: Doc;
   try {
     doc = loadDoc(src);
@@ -83,7 +83,7 @@ export async function analyze(src: SyncSource): Promise<Classification> {
     if (asDict(resolve(doc, root.get('AcroForm')))?.has('XFA')) return { ok: false, reason: 'xfa', detail: 'xfa' };
     if (hasSignature(doc, root)) return { ok: false, reason: 'signed', detail: 'signature' };
     if (!getPage(doc, 0)) return { ok: false, reason: 'damaged', detail: 'no-pages' };
-    if (doc.sections > LIM.maxRevisions) return { ok: false, reason: 'too-many-revisions', detail: 'revisions' };
+    if (doc.sections > LIM.maxRevisions && !opts.allowManyRevisions) return { ok: false, reason: 'too-many-revisions', detail: 'revisions' };
     return { ok: true, doc, trailingBytes: doc.trailing, revisions: doc.sections, hybrid: doc.hybrid, kind: doc.lastKind };
   } catch (e) {
     if (e instanceof PdfError) return { ok: false, reason: 'damaged', detail: e.code };

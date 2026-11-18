@@ -3,12 +3,18 @@ import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
 import { Button } from '../../components/Button';
 import { Dialog } from '../../components/Dialog';
+import { Lazy, lazyRetry } from '../../components/Lazy';
 import { useChangeVersion } from '../../lib/events';
+import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
+import { RlError } from '../../lib/rl-error';
 import type { RGroup, RItem } from './ReaderMenu';
 
+// The list of the annotations made by other programs and their import (J5): loaded when the user opens it.
+const ExternalAnnotations = lazyRetry(() => import('./ExternalAnnotations'));
+
 export type PdfState = ResponseOf<Channels, 'annotations:pdfState'>;
-type Ask = null | 'consent' | 'remove' | 'restore';
+type Ask = null | 'consent' | 'remove' | 'restore' | 'external';
 
 /**
  * The PDF group of the Study menu and what hangs from it (§8.3.7, §8.3.8, D-410): the state of the document's PDF, the writes the
@@ -22,6 +28,8 @@ export function usePdfWrite(docId: string, onError: (e: unknown) => void) {
   const [ask, setAsk] = useState<Ask>(null);
   const [lost, setLost] = useState<number | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  const { t } = useTranslation();
+  const { info, fail: notifyFail } = useNotify();
   const stRef = useRef(st);
   stRef.current = st;
   const edited = useRef(false);
@@ -90,6 +98,23 @@ export function usePdfWrite(docId: string, onError: (e: unknown) => void) {
       run(async () => {
         await rl.invoke('annotations:restoreOriginal', { docId });
       }),
+    /** "Export an annotated copy" (§8.3.14): the folder is picked in the main process; the original is never touched. */
+    exportCopy: async () => {
+      setBusy(true);
+      try {
+        const picked = await rl.invoke('dialog:chooseFolder', { purpose: 'export-destination', title: t('reader.pdf.exportFolderTitle') });
+        if (!picked) return;
+        const r = await rl.invoke('annotations:exportCopy', { docId, destination: picked.path });
+        info(t('reader.pdf.exported', { file: r.file, count: r.annotations }));
+      } catch (e) {
+        const reason = RlError.from(e).details?.['reason'];
+        const known = typeof reason === 'string' && ['encrypted', 'permission', 'signed', 'xfa', 'damaged', 'too-large', 'verify-failed', 'changed', 'inside-library', 'no-annotations', 'unavailable'].includes(reason);
+        if (known) notifyFail(t(`reader.pdf.exportReasons.${reason}`));
+        else fail.current(e);
+      } finally {
+        setBusy(false);
+      }
+    },
     resolveMissing: (choice: 'rewrite' | 'delete') => run(() => rl.invoke('annotations:resolveMissing', { docId, choice })),
     openRestore: () => {
       setLost(undefined);
@@ -137,6 +162,8 @@ export function usePdfGroup(pdf: PdfWrite): RGroup {
   ];
   if (writing && st && (st.state === 'pending' || st.state === 'refused')) items.push({ id: 'now', label: t('reader.pdf.writeNow'), testId: 'reader-pdf-write-now', onSelect: () => void pdf.writeNow() });
   items.push({ id: 'remove', label: t('reader.pdfRemove'), testId: 'reader-pdf-remove', ...(off ? { disabled: off } : {}), onSelect: () => pdf.setAsk('remove') });
+  // Works while writing into the PDFs is off or refused: it writes only the copy (§8.3.14).
+  items.push({ id: 'export', label: t('reader.pdf.exportCopy'), testId: 'reader-pdf-export', ...(pdf.busy ? { disabled: t('reader.pdf.busy') } : {}), onSelect: () => void pdf.exportCopy() });
   return { id: 'pdf', heading: text(st), headingId: 'reader-pdf-status', items };
 }
 
@@ -168,6 +195,14 @@ export function PdfInfoRow({ pdf }: { pdf: PdfWrite }) {
           </div>
         </div>
       )}
+      <div className="pdf-info-actions">
+        <Button size="sm" onClick={() => pdf.setAsk('external')} data-testid="reader-pdf-external">
+          {t('reader.pdf.externalOpen')}
+        </Button>
+        <Button size="sm" disabled={pdf.busy} onClick={() => void pdf.exportCopy()} data-testid="reader-pdf-export-info">
+          {t('reader.pdf.exportCopy')}
+        </Button>
+      </div>
       {st?.canRestore && (
         <div className="pdf-info-actions">
           <Button size="sm" onClick={pdf.openRestore} data-testid="reader-pdf-restore">
@@ -180,9 +215,15 @@ export function PdfInfoRow({ pdf }: { pdf: PdfWrite }) {
 }
 
 /** The two confirmations: take the highlights out of the PDF, and put the file back byte for byte. */
-export function PdfConfirmDialogs({ pdf }: { pdf: PdfWrite }) {
+export function PdfConfirmDialogs({ pdf, docId }: { pdf: PdfWrite; docId: string }) {
   const { t } = useTranslation();
   const close = () => pdf.setAsk(null);
+  if (pdf.ask === 'external')
+    return (
+      <Lazy>
+        <ExternalAnnotations docId={docId} onClose={close} />
+      </Lazy>
+    );
   if (pdf.ask === 'remove') {
     return (
       <Dialog title={t('reader.pdf.removeTitle')} onClose={close} testId="pdf-remove-dialog">

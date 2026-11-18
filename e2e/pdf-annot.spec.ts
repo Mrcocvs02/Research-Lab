@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
-import { chmod, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { launchApp, type LaunchedApp } from './helpers/launch';
@@ -14,6 +15,7 @@ import { rowByTitle } from './helpers/ui';
  * false. Whatever is written, the original bytes stay an exact prefix of the file.
  */
 const CHANNELS = ['annotations:pdfState', 'annotations:writeNow', 'annotations:restoreOriginal', 'annotations:migrate'];
+const J5_CHANNELS = ['annotations:exportCopy', 'annotations:externalList', 'annotations:externalImport'];
 const ENV = { RL_E2E: '1', RL_E2E_PDF_WRITE: '1' };
 const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 const eofs = (b: Buffer) => b.toString('latin1').split('%%EOF').length - 1;
@@ -49,8 +51,8 @@ async function createLibrary(window: Page, pdfConsent: boolean): Promise<void> {
   await expect(window.getByTestId('wizard')).toHaveCount(0, { timeout: 30_000 });
 }
 
-async function start(testInfo: Parameters<typeof skipUnlessChannels>[1], pdfConsent: boolean): Promise<{ ctx: LaunchedApp; window: Page; files: Array<{ title: string; abs: string; docId: string }> }> {
-  const ctx = await launchApp({ library: 'papers', dialogPath: true, offline: true, env: ENV });
+async function start(testInfo: Parameters<typeof skipUnlessChannels>[1], pdfConsent: boolean, env: Record<string, string> = {}): Promise<{ ctx: LaunchedApp; window: Page; files: Array<{ title: string; abs: string; docId: string }> }> {
+  const ctx = await launchApp({ library: 'papers', dialogPath: true, offline: true, env: { ...ENV, ...env } });
   const { window } = ctx;
   await createLibrary(window, pdfConsent);
   await skipUnlessChannels(window, testInfo, CHANNELS);
@@ -272,3 +274,98 @@ test('an encrypted PDF is refused with the right reason and left untouched (G4a)
     await ctx.close();
   }
 });
+
+test('"Export an annotated copy": only the copy is written, where the user picked; the original never changes (J5)', async ({}, testInfo) => {
+  test.setTimeout(420_000);
+  const outDir = await mkdtemp(path.join(os.tmpdir(), 'rl-export-'));
+  const { ctx, window, files } = await start(testInfo, true, { RL_E2E_EXPORT_DIALOG_PATH: outDir });
+  try {
+    await skipUnlessChannels(window, testInfo, J5_CHANNELS);
+    const [doc] = files as [(typeof files)[0]];
+    const original = await readFile(doc.abs);
+    const a = await saveAnn(window, doc.docId, { comment: 'for the copy' });
+    // "Only in the app" for this document: nothing is written into the original, and the copy is still offered
+    await ipcData(window, 'annotations:setPdfMode', { docId: doc.docId, mode: 'app-only' });
+    // a path that the folder dialog did not return is refused
+    expect((await ipc(window, 'annotations:exportCopy', { docId: doc.docId, destination: path.join(outDir, 'not-picked') })).ok).toBe(false);
+
+    await openInReader(window, doc.title);
+    await window.getByTestId('reader-study-menu').click();
+    await window.getByTestId('reader-pdf-export').click();
+    await expect.poll(async () => (await readdir(outDir)).filter((n) => n.endsWith('(annotated).pdf')).length, { timeout: 60_000 }).toBe(1);
+    const name = (await readdir(outDir)).find((n) => n.endsWith('(annotated).pdf'))!;
+    const copy = await readFile(path.join(outDir, name));
+    expect(copy.subarray(0, original.length).equals(original)).toBe(true);
+    expect(copy.length).toBeGreaterThan(original.length);
+    expect(copy.toString('latin1')).toContain(`/NM (rl-${a.annotation.id})`);
+    expect(copy.toString('latin1')).toContain('for the copy');
+    expect((await readFile(doc.abs)).equals(original)).toBe(true); // the original never changes
+    expect((await readdir(outDir)).filter((n) => n.endsWith('.tmp'))).toEqual([]);
+    expect((await readdir(path.dirname(doc.abs))).filter((n) => /\.rl-[0-9a-f]{8}\.tmp$/.test(n))).toEqual([]);
+    expect(await pdfState(window, doc.docId)).toMatchObject({ mode: 'app-only' });
+  } finally {
+    await ctx.close();
+    await rm(outDir, { recursive: true, force: true });
+  }
+});
+
+test('annotations made by other programs are listed and imported into the app on the user choice (J5)', async ({}, testInfo) => {
+  test.setTimeout(420_000);
+  const { ctx, window, files } = await start(testInfo, true);
+  try {
+    await skipUnlessChannels(window, testInfo, J5_CHANNELS);
+    const [doc] = files as [(typeof files)[0]];
+    // "Another program" appends a highlight to the file (a plain incremental update, as a PDF reader does); the scan then sees the new file.
+    const hl = '<< /Type /Annot /Subtype /Highlight /Rect [20 150 120 170] /QuadPoints [20 170 120 170 20 150 120 150] /C [1 0.92 0.23] /NM (other-1) /Contents (from another reader) /T (Ann) >>';
+    const withOther = appendOtherAnnotation(await readFile(doc.abs), hl);
+    test.skip(!withOther, 'the sample PDF has a layout this test does not extend');
+    await writeFile(doc.abs, withOther!);
+    await ipcData(window, 'scan:start', {});
+    await expect
+      .poll(async () => (await ipcData<{ items: unknown[] }>(window, 'annotations:externalList', { docId: doc.docId }).catch(() => ({ items: [] }))).items.length, { timeout: 120_000, intervals: [500, 1000, 2000] })
+      .toBe(1);
+    const changed = await readFile(doc.abs);
+
+    await openInReader(window, doc.title);
+    await window.getByTestId('reader-panel-info').click();
+    await window.getByTestId('reader-pdf-external').click();
+    await expect(window.getByTestId('pdf-external-dialog')).toBeVisible();
+    await expect(window.getByTestId('pdf-external-item')).toHaveCount(1);
+    await expect(window.getByTestId('pdf-external-list')).toContainText('from another reader');
+    expect((await ipcData<{ annotations: unknown[] }>(window, 'annotations:list', { docId: doc.docId })).annotations).toHaveLength(0); // listing changes nothing
+    await window.getByTestId('pdf-external-import').click();
+    await expect(window.getByTestId('pdf-external-dialog')).toHaveCount(0);
+    const list = (await ipcData<{ annotations: Array<{ kind: string; comment?: string }> }>(window, 'annotations:list', { docId: doc.docId })).annotations;
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ kind: 'highlight', comment: 'from another reader' });
+    expect((await readFile(doc.abs)).subarray(0, changed.length).equals(changed)).toBe(true); // importing never alters the PDF it reads
+    // imported once: the same item is now "already in the app"
+    expect((await ipcData<{ items: Array<{ inApp: boolean }> }>(window, 'annotations:externalList', { docId: doc.docId })).items[0]!.inApp).toBe(true);
+  } finally {
+    await ctx.close();
+  }
+});
+
+/** Appends a revision that adds one annotation object to the first page of a classic-xref PDF; null when the layout is not the expected one. */
+function appendOtherAnnotation(pdf: Buffer, annot: string): Buffer | null {
+  const text = pdf.toString('latin1');
+  const tail = text.slice(text.lastIndexOf('trailer'));
+  const m = /startxref\s+(\d+)\s+%%EOF\s*$/.exec(text);
+  const size = /\/Size (\d+)/.exec(tail);
+  const root = /\/Root (\d+) 0 R/.exec(tail);
+  if (!m || !size || !root || text.lastIndexOf('trailer') < 0 || /\/Type\s*\/XRef/.test(text.slice(Number(m[1]), Number(m[1]) + 400))) return null;
+  const n = Number(size[1]);
+  const first = /(\d+) 0 obj\s*<<(?:(?!endobj)[^])*?\/Type\s*\/Page\b(?!s)(?:(?!endobj)[^])*?>>\s*endobj/.exec(text);
+  if (!first || /\/Annots/.test(first[0])) return null;
+  const pageNo = Number(first[1]);
+  const pageBody = first[0].replace(/^\d+ 0 obj\s*/, '').replace(/\s*endobj$/, '').replace(/>>\s*$/, `/Annots [${n} 0 R] >>`);
+  let out = '';
+  const offs: Array<[number, number]> = [];
+  for (const [no, body] of [[n, annot], [pageNo, pageBody]] as Array<[number, string]>) {
+    offs.push([no, pdf.length + out.length]);
+    out += `${no} 0 obj\n${body}\nendobj\n`;
+  }
+  const xr = pdf.length + out.length;
+  out += `xref\n${offs.map(([no, off]) => `${no} 1\n${String(off).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${n + 1} /Root ${root[1]} 0 R /Prev ${m[1]} >>\nstartxref\n${xr}\n%%EOF\n`;
+  return Buffer.concat([pdf, Buffer.from(out, 'latin1')]);
+}

@@ -1,5 +1,5 @@
 import { open, realpath, stat, type FileHandle } from 'node:fs/promises';
-import { AppError, type DocumentId } from '@rl/core';
+import { AppError, contentHashOf, type DocumentId } from '@rl/core';
 import { isInside, resolveInRoot } from '@rl/core/node';
 import type { MainServices } from './services.js';
 
@@ -9,6 +9,7 @@ export interface PresentPdf {
   abs: string;
   /** Library root as configured; `openPdfHandle` re-checks the opened file against it. */
   root: string;
+  /** `contentHashOf` the record: it does not change when we append annotations to the file. */
   hash: string;
   title: string | null;
 }
@@ -35,7 +36,7 @@ export async function presentPdf(s: Pick<MainServices, 'runtime' | 'libraries'>,
   if (!PDF_EXT.test(abs)) throw refuse('not-pdf', 'Only PDF files open in the reader');
   const st = await stat(abs).catch(() => null);
   if (!st?.isFile()) throw refuse('missing', 'The file of this document is missing');
-  return { abs, root: profile.rootPath, hash: rec.hash, title: rec.title };
+  return { abs, root: profile.rootPath, hash: contentHashOf(rec), title: rec.title };
 }
 
 /** pdf.js accepts the header anywhere in the first KiB. */

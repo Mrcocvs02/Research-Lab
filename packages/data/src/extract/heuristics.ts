@@ -173,11 +173,35 @@ const MAX_ABSTRACT_SEARCH = 200_000;
 const ABSTRACT_START = /(?:^|\n)[ \t]*(?:abstract|riassunto|sommario|résumé|zusammenfassung)[ \t]*[:.—–-]*[ \t]*/i;
 const ABSTRACT_END = /\n[ \t]*(?:keywords?|key words|index terms|parole chiave|mots[- ]clés|ccs concepts|(?:1|i)[.\s]+(?:introduction|introduzione)|introduction|introduzione)\b/i;
 
+const INTRO_LINE = /^[ \t]*(?:(?:1|i)[.\s]+)?(?:introduction|introduzione)\b/i;
+const NOT_ABSTRACT = /@|\(dated|^\s*(?:received|accepted|published|arxiv|doi|pacs|keywords?)\b|https?:|www\./i;
+
+/**
+ * Papers without an "Abstract" heading (APS/arXiv style): the paragraph just above the first "Introduction" line,
+ * read backwards until an affiliation, author, date or short heading-like line. Bounded, and never an affiliation.
+ */
+function unlabelledAbstract(text: string, maxChars: number): string | undefined {
+  const lines = text.split('\n', 400);
+  const intro = lines.findIndex((l) => INTRO_LINE.test(l) && l.trim().length < 40);
+  if (intro < 1) return undefined;
+  const parts: string[] = [];
+  for (let i = intro - 1; i >= 0; i--) {
+    const l = squash(lines[i] as string);
+    if (!l) continue;
+    const isLast = parts.length === 0;
+    if (AFFILIATION.test(l) || NOT_ABSTRACT.test(l) || parseAuthorLine(l).length > 0 || (!isLast && l.length < 35)) break;
+    parts.unshift(l);
+  }
+  const clean = parts.join(' ').replace(/(\p{L})- (\p{Ll})/gu, '$1$2');
+  if (clean.length < 150) return undefined;
+  return clean.length > maxChars ? clean.slice(0, maxChars).trim() : clean;
+}
+
 /** The abstract, when an "Abstract" heading is found in the given text (first pages). */
 export function abstractFromText(text: string, maxChars = 3000): string | undefined {
   text = text.slice(0, MAX_ABSTRACT_SEARCH); // the abstract is at the start; the bound keeps the scans cheap on hostile text
   const start = ABSTRACT_START.exec(text);
-  if (!start) return undefined;
+  if (!start) return unlabelledAbstract(text, maxChars);
   let rest = text.slice(start.index + start[0].length);
   const end = ABSTRACT_END.exec(rest);
   if (end) rest = rest.slice(0, end.index);

@@ -1186,3 +1186,23 @@ button.page-chip {
   color: var(--text-muted);
   font-size: var(--fs-small);
 }
+
+/* the second line of a row: authors, year and type, then the tags on the same line (60 px rows) */
+.doc-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.doc-sub .result-meta {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.doc-sub .doc-tags {
+  flex: none;
+  flex-wrap: nowrap;
+}
+.doc-card .doc-sub {
+  flex-wrap: wrap;
+}

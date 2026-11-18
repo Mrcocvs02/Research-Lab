@@ -144,8 +144,10 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
         <h3 className="result-title" data-testid="result-title" title={title}>
           {title}
         </h3>
-        {meta.length > 0 && <p className="result-meta">{meta.join(' · ')}</p>}
-        <Tags tags={row.tags} max={view === 'grid' ? 3 : 6} />
+        <div className="doc-sub">
+          {meta.length > 0 && <p className="result-meta">{meta.join(' · ')}</p>}
+          <Tags tags={row.tags} max={view === 'grid' ? 3 : 4} />
+        </div>
         {view === 'list' && searching && row.snippet && (
           <p className="result-snippet" data-testid="result-snippet" data-field={row.field}>
             {(row.field === 'note' || row.field === 'annotation') && (

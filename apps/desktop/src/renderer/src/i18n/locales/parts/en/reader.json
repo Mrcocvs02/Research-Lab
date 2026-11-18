@@ -87,6 +87,8 @@
       "samePage": "Select the text on the same page as the annotation.",
       "done_one": "{{count}} highlight repositioned after a reader fix",
       "done_other": "{{count}} highlights repositioned after a reader fix",
+      "job_one": "Checking highlights: {{count}} document",
+      "job_other": "Checking highlights: {{count}} documents",
       "undo": "Undo"
     }
   }

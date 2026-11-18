@@ -303,6 +303,6 @@ export async function repairQuotes(rootPath: string, rel: string, queries: reado
 
 interface PdfGeometryPage {
   getViewport(params: { scale: number }): { transform: number[]; width: number; height: number };
-  getTextContent(params?: Record<string, unknown>): Promise<{ items: Array<Record<string, unknown>> }>;
+  getTextContent(params?: Record<string, unknown>): Promise<{ items: unknown[] }>;
   cleanup(): unknown;
 }

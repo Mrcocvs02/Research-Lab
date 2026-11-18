@@ -15,6 +15,7 @@ function fakeSpawner(scanMs = 0) {
         return {} as never;
       },
       extract: async () => ({}) as never,
+      repairAnnotations: async () => [],
       index: async () => {},
       remove: async () => void log.removes++,
       dispose: async () => void log.disposed++,
@@ -97,6 +98,7 @@ function gatedSpawner() {
       resetIndex: async () => {},
       scan: async () => ({}) as never,
       extract: async () => ({}) as never,
+      repairAnnotations: async () => [],
       index: async () => {},
       remove: async () => {},
       dispose: () => hold(gates.dispose),

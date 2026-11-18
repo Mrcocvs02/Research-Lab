@@ -263,7 +263,7 @@ describe('annotations', () => {
     const a = ok(await call('annotations:save', { docId: hex(1), annotation: ann({ geom: 2 }) })).annotation;
     const cleared = ok(await call('annotations:save', { docId: hex(1), annotation: ann({ id: a.id, geom: null }) })).annotation;
     expect('geom' in cleared).toBe(false);
-    const listed = ok(await call('annotations:list', { docId: hex(1) })).annotations.find((x) => x.id === a.id);
+    const listed = ok(await call('annotations:list', { docId: hex(1) })).annotations.find((x: { id: string }) => x.id === a.id);
     expect(listed && 'geom' in listed).toBe(false);
     const created = ok(await call('annotations:save', { docId: hex(1), annotation: ann({ geom: null }) })).annotation;
     expect('geom' in created).toBe(false);

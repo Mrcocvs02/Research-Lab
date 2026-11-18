@@ -9,6 +9,7 @@ import type { LibraryRuntime } from '../../library/library-runtime.js';
 import type { DomainHandlers } from '../types.js';
 
 import { listThumbs, nativeThumb, pruneThumbs, putThumb } from '../../thumbs.js';
+import { scheduleRepairJob } from '../../study/repair-job.js';
 import { openPdfHandle, presentPdf } from './doc-files.js';
 import type { MainServices } from './services.js';
 
@@ -152,6 +153,8 @@ type Underlined = { value: boolean; origin: 'annotations' | 'manual' };
 
 export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotations'> => {
   const queue = new KeyedQueue();
+  // Annotations saved while the page was stretched are measured again in the background (D-373), once per library.
+  scheduleRepairJob(s);
   /** The annotations of one document change one at a time, together with the flag that follows them. */
   const change = async <T>(docId: string, fn: (rt: LibraryRuntime) => Promise<{ value: T; changed: boolean; flagChanged: boolean; underlined: Underlined }>) => {
     const rt = await activeDocument(s, docId);

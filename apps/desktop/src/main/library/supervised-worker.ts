@@ -46,7 +46,7 @@ export interface SupervisedWorkerOptions {
   note?(message: string, details?: Record<string, unknown>): void;
 }
 
-type Op = 'openIndex' | 'resetIndex' | 'scan' | 'extract' | 'index' | 'remove';
+type Op = 'openIndex' | 'resetIndex' | 'scan' | 'extract' | 'repairAnnotations' | 'index' | 'remove';
 
 const abortError = () => Object.assign(new Error('aborted'), { name: 'AbortError' });
 
@@ -214,6 +214,7 @@ export function createSupervisedWorker(options: SupervisedWorkerOptions): Librar
     resetIndex: () => run('resetIndex', undefined, (w) => w.client.resetIndex()),
     scan: (args, hooks) => run('scan', hooks, (w, h) => w.client.scan(args, h)),
     extract: (args, hooks) => run('extract', hooks, (w, h) => w.client.extract(args, h)),
+    repairAnnotations: (args, hooks) => run('repairAnnotations', hooks, (w, h) => w.client.repairAnnotations(args, h)),
     index: (args) => run('index', undefined, (w) => w.client.index(args)),
     remove: (ids) => run('remove', undefined, (w) => w.client.remove(ids)),
     alive: () => raw !== null,

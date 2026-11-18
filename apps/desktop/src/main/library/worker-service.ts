@@ -1,6 +1,6 @@
 import { AppError, type DocumentRecord, type ExtractOptions, type LibraryStore, type ScanProgress, type Scanner, type SearchIndex, type TextExtractor } from '@rl/core';
-import { classifyExtractError } from '@rl/data';
-import type { ExtractArgs, ExtractProgress, ExtractResult, IndexJob, LibraryWorker, RecordHost, ScanArgs, WorkerHooks } from './worker-protocol.js';
+import { classifyExtractError, repairQuotes } from '@rl/data';
+import type { ExtractArgs, ExtractProgress, ExtractResult, IndexJob, LibraryWorker, RecordHost, RepairArgs, ScanArgs, WorkerHooks } from './worker-protocol.js';
 
 export interface WorkerDeps {
   createScanner(): Scanner;
@@ -130,6 +130,11 @@ export function createWorkerService(deps: WorkerDeps): LibraryWorker {
         const reason = reasonOf(e);
         return { path: item.path, hash: item.hash, ok: false, cached: false, permanent: isPermanentFailure(e), ...(reason ? { reason } : {}), error: describe(e) };
       }
+    },
+
+    repairAnnotations({ rootPath, path, queries }: RepairArgs, hooks: WorkerHooks<ExtractProgress> = {}) {
+      // Read-only: the rectangles are computed here, the caller writes them to the annotation store.
+      return repairQuotes(rootPath, path, queries, { signal: hooks.signal, onPage: (page) => hooks.onEvent?.({ page }) });
     },
 
     async index({ rootPath, cacheDir, jobs }: { rootPath: string; cacheDir: string; jobs: IndexJob[] }) {

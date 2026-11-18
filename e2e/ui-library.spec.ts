@@ -35,6 +35,7 @@ async function editData(window: Page) {
  * the machine running the test): the buttons are only checked to be available.
  */
 
+test.use({ actionTimeout: 8000 });
 const dirOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
 
 test('folders with counts, list and grid, sorting, text search (points 1 and 2)', async ({}, testInfo) => {

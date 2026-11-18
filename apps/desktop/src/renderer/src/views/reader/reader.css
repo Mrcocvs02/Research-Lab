@@ -45,8 +45,8 @@
   font-weight: 600;
 }
 .reader-title__root {
+  flex: none;
   color: var(--text-muted);
-  font-weight: 400;
 }
 @container (max-width: 1299px) {
   .reader-title {
@@ -122,8 +122,9 @@
     0 0 0 2px var(--surface),
     0 0 0 4px var(--text);
 }
-.reader-page-input {
-  width: 3.2em;
+.rbar .reader-page-input {
+  width: 44px;
+  flex: none;
   height: 28px;
   padding: 0 4px;
   text-align: center;

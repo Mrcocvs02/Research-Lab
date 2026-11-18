@@ -4,6 +4,7 @@ import { ANNOTATION_COLORS, type StudyState } from '@rl/core';
 import { Lazy, lazyView } from '../../components/Lazy';
 import { Popover } from '../../components/Popover';
 import { Icon } from '../../shell/shellIcons';
+import { ColorDots } from './AnnotationPopover';
 import { ReaderMenu, type RGroup } from './ReaderMenu';
 import type { ColorNo, Tool } from './toolMachine';
 import type { ReaderDoc } from './useReaderDoc';
@@ -179,8 +180,8 @@ export function ReaderBar(p: Props) {
         <BarButton label={t('reader.back')} keys="Alt+←" testId="reader-close" onClick={p.onClose}>
           <Icon name="close" />
         </BarButton>
+        <span className="reader-title__root">{t('sections.library')} ›</span>
         <h2 className="reader-title" title={p.title} data-testid="reader-title">
-          <span className="reader-title__root">{t('sections.library')} › </span>
           {p.title}
         </h2>
       </div>
@@ -190,26 +191,16 @@ export function ReaderBar(p: Props) {
           <span className={`rbar__pip ann-${colorName}`} aria-hidden="true" />
         </BarButton>
         <Popover anchor={colorBtn} open={open === 'color'} onClose={close} label={t('reader.ann.color')} width={196}>
-          <div className="rbar__colors" role="radiogroup" aria-label={t('reader.ann.color')}>
-            {ANNOTATION_COLORS.map((c, i) => (
-              <button
-                key={c}
-                type="button"
-                role="radio"
-                aria-checked={p.color === i + 1}
-                className={`ann-dot-btn ann-${c}`}
-                title={`${t(`reader.colors.${c}`)} (${i + 1})`}
-                aria-label={t(`reader.colors.${c}`)}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  p.onColor((i + 1) as ColorNo);
-                  close();
-                }}
-                data-testid={`ann-color-${c}`}
-              >
-                <span aria-hidden="true" />
-              </button>
-            ))}
+          <div className="rbar__colors">
+            <ColorDots
+              value={colorName}
+              label={t('reader.ann.color')}
+              prefix="ann-color"
+              onPick={(n) => {
+                p.onColor(n);
+                close();
+              }}
+            />
           </div>
         </Popover>
       </div>

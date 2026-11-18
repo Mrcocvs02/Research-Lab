@@ -79,10 +79,12 @@
   "sections": {
     "library": "Libreria",
     "projects": "Progetti",
-    "network": "Rete",
-    "inbox": "Arrivi",
+    "network": "Mappa",
+    "inbox": "Da rivedere",
     "settings": "Impostazioni",
-    "discover": "Scopri"
+    "discover": "Scopri",
+    "review": "Da rivedere",
+    "map": "Mappa"
   },
   "placeholders": {
     "library": "Qui sfoglierai e cercherai i tuoi documenti. Questa sezione arriverà in una fase successiva.",
@@ -99,10 +101,29 @@
     "activeLibrary": "Libreria attiva",
     "noLibrary": "Nessuna libreria",
     "language": "Lingua dell'interfaccia",
-    "empty": "Nessuna libreria aperta. Creane una per iniziare."
+    "empty": "Nessuna libreria aperta. Creane una per iniziare.",
+    "expand": "Espandi la barra laterale",
+    "collapse": "Comprimi la barra laterale",
+    "help": "Aiuto",
+    "documents_one": "{{count}} documento",
+    "documents_other": "{{count}} documenti",
+    "manageLibraries": "Gestisci librerie…",
+    "badgeFiles_one": "{{count}} file nuovo",
+    "badgeFiles_other": "{{count}} file nuovi",
+    "badgeDocs_one": "proposte di Claude per {{count}} documento",
+    "badgeDocs_other": "proposte di Claude per {{count}} documenti",
+    "back": "Indietro",
+    "forward": "Avanti",
+    "nothingBack": "non c'è una pagina precedente",
+    "nothingForward": "non c'è una pagina successiva",
+    "crumbs": "Percorso",
+    "crumbReader": "Lettore",
+    "crumbFiles": "Nuovi file",
+    "crumbProposals": "Proposte di Claude",
+    "searchLibrary": "Cerca nella libreria…"
   },
   "chat": {
-    "title": "Chat",
+    "title": "Claude",
     "collapse": "Comprimi il pannello della chat",
     "expand": "Espandi il pannello della chat",
     "loading": "Caricamento della chat…",
@@ -289,7 +310,13 @@
     "redone": "Ripetuto: {{summary}}",
     "nothingToUndo": "Non c'è nulla da annullare.",
     "nothingToRedo": "Non c'è nulla da ripetere.",
-    "partialRefused": "Questa modifica non si può annullare: il registro è molto grande e ne è stata letta solo una parte, quindi la modifica potrebbe essere incompleta."
+    "partialRefused": "Questa modifica non si può annullare: il registro è molto grande e ne è stata letta solo una parte, quindi la modifica potrebbe essere incompleta.",
+    "actions": {
+      "tags_update": "Tag modificati su {{documents}} documenti",
+      "taxonomy_update": "Tassonomia modificata ({{tags}} elementi)",
+      "document_fields": "Dati del documento modificati",
+      "project_update": "Progetto modificato"
+    }
   },
   "docs": {
     "sizeTitle": "{{bytes}} byte",
@@ -412,7 +439,7 @@
     "bulk": "Aggiorna citazioni",
     "bulkHint": "Scarica dalle fonti online riferimenti e opere citanti dei documenti selezionati.",
     "tooMany": "Si possono aggiornare al massimo {{limit}} documenti alla volta; ne sono selezionati {{n}}.",
-    "started": "Aggiornamento delle citazioni avviato. Seguilo nella barra di stato.",
+    "started": "Aggiornamento delle citazioni avviato.",
     "alreadyRunning": "Un aggiornamento delle citazioni è già in corso. Aspetta che finisca o annullalo prima.",
     "job": {
       "label": "Aggiornamento delle citazioni",
@@ -432,5 +459,12 @@
     "button": "Esporta come secondo cervello…",
     "clusterButton": "Esporta",
     "clusterAria": "Esporta il cluster «{{name}}» come secondo cervello"
+  },
+  "activity": {
+    "title": "Attività",
+    "idle": "Nessuna attività",
+    "attention_one": "{{count}} da guardare",
+    "attention_other": "{{count}} da guardare",
+    "see": "Vedi in Attività"
   }
 }

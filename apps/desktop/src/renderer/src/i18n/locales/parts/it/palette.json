@@ -1,6 +1,6 @@
 {
   "chat": {
-    "paletteSearch": "Cerca un comando",
+    "paletteSearch": "Cerca un comando o un documento",
     "paletteCustom": "tuo",
     "paletteNone": "Nessun comando corrisponde.",
     "paletteHint": "Scegliere un comando riempie la casella del messaggio. Non viene inviato nulla finché non premi Invia.",
@@ -46,14 +46,8 @@
       "goProjects": {
         "label": "Vai ai Progetti"
       },
-      "goNetwork": {
-        "label": "Vai alla Rete"
-      },
-      "goInbox": {
-        "label": "Vai agli Arrivi"
-      },
       "goReview": {
-        "label": "Vai alle proposte dell'AI da rivedere"
+        "label": "Vai a Da rivedere"
       },
       "goSettings": {
         "label": "Apri le impostazioni"
@@ -62,7 +56,7 @@
         "label": "Nuova libreria…"
       },
       "backupNow": {
-        "label": "Esegui il backup ora"
+        "label": "Esegui un backup ora"
       },
       "openGuide": {
         "label": "Apri la guida"
@@ -72,7 +66,40 @@
       },
       "switchLanguage": {
         "label": "Cambia la lingua in {{language}}"
+      },
+      "goDiscover": {
+        "label": "Vai a Scopri"
+      },
+      "goMap": {
+        "label": "Vai alla Mappa"
+      },
+      "openActivity": {
+        "label": "Apri Attività"
+      },
+      "scanNow": {
+        "label": "Scansiona ora"
+      },
+      "addPdf": {
+        "label": "Aggiungi PDF…"
+      },
+      "undo": {
+        "label": "Annulla l'ultima modifica"
+      },
+      "redo": {
+        "label": "Ripeti la modifica annullata"
+      },
+      "theme": {
+        "label": "Cambia tema (chiaro o scuro)"
       }
-    }
+    },
+    "paletteGroups": {
+      "recent": "Recenti",
+      "docs": "Documenti",
+      "goto": "Vai a",
+      "actions": "Azioni",
+      "claude": "Chiedi a Claude",
+      "settings": "Impostazioni"
+    },
+    "paletteNoLibrary": "Apri prima una libreria"
   }
 }

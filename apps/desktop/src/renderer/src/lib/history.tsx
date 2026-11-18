@@ -1,7 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
-import { Lazy, lazyView } from '../components/Lazy';
+import { HistoryButtons } from '../shell/HistoryButtons';
 import { RlError } from './rl-error';
 import { useApp } from '../state/app-context';
 import { useLibraryEvents } from './events';
@@ -116,31 +116,10 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
-// The panel with the list of changes is only needed when it is opened.
-const HistoryPanel = lazyView(() => import('./HistoryPanel').then((m) => ({ default: m.HistoryPanel })), ['history']);
+/** True inside the shell: Undo, Redo and History live in its top bar (`shell/HistoryButtons.tsx`), once for the whole window (3.3). */
+export const InShellContext = createContext(false);
 
-/** Undo and redo buttons plus the "History" panel with the recent changes. */
+/** Undo, Redo and History for a view rendered on its own (tests); inside the shell the top bar has them and this draws nothing. */
 export function HistoryControls() {
-  const { t } = useTranslation();
-  const h = useHistory();
-  const [open, setOpen] = useState(false);
-  const panelId = useId();
-  return (
-    <div className="history-controls" role="group" aria-label={t('history.title')}>
-      <button type="button" onClick={() => void h.undo()} disabled={!h.canUndo || h.busy} title={t('history.undoHint')} data-testid="undo-button">
-        {t('history.undo')}
-      </button>
-      <button type="button" onClick={() => void h.redo()} disabled={!h.canRedo || h.busy} title={t('history.redoHint')} data-testid="redo-button">
-        {t('history.redo')}
-      </button>
-      <button type="button" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(!open)} data-testid="history-toggle">
-        {t('history.title')}
-      </button>
-      {open && (
-        <Lazy>
-          <HistoryPanel id={panelId} onClose={() => setOpen(false)} />
-        </Lazy>
-      )}
-    </div>
-  );
+  return useContext(InShellContext) ? null : <HistoryButtons />;
 }

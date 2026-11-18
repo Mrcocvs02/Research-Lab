@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import type { AppNotice } from '@rl/core';
 import { rl } from '../lib/rl';
+import { Lazy, lazyView } from './Lazy';
+
+// The banners themselves are only drawn (and their code loaded) when the main process reported something.
+const NoticeStack = lazyView(() => import('./NoticeStack').then((m) => ({ default: m.NoticeStack })), []);
 
 /**
  * Startup notices from the main process (settings file reset, settings from a newer version).
@@ -9,7 +12,6 @@ import { rl } from '../lib/rl';
  * also arrive as `app:notice` events; both paths are de-duplicated by id.
  */
 export function NoticeBanner() {
-  const { t } = useTranslation();
   const [notices, setNotices] = useState<AppNotice[]>([]);
 
   const add = useCallback((incoming: AppNotice[]) => {
@@ -36,22 +38,8 @@ export function NoticeBanner() {
 
   if (notices.length === 0) return null;
   return (
-    <div className="notice-stack" data-testid="notice-banner">
-      {notices.map((n) => (
-        <div key={n.id} className="notice-banner" role="alert" data-notice={n.kind}>
-          <p>
-            {n.kind === 'settings-reset'
-              ? t('notices.settingsReset', { reason: t(`notices.reason.${n.reason}`), backup: n.backupName ?? '' })
-              : n.kind === 'backup-failed'
-                ? t('notices.backupFailed', { code: n.code })
-                : t('notices.settingsReadOnly', { found: n.foundVersion, supported: n.supportedVersion })}
-            {n.kind === 'settings-reset' && n.fields.length > 0 ? ` ${t('notices.fields', { fields: n.fields.join(', ') })}` : ''}
-          </p>
-          <button type="button" onClick={() => dismiss(n.id)}>
-            {t('notices.dismiss')}
-          </button>
-        </div>
-      ))}
-    </div>
+    <Lazy>
+      <NoticeStack notices={notices} onDismiss={dismiss} />
+    </Lazy>
   );
 }

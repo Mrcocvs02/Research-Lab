@@ -27,13 +27,17 @@ export async function waitClaudeReady(window: Page): Promise<void> {
 /** Enables a folder (a relative path of the tree) for Claude; every control saves by itself, so this waits for "Saved". */
 export async function enableAiFolder(window: Page, folder: string): Promise<void> {
   await openSettings(window, 'claude');
-  await window.getByTestId('config-ai-tree').locator(`input[data-folder="${folder}"]`).check();
+  // The box follows the saved config (not the click), so `check()` would see the old state: click, then wait for it to be checked.
+  const box = window.getByTestId('config-ai-tree').locator(`input[data-folder="${folder}"]`);
+  await box.click();
+  await expect(box).toBeChecked();
   await expect(window.getByTestId('ai-folders').getByText('Saved')).toBeVisible();
 }
 
 /** Enables the whole library for Claude. */
 export async function enableAiWholeLibrary(window: Page): Promise<void> {
   await openSettings(window, 'claude');
-  await window.getByTestId('ai-root-all').check();
+  await window.getByTestId('ai-root-all').click();
+  await expect(window.getByTestId('ai-root-all')).toBeChecked();
   await expect(window.getByTestId('ai-folders').getByText('Saved')).toBeVisible();
 }

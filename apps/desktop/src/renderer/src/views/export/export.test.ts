@@ -428,6 +428,8 @@ describe('command palette entry', () => {
     setHandlers({ ...handlers, 'commands:list': () => ({ items: [] }) });
     const onClose = vi.fn();
     render(createElement(AppProvider, null, createElement(AiUiProvider, null, createElement(Selected, { ids: SELECTED }), createElement(Probe), createElement(Palette, { onClose }))));
+    // The commands for Claude (and this one) show once there is some text.
+    fireEvent.change(await screen.findByTestId('palette-input'), { target: { value: 'second brain' } });
     const items = await screen.findAllByTestId('palette-item');
     const entry = items.find((i) => i.getAttribute('data-command') === 'exportDialog')!;
     expect(entry.textContent).toBe('Export as a second brain…');

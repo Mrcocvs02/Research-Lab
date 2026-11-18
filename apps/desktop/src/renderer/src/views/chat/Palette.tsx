@@ -1,27 +1,56 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ShortcutId } from '@rl/core';
 import { Dialog } from '../../components/Dialog';
 import { useAiUi } from '../../lib/aiUi';
+import { useHistory } from '../../lib/history';
+import { useInbox } from '../../lib/inbox';
 import { useEffectiveShortcuts } from '../../lib/keymap';
-import { useApp } from '../../state/app-context';
+import { useNotify } from '../../lib/notify';
+import { canRead, useReader } from '../../lib/reader';
 import { rl } from '../../lib/rl';
+import { applyTheme, isDarkTheme } from '../../lib/theme';
+import { useApp } from '../../state/app-context';
+import { searchSettings } from '../../settings/settingsIndex';
 import { safeText } from '../library/safeText';
-import { ACTION_COMMANDS, APP_ACTIONS, PREDEFINED_COMMANDS, type AppActionId, type PaletteItem } from './commands';
-import { filterItems, loadRecents, orderByRecent, rememberRecent } from './paletteModel';
+import { ACTION_COMMANDS, PREDEFINED_COMMANDS } from './commands';
+import { PALETTE_ACTIONS, filterItems, groupItems, loadRecents, orderByRecent, rememberRecent, type PaletteActionId, type PaletteGroup } from './paletteModel';
 import './chat.css';
 
+interface Item {
+  id: string;
+  label: string;
+  group: PaletteGroup;
+  prompt: string;
+  custom: boolean;
+  action?: (typeof ACTION_COMMANDS)[number];
+  appAction?: PaletteActionId;
+  docId?: string;
+  /** A setting of `settingsIndex.ts`: the id the settings page focuses. */
+  settingId?: string;
+  openable?: boolean;
+  shortcut?: ShortcutId;
+  /** Shown instead of running when the item cannot be used now (never hidden: 17.1). */
+  disabledReason?: string;
+}
+
 /**
- * Command palette (Ctrl+K): app actions (views, backup, guide...) and the commands for Claude, predefined and the user's
- * own; search ignores case and accents and recently used entries come first. Choosing a prompt command puts its text in the chat prompt and opens the
- * panel; it never sends anything, so the user can edit the prompt, see the preview and then send.
+ * Command palette (Ctrl+K, 3.4): documents (from two letters), go to, actions, and the commands for Claude, predefined
+ * and the user's own. Without text: the recent entries and the go-to and action groups. Search ignores case and accents.
+ * Choosing a prompt command puts its text in the chat prompt and opens the panel; it never sends anything.
  */
 export function Palette({ onClose }: { onClose(): void }) {
   const { t } = useTranslation();
-  const { fillPrompt, setChatOpen, openExport, selection, goTo, openGuide } = useAiUi();
+  const { fillPrompt, setChatOpen, openExport, selection, goTo, openGuide, setActivityOpen } = useAiUi();
   const app = useApp();
+  const history = useHistory();
+  const inbox = useInbox();
+  const { openReader } = useReader();
+  const { reportError } = useNotify();
   const keys = useEffectiveShortcuts();
   const [recents, setRecents] = useState<string[]>(loadRecents);
-  const [custom, setCustom] = useState<PaletteItem[]>([]);
+  const [custom, setCustom] = useState<Item[]>([]);
+  const [docs, setDocs] = useState<Item[]>([]);
   const [query, setQuery] = useState('');
   const [at, setAt] = useState(0);
   const listId = useId();
@@ -36,7 +65,7 @@ export function Palette({ onClose }: { onClose(): void }) {
   useEffect(() => {
     let live = true;
     rl.invoke('commands:list', {}).then(
-      (r) => live && setCustom(r.items.map((c) => ({ id: `user-${c.id}`, label: c.label, prompt: c.prompt, custom: true }))),
+      (r) => live && setCustom(r.items.map((c) => ({ id: `user-${c.id}`, label: c.label, prompt: c.prompt, custom: true, group: 'claude' as const }))),
       () => {}, // the user's commands are optional: the predefined ones still work
     );
     return () => {
@@ -44,48 +73,91 @@ export function Palette({ onClose }: { onClose(): void }) {
     };
   }, []);
 
-  const items = useMemo<PaletteItem[]>(() => {
+  // Documents: from two characters, 150 ms after the last key, at most 8 (local search only).
+  useEffect(() => {
+    const text = query.trim();
+    if (text.length < 2 || !app.activeProfile) return setDocs([]);
+    let live = true;
+    const timer = setTimeout(() => {
+      rl.invoke('search:query', { text, limit: 8 }).then(
+        (r) => live && setDocs(r.hits.map((h) => ({ id: `doc-${h.docId}`, label: h.title ?? h.path.split(/[\/]/).pop() ?? h.docId, group: 'docs' as const, prompt: '', custom: false, docId: h.docId, openable: canRead(h.path, false) }))),
+        () => live && setDocs([]),
+      );
+    }, 150);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [query, app.activeProfile]);
+
+  const hasLibrary = app.activeProfile !== null;
+  const noLibrary = t('chat.paletteNoLibrary');
+  const items = useMemo<Item[]>(() => {
     const other = app.settings?.uiLanguage === 'en' ? 'it' : 'en';
-    const actions: PaletteItem[] = APP_ACTIONS.map((a) => ({
+    const reason = (id: PaletteActionId): string | undefined => {
+      if (id === 'undo') return !hasLibrary ? noLibrary : history.canUndo ? undefined : t('history.nothingToUndo');
+      if (id === 'redo') return !hasLibrary ? noLibrary : history.canRedo ? undefined : t('history.nothingToRedo');
+      if (['scanNow', 'backupNow', 'addPdf', 'goReview', 'goProjects', 'goDiscover', 'goMap'].includes(id) && !hasLibrary) return noLibrary;
+      return undefined;
+    };
+    const actions: Item[] = PALETTE_ACTIONS.map((a) => ({
       id: `app-${a.id}`,
       label: t(`chat.commands.${a.id}.label`, { language: t(`languages.${other}`) }),
       prompt: '',
       custom: false,
+      group: a.group,
       appAction: a.id,
       ...('shortcut' in a ? { shortcut: a.shortcut } : {}),
+      ...(reason(a.id) ? { disabledReason: reason(a.id)! } : {}),
     }));
-    const all: PaletteItem[] = [
-      ...PREDEFINED_COMMANDS.map((id) => ({ id, label: t(`chat.commands.${id}.label`), prompt: t(`chat.commands.${id}.prompt`), custom: false })),
-      ...ACTION_COMMANDS.map((id) => ({ id, label: t(`chat.commands.${id}.label`), prompt: '', custom: false, action: id })),
+    const prompts: Item[] = [
+      ...PREDEFINED_COMMANDS.map((id) => ({ id, label: t(`chat.commands.${id}.label`), prompt: t(`chat.commands.${id}.prompt`), custom: false, group: 'claude' as const })),
+      ...ACTION_COMMANDS.map((id) => ({ id, label: t(`chat.commands.${id}.label`), prompt: '', custom: false, action: id, group: 'claude' as const })),
       ...custom,
-      ...actions,
     ];
-    return filterItems(orderByRecent(all, recents), query);
-  }, [t, custom, query, recents, app.settings?.uiLanguage]);
+    // Settings (3.4): any entry of the index whose label, synonyms, section or group matches (at most 5).
+    const settings: Item[] = searchSettings(query, (k) => t(k), 5).map((m) => ({ id: `set-${m.entry.id}`, label: `${m.label} · ${m.where}`, group: 'settings' as const, prompt: '', custom: false, settingId: m.entry.id }));
+    return groupItems(filterItems(orderByRecent([...actions, ...prompts], recents), query), { query, recents, docs: [...docs, ...settings] });
+  }, [t, custom, docs, query, recents, app.settings?.uiLanguage, hasLibrary, noLibrary, history.canUndo, history.canRedo]);
 
   useEffect(() => setAt(0), [query]);
   useEffect(() => {
     list.current?.children[at]?.scrollIntoView?.({ block: 'nearest' });
   }, [at]);
 
-  const runApp = (id: AppActionId) => {
+  const runApp = (id: PaletteActionId) => {
     switch (id) {
       case 'goLibrary':
         return goTo('library');
-      case 'goProjects':
-        return goTo('projects');
-      case 'goNetwork':
-        return goTo('network');
-      case 'goInbox':
-        return goTo('inbox');
       case 'goReview':
         return goTo('review');
+      case 'goProjects':
+        return goTo('projects');
+      case 'goDiscover':
+        return goTo('discover');
+      case 'goMap':
+        return goTo('map');
       case 'goSettings':
         return goTo('settings');
-      case 'newLibrary':
-        return goTo('newLibrary');
+      case 'openActivity':
+        return setActivityOpen(true);
+      case 'scanNow':
+        return void rl.invoke('scan:start', { full: false }).then(() => setActivityOpen(true), reportError);
       case 'backupNow':
         return goTo('settings', { focus: 'backup', run: 'backupNow' });
+      case 'addPdf':
+        return void inbox.choose();
+      case 'newLibrary':
+        return goTo('newLibrary');
+      case 'undo':
+        return void history.undo();
+      case 'redo':
+        return void history.redo();
+      case 'theme': {
+        const next = isDarkTheme() ? 'light' : 'dark';
+        applyTheme(next);
+        return void rl.invoke('settings:set', { appearance: { theme: next } }).catch(reportError);
+      }
       case 'openGuide':
         return openGuide('guide');
       case 'showShortcuts':
@@ -95,8 +167,19 @@ export function Palette({ onClose }: { onClose(): void }) {
     }
   };
 
-  const choose = (item: PaletteItem | undefined) => {
-    if (!item) return;
+  const choose = (item: Item | undefined) => {
+    if (!item || item.disabledReason) return;
+    if (item.settingId) {
+      onClose();
+      goTo('settings', { focus: item.settingId });
+      return;
+    }
+    if (item.docId) {
+      onClose();
+      if (item.openable) openReader(item.docId);
+      else goTo('library');
+      return;
+    }
     setRecents(rememberRecent(item.id));
     if (item.appAction) {
       onClose();
@@ -143,21 +226,30 @@ export function Palette({ onClose }: { onClose(): void }) {
       />
       <ul id={listId} ref={list} role="listbox" className="palette-list" aria-label={t('chat.palette')}>
         {items.map((c, i) => (
-          <li
-            key={c.id}
-            id={`${listId}-${i}`}
-            role="option"
-            aria-selected={i === at}
-            className={i === at ? 'palette-item on' : 'palette-item'}
-            data-testid="palette-item"
-            data-command={c.id}
-            onMouseEnter={() => setAt(i)}
-            onClick={() => choose(c)}
-          >
-            <span>{safeText(c.label)}</span>
-            {c.custom && <span className="badge">{t('chat.paletteCustom')}</span>}
-            {c.shortcut && keys[c.shortcut] && <kbd className="palette-key">{keys[c.shortcut]}</kbd>}
-          </li>
+          <Fragment key={`${c.group}:${c.id}`}>
+            {(i === 0 || items[i - 1]!.group !== c.group) && (
+              <li role="presentation" className="palette-group" data-group={c.group}>
+                {t(`chat.paletteGroups.${c.group}`)}
+              </li>
+            )}
+            <li
+              id={`${listId}-${i}`}
+              role="option"
+              aria-selected={i === at}
+              aria-disabled={c.disabledReason ? true : undefined}
+              title={c.disabledReason}
+              className={i === at ? 'palette-item on' : 'palette-item'}
+              data-testid="palette-item"
+              data-command={c.id}
+              onMouseEnter={() => setAt(i)}
+              onClick={() => choose(c)}
+            >
+              <span>{safeText(c.label)}</span>
+              {c.custom && <span className="badge">{t('chat.paletteCustom')}</span>}
+              {c.disabledReason && <span className="palette-why">{c.disabledReason}</span>}
+              {c.shortcut && keys[c.shortcut] && <kbd className="palette-key">{keys[c.shortcut]}</kbd>}
+            </li>
+          </Fragment>
         ))}
         {items.length === 0 && <li className="hint">{t('chat.paletteNone')}</li>}
       </ul>

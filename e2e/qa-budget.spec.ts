@@ -72,6 +72,12 @@ test('memory at rest and start-up time on a 40-document library', async ({}, tes
     try {
       await expect(window.getByTestId('scan-status')).toHaveAttribute('data-state', 'done', { timeout: 120_000 });
 
+      // The shell's popovers, the palette and the chat are lazy: none of their chunks is fetched while the window is only looked at (D-358, 13).
+      const fetched = await window.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name.split('/').pop() ?? ''));
+      for (const lazy of ['ActivityPopover', 'LibraryPopover', 'NoticeStack', 'Palette', 'ChatPanel', 'GuideDialog', 'ExportDialog', 'HistoryPanel']) {
+        expect(fetched.filter((n) => n.startsWith(`${lazy}-`)), `${lazy} must load on demand`).toEqual([]);
+      }
+
       const metrics = () => app.evaluate(({ app: a }) => a.getAppMetrics());
       const busy = await metrics();
       await new Promise((r) => setTimeout(r, IDLE_MS));

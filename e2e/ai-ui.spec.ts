@@ -1,6 +1,7 @@
 import { _electron as electron, expect, test } from '@playwright/test';
 import { DESKTOP_DIR, launchApp, type LaunchedApp } from './helpers/launch';
 import { createLibraryViaWizard, skipUnlessChannels, waitForScan } from './helpers/phase1';
+import { enableAiFolder, openSettings, waitClaudeReady } from './helpers/settings';
 import { clickRow } from './helpers/ui';
 
 /**
@@ -35,13 +36,9 @@ test('enable a folder, preview and confirm, streamed answer with card and chip, 
     await expect(window.getByTestId('status-ai')).toContainText(/no folder|nessuna/i);
 
     // 1. Enable the folder in the settings (the default is none).
-    await window.getByTestId('nav-settings').click();
-    await expect(window.getByTestId('ai-settings')).toBeVisible({ timeout: 30_000 });
+    await waitClaudeReady(window);
     await expect(window.getByTestId('ai-folders-summary')).toContainText('nothing is sent');
-    await expect(window.getByTestId('ai-available')).toHaveText('Available', { timeout: 30_000 });
-    await window.getByTestId('config-ai-tree').locator(`input[data-folder="${folder}"]`).check();
-    await window.getByTestId('ai-save').click();
-    await expect(window.getByTestId('ai-settings').getByText('Saved')).toBeVisible();
+    await enableAiFolder(window, folder);
     await expect(window.getByTestId('status-ai')).toContainText('1');
 
     // 2. Select a document.
@@ -88,7 +85,9 @@ test('enable a folder, preview and confirm, streamed answer with card and chip, 
     await window.getByTestId('reader-close').click();
 
     // The log viewer lists the send, with the confirmed document.
-    await window.getByTestId('nav-settings').click();
+    await openSettings(window, 'claude');
+    const fold = window.getByTestId('settings-fold-aiLog');
+    if ((await fold.getAttribute('open')) === null) await fold.locator('summary').click();
     await expect(window.getByTestId('log-row').first()).toBeVisible({ timeout: 30_000 });
 
     // 5. Restart on the same data: the conversation is in the history.

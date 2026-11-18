@@ -11,12 +11,6 @@
       "change": "modifica",
       "undo": "annulla",
       "redo": "ripeti"
-    },
-    "actions": {
-      "tags_update": "Tag modificati su {{documents}} documenti",
-      "taxonomy_update": "Tassonomia modificata ({{tags}} elementi)",
-      "document_fields": "Dati del documento modificati",
-      "project_update": "Progetto modificato"
     }
   }
 }

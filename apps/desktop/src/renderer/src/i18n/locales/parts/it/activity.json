@@ -1,0 +1,16 @@
+{
+  "activity": {
+    "attention_title": "Da guardare",
+    "running": "In corso",
+    "recent": "Recenti",
+    "showAll": "Mostra tutte",
+    "none": "Niente in corso. Gli esiti recenti compaiono qui.",
+    "scan": "Scansione",
+    "retry": "Riprova",
+    "lastScan": "Ultima scansione · {{when}}",
+    "noScan": "Nessuna scansione in questa sessione",
+    "scanSummary": "+{{added}} nuovi · {{changed}} cambiati · {{missing}} mancanti",
+    "scanRunning": "Una scansione è già in corso",
+    "needsLibrary": "Apri prima una libreria"
+  }
+}

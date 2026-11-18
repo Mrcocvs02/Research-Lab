@@ -1,7 +1,23 @@
+import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Popover } from '../components/Popover';
 import { useHistory } from './history';
 
-export function HistoryPanel({ id, onClose }: { id: string; onClose(): void }) {
+/**
+ * The recent changes, as a popover under its button (420 px, up to 480 high: 3.3) or, without an anchor, in the flow of
+ * the caller. Escape, a click outside and a second click on the button close it.
+ */
+export function HistoryPanel({ id, onClose, anchor }: { id: string; onClose(): void; anchor?: RefObject<HTMLElement | null> }) {
+  const { t } = useTranslation();
+  if (!anchor) return <HistoryList id={id} onClose={onClose} />;
+  return (
+    <Popover anchor={anchor} open onClose={onClose} label={t('history.title')} placement="bottom-end" width={420} className="history-popover">
+      <HistoryList id={id} onClose={onClose} />
+    </Popover>
+  );
+}
+
+function HistoryList({ id, onClose }: { id: string; onClose(): void }) {
   const { t, i18n } = useTranslation();
   const h = useHistory();
   const time = (iso: string) => {

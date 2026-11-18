@@ -60,3 +60,9 @@ export async function backToList(window: Page): Promise<void> {
   await window.getByTestId('taxonomy-back').click();
   await expect(window.getByTestId('search-results')).toBeVisible();
 }
+
+/** Opens the Activity popover of the top bar (scan, AI jobs, citations); the rows of the jobs are in it. */
+export async function openActivity(window: Page): Promise<void> {
+  if (!(await window.getByTestId('activity-popover').isVisible())) await window.getByTestId('scan-status').click();
+  await expect(window.getByTestId('activity-popover')).toBeVisible();
+}

@@ -37,7 +37,7 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     await expect(window.getByTestId('scan-status')).toHaveAttribute('data-state', 'done', { timeout: 300_000 });
 
     // 1. Empty state, build with progress.
-    await window.getByTestId('nav-network').click();
+    await window.getByTestId('nav-map').click();
     await expect(window.getByTestId('graph-empty')).toBeVisible();
     await window.getByTestId('graph-seed').fill('42');
     await window.getByTestId('graph-build-empty').click();

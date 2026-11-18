@@ -79,3 +79,12 @@ export function effectiveShortcuts(overrides: readonly ShortcutOverride[]): Reco
   for (const o of overrides) out[o.id] = o.accelerator;
   return out;
 }
+
+/** Reader tool keys are single keys (a letter, a digit, Space, Delete), no Ctrl or Alt; same answers as `normalizeReaderToolKey` of the contract. */
+export function normalizeReaderToolKey(input: string): string | null {
+  const k = input.trim();
+  if (/^[a-z0-9]$/i.test(k)) return k.toUpperCase();
+  if (k.toLowerCase() === 'space') return 'Space';
+  if (k.toLowerCase() === 'delete') return 'Delete';
+  return null;
+}

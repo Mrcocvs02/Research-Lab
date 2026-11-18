@@ -498,14 +498,19 @@ describe('chat: without AI', () => {
 });
 
 describe('command palette', () => {
-  it('fills the prompt with the chosen command and does not send it', async () => {
+  const type = (text: string) => fireEvent.change(screen.getByTestId('palette-input'), { target: { value: text } });
+
+  it('lists only go-to and actions with no text; the commands for Claude appear when typing, and choosing one fills the prompt without sending', async () => {
     setup({ palette: true, commands: [{ id: 'mine', label: 'My own command', prompt: 'Do my thing' }] });
     await ready();
     const palette = await screen.findByTestId('command-palette');
+    const ids = () => within(palette).getAllByTestId('palette-item').map((i) => i.getAttribute('data-command'));
+    // Without text: the go-to group, then the actions (3.4); no commands for Claude, no documents.
+    expect(ids()).toEqual(['app-goLibrary', 'app-goReview', 'app-goProjects', 'app-goDiscover', 'app-goMap', 'app-goSettings', 'app-openActivity', 'app-scanNow', 'app-backupNow', 'app-addPdf', 'app-newLibrary', 'app-undo', 'app-redo', 'app-theme', 'app-switchLanguage', 'app-openGuide', 'app-showShortcuts']);
+    expect(within(palette).getAllByRole('listbox')[0]!.querySelectorAll('.palette-group')).toHaveLength(2);
+    type('describe');
     const items = within(palette).getAllByTestId('palette-item');
-    expect(items.map((i) => i.getAttribute('data-command')).slice(0, 10)).toEqual(['describe', 'tags', 'related', 'readNext', 'summarizeSelection', 'updateProject', 'whatsNew', 'secondBrain', 'exportDialog', 'user-mine']);
-    // The app actions (views, backup, guide...) follow the commands for Claude.
-    expect(items).toHaveLength(21);
+    expect(items[0]!.getAttribute('data-command')).toBe('describe');
     expect(items[0]!.textContent).toBe('Describe this paper');
     fireEvent.click(items[0]!);
     await waitFor(() => expect(input().value).toContain('Describe the selected paper'));
@@ -517,10 +522,10 @@ describe('command palette', () => {
     setup({ palette: true, commands: [{ id: 'mine', label: 'My own command', prompt: 'Do my thing' }] });
     await ready();
     const box = await screen.findByTestId('palette-input');
-    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(21));
+    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(17));
     fireEvent.change(box, { target: { value: 'own' } });
+    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(1));
     const only = screen.getAllByTestId('palette-item');
-    expect(only).toHaveLength(1);
     expect(only[0]!.textContent).toContain('My own command');
     fireEvent.keyDown(box, { key: 'Enter' });
     await waitFor(() => expect(input().value).toBe('Do my thing'));
@@ -530,7 +535,8 @@ describe('command palette', () => {
   it('still lists the predefined commands when the user commands cannot be read', async () => {
     setup({ palette: true, tweak: (a) => (a.handlers['commands:list'] = () => { throw new AppError('IO_ERROR', 'x'); }) });
     await ready();
-    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(20));
+    type('related');
+    await waitFor(() => expect(screen.getAllByTestId('palette-item').map((i) => i.getAttribute('data-command'))).toContain('related'));
   });
 
   it('translates the predefined commands', async () => {
@@ -540,7 +546,9 @@ describe('command palette', () => {
       await i18n.changeLanguage('it');
     });
     const items = await screen.findAllByTestId('palette-item');
-    expect(items[0]!.textContent).toBe('Descrivi questo articolo');
+    expect(items[0]!.textContent).toContain('Vai alla Libreria');
+    type('descrivi');
+    await waitFor(() => expect(screen.getAllByTestId('palette-item')[0]!.textContent).toBe('Descrivi questo articolo'));
   });
 });
 

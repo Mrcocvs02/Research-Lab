@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { launchApp, type LaunchedApp } from './helpers/launch';
 import { createLibraryViaWizard, ipcData, skipUnlessChannels, waitForScan } from './helpers/phase1';
-import { rows } from './helpers/ui';
+import { enableAiWholeLibrary, waitClaudeReady } from './helpers/settings';
+import { openActivity, rows } from './helpers/ui';
 
 /**
  * Phase 4 (wave 4.2) criterion, with the mock provider (`RL_AI_PROVIDER=mock`, no network): the whole library is
@@ -41,11 +42,8 @@ test('bulk AI job with estimate and confirmation, review with partial accept, un
     });
 
     // 1. The whole library goes to the AI through the root entry of the tree.
-    await window.getByTestId('nav-settings').click();
-    await expect(window.getByTestId('ai-available')).toHaveText('Available', { timeout: 30_000 });
-    await window.getByTestId('ai-root-all').check();
-    await window.getByTestId('ai-save').click();
-    await expect(window.getByTestId('ai-settings').getByText('Saved')).toBeVisible();
+    await waitClaudeReady(window);
+    await enableAiWholeLibrary(window);
 
     // 2. Bulk job on the whole selection: estimate first, then confirmation.
     await window.getByTestId('nav-library').click();
@@ -59,6 +57,8 @@ test('bulk AI job with estimate and confirmation, review with partial accept, un
     await expect(dialog.getByTestId('job-field-description')).toBeChecked();
     await expect(dialog.getByTestId('job-to-send')).toContainText(String(total), { timeout: 30_000 });
     await dialog.getByTestId('job-confirm').click();
+    // The job's row lives in the Activity popover (D-358).
+    await openActivity(window);
     const indicator = window.getByTestId('job-indicator');
     await expect(indicator).toHaveAttribute('data-state', 'done', { timeout: 120_000 });
 

@@ -59,7 +59,7 @@ function setup(o: { items?: any[]; folders?: string[]; tweak?(w: ReturnType<type
     'review:stats': () => ({ pending: {}, tags: { proposed: 0, accepted: 0, rate: null }, newTags: { proposed: 0, accepted: 0 } }),
   });
   const providers: any[] = [AppProvider, LibraryEventsProvider, NotifyProvider, HistoryProvider, ReaderProvider, AiUiProvider, JobsProvider, InboxProvider];
-  render(providers.reduceRight((child, P) => createElement(P, null, child), createElement('div', null, createElement(Shell, { section: 'inbox', onSection() {}, onNewLibrary() {}, children: createElement(Section) }), createElement(Probe))));
+  render(providers.reduceRight((child, P) => createElement(P, null, child), createElement('div', null, createElement(Shell, { section: 'review', onSection() {}, onNewLibrary() {}, children: createElement(Section) }), createElement(Probe))));
   return work;
 }
 

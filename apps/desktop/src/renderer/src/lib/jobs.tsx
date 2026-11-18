@@ -1,8 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
 import { useApp } from '../state/app-context';
-import { useAiUi } from './aiUi';
 import { useNotify } from './notify';
 import { rl } from './rl';
 
@@ -19,9 +17,9 @@ const NONE: JobsValue = { job: null, refresh: async () => {}, cancel: async () =
 const Ctx = createContext<JobsValue>(NONE);
 export const useJobs = () => useContext(Ctx);
 
-const live = (j: JobStatus) => j.state === 'queued' || j.state === 'running';
+export const live = (j: JobStatus) => j.state === 'queued' || j.state === 'running';
 
-/** Follows `jobs:progress` for the status bar indicator (the dialog and the review are loaded on demand). */
+/** Follows `jobs:progress` for the Activity chip and popover (`shell/ActivityPopover.tsx`; the dialog and the review load on demand). */
 export function JobsProvider({ children }: { children: ReactNode }) {
   const { activeLibraryId } = useApp();
   const { reportError } = useNotify();
@@ -56,38 +54,4 @@ export function JobsProvider({ children }: { children: ReactNode }) {
   const dismiss = useCallback(() => setDismissed(newest?.jobId ?? null), [newest]);
   const value = useMemo(() => ({ job, refresh, cancel, dismiss }), [job, refresh, cancel, dismiss]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
-}
-
-/** Status bar piece: progress of the running AI job, cancel, and a link to the review when it ends. */
-export function JobIndicator() {
-  const { t } = useTranslation();
-  const { job, cancel, dismiss } = useJobs();
-  const { openReview } = useAiUi();
-  if (!job) return null;
-  const running = live(job);
-  const usd = job.usd > 0 && job.usd < 0.01 ? '<$0.01' : `$${job.usd.toFixed(2)}`;
-  const total = job.total + job.skipped;
-  const text = running ? t('jobs.running', { done: job.done, total, usd }) : t(`jobs.ended_${job.state}`, { done: job.done, total, failed: job.failed, usd });
-  return (
-    <span className="job-indicator" data-testid="job-indicator" data-state={job.state} role="status" aria-label={t('jobs.label')}>
-      <span data-testid="job-text">{text}</span>
-      {job.state === 'failed' && job.error && <span data-testid="job-error">{t(`errors.${job.error.code}`, { defaultValue: t('errors.INTERNAL') })}</span>}
-      {running ? (
-        <button type="button" className="link" onClick={() => void cancel()} data-testid="job-cancel">
-          {t('jobs.cancel')}
-        </button>
-      ) : (
-        <>
-          {job.done > job.failed && (
-            <button type="button" className="link" onClick={openReview} data-testid="job-review">
-              {t('jobs.review')}
-            </button>
-          )}
-          <button type="button" className="link" onClick={dismiss} data-testid="job-dismiss">
-            {t('jobs.dismiss')}
-          </button>
-        </>
-      )}
-    </span>
-  );
 }

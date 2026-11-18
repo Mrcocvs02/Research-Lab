@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { safeText } from '../views/library/safeText';
+import '../styles/markdown.css';
 
 /**
  * A small Markdown renderer for the notes of a project. It builds React elements from a parsed structure and

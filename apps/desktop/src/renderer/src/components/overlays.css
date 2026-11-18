@@ -1,0 +1,244 @@
+/*
+ * Floating and in-flow messages (5.5): Popover, Menu, Drawer, Banner, Toast. Prefixed `rl-`; colours are tokens only; only opacity and
+ * transform animate (5.3). With prefers-reduced-motion the durations are 0 (tokens.css).
+ */
+
+/* ---- Popover and Menu ---- */
+.rl-popover {
+  position: fixed;
+  z-index: 80;
+  max-width: calc(100vw - 16px);
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--e-2);
+  animation: rl-pop-in var(--dur) var(--ease);
+}
+@keyframes rl-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.rl-menu {
+  padding: var(--sp-2);
+}
+.rl-menu__sep {
+  height: 1px;
+  margin: var(--sp-2) 0;
+  background: var(--border);
+}
+.rl-menu__heading {
+  padding: 6px 10px 2px;
+  color: var(--text-muted);
+  font: 600 var(--fs-caption) / var(--lh-caption) var(--font);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.rl-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--h-md);
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-size: var(--fs-body);
+  cursor: pointer;
+  user-select: none;
+}
+.rl-menu__item:hover:not(.is-disabled),
+.rl-menu__item:focus-visible:not(.is-disabled) {
+  background: var(--surface-2);
+}
+.rl-menu__item:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.rl-menu__item.is-danger {
+  color: var(--danger);
+}
+.rl-menu__item.is-disabled {
+  color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+  cursor: not-allowed;
+}
+.rl-menu__icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+}
+.rl-menu__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Drawer ---- */
+.rl-drawer-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  background: var(--scrim-soft);
+  animation: rl-fade-in var(--dur-slow) var(--ease);
+}
+@keyframes rl-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+.rl-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 100vw;
+  background: var(--surface);
+  box-shadow: var(--e-3);
+  animation: rl-drawer-in var(--dur-slow) var(--ease);
+}
+.rl-drawer--right {
+  right: 0;
+  border-left: 1px solid var(--border);
+  border-radius: var(--r-lg) 0 0 var(--r-lg);
+}
+.rl-drawer--left {
+  left: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0 var(--r-lg) var(--r-lg) 0;
+  --rl-drawer-from: -16px;
+}
+@keyframes rl-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--rl-drawer-from, 16px));
+  }
+}
+.rl-drawer:focus {
+  outline: none;
+}
+.rl-drawer__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 var(--sp-5);
+  border-bottom: 1px solid var(--border);
+}
+.rl-drawer__head h2 {
+  margin: 0;
+  font: 600 var(--fs-heading) / var(--lh-heading) var(--font-display);
+}
+.rl-drawer__body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--sp-5);
+  overflow: auto;
+}
+
+/* ---- Banner ---- */
+.rl-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 10px var(--sp-4);
+  border-radius: var(--r-md);
+  background: var(--info-soft);
+  color: var(--text);
+  font-size: var(--fs-body);
+}
+.rl-banner--warning {
+  background: var(--warning-soft);
+}
+.rl-banner--error {
+  background: var(--danger-soft);
+}
+.rl-banner__icon {
+  display: inline-grid;
+  flex: none;
+  color: var(--info);
+}
+.rl-banner--warning .rl-banner__icon {
+  color: var(--warning);
+}
+.rl-banner--error .rl-banner__icon {
+  color: var(--danger);
+}
+.rl-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- Toast ---- */
+.rl-toasts {
+  position: fixed;
+  right: var(--sp-5);
+  bottom: var(--sp-5);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-3);
+  pointer-events: none;
+}
+.rl-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 360px;
+  padding: 10px var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--e-2);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  pointer-events: auto;
+  animation: rl-toast-in var(--dur) var(--ease);
+}
+@keyframes rl-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.rl-toast__icon {
+  display: inline-grid;
+  flex: none;
+  color: var(--info);
+}
+.rl-toast--success .rl-toast__icon {
+  color: var(--success);
+}
+.rl-toast--error .rl-toast__icon {
+  color: var(--danger);
+}
+.rl-toast__text {
+  flex: 1;
+  min-width: 0;
+}
+button.rl-toast__action {
+  flex: none;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--accent-text);
+  font: 500 var(--fs-small) / var(--lh-small) var(--font);
+  cursor: pointer;
+}
+button.rl-toast__action:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+button.rl-toast__action:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

@@ -5,6 +5,7 @@ import { flushAll } from '../lib/dirtyEditors';
 import { errorMessage } from '../lib/errors';
 import { rl } from '../lib/rl';
 import { useApp } from '../state/app-context';
+import './settings.css';
 
 /** The list of library profiles: activate, rename, remove from the list (files are never deleted). */
 export function LibrariesSection({ onNew }: { onNew: () => void }) {

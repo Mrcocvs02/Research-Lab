@@ -1,0 +1,36 @@
+/* Library list */
+.library-list > li {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+.library-main {
+  margin-bottom: var(--space-2);
+}
+.secret-list > li {
+  margin-bottom: var(--space-4);
+}
+.secret-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-1);
+}
+.secret-head label {
+  font-weight: 600;
+}
+
+.log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.log-table th,
+.log-table td {
+  text-align: left;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+

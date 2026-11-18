@@ -11,6 +11,7 @@ import { safeText } from '../library/safeText';
 import { useFolderOptions } from '../library/useFolderOptions';
 import { TaxonomyProvider } from '../library/useTaxonomy';
 import { InboxCard } from './InboxCard';
+import './inbox.css';
 
 const ReviewView = lazyView(() => import('../review/ReviewView').then((m) => ({ default: m.ReviewView })), ['doc-review', 'review']);
 

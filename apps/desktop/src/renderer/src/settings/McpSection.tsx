@@ -8,6 +8,7 @@ import { RlError } from '../lib/rl-error';
 import { useApp } from '../state/app-context';
 import { safeText } from '../views/library/safeText';
 import '../views/export/export.css';
+import './settings.css';
 
 type LogPage = ResponseOf<Channels, 'mcp:log'>;
 const PAGE = 25;

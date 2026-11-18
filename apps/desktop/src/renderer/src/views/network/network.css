@@ -225,7 +225,7 @@
   border-radius: 50%;
 }
 .net-key .key-folder::before {
-  background: #a8741a;
+  background: var(--warning);
   border-radius: 1px;
 }
 .net-key .key-tag::before {

@@ -9,6 +9,8 @@ import { rl } from '../../lib/rl';
 import { WorkRow } from '../citations/WorkRow';
 import { safeText } from '../library/safeText';
 import { useFolderOptions } from '../library/useFolderOptions';
+import '../citations/citations.css';
+import './discover.css';
 
 type Result = ResponseOf<Channels, 'recommend:readNext'>;
 type Item = Result['items'][number];

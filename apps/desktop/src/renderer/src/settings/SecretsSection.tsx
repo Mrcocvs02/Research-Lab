@@ -5,6 +5,7 @@ import { ErrorNote } from '../components/ui';
 import { errorMessage } from '../lib/errors';
 import { rl } from '../lib/rl';
 import { useApp } from '../state/app-context';
+import './settings.css';
 
 /** Names of the keys listed here; the value never comes back from the main process. The Anthropic key is in the AI settings. */
 export const SECRET_NAMES = ['gemini-api-key'] as const;

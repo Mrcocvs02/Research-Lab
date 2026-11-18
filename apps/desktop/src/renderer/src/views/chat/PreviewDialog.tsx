@@ -5,6 +5,7 @@ import { safeText } from '../library/safeText';
 import { formatTokens, formatUsd } from './format';
 import type { AiPreview } from './useChat';
 import { useDocTitle } from './useLabels';
+import './chat.css';
 
 function DocLine({ docId, reason, label }: { docId: string; reason?: AiPreview['refused'][number]['reason']; label?: string | undefined }) {
   const { t } = useTranslation();

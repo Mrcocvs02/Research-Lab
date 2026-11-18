@@ -1,5 +1,6 @@
 import { useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import './tree.css';
 
 export interface TreeItem {
   key: string;

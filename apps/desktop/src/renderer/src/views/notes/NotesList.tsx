@@ -6,6 +6,8 @@ import { useChangeVersion } from '../../lib/events';
 import { rl } from '../../lib/rl';
 import { ErrorNote } from '../../components/ui';
 import { safeText } from '../library/safeText';
+import './notes.css';
+import '../reader/reader.css';
 
 type Item = ResponseOf<Channels, 'notes:list'>['items'][number];
 

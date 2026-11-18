@@ -1,0 +1,125 @@
+/* projects */
+.view.projects-page {
+  max-width: 1000px;
+}
+.project-list {
+  list-style: none;
+  padding: 0;
+}
+.project-row {
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.project-row.archived {
+  opacity: 0.7;
+}
+.project-main,
+.project-head {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.project-head h2 {
+  margin: 0;
+}
+.project-name {
+  font-size: 16px;
+  font-weight: 650;
+}
+.project-summary {
+  margin: 4px 0;
+  color: var(--text-muted);
+}
+.study-bar {
+  display: flex;
+  height: 6px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+.study-bar-read {
+  background: var(--ok);
+}
+.study-bar-reading {
+  background: var(--accent);
+}
+.project-fields {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+.project-fields .wide {
+  grid-column: 1 / -1;
+}
+.project-create .inline-form {
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.project-create .grow {
+  flex: 1;
+  min-width: 200px;
+}
+.members-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.members-table th,
+.members-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.members-table select {
+  width: auto;
+}
+.members-table tr.missing {
+  opacity: 0.7;
+}
+.plan-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-3);
+}
+.plan-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.plan-item.is-dragging {
+  opacity: 0.5;
+}
+.plan-item.drop-over {
+  border-color: var(--accent);
+  box-shadow: 0 -3px 0 var(--accent);
+}
+.plan-grip {
+  color: var(--text-muted);
+  cursor: grab;
+}
+.plan-pos {
+  width: 24px;
+  text-align: right;
+  color: var(--text-muted);
+}
+.plan-title {
+  flex: 1;
+  min-width: 0;
+}
+.plan-status select {
+  width: auto;
+}
+.plan-buttons {
+  display: inline-flex;
+  gap: 2px;
+}

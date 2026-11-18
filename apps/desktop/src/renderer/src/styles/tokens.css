@@ -1,0 +1,301 @@
+/*
+ * Design tokens (docs/design/ARCHITETTURA-UI.md section 5). The ONLY file with literal colours: styles/no-literal-colors.test.ts
+ * enforces it (pdf.js sheet and icons excepted) and styles/tokens.contrast.test.ts computes the WCAG contrast of the pairs.
+ * Light is the default; dark applies for data-theme="dark" and for prefers-color-scheme when the user did not pick light (D-281).
+ * No remote fonts (CSP).
+ *
+ * ACCENT: "Petrolio" (teal, provisional D-378) is the accent block of each theme below (--accent, --on-accent, --accent-text,
+ * --accent-soft, --focus). To switch to "Indaco" (indigo) set data-accent="indigo" on <html> (the indigo blocks at the end of the
+ * file already exist and are contrast-tested) or, to make it the default, replace the five accent values in the two accent blocks
+ * of :root and of the dark theme with the indigo ones.
+ */
+:root {
+  color-scheme: light dark;
+
+  /* Type (5.1) */
+  --font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif;
+  --mono: 'Cascadia Mono', Consolas, ui-monospace, monospace;
+  --fs-display: 32px;
+  --lh-display: 40px;
+  --fs-title: 26px;
+  --lh-title: 32px;
+  --fs-heading: 16px;
+  --lh-heading: 24px;
+  --fs-body: 14px;
+  --lh-body: 21px;
+  --fs-small: 13px;
+  --lh-small: 19px;
+  --fs-caption: 12px;
+  --lh-caption: 16px;
+
+  /* Neutrals (5.2.1) */
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --surface-2: #efeee9;
+  --surface-3: #e5e3dc;
+  --border: #dedcd5;
+  --border-strong: #86847c;
+  --text: #1b1c1f;
+  --text-muted: #555963;
+  --text-subtle: var(--text-muted);
+
+  /* ACCENT block (Petrolio) */
+  --accent: #0f6e78;
+  --on-accent: #ffffff;
+  --accent-text: #0b5f68;
+  --accent-soft: #e3f1f2;
+  --focus: #0b5f68;
+
+  /* States */
+  --danger: #b42318;
+  --danger-soft: #fcebe9;
+  --on-danger: #ffffff;
+  --warning: #8a5300;
+  --warning-soft: #fcf1dd;
+  --success: #1b6e38;
+  --success-soft: #e6f3ea;
+  --info: #1f5fa8;
+  --info-soft: #e7f0fa;
+  --ai: #6b3fc0;
+  --ai-soft: #f2ecfc;
+  --scrim: rgb(15 17 22 / 0.4);
+  --scrim-soft: rgb(15 17 22 / 0.2);
+
+  /* File-type badges and library tints (5.2.2) */
+  --type-pdf: #a3261b;
+  --type-pdf-bg: #fcebe9;
+  --type-md: #1b6e38;
+  --type-md-bg: #e6f3ea;
+  --type-office: #1f5fa8;
+  --type-office-bg: #e7f0fa;
+  --lib-1: #2b50c8;
+  --lib-2: #1b8a5a;
+  --lib-3: #b4531a;
+  --lib-4: #8e44ad;
+  --lib-5: #c0392b;
+  --lib-6: #127c8c;
+  --lib-7: #7a6a00;
+  --lib-8: #5d6470;
+
+  /* Categorical (graph nodes, tags) */
+  --cat-1: #3e63dd;
+  --cat-2: #1f9d6b;
+  --cat-3: #d9822b;
+  --cat-4: #8e4ec6;
+  --cat-5: #d6409f;
+  --cat-6: #0f9fb0;
+
+  /* Annotations and page (5.2.3): fills are the same in both themes (the PDF page stays white) */
+  --hl-yellow: #f7d046;
+  --hl-green: #7bd389;
+  --hl-blue: #7db7f2;
+  --hl-pink: #f29ac1;
+  --hl-orange: #f6a85b;
+  --ul-yellow: #a67c00;
+  --ul-green: #2e8b45;
+  --ul-blue: #2f6fd0;
+  --ul-pink: #c2407f;
+  --ul-orange: #c25e0a;
+  --page-edge: #b9b6ad;
+  --page-shadow: 0 1px 3px rgb(20 22 28 / 0.1), 0 4px 12px rgb(20 22 28 / 0.06);
+  --page-bg: #ffffff;
+
+  /* Spacing, 4px grid (5.3) */
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 8px;
+  --sp-4: 12px;
+  --sp-5: 16px;
+  --sp-6: 20px;
+  --sp-7: 24px;
+  --sp-8: 32px;
+  --sp-9: 48px;
+  /* Legacy aliases of the views not yet migrated: kept until the end of wave 5 */
+  --space-1: var(--sp-2);
+  --space-2: var(--sp-3);
+  --space-3: var(--sp-4);
+  --space-4: var(--sp-5);
+  --space-5: var(--sp-7);
+  --space-6: var(--sp-8);
+  --accent-contrast: var(--on-accent);
+  --ok: var(--success);
+  --ok-soft: var(--success-soft);
+  --warn: var(--warning);
+  --warn-soft: var(--warning-soft);
+  --shadow: var(--e-3);
+  --radius: 8px;
+
+  /* Sizes, radii, widths */
+  --h-sm: 28px;
+  --h-md: 32px;
+  --h-lg: 40px;
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+  --sidebar-w: 236px; /* 232 in the design (5.3): A2 sets it with the new shell */
+  --chat-w: 380px;
+
+  /* Elevation */
+  --e-0: none;
+  --e-1: 0 1px 2px rgb(20 22 28 / 0.06), 0 1px 1px rgb(20 22 28 / 0.04);
+  --e-2: 0 4px 16px rgb(20 22 28 / 0.12), 0 1px 3px rgb(20 22 28 / 0.08);
+  --e-3: 0 12px 40px rgb(20 22 28 / 0.2);
+
+  /* Motion: only opacity and transform animate */
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-slow: 240ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #121316;
+    --surface: #1a1b1f;
+    --surface-2: #212227;
+    --surface-3: #2a2b31;
+    --border: #33353c;
+    --border-strong: #6a6d77;
+    --text: #ececef;
+    --text-muted: #a9acb5;
+
+    /* ACCENT block (Petrolio) */
+    --accent: #5cc6cf;
+    --on-accent: #062328;
+    --accent-text: #6fd0d8;
+    --accent-soft: #15302f;
+    --focus: #6fd0d8;
+
+    --danger: #ff8b80;
+    --danger-soft: #3a1d1b;
+    --on-danger: #1a0b09;
+    --warning: #f2b755;
+    --warning-soft: #33280f;
+    --success: #6bd394;
+    --success-soft: #15301f;
+    --info: #7fb3f5;
+    --info-soft: #16263a;
+    --ai: #c3a6ff;
+    --ai-soft: #2a2140;
+    --scrim: rgb(0 0 0 / 0.6);
+    --scrim-soft: rgb(0 0 0 / 0.35);
+    --type-pdf: #ff9c92;
+    --type-pdf-bg: #3a1d1b;
+    --type-md: #7fdca3;
+    --type-md-bg: #15301f;
+    --type-office: #7fb3f5;
+    --type-office-bg: #16263a;
+    --lib-1: #8ca4ff;
+    --lib-2: #6bd394;
+    --lib-3: #f2a15b;
+    --lib-4: #c3a6ff;
+    --lib-5: #ff8b80;
+    --lib-6: #6cc7d3;
+    --lib-7: #d9c35a;
+    --lib-8: #a9acb5;
+    --cat-1: #7d97f0;
+    --cat-2: #56c79a;
+    --cat-3: #f0a860;
+    --cat-4: #b58ce6;
+    --cat-5: #ee7dbe;
+    --cat-6: #4fc6d4;
+    --page-edge: #3a3c44;
+    --page-shadow: 0 2px 8px rgb(0 0 0 / 0.6);
+    --e-1: 0 1px 2px rgb(0 0 0 / 0.5);
+    --e-2: 0 6px 20px rgb(0 0 0 / 0.55);
+    --e-3: 0 16px 48px rgb(0 0 0 / 0.65);
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #121316;
+  --surface: #1a1b1f;
+  --surface-2: #212227;
+  --surface-3: #2a2b31;
+  --border: #33353c;
+  --border-strong: #6a6d77;
+  --text: #ececef;
+  --text-muted: #a9acb5;
+
+  /* ACCENT block (Petrolio) */
+  --accent: #5cc6cf;
+  --on-accent: #062328;
+  --accent-text: #6fd0d8;
+  --accent-soft: #15302f;
+  --focus: #6fd0d8;
+
+  --danger: #ff8b80;
+  --danger-soft: #3a1d1b;
+  --on-danger: #1a0b09;
+  --warning: #f2b755;
+  --warning-soft: #33280f;
+  --success: #6bd394;
+  --success-soft: #15301f;
+  --info: #7fb3f5;
+  --info-soft: #16263a;
+  --ai: #c3a6ff;
+  --ai-soft: #2a2140;
+  --scrim: rgb(0 0 0 / 0.6);
+  --scrim-soft: rgb(0 0 0 / 0.35);
+  --type-pdf: #ff9c92;
+  --type-pdf-bg: #3a1d1b;
+  --type-md: #7fdca3;
+  --type-md-bg: #15301f;
+  --type-office: #7fb3f5;
+  --type-office-bg: #16263a;
+  --lib-1: #8ca4ff;
+  --lib-2: #6bd394;
+  --lib-3: #f2a15b;
+  --lib-4: #c3a6ff;
+  --lib-5: #ff8b80;
+  --lib-6: #6cc7d3;
+  --lib-7: #d9c35a;
+  --lib-8: #a9acb5;
+  --cat-1: #7d97f0;
+  --cat-2: #56c79a;
+  --cat-3: #f0a860;
+  --cat-4: #b58ce6;
+  --cat-5: #ee7dbe;
+  --cat-6: #4fc6d4;
+  --page-edge: #3a3c44;
+  --page-shadow: 0 2px 8px rgb(0 0 0 / 0.6);
+  --e-1: 0 1px 2px rgb(0 0 0 / 0.5);
+  --e-2: 0 6px 20px rgb(0 0 0 / 0.55);
+  --e-3: 0 16px 48px rgb(0 0 0 / 0.65);
+}
+
+/* Alternative accent "Indaco" (D-378): activated with data-accent="indigo" on <html>. */
+:root[data-accent='indigo'] {
+  --accent: #3d4edb;
+  --accent-text: #3442c2;
+  --accent-soft: #e9ebfc;
+  --focus: #3442c2;
+}
+:root[data-theme='dark'][data-accent='indigo'] {
+  --accent: #9aa6ff;
+  --on-accent: #0e1330;
+  --accent-text: #aab4ff;
+  --accent-soft: #212a48;
+  --focus: #aab4ff;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-accent='indigo']:not([data-theme='light']) {
+    --accent: #9aa6ff;
+    --on-accent: #0e1330;
+    --accent-text: #aab4ff;
+    --accent-soft: #212a48;
+    --focus: #aab4ff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+    --dur-slow: 0ms;
+  }
+}

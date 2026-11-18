@@ -4,6 +4,7 @@ import { useNotify } from '../../lib/notify';
 import { useReader } from '../../lib/reader';
 import { openWork, shortAuthors, workLink, type WorkIds } from '../../lib/workLinks';
 import { safeText } from '../library/safeText';
+import './citations.css';
 
 export interface WorkRowProps {
   /** Prefix of the `data-testid`s: `<testId>` on the row, `<testId>-open` and `<testId>-external` on the actions. */

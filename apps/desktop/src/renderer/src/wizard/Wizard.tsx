@@ -8,6 +8,7 @@ import { errorMessage } from '../lib/errors';
 import { rl } from '../lib/rl';
 import { splitLines, validateWith, validationKey } from '../lib/validate';
 import { useApp } from '../state/app-context';
+import './wizard.css';
 
 type StepId = 'language' | 'profile' | 'folder' | 'details' | 'legacy' | 'taxonomy' | 'aiFolders' | 'summary';
 type Taxonomy = 'empty' | 'file' | 'claude';

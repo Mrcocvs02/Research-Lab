@@ -10,6 +10,8 @@ import { rl } from '../../lib/rl';
 import { openWork, workLink } from '../../lib/workLinks';
 import { safeText } from '../library/safeText';
 import { useWatchOp } from './watchOps';
+import '../citations/citations.css';
+import './discover.css';
 
 type Check = ResponseOf<Channels, 'watch:checkPublished'>;
 type Proposal = Check['proposals'][number];

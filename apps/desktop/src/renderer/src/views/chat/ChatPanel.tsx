@@ -11,6 +11,7 @@ import { formatUsd } from './format';
 import { PreviewDialog } from './PreviewDialog';
 import { useChat, type Banner } from './useChat';
 import { useDocTitle } from './useLabels';
+import './chat.css';
 
 const REASONING: ReasoningLevel[] = ['low', 'medium', 'high'];
 

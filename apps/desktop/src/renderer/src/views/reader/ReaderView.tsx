@@ -19,6 +19,7 @@ import { annotationAt, colorOf, type AnnotationColor } from './geometry';
 import { useRepair } from './repair';
 import { useAnnotations } from './useAnnotations';
 import { useReaderDoc } from './useReaderDoc';
+import './reader.css';
 
 const STUDY: StudyState[] = ['to-read', 'reading', 'read'];
 const TABS: ReaderPanel[] = ['annotations', 'pageNote', 'fileNote', 'notes'];

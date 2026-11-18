@@ -8,6 +8,7 @@ import { TagChip } from '../library/TagParts';
 import { resolveId } from '../library/taxonomyModel';
 import { useTaxonomy } from '../library/useTaxonomy';
 import { useDecide, type DecideRequest } from './useDecide';
+import '../inbox/inbox.css';
 
 export type ReviewItemData = ResponseOf<Channels, 'review:list'>['items'][number];
 type NewTag = Extract<ReviewItemData, { field: 'newTags' }>['value'][number];

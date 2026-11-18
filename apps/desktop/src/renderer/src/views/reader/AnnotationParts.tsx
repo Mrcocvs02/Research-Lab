@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ANNOTATION_COLORS, type Annotation } from '@rl/core';
 import { safeText } from '../library/safeText';
 import { colorOf, excerpt, type AnnotationColor } from './geometry';
+import './reader.css';
 
 const pct = (n: number) => `${Math.round(Math.min(1, Math.max(0, Number(n) || 0)) * 10000) / 100}%`;
 

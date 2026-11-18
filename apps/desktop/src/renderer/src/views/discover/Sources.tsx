@@ -7,6 +7,8 @@ import { rl } from '../../lib/rl';
 import { safeText } from '../library/safeText';
 import type { WatchSource } from './DiscoverView';
 import { sourceName } from './sourceName';
+import '../citations/citations.css';
+import './discover.css';
 
 type Kind = WatchSource['kind'];
 const KINDS: Kind[] = ['author', 'topic', 'venue', 'own-preprint'];

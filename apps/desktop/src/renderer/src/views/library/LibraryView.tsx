@@ -19,6 +19,7 @@ import { emptySelection, type SelectionState } from './selection';
 import { useDocumentList, type DocRow } from './useDocumentList';
 import { useScanStatus } from './useScanStatus';
 import { TaxonomyProvider } from './useTaxonomy';
+import './library.css';
 
 // The detail panel, the bulk tag editor, the taxonomy manager and the project dialog load when they are first used.
 const DocumentCard = lazyView(() => import('./DocPanel').then((m) => ({ default: m.DocumentCard })), ['doc', 'doc-projects-reader', 'doc-reader', 'doc-review']);

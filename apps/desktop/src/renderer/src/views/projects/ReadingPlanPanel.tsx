@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { ProjectDetail, StudyState } from '@rl/core';
 import { safeText } from '../library/safeText';
 import { appendMembers, effectiveStatus, moveItem, notInPlan, planProgress, sortPlan, type PlanItemView } from './readingPlan';
+import './projects.css';
 
 const STATES: StudyState[] = ['to-read', 'reading', 'read'];
 

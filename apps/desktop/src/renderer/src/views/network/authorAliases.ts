@@ -1,45 +1,61 @@
 import { useSyncExternalStore } from 'react';
-import { NO_ALIASES, type AuthorAliases } from './entityData';
+import { rl } from '../../lib/rl';
 
 /**
- * The user's corrections to the authors (D-386): "Separate these forms" and "Merge with…". They belong in
- * `<dataDir>/graph/author-aliases.json`, written by the main process (N4); until that handler exists they are kept for this
- * browser profile and per library, and applied to the networks the view derives itself.
+ * The user's corrections to the authors (D-386, D-454): "Separate these forms" and "Merge with…". They live in
+ * `<dataDir>/graph/author-aliases.json`, written by the main process, which also applies them to the networks and to Explore.
+ * Here only the change is announced, so the networks load again. Corrections an earlier version kept in this browser profile
+ * (per library) are sent once and then forgotten.
  */
-const KEY = (lib: string) => `rl.authorAliases.${lib}`;
+const OLD_KEY = (lib: string) => `rl.authorAliases.${lib}`;
 let version = 0;
 const listeners = new Set<() => void>();
+const migrated = new Map<string, Promise<void>>();
 
-export function readAliases(lib: string): AuthorAliases {
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY(lib)) ?? 'null') as Partial<AuthorAliases> | null;
-    return { merge: raw?.merge ?? {}, split: raw?.split ?? [] };
-  } catch {
-    return NO_ALIASES;
-  }
-}
-
-function save(lib: string, a: AuthorAliases): void {
-  try {
-    localStorage.setItem(KEY(lib), JSON.stringify(a));
-  } catch {
-    /* storage unavailable: the correction lasts until the view reloads */
-  }
+function changed(): void {
   version++;
   listeners.forEach((l) => l());
 }
 
-/** `from` and `to` are author keys (the part after `author:`). */
-export function mergeAuthors(lib: string, from: string, to: string): void {
-  const a = readAliases(lib);
-  if (from === to) return;
-  save(lib, { split: a.split, merge: { ...a.merge, [from]: to } });
+/** Sends what localStorage holds for this library, once per session, and clears it when the main process has it. */
+export function migrateAliases(lib: string): Promise<void> {
+  let p = migrated.get(lib);
+  if (!p) {
+    p = (async () => {
+      let raw: string | null = null;
+      try {
+        raw = localStorage.getItem(OLD_KEY(lib));
+      } catch {
+        return;
+      }
+      if (raw === null) return;
+      try {
+        const old = JSON.parse(raw) as { merge?: Record<string, string>; split?: string[] };
+        const merge = Object.fromEntries(Object.entries(old.merge ?? {}).filter(([k, v]) => typeof v === 'string' && k !== '' && v !== '' && k !== v));
+        const split = (old.split ?? []).filter((k) => typeof k === 'string' && k !== '');
+        if (Object.keys(merge).length > 0 || split.length > 0) await rl.invoke('graph:editAuthorAliases', { action: 'import', aliases: { merge, split } });
+        localStorage.removeItem(OLD_KEY(lib));
+      } catch {
+        /* kept for the next start: nothing is lost */
+        migrated.delete(lib);
+      }
+    })();
+    migrated.set(lib, p);
+  }
+  return p;
 }
 
-export function splitAuthor(lib: string, key: string): void {
-  const a = readAliases(lib);
-  const merge = Object.fromEntries(Object.entries(a.merge).filter(([k, v]) => k !== key && v !== key));
-  save(lib, { merge, split: a.split.includes(key) ? a.split : [...a.split, key] });
+/** `from` and `to` are author keys (the part after `author:`). */
+export async function mergeAuthors(lib: string, from: string, to: string): Promise<void> {
+  await migrateAliases(lib);
+  await rl.invoke('graph:editAuthorAliases', { action: 'merge', from, to });
+  changed();
+}
+
+export async function splitAuthor(lib: string, key: string): Promise<void> {
+  await migrateAliases(lib);
+  await rl.invoke('graph:editAuthorAliases', { action: 'split', key });
+  changed();
 }
 
 /** Changes whenever a correction was saved, so the networks load again. */

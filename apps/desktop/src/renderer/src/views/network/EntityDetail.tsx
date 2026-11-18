@@ -97,7 +97,7 @@ export function EntityDetail({ mode, entity, peers, yearRange, onClose, onOpenDo
       {mode === 'author' && (
         <div className="net-toolbar ent-alias" data-testid="entity-alias">
           {forms.length > 1 && (
-            <button type="button" onClick={() => splitAuthor(lib, key)} data-testid="entity-split">
+            <button type="button" onClick={() => void splitAuthor(lib, key).catch(() => {})} data-testid="entity-split">
               {t('network.ent.split')}
             </button>
           )}
@@ -112,7 +112,7 @@ export function EntityDetail({ mode, entity, peers, yearRange, onClose, onOpenDo
               ))}
             </select>
           </label>
-          <button type="button" disabled={mergeWith === ''} onClick={() => (mergeAuthors(lib, key, mergeWith.slice(7)), setMergeWith(''))} data-testid="entity-merge">
+          <button type="button" disabled={mergeWith === ''} onClick={() => (void mergeAuthors(lib, key, mergeWith.slice(7)).catch(() => {}), setMergeWith(''))} data-testid="entity-merge">
             {t('network.ent.merge')}
           </button>
         </div>

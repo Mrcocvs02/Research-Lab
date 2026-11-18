@@ -85,6 +85,21 @@ export function authorKey(name: string): string {
   return `${family} ${given.charAt(0)}`;
 }
 
+/** The user's corrections to the authors (D-386, D-454): keys merged into another, and keys split into one node per written form. */
+export interface AuthorAliases {
+  merge: Readonly<Record<string, string>>;
+  split: readonly string[];
+}
+export const NO_ALIASES: AuthorAliases = { merge: {}, split: [] };
+
+/** The key of an author after the user's corrections: merged into another, or split by the full written form. */
+export function resolveAuthor(name: string, aliases: AuthorAliases = NO_ALIASES): string {
+  const k = authorKey(name);
+  if (k === '') return '';
+  const split = aliases.split.includes(k) ? `${k}|${fold(name)}` : k;
+  return Object.hasOwn(aliases.merge, split) ? (aliases.merge[split] as string) : split;
+}
+
 function mostCommon(counts: Map<string, number>): string {
   let best = '';
   let bc = -1;
@@ -185,7 +200,8 @@ function groupKeys(keys: string[], edges: Edge[], countOf: (k: string) => number
   return { members, of };
 }
 
-function authorDim(docs: readonly ExploreDoc[]): Dim {
+function authorDim(docs: readonly ExploreDoc[], aliases: AuthorAliases): Dim {
+  const authorKey = (name: string) => resolveAuthor(name, aliases);
   const byAuthor = new Map<string, Set<number>>();
   const names = new Map<string, Map<string, number>>();
   docs.forEach((d, i) => {
@@ -335,9 +351,9 @@ const recency = (docs: readonly ExploreDoc[]) => (p: number, q: number): number 
 };
 
 /** Lazily built indexes of the three dimensions over a list of documents. */
-export function createExploreIndex(docs: readonly ExploreDoc[], taxonomy: ExploreTaxonomy): ExploreIndex {
+export function createExploreIndex(docs: readonly ExploreDoc[], taxonomy: ExploreTaxonomy, aliases: AuthorAliases = NO_ALIASES): ExploreIndex {
   const built: Partial<Record<ExploreDimension, Dim>> = {};
-  const dim = (d: ExploreDimension): Dim => (built[d] ??= d === 'topic' ? topicDim(docs, taxonomy) : d === 'author' ? authorDim(docs) : venueDim(docs, taxonomy));
+  const dim = (d: ExploreDimension): Dim => (built[d] ??= d === 'topic' ? topicDim(docs, taxonomy) : d === 'author' ? authorDim(docs, aliases) : venueDim(docs, taxonomy));
   const recent = recency(docs);
   const docsOf = (d: ExploreDimension, id: string): number[] | undefined => {
     const idx = dim(d).docs(id);

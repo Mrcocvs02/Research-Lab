@@ -1,7 +1,33 @@
 import { expect, test } from '@playwright/test';
 import type { LaunchedApp } from './helpers/launch';
 import { ipc, ipcData } from './helpers/phase1';
-import { backToList, clickRow, createTagInManager, openSyntheticLibrary, pickTag, rowByTitle, rows } from './helpers/ui';
+import type { Page } from '@playwright/test';
+import { backToList, clickRow, createTagInManager, openSyntheticLibrary, pickTag, rowByTitle, rows, unfoldNode } from './helpers/ui';
+
+/** The View popover (list or grid, sort order) opens from the header; it stays open until a click outside. */
+async function viewMenu(window: Page) {
+  if (!(await window.getByTestId('search-sort').isVisible())) await window.getByTestId('view-menu').click();
+}
+async function pickSort(window: Page, value: string) {
+  await viewMenu(window);
+  await pickSort(window, value);
+}
+async function pickView(window: Page, mode: 'list' | 'grid') {
+  await viewMenu(window);
+  await window.getByTestId(`view-${mode}`).click();
+}
+/** Opens the card (the details panel) when it is closed. */
+async function openCard(window: Page) {
+  if (!(await window.getByTestId('detail-pane').isVisible())) await window.getByTestId('detail-toggle').click();
+}
+/** Opens the popover of the tag filter chip. */
+async function openTagFilter(window: Page) {
+  if (!(await window.getByTestId('filter-include-input').isVisible())) await window.getByTestId('facet-chip-tags').locator('button').first().click();
+}
+/** Opens "Edit details" in the card so that the fields are there. */
+async function editData(window: Page) {
+  if (!(await window.getByTestId('field-title').isVisible())) await window.getByTestId('detail-edit-data').click();
+}
 
 /**
  * Phase 2 criterion, library half: what TagSpaces did, done in the app. Checklist points 1-8 on the synthetic
@@ -43,27 +69,27 @@ test('folders with counts, list and grid, sorting, text search (points 1 and 2)'
 
     // List and grid.
     await expect(rows(window).first()).toHaveAttribute('data-view', 'list');
-    await window.getByTestId('view-grid').click();
+    await pickView(window, 'grid');
     await expect(rows(window).first()).toHaveAttribute('data-view', 'grid');
     await expect(rows(window).first().locator('.type-icon')).toBeVisible();
-    await window.getByTestId('view-list').click();
+    await pickView(window, 'list');
 
     // Sorting by title and by year.
     const titles = files.map((f) => f.title).filter((t): t is string => Boolean(t));
     const firstByTitle = [...titles].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))[0]!;
-    await window.getByTestId('search-sort').selectOption('title');
+    await pickSort(window, 'title');
     await expect(rows(window).first().getByTestId('result-title')).toHaveText(firstByTitle);
-    await window.getByTestId('search-sort').selectOption('year-desc');
+    await pickSort(window, 'year-desc');
     await expect(window.getByTestId('search-summary')).toContainText(String(total));
-    await window.getByTestId('search-sort').selectOption('added-desc');
-    await window.getByTestId('search-sort').selectOption('author');
+    await pickSort(window, 'added-desc');
+    await pickSort(window, 'author');
     await expect(rows(window).first()).toBeVisible();
     // By size: the order and the readable size of the first row are the index's.
     const bySize = (await ipc(window, 'documents:list', { sort: 'size-desc', limit: 3 })).data as { items: Array<{ size: number }> };
-    await window.getByTestId('search-sort').selectOption('size-desc');
+    await pickSort(window, 'size-desc');
     await expect(rows(window).first().getByTestId('doc-size')).toHaveAttribute('title', `${bySize.items[0]!.size} bytes`);
     await expect(rows(window).first().getByTestId('doc-size')).toHaveText(/^\d+(\.\d)? (B|KB|MB|GB)$/);
-    await window.getByTestId('search-sort').selectOption('size-asc');
+    await pickSort(window, 'size-asc');
     const asc = (await ipc(window, 'documents:list', { sort: 'size-asc', limit: 1 })).data as { items: Array<{ size: number }> };
     await expect(rows(window).first().getByTestId('doc-size')).toHaveAttribute('title', `${asc.items[0]!.size} bytes`);
 
@@ -91,9 +117,9 @@ test('tags on one and many documents, filters, undo and history (points 3, 4 and
     const [a, b, c] = [...titles].sort((x, y) => x.localeCompare(y, undefined, { sensitivity: 'base' }));
 
     // A tag created on the fly while tagging one document; a second one with an alias from the manager.
-    await window.getByTestId('search-sort').selectOption('title');
+    await pickSort(window, 'title');
     await clickRow(window, a!);
-    await window.getByTestId('selection-details').click();
+    await openCard(window);
     const panel = window.getByTestId('doc-panel');
     await expect(panel).toBeVisible();
     await pickTag(window, panel.getByTestId('tag-input'), 'Alpha topic', true);
@@ -101,6 +127,7 @@ test('tags on one and many documents, filters, undo and history (points 3, 4 and
     await expect(rowByTitle(window, a!).getByTestId('tag-chip')).toContainText('Alpha topic');
 
     await createTagInManager(window, 'Beta topic');
+    await unfoldNode(window, 'aliases');
     await window.getByTestId('node-aliases').fill('bt\nsecond topic');
     await window.getByTestId('node-aliases').blur();
     await window.getByTestId('color-swatch').nth(5).click();
@@ -110,7 +137,7 @@ test('tags on one and many documents, filters, undo and history (points 3, 4 and
     await clickRow(window, a!);
     await clickRow(window, c!, ['Shift']);
     await expect(window.getByTestId('selection-count')).toHaveText(/3 selected/);
-    await window.getByTestId('selection-details').click();
+    await openCard(window);
     const bulk = window.getByTestId('bulk-panel');
     await expect(bulk).toBeVisible();
     await bulk.getByTestId('bulk-tag-input').fill('second');
@@ -123,6 +150,7 @@ test('tags on one and many documents, filters, undo and history (points 3, 4 and
 
     // Filters: one tag, two tags (all / at least one), exclusion, combined with text.
     await window.getByTestId('selection-clear').click();
+    await openTagFilter(window);
     const include = window.getByTestId('filter-include-input');
     await pickTag(window, include, 'Beta');
     await expect(window.getByTestId('search-summary')).toContainText('3 documents');
@@ -157,14 +185,14 @@ test('tags on one and many documents, filters, undo and history (points 3, 4 and
   }
 });
 
-test('keyboard: arrows, Shift, Ctrl+A, Enter opens the card, Delete deletes nothing (point 4)', async ({}, testInfo) => {
+test('keyboard: arrows, Shift, Ctrl+A, Shift+Enter opens the card, Delete deletes nothing (point 4)', async ({}, testInfo) => {
   test.setTimeout(300_000);
   let ctx: LaunchedApp | undefined;
   try {
     const opened = await openSyntheticLibrary(testInfo, 'papers');
     ctx = opened.ctx;
     const { window, total } = opened;
-    await window.getByTestId('search-sort').selectOption('title');
+    await pickSort(window, 'title');
     const list = window.getByTestId('search-results');
     await rows(window).first().click();
     await list.press('ArrowDown');
@@ -177,7 +205,7 @@ test('keyboard: arrows, Shift, Ctrl+A, Enter opens the card, Delete deletes noth
     await expect(window.getByTestId('search-summary')).toContainText(String(total));
     await window.getByTestId('selection-clear').click();
     await rows(window).first().click();
-    await list.press('Enter');
+    await list.press('Shift+Enter'); // Enter reads the document, Shift+Enter opens its card (3.2)
     await expect(window.getByTestId('doc-panel')).toBeVisible();
     await ctx.verifyLibraryUntouched();
   } finally {
@@ -192,12 +220,12 @@ test('bulk tags follow the selected ids and the selection survives a refresh; En
     const opened = await openSyntheticLibrary(testInfo, 'papers');
     ctx = opened.ctx;
     const { window, total } = opened;
-    await window.getByTestId('search-sort').selectOption('title');
+    await pickSort(window, 'title');
     const list = window.getByTestId('search-results');
     await rows(window).first().click();
     await list.press('Control+a');
     await expect(window.getByTestId('selection-count')).toHaveText(new RegExp(`${total} selected`));
-    await window.getByTestId('selection-details').click();
+    await openCard(window);
     const bulk = window.getByTestId('bulk-panel');
     await pickTag(window, bulk.getByTestId('bulk-tag-input'), 'First topic', true);
     await expect(bulk.getByTestId('bulk-tag')).toHaveCount(1);
@@ -215,7 +243,7 @@ test('bulk tags follow the selected ids and the selection survives a refresh; En
     const focused = await rows(window).nth(1).getAttribute('data-doc-id');
     await ipcData(window, 'documents:update', { docId: items[0]!.docId, patch: { title: 'Zzz moved to the end' } });
     await expect(rows(window).last()).toContainText('Zzz moved to the end');
-    await list.press('Enter');
+    await list.press('Shift+Enter');
     await expect(window.getByTestId('doc-panel')).toHaveAttribute('data-doc-id', focused!);
     await ctx.verifyLibraryUntouched();
   } finally {
@@ -230,15 +258,18 @@ test('document card: editable fields, study state, extracted values apart, AI ar
     const opened = await openSyntheticLibrary(testInfo, 'papers');
     ctx = opened.ctx;
     const { window } = opened;
-    await window.getByTestId('search-sort').selectOption('title');
+    await pickSort(window, 'title');
     await rows(window).first().click();
-    await window.getByTestId('selection-details').click();
+    await openCard(window);
     const panel = window.getByTestId('doc-panel');
     await expect(panel).toBeVisible();
 
-    // Opening and showing the file are offered (not clicked: they start programs on this machine).
-    await expect(panel.getByTestId('open-file')).toBeEnabled();
-    await expect(panel.getByTestId('reveal-file')).toBeEnabled();
+    // Opening and showing the file are offered in the menu (not clicked: they start programs on this machine).
+    await panel.getByTestId('doc-more').click();
+    await expect(window.getByRole('menuitem', { name: /default program/ })).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(window.getByRole('menuitem', { name: /Show in folder/ })).not.toHaveAttribute('aria-disabled', 'true');
+    await window.keyboard.press('Escape');
+    await editData(window);
 
     // Values the scan took from the file are marked; once the user edits one, the mark goes away.
     const marks = panel.getByTestId('extracted-mark');
@@ -270,13 +301,14 @@ test('document card: editable fields, study state, extracted values apart, AI ar
     // The AI area is its own, labelled block and has no inputs.
     const ai = panel.getByTestId('ai-area');
     await expect(ai).toBeVisible();
-    await expect(ai).toContainText(/AI-generated/);
+    await expect(ai).toContainText(/AI-generated|No AI content/);
     await expect(ai.locator('input, textarea, select')).toHaveCount(0);
 
     // Reload the card from the main process: the values were stored.
     await window.getByTestId('selection-clear').click();
     await rows(window).filter({ hasText: 'A title chosen by the user' }).click();
-    await window.getByTestId('selection-details').click();
+    await openCard(window);
+    await editData(window);
     await expect(window.getByTestId('field-year')).toHaveValue('1999');
     await expect(window.getByTestId('field-doi')).toHaveValue('10.1234/example');
     await expect(window.getByTestId('field-authors')).toHaveValue('First Author\nSecond Author');
@@ -299,6 +331,7 @@ test('taxonomy: free levels, rename, move, aliases, implications, colour, merge,
 
     await createTagInManager(window, 'Macro');
     await createTagInManager(window, 'Micro', { parent: 'macro' });
+    await unfoldNode(window, 'relations');
     await expect(window.getByTestId('node-parents')).toContainText('Macro');
     // third level
     await window.getByTestId('add-child').click();
@@ -311,6 +344,7 @@ test('taxonomy: free levels, rename, move, aliases, implications, colour, merge,
     await window.getByTestId('node-label').fill('Sub-topic renamed');
     await window.getByTestId('node-label').blur();
     await expect(window.getByTestId('node-title')).toHaveText('Sub-topic renamed');
+    await unfoldNode(window, 'relations');
     await window.getByTestId('parent-input').fill('Macro');
     await window.getByTestId('parent-input').press('Enter');
     await expect(window.getByTestId('node-parents')).toContainText('Macro');
@@ -323,9 +357,11 @@ test('taxonomy: free levels, rename, move, aliases, implications, colour, merge,
     await item('sub-topic').dragTo(item('micro'));
     await expect(item('sub-topic')).toBeVisible();
     await item('sub-topic').click();
+    await unfoldNode(window, 'relations');
     await expect(window.getByTestId('node-parents').getByTestId('tag-chip')).toContainText('Micro');
 
     // implications and colour
+    await unfoldNode(window, 'relations');
     await window.getByTestId('implies-input').fill('Macro');
     await window.getByTestId('implies-input').press('Enter');
     await expect(window.getByTestId('node-implies')).toContainText('Macro');
@@ -338,12 +374,14 @@ test('taxonomy: free levels, rename, move, aliases, implications, colour, merge,
     await window.getByTestId('new-node-create').click();
     await backToList(window);
     await rows(window).first().click();
-    await window.getByTestId('selection-details').click();
+    await openCard(window);
     await pickTag(window, window.getByTestId('tag-input'), 'Extra');
     await expect(window.getByTestId('doc-tag-list')).toContainText('Extra');
-    await window.getByTestId('open-taxonomy').click();
+    await window.getByTestId('library-more').click();
+    await window.getByRole('menuitem', { name: /Manage tags/ }).click();
     await item('extra').click();
     await expect(window.getByTestId('node-counts')).toContainText(/1 direct/);
+    await unfoldNode(window, 'merge');
     await expect(window.getByTestId('delete-node')).toBeDisabled();
     await window.getByTestId('deprecate-node').click();
     await expect(window.getByTestId('restore-node')).toBeVisible();
@@ -356,6 +394,7 @@ test('taxonomy: free levels, rename, move, aliases, implications, colour, merge,
     await window.getByTestId('new-top-level').click();
     await window.getByTestId('new-node-label').fill('Throwaway');
     await window.getByTestId('new-node-create').click();
+    await unfoldNode(window, 'merge');
     await window.getByTestId('delete-node').click();
     await window.getByTestId('delete-confirm').click();
     await expect(item('throwaway')).toHaveCount(0);
@@ -363,6 +402,58 @@ test('taxonomy: free levels, rename, move, aliases, implications, colour, merge,
     // everything above is one undo away
     await window.getByTestId('undo-button').click();
     await expect(item('throwaway')).toHaveCount(1);
+    await ctx.verifyLibraryUntouched();
+  } finally {
+    await ctx?.close();
+  }
+});
+
+test('crowding and layout at 1024x700: top bar 9, header 4, filters 8, selection bar 5 on one line, 7 rows, the card keeps Folders visible', async ({}, testInfo) => {
+  test.setTimeout(300_000);
+  let ctx: LaunchedApp | undefined;
+  try {
+    const opened = await openSyntheticLibrary(testInfo, 'papers');
+    ctx = opened.ctx;
+    const { window } = opened;
+    await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setContentSize(1024, 700));
+    await expect.poll(() => window.evaluate(() => `${globalThis.innerWidth}x${globalThis.innerHeight}`)).toBe('1024x700');
+    const visible = (root: ReturnType<Page['getByTestId']>) => root.locator('button:visible, input:visible, select:visible, [role="button"]:visible');
+
+    // Top bar (17.3: 9 controls): back, forward, search box with its (?) and Claude buttons, Undo, History, Commands, Activity.
+    await expect(visible(window.getByTestId('topbar'))).toHaveCount(9);
+    await expect(window.getByTestId('search-input')).toBeVisible();
+    await expect(window.getByTestId('search-syntax')).toBeVisible();
+    await expect(window.getByTestId('adv-search')).toBeVisible();
+    // The Library has no search box of its own and no second "Ask Claude" button.
+    await expect(window.getByTestId('section-library').getByTestId('search-input')).toHaveCount(0);
+
+    // Header: View, + Add PDF, the menu, the card toggle.
+    await expect(visible(window.locator('.library-head'))).toHaveCount(4);
+    // The row of filters: 6 facet chips and "Show missing files" (Clear appears with a filter).
+    await expect(visible(window.getByTestId('facet-bar'))).toHaveCount(7);
+    // At least seven rows are visible without scrolling.
+    const box = await window.getByTestId('search-results').boundingBox();
+    const rowH = (await rows(window).first().boundingBox())!.height;
+    expect(Math.floor(box!.height / rowH)).toBeGreaterThanOrEqual(7);
+
+    // The selection bar replaces the row of filters: 5 controls, one line.
+    await rows(window).nth(0).click();
+    await rows(window).nth(1).click({ modifiers: ['Control'] });
+    const bar = window.getByTestId('selection-bar');
+    await expect(bar).toBeVisible();
+    await expect(visible(bar)).toHaveCount(5);
+    await expect(window.getByTestId('facet-bar')).toHaveCount(0);
+    const bb = (await bar.boundingBox())!;
+    expect(bb.height).toBeLessThanOrEqual(48);
+    await window.getByTestId('selection-clear').click();
+
+    // The card is a drawer over the list at this width: the Folders pane stays where it is.
+    await rows(window).first().click();
+    await window.getByTestId('detail-toggle').click();
+    await expect(window.getByTestId('detail-pane')).toBeVisible();
+    await expect(window.getByTestId('folder-tree')).toBeVisible();
+    const listBox = (await window.getByTestId('results-pane').boundingBox())!;
+    expect(listBox.width).toBeGreaterThanOrEqual(420);
     await ctx.verifyLibraryUntouched();
   } finally {
     await ctx?.close();

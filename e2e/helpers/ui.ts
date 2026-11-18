@@ -43,10 +43,14 @@ export async function pickTag(window: Page, input: ReturnType<Page['getByTestId'
 
 /** Creates a top-level tag in the taxonomy manager and comes back to the list. */
 export async function createTagInManager(window: Page, label: string, opts: { parent?: string } = {}): Promise<void> {
-  if (!(await window.getByTestId('taxonomy-manager').isVisible())) await window.getByTestId('open-taxonomy').click();
+  if (!(await window.getByTestId('taxonomy-manager').isVisible())) {
+    await window.getByTestId('library-more').click();
+    await window.getByRole('menuitem', { name: /Manage tags|Gestisci tag/ }).click();
+  }
   await expect(window.getByTestId('taxonomy-manager')).toBeVisible();
   if (opts.parent) {
     await window.getByTestId('tax-tree').locator(`[data-key="${opts.parent}"]`).click();
+    await unfoldNode(window, 'relations');
     await window.getByTestId('add-child').click();
   } else {
     await window.getByTestId('new-top-level').click();
@@ -54,6 +58,12 @@ export async function createTagInManager(window: Page, label: string, opts: { pa
   await window.getByTestId('new-node-label').fill(label);
   await window.getByTestId('new-node-create').click();
   await expect(window.getByTestId('node-title')).toHaveText(label);
+}
+
+/** Opens a section of the tag editor ("aliases", "relations", "merge"; "name" is open at first): they close again for each node. */
+export async function unfoldNode(window: Page, id: 'name' | 'aliases' | 'relations' | 'merge'): Promise<void> {
+  const fold = window.getByTestId(`node-fold-${id}`);
+  if (!(await fold.evaluate((el) => (el as HTMLDetailsElement).open))) await fold.locator('summary').click();
 }
 
 export async function backToList(window: Page): Promise<void> {

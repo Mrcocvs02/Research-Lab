@@ -55,6 +55,7 @@ test('PDFs show their first page in the grid, cached across a restart', async ()
     await expect(rows(window).first()).toBeVisible();
     await expect(window.locator('[data-testid="doc-thumb"]')).toHaveCount(0);
 
+    await window.getByTestId('view-menu').click();
     await window.getByTestId('view-grid').click();
     await expect(rows(window).first()).toHaveAttribute('data-view', 'grid');
     await expect.poll(async () => (await widths(window)).filter((x) => x.w > 0).length, { timeout: 90_000, intervals: [250, 500, 1000] }).toBeGreaterThan(0);
@@ -76,7 +77,10 @@ test('PDFs show their first page in the grid, cached across a restart', async ()
     for (const t of shown.slice(0, 3)) expect(await imgWidth(w2, t.src)).toBeGreaterThan(0);
     const again = await ipcData<{ items: Array<{ docId: string; url: string | null; drawable: boolean }> }>(w2, 'thumbs:list', { docIds: ids });
     expect(again.items.map((i) => [i.url !== null, i.drawable])).toEqual(ids.map(() => [true, false]));
-    if ((await w2.getByTestId('view-grid').getAttribute('aria-pressed')) !== 'true') await w2.getByTestId('view-grid').click();
+    if ((await rows(w2).first().getAttribute('data-view')) !== 'grid') {
+      await w2.getByTestId('view-menu').click();
+      await w2.getByTestId('view-grid').click();
+    }
     await expect.poll(async () => (await widths(w2)).filter((x) => x.w > 0).length, { timeout: 60_000, intervals: [250, 500, 1000] }).toBeGreaterThan(0);
 
     const after = await Promise.all(pdfs.map(async (f) => sha(await readFile(path.join(root, f.relPath)))));
@@ -97,6 +101,7 @@ test('rl-thumb serves only thumbnails: other names and versions do not load as i
     await createLibraryViaWizard(window, { name: 'Thumbs scheme' });
     await waitForScan(window, ctx.library!.manifest!.files.length);
     await expect(window.getByTestId('scan-status')).toHaveAttribute('data-state', 'done', { timeout: 120_000 });
+    await window.getByTestId('view-menu').click();
     await window.getByTestId('view-grid').click();
     await expect.poll(async () => (await widths(window)).filter((x) => x.w > 0).length, { timeout: 90_000, intervals: [250, 500, 1000] }).toBeGreaterThan(0);
     const good = (await widths(window)).find((x) => x.w > 0)!.src;

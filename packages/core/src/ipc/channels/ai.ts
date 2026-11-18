@@ -7,6 +7,18 @@ import { defineChannels, defineEvents } from '../registry.js';
 /** How the provider reaches Claude: the user's Claude Code login, an API key in the OS secure store, or nothing. */
 export const aiAuthSchema = z.enum(['claude-code', 'api-key', 'none']);
 
+/** Tokens of this calendar month (input + output, every library) against the monthly token cap of the app (D-442). */
+export const aiTokenUsageSchema = z.object({
+  month: z.string().regex(/^\d{4}-\d{2}$/),
+  monthTokens: z.number().int().nonnegative(),
+  /** Null: no cap. */
+  tokenCap: z.number().int().positive().nullable(),
+  /** Whole percent of the cap used (may exceed 100); null without a cap. */
+  pct: z.number().int().nonnegative().nullable(),
+  warnAtPct: z.number().int().min(1).max(99),
+});
+export type AiTokenUsage = z.infer<typeof aiTokenUsageSchema>;
+
 export const aiStatusSchema = z.object({
   provider: aiProviderIdSchema,
   /** The provider can be used now (access configured and reachable). */
@@ -150,6 +162,10 @@ export const aiChannels = defineChannels('ai', {
       libraries: z.array(z.object({ libraryId: itemIdSchema, usd: z.number().nonnegative().nullable(), reachable: z.boolean() })),
     }),
   },
+  /** The token monitor (D-442): counted once per month over every library, then kept up to date on each send. */
+  tokenUsage: { request: z.object({}), response: aiTokenUsageSchema },
+  /** Sets the monthly token cap (null: none); the event `ai:usageChanged` follows. */
+  setTokenCap: { request: z.object({ monthlyTokens: z.number().int().positive().max(1e12).nullable() }), response: aiTokenUsageSchema },
   /** Forgets the chosen executable: back to automatic discovery. */
   clearExecutable: { request: z.object({}), response: z.object({ ok: z.literal(true) }) },
 });
@@ -157,4 +173,6 @@ export const aiChannels = defineChannels('ai', {
 export const aiEvents = defineEvents('ai', {
   /** The account state changed: after `setAuthMode`, `logout`, or a change seen by the login watcher (§10.3). */
   accountChanged: aiAccountSchema,
+  /** Tokens of the month or the cap changed; `crossedWarn`: this send passed `warnAtPct` (the warning is shown once). */
+  usageChanged: aiTokenUsageSchema.extend({ crossedWarn: z.boolean() }),
 });

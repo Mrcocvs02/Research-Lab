@@ -1,3 +1,4 @@
+import { noteSend } from './token-cap.js';
 import { execFile, spawn } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync, watch as fsWatch, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -223,6 +224,7 @@ export function createAccountService(s: MainServices, io: AccountIo = realIo()):
       // Counted like any send; without an active library nothing is recorded.
       await rt?.store
         .appendLog({ type: 'ai-send', at: new Date().toISOString(), deviceId, provider: provider.id, model: MODEL, purpose: 'connection-test', docIds: [], folders: [], approxInputTokens: tokens.in, approxOutputTokens: tokens.out, ...(usd !== null ? { estimatedCostUsd: usd } : {}), confirmed: true })
+        .then(() => noteSend(s, 'connection-test', tokens.in, tokens.out))
         .catch((e: unknown) => s.log.warn('could not log the connection test', { code: AppError.from(e).code }));
       return error ? { ok: false, ms, model: MODEL, usd, error: { code: error } } : { ok: true, ms, model: MODEL, usd };
     },

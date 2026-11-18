@@ -12,8 +12,10 @@ export const CHANNEL_NAMES: readonly string[] = [
   'ai:logout',
   'ai:preview',
   'ai:setAuthMode',
+  'ai:setTokenCap',
   'ai:status',
   'ai:test',
+  'ai:tokenUsage',
   'ai:usage',
   'ai:usageAll',
   'annotations:list',
@@ -91,6 +93,7 @@ export const CHANNEL_NAMES: readonly string[] = [
   'jobs:cancel',
   'jobs:estimate',
   'jobs:list',
+  'jobs:restart',
   'jobs:start',
   'library:create',
   'library:forget',
@@ -163,6 +166,7 @@ export const CHANNEL_NAMES: readonly string[] = [
 
 export const EVENT_NAMES: readonly string[] = [
   'ai:accountChanged',
+  'ai:usageChanged',
   'app:notice',
   'backup:progress',
   'chat:event',

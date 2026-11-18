@@ -3,6 +3,7 @@ import { AppError, type LibraryConfig, type ReasoningLevel } from '@rl/core';
 import { modelVector, topTermsOf, type GraphModel } from '@rl/graph';
 import { z } from 'zod';
 import { availability, computePreview, loadCtx, monthUsage, type AiPreview } from '../ai/service.js';
+import { assertTokenCap, noteSend } from '../ai/token-cap.js';
 import { monthOf, usdOfUsage } from '../ai/usage.js';
 import type { MainServices } from '../ipc/handlers/services.js';
 import type { LibraryRuntime } from '../library/library-runtime.js';
@@ -146,6 +147,7 @@ async function sendLabels(s: MainServices, ctx: Awaited<ReturnType<typeof loadCt
   const monthUsd = (await monthUsage(rt, monthOf(new Date()))).usd;
   const cap = cfg.ai.usageCap.monthlyUsd;
   if (cap !== null && monthUsd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached', { monthUsd, capUsd: cap });
+  await assertTokenCap(s, 0);
   const av = await availability(s, provider);
   if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
   // 3. The documents whose titles go: only those of enabled folders.
@@ -159,6 +161,7 @@ async function sendLabels(s: MainServices, ctx: Awaited<ReturnType<typeof loadCt
     perDocChars: 0,
   });
   if (cap !== null && preview.overCap) throw new AppError('AI_BUDGET_EXCEEDED', 'This send would go over the monthly AI spending cap', { monthUsd, capUsd: cap, estimatedUsd: preview.estimatedUsd });
+  await assertTokenCap(s, preview.approxInputTokens);
   if (preview.needsConfirmation && !req.confirmed) throw new AppError('CONFLICT', 'The send needs the confirmation of the user', { reason: 'needs-confirmation', preview });
 
   const deviceId = (await s.settings.get()).deviceId;
@@ -180,6 +183,7 @@ async function sendLabels(s: MainServices, ctx: Awaited<ReturnType<typeof loadCt
         ...(usd !== null ? { estimatedCostUsd: usd } : {}),
         confirmed: req.confirmed,
       })
+      .then(() => noteSend(s, PURPOSE, inputTokens, outputTokens))
       .catch((e: unknown) => s.log.warn('could not log an AI send', { error: e }));
   let result;
   try {

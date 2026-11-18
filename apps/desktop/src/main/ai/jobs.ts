@@ -7,6 +7,7 @@ import type { MainServices } from '../ipc/handlers/services.js';
 import { availability, buildDataBlock, classifyDocs, computePreview, loadCtx, monthUsage, type AiCtx } from './service.js';
 import { abortTracked } from './abort-registry.js';
 import { createToolsHost } from './tools-host.js';
+import { assertTokenCap, noteSend } from './token-cap.js';
 import { monthOf, usdOfUsage } from './usage.js';
 
 type JobRequest = z.infer<typeof aiJobRequestSchema>;
@@ -95,6 +96,13 @@ export async function estimateJob(s: MainServices, req: JobRequest) {
   return { preview: p.preview, skipped: p.skipped, toSend: p.todo.length };
 }
 
+/** A finished job of this session started again with the same request (the plan leaves out what already has a value unless `regenerate`). */
+export async function restartJob(s: MainServices, jobId: string): Promise<{ jobId: string }> {
+  const j = jobs.find((x) => x.status.jobId === jobId);
+  if (!j) throw new AppError('NOT_FOUND', 'Unknown job');
+  return startJob(s, { ...j.req, confirmed: j.confirmed });
+}
+
 export async function startJob(s: MainServices, req: JobRequest & { confirmed: boolean }): Promise<{ jobId: string }> {
   const ctx = await loadCtx(s);
   const { rt, cfg, provider } = ctx;
@@ -102,11 +110,13 @@ export async function startJob(s: MainServices, req: JobRequest & { confirmed: b
   const monthUsd = (await monthUsage(rt, monthOf(new Date()))).usd;
   const cap = cfg.ai.usageCap.monthlyUsd;
   if (cap !== null && monthUsd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached', { monthUsd, capUsd: cap });
+  await assertTokenCap(s, 0);
   const av = await availability(s, provider);
   if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
   const p = await plan(s, ctx, req);
   if (p.todo.length === 0) throw new AppError('INVALID_REQUEST', 'No document would be sent', { reason: 'nothing-to-send', skipped: p.skipped, refused: p.preview.refused.length });
   if (cap !== null && p.preview.overCap) throw new AppError('AI_BUDGET_EXCEEDED', 'This job would go over the monthly AI spending cap', { monthUsd, capUsd: cap, estimatedUsd: p.preview.estimatedUsd });
+  await assertTokenCap(s, p.preview.approxInputTokens);
   if (p.preview.needsConfirmation && !req.confirmed) throw new AppError('CONFLICT', 'The job needs the confirmation of the user', { reason: 'needs-confirmation', preview: p.preview });
 
   const job: JobRec = {
@@ -205,6 +215,13 @@ async function run(j: JobRec): Promise<void> {
     const cap = cfg.ai.usageCap.monthlyUsd;
     if (cap !== null && monthUsd >= cap) return finish(j, 'failed', { code: 'AI_BUDGET_EXCEEDED', message: 'The monthly AI spending cap is reached' });
 
+    try {
+      await assertTokenCap(s, 0);
+    } catch (e) {
+      const err = AppError.from(e);
+      return finish(j, 'failed', { code: err.code, message: err.message });
+    }
+
     const rec = await rt.store.documents.get(item.docId as DocumentId).catch(() => null);
     if (!rec || rec.missing) {
       j.status.failed++;
@@ -282,7 +299,7 @@ async function suggestOne(a: OneArgs): Promise<void> {
       ...(outputTokens !== undefined ? { approxOutputTokens: outputTokens } : {}),
       ...(usd !== null ? { estimatedCostUsd: usd } : {}),
       confirmed: j.confirmed,
-    });
+    }).then(() => noteSend(s, 'job:suggest', inputTokens, outputTokens));
   const approxIn = Math.ceil((system.length + prompt.length) / 4);
   let result;
   try {

@@ -1,195 +1,253 @@
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { libraryConfigSchema, type ExportPreset, type Language, type LibraryConfig } from '@rl/core';
+import { libraryConfigSchema, type Language, type LibraryProfile, type ScanReport } from '@rl/core';
+import { Button } from '../components/Button';
+import { Dialog } from '../components/Dialog';
 import { FolderTree, type FolderEntry } from '../components/FolderTree';
-import { CheckField, ErrorNote, LanguageSelect, SelectField, TextField } from '../components/ui';
-import { errorMessage, issuesFromError } from '../lib/errors';
+import { IconButton } from '../components/IconButton';
+import { IconMore } from '../components/icons';
+import { Menu } from '../components/Menu';
+import { flushAll } from '../lib/dirtyEditors';
+import { errorMessage } from '../lib/errors';
+import { useNotify } from '../lib/notify';
 import { rl } from '../lib/rl';
 import { validateWith, validationKey } from '../lib/validate';
 import { useApp } from '../state/app-context';
+import { Group, NeedsLibrary, Row, SectionHead, TextRow, useLibraryPatch } from './rows';
+import { useAutoSave } from './useAutoSave';
 
-interface Draft {
-  name: string;
-  language: Language;
-  excluded: string[];
-  presets: ExportPreset[];
-}
-
-const toDraft = (c: LibraryConfig): Draft => ({
-  name: c.name,
-  language: c.language,
-  excluded: c.excludedFolders,
-  presets: c.exportPresets,
-});
-
-/** Builds the full candidate config that the core schema validates (and the patch is taken from). */
-function toCandidate(base: LibraryConfig, d: Draft): unknown {
-  return {
-    ...base,
-    name: d.name,
-    language: d.language,
-    excludedFolders: d.excluded,
-    exportPresets: d.presets,
+/** One library of the list: name, path and its actions; "Rename" turns the name into a field, "Remove from list" asks first (files are never deleted). */
+function LibraryItem({ p, active, run }: { p: LibraryProfile; active: boolean; run(fn: () => Promise<unknown>): Promise<void> }) {
+  const { t } = useTranslation();
+  const [menu, setMenu] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [name, setName] = useState(p.name);
+  const [forget, setForget] = useState(false);
+  const more = useRef<HTMLSpanElement>(null);
+  const rename = () => {
+    const n = name.trim();
+    if (n)
+      void run(async () => {
+        await rl.invoke('library:rename', { libraryId: p.id, name: n });
+        setRenaming(false);
+      });
   };
+  return (
+    <li data-testid="library-item" data-active={active || undefined}>
+      <div className="grow">
+        {renaming ? (
+          <form
+            className="inline-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              rename();
+            }}
+          >
+            <input aria-label={t('library.name')} value={name} maxLength={120} autoFocus onChange={(e) => setName(e.target.value)} data-testid="library-rename-input" />
+            <Button type="submit" variant="primary" size="sm" disabled={!name.trim()}>
+              {t('common.save')}
+            </Button>
+            <Button size="sm" onClick={() => setRenaming(false)}>
+              {t('common.cancel')}
+            </Button>
+          </form>
+        ) : (
+          <>
+            <strong>{p.name}</strong>
+            {active && <span className="badge ok">{t('settings.libraries.active')}</span>}
+          </>
+        )}
+        <span className="path">{p.rootPath}</span>
+      </div>
+      {!active && !renaming && (
+        <Button
+          size="sm"
+          onClick={() =>
+            void run(async () => {
+              await flushAll(); // unsaved notes belong to the library that is active now
+              await rl.invoke('library:setActive', { libraryId: p.id });
+            })
+          }
+          data-testid="library-activate"
+        >
+          {t('settings.libraries.activate')}
+        </Button>
+      )}
+      <span ref={more}>
+        <IconButton label={t('settings.libraries.more', { name: p.name })} onClick={() => setMenu(true)} data-testid="library-more">
+          <IconMore size={16} />
+        </IconButton>
+      </span>
+      <Menu
+        anchor={more}
+        open={menu}
+        onClose={() => setMenu(false)}
+        label={t('settings.libraries.more', { name: p.name })}
+        groups={[
+          {
+            id: 'lib',
+            items: [
+              {
+                id: 'rename',
+                label: t('settings.libraries.rename'),
+                onSelect: () => {
+                  setName(p.name);
+                  setRenaming(true);
+                },
+              },
+              { id: 'forget', label: t('settings.libraries.forget'), danger: true, onSelect: () => setForget(true) },
+            ],
+          },
+        ]}
+      />
+      {forget && (
+        <Dialog title={t('settings.libraries.forgetTitle')} onClose={() => setForget(false)} testId="library-forget-dialog">
+          <p>{t('settings.libraries.forgetBody', { name: p.name })}</p>
+          <div className="actions">
+            <Button onClick={() => setForget(false)}>{t('common.cancel')}</Button>
+            <Button
+              variant="danger"
+              onClick={() =>
+                void run(async () => {
+                  await rl.invoke('library:forget', { libraryId: p.id });
+                  setForget(false);
+                })
+              }
+              data-testid="library-forget-yes"
+            >
+              {t('settings.libraries.forgetConfirm')}
+            </Button>
+          </div>
+        </Dialog>
+      )}
+    </li>
+  );
 }
 
-let presetCounter = 0;
-const newPresetId = () => `preset-${Date.now().toString(36)}-${++presetCounter}`;
+/** The last scan: when, what it found, and "Scan now". */
+function ScanRow() {
+  const { t, i18n } = useTranslation();
+  const [report, setReport] = useState<ScanReport | null>(null);
+  const save = useAutoSave();
+  useEffect(() => {
+    rl.invoke('scan:report', {}).then(setReport, () => {});
+  }, []);
+  const last = report?.finishedAt ? t('settings.scan.last', { when: new Date(report.finishedAt).toLocaleString(i18n.language), added: report.summary?.added ?? 0 }) : t('settings.scan.never');
+  return (
+    <Row sid="scanNow" label={t('settings.scan.title')} help={last} save={save} savedText={t('settings.scan.started')}>
+      <Button size="sm" onClick={() => void save.run(() => rl.invoke('scan:start', {}))} data-testid="settings-scan-now">
+        {t('settings.scan.now')}
+      </Button>
+    </Row>
+  );
+}
 
-/** Editor for library.json of the active library. */
-export function LibraryConfigSection() {
+/** Library (6.1): your libraries, and for the active one its name, language, excluded folders and scan. Every control saves by itself. */
+export function LibraryConfigSection({ onNewLibrary }: { onNewLibrary(): void }) {
   const { t } = useTranslation();
   const app = useApp();
-  const libraryId = app.activeLibraryId;
+  const notify = useNotify();
   const config = app.config;
-  const [draft, setDraft] = useState<Draft | null>(config ? toDraft(config) : null);
-  const [saved, setSaved] = useState(false);
+  const libraryId = app.activeLibraryId;
+  const patch = useLibraryPatch();
+  const lang = useAutoSave();
+  const excl = useAutoSave();
   const [error, setError] = useState<unknown>(null);
 
-  // The config that our own save produced comes back through `app.refresh()`: it must not hide the "Saved" note.
-  const ownSave = useRef(false);
-  useEffect(() => {
-    setDraft(config ? toDraft(config) : null);
-    if (ownSave.current) ownSave.current = false;
-    else setSaved(false);
-  }, [config, libraryId]);
-
-  const check = useMemo(() => {
-    if (!config || !draft) return { data: null, errors: {} as Record<string, string> };
-    return validateWith(libraryConfigSchema, toCandidate(config, draft));
-  }, [config, draft]);
-  const serverIssues = useMemo(() => (error ? issuesFromError(error) : {}), [error]);
-
-  const loadFolders = useCallback(
-    async (parent: string): Promise<FolderEntry[]> => {
-      if (!libraryId) return [];
-      const r = await rl.invoke('library:listFolders', { libraryId, ...(parent ? { parent } : {}) });
-      return r.folders;
+  const { refresh } = app;
+  const run = useCallback(
+    async (fn: () => Promise<unknown>) => {
+      setError(null);
+      try {
+        await fn();
+        await refresh();
+      } catch (e) {
+        setError(e);
+      }
     },
+    [refresh],
+  );
+  const loadFolders = useCallback(
+    async (parent: string): Promise<FolderEntry[]> => (libraryId ? (await rl.invoke('library:listFolders', { libraryId, ...(parent ? { parent } : {}) })).folders : []),
     [libraryId],
   );
-
-  if (!libraryId) {
-    return (
-      <section className="card" aria-labelledby="settings-library">
-        <h2 id="settings-library">{t('settings.library.title')}</h2>
-        <p className="hint">{t('settings.needsLibrary')}</p>
-      </section>
-    );
-  }
-  if (!config || !draft) {
-    return (
-      <section className="card" aria-labelledby="settings-library">
-        <h2 id="settings-library">{t('settings.library.title')}</h2>
-        <ErrorNote>{t('settings.library.unreadable')}</ErrorNote>
-      </section>
-    );
-  }
-
-  const err = (path: string) => (check.errors[path] || serverIssues[path] ? t(validationKey(path)) : undefined);
-  const edit = (patch: Partial<Draft>) => {
-    setDraft({ ...draft, ...patch });
-    setSaved(false);
-  };
-  const setPreset = (i: number, patch: Partial<ExportPreset>) => edit({ presets: draft.presets.map((p, j) => (j === i ? { ...p, ...patch } : p)) });
-
-  const save = async () => {
-    if (!check.data) return;
-    setError(null);
-    try {
-      const c = check.data;
-      await rl.invoke('library:setConfig', {
-        libraryId,
-        patch: {
-          name: c.name,
-          language: c.language,
-          excludedFolders: c.excludedFolders,
-          exportPresets: c.exportPresets,
-        },
-      });
-      ownSave.current = true;
-      await app.refresh();
-      setSaved(true);
-    } catch (e) {
-      setError(e);
-    }
-  };
+  /** A change with a wide effect: saved at once, with "Saved · Undo" (6.4). */
+  const undoable = (save: ReturnType<typeof useAutoSave>, apply: () => Promise<void>, undo: () => Promise<void>) =>
+    void save.run(async () => {
+      await apply();
+      notify.info(t('settings.savedUndo'), { label: t('settings.undo'), run: () => void undo().catch(() => {}) });
+    });
 
   return (
-    <section className="card" aria-labelledby="settings-library" data-testid="library-config">
-      <h2 id="settings-library">{t('settings.library.title', { name: app.activeProfile?.name ?? '' })}</h2>
-
-      <div className="group">
-        <h3>{t('settings.library.general')}</h3>
-        <TextField label={t('library.name')} value={draft.name} maxLength={120} error={err('name')} onChange={(e) => edit({ name: e.target.value })} data-testid="config-name" />
-        <LanguageSelect label={t('library.language')} hint={t('library.languageHint')} value={draft.language} onChange={(v) => edit({ language: v })} testId="config-language" />
-      </div>
-
-      <div className="group">
-        <h3>{t('settings.library.excluded')}</h3>
-        <p className="hint">{t('settings.library.excludedHint')}</p>
-        <FolderTree load={loadFolders} value={draft.excluded} onChange={(v) => edit({ excluded: v })} ariaLabel={t('settings.library.excluded')} testId="config-excluded-tree" />
-      </div>
-
-      <div className="group">
-        <h3>{t('settings.library.presets')}</h3>
-        {draft.presets.length === 0 && <p className="hint">{t('settings.library.presetsEmpty')}</p>}
-        <ul className="rows">
-          {draft.presets.map((p, i) => (
-            <li key={p.id} className="preset" data-testid="export-preset">
-              <TextField label={t('settings.library.presetName')} value={p.name} error={err(`exportPresets.${i}.name`)} onChange={(e) => setPreset(i, { name: e.target.value })} />
-              <div className="two-col">
-                <SelectField label={t('settings.library.presetSources')} value={p.sources} onChange={(e) => setPreset(i, { sources: e.target.value as ExportPreset['sources'] })}>
-                  <option value="none">{t('settings.library.sourcesNone')}</option>
-                  <option value="paths">{t('settings.library.sourcesPaths')}</option>
-                  <option value="copies">{t('settings.library.sourcesCopies')}</option>
-                </SelectField>
-                <TextField
-                  label={t('settings.library.presetDepth')}
-                  type="number"
-                  min={0}
-                  max={3}
-                  value={p.citedDepth}
-                  error={err(`exportPresets.${i}.citedDepth`)}
-                  onChange={(e) => setPreset(i, { citedDepth: e.target.value === '' ? Number.NaN : Number(e.target.value) })}
-                />
-              </div>
-              <CheckField label={t('settings.library.presetCited')} checked={p.includeCited} onChange={(e) => setPreset(i, { includeCited: e.target.checked })} />
-              <CheckField label={t('settings.library.presetNotes')} checked={p.includeNotes} onChange={(e) => setPreset(i, { includeNotes: e.target.checked })} />
-              <CheckField label={t('settings.library.presetAnnotations')} checked={p.includeAnnotations} onChange={(e) => setPreset(i, { includeAnnotations: e.target.checked })} />
-              <button type="button" onClick={() => edit({ presets: draft.presets.filter((_, j) => j !== i) })}>
-                {t('common.remove')}
-              </button>
-            </li>
+    <>
+      <SectionHead title={t('settings.sec.library')} intro={app.activeProfile ? t('settings.intro.library', { name: app.activeProfile.name }) : undefined} />
+      <Group title={t('settings.libraries.title')} testId="library-list" sid="libraries">
+        {app.profiles.length === 0 && <p className="set-help">{t('settings.libraries.empty')}</p>}
+        <ul className="set-libs">
+          {app.profiles.map((p) => (
+            <LibraryItem key={p.id} p={p} active={p.id === libraryId} run={run} />
           ))}
         </ul>
+        {error ? (
+          <p className="field-error" role="alert">
+            {errorMessage(error, t)}
+          </p>
+        ) : null}
         <div className="actions start">
-          <button
-            type="button"
-            onClick={() =>
-              edit({
-                presets: [
-                  ...draft.presets,
-                  { id: newPresetId(), name: t('settings.library.presetDefaultName', { n: draft.presets.length + 1 }), includeCited: false, citedDepth: 1, sources: 'none', includeNotes: true, includeAnnotations: true },
-                ],
-              })
-            }
-            data-testid="add-preset"
-          >
-            {t('settings.library.addPreset')}
-          </button>
+          <Button onClick={onNewLibrary} data-testid="settings-new-library">
+            {t('library.new')}
+          </Button>
         </div>
-      </div>
-
-      <div className="actions start sticky">
-        <button type="button" className="primary" onClick={() => void save()} disabled={!check.data} data-testid="config-save">
-          {t('common.save')}
-        </button>
-        <span className="status" role="status">
-          {saved ? t('common.saved') : check.data ? '' : t('common.fixErrors')}
-        </span>
-      </div>
-      {error ? <ErrorNote>{errorMessage(error, t)}</ErrorNote> : null}
-    </section>
+      </Group>
+      <Group title={t('settings.library.thisOne')} testId="library-config">
+        {!libraryId ? (
+          <NeedsLibrary />
+        ) : !config ? (
+          <p className="field-error">{t('settings.library.unreadable')}</p>
+        ) : (
+          <>
+            <TextRow
+              sid="libraryName"
+              label={t('library.name')}
+              value={config.name}
+              maxLength={120}
+              testId="config-name"
+              validate={(v) => (validateWith(libraryConfigSchema, { ...config, name: v }).errors.name ? t(validationKey('name')) : undefined)}
+              commit={(v) => patch({ name: v.trim() })}
+            />
+            <Row sid="libraryLanguage" label={t('library.language')} help={t('library.languageHint')} htmlFor="config-language" save={lang}>
+              <select
+                id="config-language"
+                value={config.language}
+                onChange={(e) => {
+                  const before = config.language;
+                  const next = e.target.value as Language;
+                  undoable(lang, () => patch({ language: next }), () => patch({ language: before }));
+                }}
+                data-testid="config-language"
+              >
+                <option value="it">{t('languages.it')}</option>
+                <option value="en">{t('languages.en')}</option>
+              </select>
+            </Row>
+            <Row sid="excludedFolders" label={t('settings.library.excluded')} help={t('settings.library.excludedHint')} save={excl}>
+              <div className="srow__tree">
+                <FolderTree
+                  load={loadFolders}
+                  value={config.excludedFolders}
+                  onChange={(v) => {
+                    const before = config.excludedFolders;
+                    undoable(excl, () => patch({ excludedFolders: v }), () => patch({ excludedFolders: before }));
+                  }}
+                  ariaLabel={t('settings.library.excluded')}
+                  testId="config-excluded-tree"
+                />
+              </div>
+            </Row>
+            <ScanRow />
+          </>
+        )}
+      </Group>
+    </>
   );
 }

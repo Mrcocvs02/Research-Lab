@@ -1,15 +1,22 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SHORTCUT_COMMANDS, SHORTCUT_IDS, effectiveShortcuts, findShortcutConflicts, type ShortcutId, type ShortcutOverride } from '@rl/core';
+import { SHORTCUT_COMMANDS, SHORTCUT_IDS, effectiveShortcuts, findShortcutConflicts, normalizeReaderToolKey, type ShortcutId, type ShortcutOverride, type ShortcutScope } from '@rl/core';
+import { Button } from '../components/Button';
+import { IconButton } from '../components/IconButton';
+import { IconMore } from '../components/icons';
+import { Kbd } from '../components/Kbd';
+import { Menu } from '../components/Menu';
 import { ErrorNote } from '../components/ui';
 import { errorMessage } from '../lib/errors';
 import { FIXED_ACCELERATORS, eventAccelerator } from '../lib/keymap';
 import { RlError } from '../lib/rl-error';
 import { rl } from '../lib/rl';
 import { useApp } from '../state/app-context';
+import { Group, SavedMark, SectionHead } from './rows';
+import { useAutoSave } from './useAutoSave';
 import './shortcuts.css';
 
-const SCOPES = ['global', 'reader'] as const;
+const SCOPES: readonly ShortcutScope[] = ['global', 'reader', 'reader-tool'];
 
 /** Overrides to save: only the commands whose accelerator differs from the default (an empty list = all defaults). */
 export function overridesOf(effective: Record<ShortcutId, string | null>): ShortcutOverride[] {
@@ -17,67 +24,118 @@ export function overridesOf(effective: Record<ShortcutId, string | null>): Short
 }
 
 /**
- * The keyboard shortcuts editor (D-257): the commands by scope, each with its accelerator. "Change" records the next key
- * press (Esc cancels), "Turn off" disables the command, "Default" restores one, "Reset all" restores every default.
- * Two commands on the same key in the same place (or against a global one) are shown, and saving is refused until the
- * conflict is solved. Fixed keys (Esc, Enter, arrows, Ctrl+A/C/V/X) cannot be assigned.
+ * The key of a key press for a command of the `reader-tool` scope: a bare key (a letter, a digit, Space, Delete), validated by
+ * `normalizeReaderToolKey` of the core; Ctrl, Alt or Meta make it refused. null for a lone modifier (still waiting), `'modifier'`
+ * for a combination, `'invalid'` for any other key.
+ */
+export function readerToolKeyOf(e: { key: string; ctrlKey: boolean; altKey: boolean; metaKey: boolean }): string | null | 'modifier' | 'invalid' {
+  if (['Control', 'Shift', 'Alt', 'Meta', 'AltGraph', 'OS'].includes(e.key)) return null;
+  if (e.ctrlKey || e.altKey || e.metaKey) return 'modifier';
+  return normalizeReaderToolKey(e.key === ' ' ? 'Space' : e.key) ?? 'invalid';
+}
+
+interface RowProps {
+  id: ShortcutId;
+  label: string;
+  accel: string | null;
+  recording: boolean;
+  conflict: boolean;
+  note: string | undefined;
+  onRecord(): void;
+  onKey(e: ReactKeyboardEvent): void;
+  onCancel(): void;
+  onSet(accel: string | null): void;
+}
+
+/** One command (40 px): its name, its key (or the recorder, in the same space) and a menu with Change… / Turn off / Restore the default. */
+function ShortcutRow({ id, label, accel, recording, conflict, note, onRecord, onKey, onCancel, onSet }: RowProps) {
+  const { t } = useTranslation();
+  const [menu, setMenu] = useState(false);
+  const more = useRef<HTMLSpanElement>(null);
+  const recorder = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (recording) recorder.current?.focus();
+  }, [recording]);
+  const def = SHORTCUT_COMMANDS[id].default;
+  const menuLabel = t('shortcuts.actionsFor', { command: label });
+  return (
+    <>
+      <tr data-testid="shortcut-row" data-command={id} data-conflict={conflict || undefined} data-changed={accel !== def || undefined}>
+        <th scope="row">{label}</th>
+        <td className="shortcut-key">
+          {recording ? (
+            <button type="button" ref={recorder} className="shortcut-recorder" onKeyDown={onKey} onBlur={onCancel} data-testid="shortcut-recorder" aria-label={t('shortcuts.recordingLabel', { command: label })}>
+              {t('shortcuts.recording')}
+            </button>
+          ) : accel ? (
+            <Kbd data-testid="shortcut-key">{accel}</Kbd>
+          ) : (
+            <span className="muted" data-testid="shortcut-key">
+              {t('shortcuts.off')}
+            </span>
+          )}
+        </td>
+        <td className="shortcut-act">
+          <span ref={more}>
+            <IconButton label={menuLabel} size="sm" onClick={() => setMenu(true)} data-testid="shortcut-more">
+              <IconMore size={16} />
+            </IconButton>
+          </span>
+          <Menu
+            anchor={more}
+            open={menu}
+            onClose={() => setMenu(false)}
+            label={menuLabel}
+            groups={[
+              {
+                id: 'cmd',
+                items: [
+                  { id: 'change', label: t('shortcuts.change'), onSelect: onRecord },
+                  accel === null ? { id: 'off', label: t('shortcuts.turnOff'), disabled: true, disabledReason: t('shortcuts.alreadyOff'), onSelect: () => {} } : { id: 'off', label: t('shortcuts.turnOff'), onSelect: () => onSet(null) },
+                  accel === def ? { id: 'default', label: t('shortcuts.default'), disabled: true, disabledReason: t('shortcuts.alreadyDefault'), onSelect: () => {} } : { id: 'default', label: t('shortcuts.defaultKey', { key: def }), onSelect: () => onSet(def) },
+                ],
+              },
+            ]}
+          />
+        </td>
+      </tr>
+      {note && (
+        <tr className="shortcut-note">
+          <td colSpan={3}>
+            <span className="field-error" role="alert" data-testid={conflict ? undefined : 'shortcut-problem'}>
+              {note}
+            </span>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+/**
+ * The keyboard shortcuts editor (D-257, 4.17): the commands by place (everywhere, reader, reader tools), each with its key.
+ * "Change…" records the next key press (Esc cancels), a change that creates no conflict is saved at once; two commands on one
+ * key are shown under their rows and nothing is saved until it is solved. Fixed keys (Esc, Enter, arrows, Ctrl+A/C/V/X) cannot
+ * be assigned; the reader tools use single keys. "Undo changes" goes back to the state when the page was opened.
  */
 export function ShortcutsSection() {
   const { t } = useTranslation();
   const app = useApp();
-  const headId = useId();
   const saved = app.settings?.shortcuts;
   const [draft, setDraft] = useState<Record<ShortcutId, string | null>>(() => effectiveShortcuts(saved ?? []));
+  const opening = useRef(draft);
   const [recording, setRecording] = useState<ShortcutId | null>(null);
   const [problem, setProblem] = useState<{ id: ShortcutId; text: string } | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  const [justSaved, setJustSaved] = useState(false);
-  const recorder = useRef<HTMLButtonElement | null>(null);
+  const [query, setQuery] = useState('');
+  const save = useAutoSave();
 
-  // The saved list reaches the draft again after a save or a restore of the settings.
-  useEffect(() => setDraft(effectiveShortcuts(saved ?? [])), [saved]);
-  useEffect(() => {
-    if (recording) recorder.current?.focus();
-  }, [recording]);
+  // The saved list reaches the draft again after a save or a restore of the settings (an unsolved conflict stays on screen).
+  useEffect(() => setDraft((d) => (findShortcutConflicts(d).length > 0 ? d : effectiveShortcuts(saved ?? []))), [saved]);
 
   const conflicts = useMemo(() => findShortcutConflicts(draft), [draft]);
   const conflicting = useMemo(() => new Set(conflicts.flat()), [conflicts]);
-  const savedEffective = useMemo(() => effectiveShortcuts(saved ?? []), [saved]);
-  const dirty = SHORTCUT_IDS.some((id) => draft[id] !== savedEffective[id]);
   const isDefault = SHORTCUT_IDS.every((id) => draft[id] === SHORTCUT_COMMANDS[id].default);
-
-  const set = (id: ShortcutId, accelerator: string | null) => {
-    setDraft((d) => ({ ...d, [id]: accelerator }));
-    setJustSaved(false);
-    setProblem(null);
-  };
-
-  const onRecordKey = (id: ShortcutId, e: ReactKeyboardEvent) => {
-    // The key press belongs to the recorder: no command of the window may answer it.
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.key === 'Escape') return setRecording(null);
-    const accel = eventAccelerator(e.nativeEvent);
-    if (accel === null) {
-      // A lone modifier is just the start of a combination; a key without Ctrl or Alt is refused with the reason.
-      if (!['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) setProblem({ id, text: t('shortcuts.needsModifier') });
-      return;
-    }
-    if (FIXED_ACCELERATORS.includes(accel)) return setProblem({ id, text: t('shortcuts.fixedKey', { key: accel }) });
-    set(id, accel);
-    setRecording(null);
-  };
-
-  const save = async () => {
-    setError(null);
-    try {
-      await rl.invoke('settings:set', { shortcuts: overridesOf(draft) });
-      await app.refresh();
-      setJustSaved(true);
-    } catch (e) {
-      setError(e);
-    }
-  };
+  const changedSinceOpening = SHORTCUT_IDS.some((id) => draft[id] !== opening.current[id]);
 
   const label = (id: ShortcutId) => t(`shortcuts.commands.${id}`);
   // The main process refuses a conflict too (a race with another window, D-301): name the commands it found.
@@ -91,109 +149,105 @@ export function ShortcutsSection() {
     }
     return errorMessage(e, t);
   };
-  const conflictText = (a: ShortcutId, b: ShortcutId) => t('shortcuts.conflict', { a: label(a), b: label(b), key: draft[a] ?? '' });
+
+  /** Shows the new state and saves it unless it holds a conflict (then it waits for the fix). */
+  const apply = (next: Record<ShortcutId, string | null>) => {
+    setDraft(next);
+    setProblem(null);
+    if (findShortcutConflicts(next).length > 0) return;
+    void save.run(async () => {
+      await rl.invoke('settings:set', { shortcuts: overridesOf(next) });
+      await app.refresh();
+    });
+  };
+  const set = (id: ShortcutId, accelerator: string | null) => apply({ ...draft, [id]: accelerator });
+
+  const onRecordKey = (id: ShortcutId, e: ReactKeyboardEvent) => {
+    // The key press belongs to the recorder: no command of the window may answer it.
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Escape') return setRecording(null);
+    if (SHORTCUT_COMMANDS[id].scope === 'reader-tool') {
+      const key = readerToolKeyOf(e.nativeEvent);
+      if (key === null) return;
+      if (key === 'modifier' || key === 'invalid') return setProblem({ id, text: t(key === 'modifier' ? 'shortcuts.bareKey' : 'shortcuts.bareInvalid') });
+      set(id, key);
+      return setRecording(null);
+    }
+    const accel = eventAccelerator(e.nativeEvent);
+    if (accel === null) {
+      // A lone modifier is just the start of a combination; a key without Ctrl or Alt is refused with the reason.
+      if (!['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) setProblem({ id, text: t('shortcuts.needsModifier') });
+      return;
+    }
+    if (FIXED_ACCELERATORS.includes(accel)) return setProblem({ id, text: t('shortcuts.fixedKey', { key: accel }) });
+    set(id, accel);
+    setRecording(null);
+  };
+
+  const q = query.trim().toLowerCase();
+  const visible = (id: ShortcutId) => q === '' || label(id).toLowerCase().includes(q) || (draft[id] ?? '').toLowerCase().includes(q);
+  const conflictText = (id: ShortcutId) => {
+    const other = conflicts.find((c) => c.includes(id))?.find((x) => x !== id);
+    return other ? t('shortcuts.conflict', { a: label(id), b: label(other), key: draft[id] ?? '' }) : undefined;
+  };
 
   return (
-    <section className="card" aria-labelledby={headId} data-testid="shortcuts-section">
-      <h2 id={headId}>{t('shortcuts.title')}</h2>
-      <p className="hint">{t('shortcuts.intro')}</p>
-      {SCOPES.map((scope) => (
-        <div className="group" key={scope}>
-          <h3>{t(`shortcuts.scope.${scope}`)}</h3>
-          <p className="hint">{t(`shortcuts.scopeHint.${scope}`)}</p>
-          <table className="shortcut-table" data-testid={`shortcuts-${scope}`}>
-            <caption className="sr-only">{t(`shortcuts.scope.${scope}`)}</caption>
-            <thead>
-              <tr>
-                <th scope="col">{t('shortcuts.command')}</th>
-                <th scope="col">{t('shortcuts.key')}</th>
-                <th scope="col">
-                  <span className="sr-only">{t('shortcuts.actions')}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {SHORTCUT_IDS.filter((id) => SHORTCUT_COMMANDS[id].scope === scope).map((id) => {
-                const accel = draft[id];
-                const bad = conflicting.has(id);
-                const isRecording = recording === id;
-                return (
-                  <tr key={id} data-testid="shortcut-row" data-command={id} data-conflict={bad || undefined} data-changed={accel !== SHORTCUT_COMMANDS[id].default || undefined}>
-                    <th scope="row">{label(id)}</th>
-                    <td>
-                      {isRecording ? (
-                        <button
-                          type="button"
-                          ref={recorder}
-                          className="shortcut-recorder"
-                          onKeyDown={(e) => onRecordKey(id, e)}
-                          onBlur={() => setRecording((cur) => (cur === id ? null : cur))}
-                          data-testid="shortcut-recorder"
-                          aria-label={t('shortcuts.recordingLabel', { command: label(id) })}
-                        >
-                          {t('shortcuts.recording')}
-                        </button>
-                      ) : accel ? (
-                        <kbd className="kbd" data-testid="shortcut-key">
-                          {accel}
-                        </kbd>
-                      ) : (
-                        <span className="hint" data-testid="shortcut-key">
-                          {t('shortcuts.off')}
-                        </span>
-                      )}
-                      {bad && !isRecording && (
-                        <span className="field-error" role="alert">
-                          {t('shortcuts.conflictShort')}
-                        </span>
-                      )}
-                      {problem?.id === id && (
-                        <span className="field-error" role="alert" data-testid="shortcut-problem">
-                          {problem.text}
-                        </span>
-                      )}
-                    </td>
-                    <td className="row-actions">
-                      <button type="button" onClick={() => (setProblem(null), setRecording(id))} aria-label={t('shortcuts.changeFor', { command: label(id) })} data-testid="shortcut-change">
-                        {t('shortcuts.change')}
-                      </button>
-                      <button type="button" onClick={() => set(id, null)} disabled={accel === null} aria-label={t('shortcuts.offFor', { command: label(id) })} data-testid="shortcut-off">
-                        {t('shortcuts.turnOff')}
-                      </button>
-                      <button type="button" onClick={() => set(id, SHORTCUT_COMMANDS[id].default)} disabled={accel === SHORTCUT_COMMANDS[id].default} aria-label={t('shortcuts.defaultFor', { command: label(id), key: SHORTCUT_COMMANDS[id].default })} data-testid="shortcut-default">
-                        {t('shortcuts.default')}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ))}
-      <p className="hint">{t('shortcuts.fixed')}</p>
+    <div data-testid="shortcuts-section" data-set="shortcuts">
+      <SectionHead title={t('shortcuts.title')} intro={t('shortcuts.intro')} />
+      <input type="search" className="shortcut-search" aria-label={t('shortcuts.search')} placeholder={t('shortcuts.search')} value={query} onChange={(e) => setQuery(e.target.value)} data-testid="shortcuts-search" />
+      {SCOPES.map((scope) => {
+        const ids = SHORTCUT_IDS.filter((id) => SHORTCUT_COMMANDS[id].scope === scope && visible(id));
+        if (ids.length === 0) return null;
+        return (
+          <Group key={scope} title={t(`shortcuts.scope.${scope}`)}>
+            <p className="set-help">{t(`shortcuts.scopeHint.${scope}`)}</p>
+            <table className="shortcut-table shortcut-grid" data-testid={`shortcuts-${scope}`}>
+              <caption className="sr-only">{t(`shortcuts.scope.${scope}`)}</caption>
+              <thead className="sr-only">
+                <tr>
+                  <th scope="col">{t('shortcuts.command')}</th>
+                  <th scope="col">{t('shortcuts.key')}</th>
+                  <th scope="col">{t('shortcuts.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ids.map((id) => (
+                  <ShortcutRow
+                    key={id}
+                    id={id}
+                    label={label(id)}
+                    accel={draft[id]}
+                    recording={recording === id}
+                    conflict={conflicting.has(id)}
+                    note={problem?.id === id ? problem.text : conflicting.has(id) ? conflictText(id) : undefined}
+                    onRecord={() => (setProblem(null), setRecording(id))}
+                    onKey={(e) => onRecordKey(id, e)}
+                    onCancel={() => setRecording((cur) => (cur === id ? null : cur))}
+                    onSet={(a) => set(id, a)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </Group>
+        );
+      })}
+      <p className="set-help">{t('shortcuts.fixed')}</p>
       {conflicts.length > 0 && (
-        <div className="callout warn" role="alert" data-testid="shortcuts-conflicts">
-          <p>{t('shortcuts.conflictsTitle')}</p>
-          <ul>
-            {conflicts.map(([a, b]) => (
-              <li key={`${a}-${b}`}>{conflictText(a, b)}</li>
-            ))}
-          </ul>
-        </div>
+        <p className="field-error" role="alert" data-testid="shortcuts-conflicts">
+          {t('shortcuts.conflictsTitle')}
+        </p>
       )}
       <div className="actions start">
-        <button type="button" className="primary" onClick={() => void save()} disabled={!dirty || conflicts.length > 0} data-testid="shortcuts-save">
-          {t('common.save')}
-        </button>
-        <button type="button" onClick={() => (setDraft(effectiveShortcuts([])), setProblem(null), setJustSaved(false))} disabled={isDefault} data-testid="shortcuts-reset">
+        <Button size="sm" onClick={() => apply({ ...opening.current })} disabled={!changedSinceOpening} data-testid="shortcuts-undo">
+          {t('shortcuts.undoChanges')}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => apply(effectiveShortcuts([]))} disabled={isDefault} data-testid="shortcuts-reset">
           {t('shortcuts.resetAll')}
-        </button>
-        <span className="status" role="status">
-          {justSaved && !dirty ? t('common.saved') : ''}
-        </span>
+        </Button>
+        <SavedMark save={save} />
       </div>
-      {error ? <ErrorNote testId="shortcuts-error">{saveErrorText(error)}</ErrorNote> : null}
-    </section>
+      {save.state === 'error' ? <ErrorNote testId="shortcuts-error">{saveErrorText(save.error)}</ErrorNote> : null}
+    </div>
   );
 }

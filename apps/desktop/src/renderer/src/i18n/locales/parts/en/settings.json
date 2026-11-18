@@ -1,7 +1,7 @@
 {
   "settings": {
     "profile": {
-      "title": "You and the interface"
+      "openAlexHelp": "The id of your author page on OpenAlex (it starts with A). Search your name on openalex.org to find it."
     },
     "language": {
       "label": "Interface language",
@@ -16,57 +16,19 @@
       "forget": "Remove from list",
       "forgetTitle": "Remove library from the list",
       "forgetBody": "\"{{name}}\" will be removed from this list. No file or folder is deleted, and you can add the folder again later.",
-      "forgetConfirm": "Remove from list"
+      "forgetConfirm": "Remove from list",
+      "more": "More about {{name}}"
     },
     "library": {
-      "title": "Library settings: {{name}}",
-      "general": "General",
       "excluded": "Excluded folders",
       "excludedHint": "These folders are not scanned or indexed.",
-      "presets": "Export presets",
-      "presetsEmpty": "No presets yet.",
-      "presetName": "Preset name",
-      "presetSources": "Source documents",
-      "sourcesNone": "Not included",
-      "sourcesPaths": "Links to the files",
-      "sourcesCopies": "Copies",
-      "presetDepth": "Depth of cited papers",
-      "presetCited": "Include cited papers",
-      "presetNotes": "Include notes",
-      "presetAnnotations": "Include annotations",
-      "presetDefaultName": "Preset {{n}}",
-      "addPreset": "Add preset"
-    },
-    "secrets": {
-      "title": "API keys",
-      "intro": "Keys for the library \"{{name}}\". They are stored encrypted in the system's secure storage. Once saved they cannot be viewed again, only replaced or deleted.",
-      "storage": "Keys are never written to the library folder or to any synchronised file.",
-      "names": {
-        "gemini-api-key": "Gemini API key"
-      },
-      "set": "Set",
-      "notSet": "Not set",
-      "placeholder": "Paste the key",
-      "replacePlaceholder": "Paste a new key to replace it",
-      "delete": "Delete"
+      "thisOne": "This library"
     },
     "network": {
       "title": "Online sources",
-      "intro": "Citations and monitoring use OpenAlex, arXiv and Semantic Scholar, and only when you ask. Only identifiers and titles leave this computer, never the text of your documents.",
       "openAlexEmail": "Send my profile email to OpenAlex",
       "openAlexEmailHint": "OpenAlex answers faster and more reliably when it knows an email to contact. Off by default: the email leaves this computer only if you turn this on.",
-      "noEmail": "Add an email to your profile above to turn this on.",
-      "apiKey": {
-        "title": "OpenAlex API key (optional)",
-        "hint": "A free key from your OpenAlex account settings gives you your own daily budget, and is needed to read more than the 200 most recent \"cited by\" works of a document. It is kept in the system's secure storage and is never shown again.",
-        "label": "OpenAlex API key",
-        "stored": "Saved",
-        "notStored": "Not saved",
-        "placeholder": "Paste the key",
-        "replacePlaceholder": "Paste a new key to replace the saved one",
-        "store": "Save",
-        "remove": "Remove"
-      }
+      "noEmail": "Add an email to your profile above to turn this on."
     },
     "appearance": {
       "label": "Appearance",
@@ -74,6 +36,126 @@
       "system": "Follow the system",
       "light": "Light",
       "dark": "Dark"
-    }
+    },
+    "sec": {
+      "general": "General",
+      "profile": "Profile",
+      "library": "Library",
+      "claude": "Claude",
+      "backup": "Backup",
+      "shortcuts": "Shortcuts",
+      "advanced": "Developer / Advanced"
+    },
+    "grp": {
+      "interface": "Interface",
+      "about": "About",
+      "you": "You",
+      "online": "Online sources",
+      "libraries": "Your libraries",
+      "thisOne": "This library",
+      "account": "Account",
+      "reads": "What Claude can read",
+      "spend": "Model and spending",
+      "log": "Log",
+      "destination": "Destination",
+      "schedule": "Schedule",
+      "list": "Backups",
+      "options": "Options",
+      "keys": "Keys",
+      "claude": "Claude",
+      "mcp": "MCP server",
+      "scan": "Scan",
+      "export": "Export",
+      "maintenance": "Maintenance"
+    },
+    "ix": {
+      "uiLanguage": "Interface language|language italiano english lingua",
+      "theme": "Appearance|theme dark light mode colors",
+      "tips": "Show the tips again|guide help welcome hints",
+      "about": "Version|about info release",
+      "userName": "Name|profile me author",
+      "userVariants": "Names among authors|author variants aliases",
+      "userEmail": "Email|mail contact",
+      "userOrcid": "ORCID|identifier",
+      "userOpenAlexId": "OpenAlex author id|identifier",
+      "openAlexEmail": "Send my email to OpenAlex|privacy citations polite",
+      "libraries": "Your libraries|switch activate rename forget remove new folder",
+      "libraryName": "Library name|rename",
+      "libraryLanguage": "Language of the documents|tags summaries",
+      "excludedFolders": "Excluded folders|ignore skip",
+      "scanNow": "Scan now|index refresh update",
+      "authMode": "Which access to use|login api key automatic mode",
+      "account": "Claude account|login logout switch change connection test",
+      "secretAnthropic": "Anthropic API key|key secret",
+      "usage": "Usage this month|cost spend money total",
+      "aiFolders": "Folders Claude can read|ai privacy enabled send",
+      "defaultModel": "Default model|haiku sonnet opus",
+      "defaultReasoning": "Reasoning level|thinking effort low medium high",
+      "monthlyCap": "Monthly cap|budget limit spending",
+      "confirmBeforeSend": "Confirm before sending|preview ask privacy",
+      "aiLog": "What was sent to Claude|log history sends",
+      "backupDestination": "Backup folder|destination where",
+      "backupAuto": "Automatic backup|schedule daily weekly monthly",
+      "backupNow": "Back up now|run save copy",
+      "backupList": "Backups|verify restore open remove",
+      "backupKeep": "Backups to keep|how many old",
+      "backupLocal": "Include chat history|local data chats counters",
+      "shortcuts": "Keyboard shortcuts|keys keybindings hotkeys reader tools",
+      "secretOpenAlex": "OpenAlex API key|key secret",
+      "secretGemini": "Gemini API key|key secret experimental",
+      "claudeProvider": "Provider|gemini experimental",
+      "claudeExe": "Claude Code program|executable path cli",
+      "claudeModels": "Models and prices|haiku sonnet opus cost",
+      "batchConfirm": "Confirm large jobs above|batch threshold bulk",
+      "mcpEnable": "MCP server for Claude Code|server tools",
+      "mcpWrite": "MCP write access|propose fields",
+      "mcpPort": "MCP port|server",
+      "mcpCopy": "Copy the MCP configuration|command json",
+      "mcpRotate": "New MCP token|rotate secret",
+      "mcpLog": "MCP call log|calls history",
+      "scanExtensions": "File types to scan|extensions pdf md txt",
+      "scanNameOnly": "Indexed by name only|extensions no text",
+      "scanPrune": "Days before forgetting missing files|prune deleted",
+      "dataDirName": "Data folder name|lab folder",
+      "indexRebuild": "Rebuild the index|reindex full scan",
+      "exportPresets": "Export presets|export copies",
+      "deviceId": "Device id|diagnostics",
+      "maintenance": "Maintenance and diagnostics|size clean logs memory processes limits cache"
+    },
+    "search": {
+      "label": "Search settings",
+      "placeholder": "Search settings",
+      "none": "No setting found"
+    },
+    "warn": {
+      "backup": "The last backup is old or failed",
+      "claude": "Claude is not connected"
+    },
+    "intro": {
+      "general": "Language, appearance and tips.",
+      "profile": "Who you are, to recognise your own papers.",
+      "library": "The libraries on this computer, and the settings of “{{name}}”."
+    },
+    "tips": {
+      "label": "Tips",
+      "hint": "Shows the welcome card and the tips you closed again.",
+      "button": "Show the tips again",
+      "done": "Done"
+    },
+    "about": {
+      "title": "About",
+      "version": "Version",
+      "copy": "Copy info",
+      "copied": "Copied"
+    },
+    "scan": {
+      "title": "Scan",
+      "last": "Last: {{when}} · {{added}} new",
+      "never": "Not scanned yet.",
+      "now": "Scan now",
+      "started": "Started"
+    },
+    "savedUndo": "Saved",
+    "undo": "Undo"
   }
 }

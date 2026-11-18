@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MAINTENANCE_TARGETS, type Channels, type ResponseOf } from '@rl/core';
+import { Button } from '../components/Button';
 import { CheckField, ErrorNote } from '../components/ui';
 import { errorMessage } from '../lib/errors';
 import { rl } from '../lib/rl';
@@ -20,7 +21,7 @@ const TARGETS: readonly MaintenanceTarget[] = MAINTENANCE_TARGETS;
  * process, cleaning of the regenerable data only, the log folder, and the diagnostics text for a bug report (it is
  * shown here as well as copied, so the user sees what would be shared: no paths, titles or keys).
  */
-export function MaintenanceSection() {
+export function MaintenanceSection({ embedded = false }: { embedded?: boolean }) {
   const { t, i18n } = useTranslation();
   const app = useApp();
   const headId = useId();
@@ -89,9 +90,12 @@ export function MaintenanceSection() {
     : [];
 
   return (
-    <section className="card" aria-labelledby={headId} data-testid="maintenance-section">
-      <h2 id={headId}>{t('maintenance.title')}</h2>
-      <p className="hint">{t('maintenance.intro')}</p>
+    <section className={embedded ? undefined : 'card set-group'} aria-labelledby={embedded ? undefined : headId} data-testid="maintenance-section" data-set="maintenance">
+      {!embedded && <h2 id={headId}>{t('maintenance.title')}</h2>}
+      <p className="set-help">{t('maintenance.intro')}</p>
+      <p className="set-help" data-testid="maintenance-limits">
+        {t('maintenance.limits')}
+      </p>
 
       <div className="group">
         <h3>{t('maintenance.sizes')}</h3>
@@ -129,9 +133,9 @@ export function MaintenanceSection() {
           <p className="hint">{libraryId ? t('maintenance.loading') : t('maintenance.needsLibrary')}</p>
         )}
         <div className="actions start">
-          <button type="button" onClick={() => void load()} disabled={busy} data-testid="maintenance-refresh">
+          <Button size="sm" onClick={() => void load()} disabled={busy} data-testid="maintenance-refresh">
             {t('maintenance.refresh')}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -157,9 +161,9 @@ export function MaintenanceSection() {
           ))}
         </div>
         <div className="actions start">
-          <button type="button" onClick={() => void clean()} disabled={busy || picked.size === 0 || !libraryId} data-testid="maintenance-clean">
+          <Button size="sm" onClick={() => void clean()} disabled={busy || picked.size === 0 || !libraryId} data-testid="maintenance-clean">
             {t('maintenance.clean.button')}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -167,12 +171,12 @@ export function MaintenanceSection() {
         <h3>{t('maintenance.support.title')}</h3>
         <p className="hint">{t('maintenance.support.hint')}</p>
         <div className="actions start">
-          <button type="button" onClick={() => void run(async () => void (await rl.invoke('maintenance:openLogs', {})))} disabled={busy} data-testid="maintenance-logs">
+          <Button size="sm" onClick={() => void run(async () => void (await rl.invoke('maintenance:openLogs', {})))} disabled={busy} data-testid="maintenance-logs">
             {t('maintenance.support.openLogs')}
-          </button>
-          <button type="button" onClick={() => void copy()} disabled={busy} data-testid="maintenance-diagnostics">
+          </Button>
+          <Button size="sm" onClick={() => void copy()} disabled={busy} data-testid="maintenance-diagnostics">
             {t('maintenance.support.copy')}
-          </button>
+          </Button>
         </div>
         {diagnostics !== null && (
           <details open>

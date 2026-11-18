@@ -1,101 +1,50 @@
-import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { userProfileSchema } from '@rl/core';
-import { ErrorNote, LanguageSelect, SelectField, TextAreaField, TextField } from '../components/ui';
-import { errorMessage } from '../lib/errors';
+import { userProfileSchema, type UserProfile } from '@rl/core';
+import { Switch } from '../components/Switch';
 import { rl } from '../lib/rl';
 import { splitLines, validateWith, validationKey } from '../lib/validate';
 import { useApp } from '../state/app-context';
+import { Group, Row, SectionHead, TextRow } from './rows';
+import { useAutoSave } from './useAutoSave';
 
-/** User profile (name, author variants, identifiers) and the interface language. */
+type Field = 'name' | 'email' | 'orcid' | 'openAlexId';
+
+/** Profile (6.1): who you are, the names you appear under among authors, identifiers and the OpenAlex email choice. Every field saves by itself. */
 export function ProfileSection() {
   const { t } = useTranslation();
   const app = useApp();
   const user = app.settings?.user;
-  const [draft, setDraft] = useState({ name: '', variants: '', email: '', orcid: '', openAlexId: '' });
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  const [langError, setLangError] = useState<unknown>(null);
-
-  useEffect(() => {
-    if (user) {
-      setDraft({ name: user.name, variants: user.authorVariants.join('\n'), email: user.email, orcid: user.orcid, openAlexId: user.openAlexId });
-    }
-  }, [user]);
-
-  const check = useMemo(
-    () =>
-      validateWith(userProfileSchema, {
-        name: draft.name,
-        authorVariants: splitLines(draft.variants),
-        email: draft.email.trim(),
-        orcid: draft.orcid.trim(),
-        openAlexId: draft.openAlexId.trim(),
-      }),
-    [draft],
-  );
-  const err = (key: string) => (check.errors[key] ? t(validationKey(key)) : undefined);
-  const edit = (patch: Partial<typeof draft>) => {
-    setDraft({ ...draft, ...patch });
-    setSaved(false);
+  const mail = useAutoSave();
+  const on = app.settings?.network?.openAlexEmail ?? false;
+  const hasEmail = (user?.email ?? '').trim() !== '';
+  const patch = async (p: Partial<UserProfile>) => {
+    await rl.invoke('settings:set', { user: p });
+    await app.refresh();
   };
-
-  const save = async () => {
-    if (!check.data) return;
-    setError(null);
-    try {
-      await rl.invoke('settings:set', { user: check.data });
-      await app.refresh();
-      setSaved(true);
-    } catch (e) {
-      setError(e);
-    }
-  };
-
+  // A value is checked with the core schema against the profile it would join (the same rule as the main process).
+  const check = (field: Field | 'authorVariants', v: unknown) => (validateWith(userProfileSchema, { ...user, [field]: v }).errors[field] ? t(validationKey(field)) : undefined);
+  const field = (f: Field) => ({ value: user?.[f] ?? '', validate: (v: string) => check(f, v.trim()), commit: (v: string) => patch({ [f]: v.trim() }) });
   return (
-    <section className="card" aria-labelledby="settings-profile">
-      <h2 id="settings-profile">{t('settings.profile.title')}</h2>
-      <LanguageSelect
-        label={t('settings.language.label')}
-        hint={t('settings.language.hint')}
-        value={app.settings?.uiLanguage ?? 'it'}
-        testId="settings-ui-language"
-        onChange={(v) => {
-          setLangError(null);
-          app.setUiLanguage(v).catch((e: unknown) => setLangError(e));
-        }}
-      />
-      {langError ? <ErrorNote>{errorMessage(langError, t)}</ErrorNote> : null}
-      <SelectField
-        label={t('settings.appearance.label')}
-        hint={t('settings.appearance.hint')}
-        value={app.settings?.appearance?.theme ?? 'system'}
-        data-testid="settings-theme"
-        onChange={(e) => {
-          setLangError(null);
-          rl.invoke('settings:set', { appearance: { theme: e.target.value as 'system' | 'light' | 'dark' } })
-            .then(() => app.refresh())
-            .catch((err: unknown) => setLangError(err));
-        }}
-      >
-        <option value="system">{t('settings.appearance.system')}</option>
-        <option value="light">{t('settings.appearance.light')}</option>
-        <option value="dark">{t('settings.appearance.dark')}</option>
-      </SelectField>
-      <TextField label={t('profile.name')} placeholder={t('profile.namePlaceholder')} value={draft.name} onChange={(e) => edit({ name: e.target.value })} data-testid="settings-profile-name" />
-      <TextAreaField label={t('profile.variants')} hint={t('profile.variantsHint')} placeholder={t('profile.variantsPlaceholder')} rows={3} value={draft.variants} onChange={(e) => edit({ variants: e.target.value })} />
-      <TextField label={t('profile.email')} type="email" placeholder="name@example.org" value={draft.email} error={err('email')} onChange={(e) => edit({ email: e.target.value })} />
-      <TextField label={t('profile.orcid')} placeholder="0000-0000-0000-0000" value={draft.orcid} error={err('orcid')} onChange={(e) => edit({ orcid: e.target.value })} />
-      <TextField label={t('profile.openAlexId')} placeholder="A1234567890" value={draft.openAlexId} error={err('openAlexId')} onChange={(e) => edit({ openAlexId: e.target.value })} />
-      <div className="actions start">
-        <button type="button" className="primary" onClick={() => void save()} disabled={!check.data} data-testid="settings-profile-save">
-          {t('common.save')}
-        </button>
-        <span className="status" role="status">
-          {saved ? t('common.saved') : ''}
-        </span>
-      </div>
-      {error ? <ErrorNote>{errorMessage(error, t)}</ErrorNote> : null}
-    </section>
+    <>
+      <SectionHead title={t('settings.sec.profile')} intro={t('settings.intro.profile')} />
+      <Group>
+        <TextRow sid="userName" label={t('profile.name')} placeholder={t('profile.namePlaceholder')} testId="settings-profile-name" {...field('name')} />
+        <TextRow sid="userVariants" label={t('profile.variants')} help={t('profile.variantsHint')} multiline placeholder={t('profile.variantsPlaceholder')} value={(user?.authorVariants ?? []).join('\n')} validate={(v) => check('authorVariants', splitLines(v))} commit={(v) => patch({ authorVariants: splitLines(v) })} />
+        <TextRow sid="userEmail" label={t('profile.email')} placeholder="name@example.org" type="email" {...field('email')} />
+        <TextRow sid="userOrcid" label={t('profile.orcid')} placeholder="0000-0000-0000-0000" {...field('orcid')} />
+        <TextRow sid="userOpenAlexId" label={t('profile.openAlexId')} placeholder="A1234567890" help={t('settings.profile.openAlexHelp')} {...field('openAlexId')} />
+      </Group>
+      <Group title={t('settings.network.title')}>
+        <Row sid="openAlexEmail" label={t('settings.network.openAlexEmail')} help={hasEmail || on ? t('settings.network.openAlexEmailHint') : `${t('settings.network.openAlexEmailHint')} ${t('settings.network.noEmail')}`} save={mail}>
+          <Switch
+            aria-label={t('settings.network.openAlexEmail')}
+            checked={on}
+            disabled={!hasEmail && !on}
+            onChange={(v) => void mail.run(async () => (await rl.invoke('settings:set', { network: { openAlexEmail: v } }), app.refresh()))}
+            data-testid="net-openalex-email"
+          />
+        </Row>
+      </Group>
+    </>
   );
 }

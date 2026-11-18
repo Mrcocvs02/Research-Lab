@@ -1,72 +1,78 @@
 /* Backup, restore and maintenance (settings, lazy). */
-.backup-dialog {
-  display: grid;
-  gap: var(--space-3);
-}
 .rl-dialog:has(.backup-dialog) {
   width: min(640px, 94vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.rl-dialog:has(.backup-dialog) > div[data-testid='restore-progress-panel'] {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.backup-dialog {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.backup-body {
+  display: grid;
+  gap: var(--sp-4);
+  align-content: start;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-3) 2px var(--sp-3) 0;
+}
+/* The footer stays in view while the body scrolls. */
+.backup-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border);
 }
 .backup-dialog .callout.warn,
 .backup-job .callout.warn,
 .card .callout.warn {
-  border-left-color: var(--warn);
-  background: var(--warn-soft);
-}
-.kv {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--space-1) var(--space-4);
-  margin: 0 0 var(--space-3);
-}
-.kv dt {
-  color: var(--text-muted);
-}
-.kv dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-.kv .fact-row {
-  display: contents;
-}
-.backup-schedule {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-}
-.backup-schedule .field input[type='number'] {
-  width: 6em;
+  border-left-color: var(--warning);
+  background: var(--warning-soft);
 }
 .backup-job {
-  margin-top: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  margin-top: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
   background: var(--surface-2);
-  border-radius: var(--radius);
+  border-radius: var(--r-md);
 }
 .backup-list {
   list-style: none;
-  margin: 0 0 var(--space-3);
+  margin: 0 0 var(--sp-3);
   padding: 0;
 }
 .backup-list > li {
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  min-height: 48px;
+  padding: var(--sp-2) 0;
+  border-top: 1px solid var(--border);
+}
+.backup-list > li:first-child {
+  border-top: 0;
 }
 .backup-main {
   display: grid;
-  gap: var(--space-1);
-  margin-bottom: var(--space-2);
+  flex: 1;
+  min-width: 0;
   overflow-wrap: anywhere;
-}
-.backup-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
 }
 .backup-targets {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-  margin-bottom: var(--space-2);
+  gap: var(--sp-3) var(--sp-5);
+  margin-bottom: var(--sp-3);
 }
 .card textarea[readonly] {
   width: 100%;

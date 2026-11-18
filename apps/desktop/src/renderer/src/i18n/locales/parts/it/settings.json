@@ -1,7 +1,7 @@
 {
   "settings": {
     "profile": {
-      "title": "Tu e l'interfaccia"
+      "openAlexHelp": "L'id della tua pagina autore su OpenAlex (inizia con A). Cerca il tuo nome su openalex.org per trovarlo."
     },
     "language": {
       "label": "Lingua dell'interfaccia",
@@ -16,57 +16,19 @@
       "forget": "Rimuovi dall'elenco",
       "forgetTitle": "Rimuovi la libreria dall'elenco",
       "forgetBody": "\"{{name}}\" verrà tolta da questo elenco. Nessun file o cartella viene cancellato e potrai aggiungere di nuovo la cartella più tardi.",
-      "forgetConfirm": "Rimuovi dall'elenco"
+      "forgetConfirm": "Rimuovi dall'elenco",
+      "more": "Altro su {{name}}"
     },
     "library": {
-      "title": "Impostazioni della libreria: {{name}}",
-      "general": "Generale",
       "excluded": "Cartelle escluse",
       "excludedHint": "Queste cartelle non vengono scansionate né indicizzate.",
-      "presets": "Preset di export",
-      "presetsEmpty": "Ancora nessun preset.",
-      "presetName": "Nome del preset",
-      "presetSources": "Documenti sorgente",
-      "sourcesNone": "Non inclusi",
-      "sourcesPaths": "Collegamenti ai file",
-      "sourcesCopies": "Copie",
-      "presetDepth": "Profondità dei paper citati",
-      "presetCited": "Includi i paper citati",
-      "presetNotes": "Includi le note",
-      "presetAnnotations": "Includi le annotazioni",
-      "presetDefaultName": "Preset {{n}}",
-      "addPreset": "Aggiungi preset"
-    },
-    "secrets": {
-      "title": "Chiavi API",
-      "intro": "Chiavi per la libreria \"{{name}}\". Sono conservate cifrate nell'archivio sicuro del sistema. Una volta salvate non si possono rivedere, solo sostituire o cancellare.",
-      "storage": "Le chiavi non vengono mai scritte nella cartella della libreria né in file sincronizzati.",
-      "names": {
-        "gemini-api-key": "Chiave API Gemini"
-      },
-      "set": "Impostata",
-      "notSet": "Non impostata",
-      "placeholder": "Incolla la chiave",
-      "replacePlaceholder": "Incolla una nuova chiave per sostituirla",
-      "delete": "Cancella"
+      "thisOne": "Questa libreria"
     },
     "network": {
       "title": "Fonti online",
-      "intro": "Citazioni e monitoraggio usano OpenAlex, arXiv e Semantic Scholar, e solo su tua richiesta. Escono dal computer solo identificatori e titoli, mai il testo dei documenti.",
       "openAlexEmail": "Invia a OpenAlex l’email del mio profilo",
       "openAlexEmailHint": "OpenAlex risponde più in fretta e in modo più affidabile se conosce un’email di contatto. Spento di default: l’email lascia il computer solo se lo attivi.",
-      "noEmail": "Aggiungi un’email al profilo qui sopra per attivarlo.",
-      "apiKey": {
-        "title": "Chiave API di OpenAlex (facoltativa)",
-        "hint": "Una chiave gratuita, dalle impostazioni del tuo account OpenAlex, dà un budget giornaliero tutto tuo ed è necessaria per leggere più dei 200 lavori più recenti di \"citato da\" di un documento. Resta nell’archivio sicuro del sistema e non viene più mostrata.",
-        "label": "Chiave API di OpenAlex",
-        "stored": "Salvata",
-        "notStored": "Non salvata",
-        "placeholder": "Incolla la chiave",
-        "replacePlaceholder": "Incolla una nuova chiave per sostituire quella salvata",
-        "store": "Salva",
-        "remove": "Rimuovi"
-      }
+      "noEmail": "Aggiungi un’email al profilo qui sopra per attivarlo."
     },
     "appearance": {
       "label": "Aspetto",
@@ -74,6 +36,126 @@
       "system": "Segui il sistema",
       "light": "Chiaro",
       "dark": "Scuro"
-    }
+    },
+    "sec": {
+      "general": "Generale",
+      "profile": "Profilo",
+      "library": "Libreria",
+      "claude": "Claude",
+      "backup": "Backup",
+      "shortcuts": "Scorciatoie",
+      "advanced": "Sviluppatore / Avanzate"
+    },
+    "grp": {
+      "interface": "Interfaccia",
+      "about": "Informazioni",
+      "you": "Tu",
+      "online": "Fonti online",
+      "libraries": "Le tue librerie",
+      "thisOne": "Questa libreria",
+      "account": "Account",
+      "reads": "Cosa può leggere Claude",
+      "spend": "Modello e spesa",
+      "log": "Registro",
+      "destination": "Destinazione",
+      "schedule": "Cadenza",
+      "list": "Backup",
+      "options": "Opzioni",
+      "keys": "Chiavi",
+      "claude": "Claude",
+      "mcp": "Server MCP",
+      "scan": "Scansione",
+      "export": "Esportazione",
+      "maintenance": "Manutenzione"
+    },
+    "ix": {
+      "uiLanguage": "Lingua dell'interfaccia|language italiano english",
+      "theme": "Aspetto|tema scuro chiaro modalità colori",
+      "tips": "Mostra di nuovo i suggerimenti|guida aiuto benvenuto",
+      "about": "Versione|informazioni release",
+      "userName": "Nome|profilo io autore",
+      "userVariants": "Nomi tra gli autori|varianti alias",
+      "userEmail": "Email|posta contatto",
+      "userOrcid": "ORCID|identificativo",
+      "userOpenAlexId": "Id autore OpenAlex|identificativo",
+      "openAlexEmail": "Invia la mia email a OpenAlex|privacy citazioni",
+      "libraries": "Le tue librerie|cambia attiva rinomina dimentica rimuovi nuova cartella",
+      "libraryName": "Nome della libreria|rinomina",
+      "libraryLanguage": "Lingua dei documenti|tag riassunti",
+      "excludedFolders": "Cartelle escluse|ignora salta",
+      "scanNow": "Scansiona ora|indice aggiorna",
+      "authMode": "Quale accesso usare|login chiave api automatico modalità",
+      "account": "Account Claude|accesso esci cambia collegamento prova connessione",
+      "secretAnthropic": "Chiave API Anthropic|chiave segreto",
+      "usage": "Uso di questo mese|costo spesa denaro totale",
+      "aiFolders": "Cartelle che Claude può leggere|ai privacy abilitate invio",
+      "defaultModel": "Modello predefinito|haiku sonnet opus",
+      "defaultReasoning": "Livello di ragionamento|pensiero sforzo basso medio alto",
+      "monthlyCap": "Tetto mensile|budget limite spesa",
+      "confirmBeforeSend": "Chiedi conferma prima di inviare|anteprima privacy",
+      "aiLog": "Cosa è stato inviato a Claude|registro cronologia invii",
+      "backupDestination": "Cartella dei backup|destinazione dove",
+      "backupAuto": "Backup automatico|cadenza giornaliero settimanale mensile",
+      "backupNow": "Esegui il backup ora|copia salva",
+      "backupList": "Backup|verifica ripristina apri rimuovi",
+      "backupKeep": "Backup da tenere|quanti vecchi",
+      "backupLocal": "Includi la cronologia delle chat|dati locali contatori",
+      "shortcuts": "Scorciatoie da tastiera|tasti tastiera lettore strumenti",
+      "secretOpenAlex": "Chiave API OpenAlex|chiave segreto",
+      "secretGemini": "Chiave API Gemini|chiave segreto sperimentale",
+      "claudeProvider": "Fornitore|gemini sperimentale",
+      "claudeExe": "Programma Claude Code|eseguibile percorso cli",
+      "claudeModels": "Modelli e prezzi|haiku sonnet opus costo",
+      "batchConfirm": "Conferma i lavori grandi sopra|soglia blocco",
+      "mcpEnable": "Server MCP per Claude Code|server strumenti",
+      "mcpWrite": "Scrittura via MCP|proposte campi",
+      "mcpPort": "Porta MCP|server",
+      "mcpCopy": "Copia la configurazione MCP|comando json",
+      "mcpRotate": "Nuovo token MCP|cambia segreto",
+      "mcpLog": "Registro delle chiamate MCP|chiamate cronologia",
+      "scanExtensions": "Tipi di file da scansionare|estensioni pdf md txt",
+      "scanNameOnly": "Indicizzati solo per nome|estensioni senza testo",
+      "scanPrune": "Giorni prima di dimenticare i mancanti|elimina cancellati",
+      "dataDirName": "Nome della cartella dati|lab cartella",
+      "indexRebuild": "Ricostruisci l'indice|reindicizza scansione completa",
+      "exportPresets": "Preset di esportazione|export copie",
+      "deviceId": "Id del dispositivo|diagnostica",
+      "maintenance": "Manutenzione e diagnostica|dimensioni pulizia log memoria processi limiti cache"
+    },
+    "search": {
+      "label": "Cerca nelle impostazioni",
+      "placeholder": "Cerca impostazioni",
+      "none": "Nessuna impostazione trovata"
+    },
+    "warn": {
+      "backup": "L'ultimo backup è vecchio o non è riuscito",
+      "claude": "Claude non è collegato"
+    },
+    "intro": {
+      "general": "Lingua, aspetto e suggerimenti.",
+      "profile": "Chi sei, per riconoscere i tuoi paper.",
+      "library": "Le librerie di questo computer e le impostazioni di «{{name}}»."
+    },
+    "tips": {
+      "label": "Suggerimenti",
+      "hint": "Mostra di nuovo la carta di benvenuto e i suggerimenti che hai chiuso.",
+      "button": "Mostra di nuovo i suggerimenti",
+      "done": "Fatto"
+    },
+    "about": {
+      "title": "Informazioni",
+      "version": "Versione",
+      "copy": "Copia le informazioni",
+      "copied": "Copiato"
+    },
+    "scan": {
+      "title": "Scansione",
+      "last": "Ultima: {{when}} · {{added}} nuovi",
+      "never": "Non ancora scansionata.",
+      "now": "Scansiona ora",
+      "started": "Avviata"
+    },
+    "savedUndo": "Salvato",
+    "undo": "Annulla"
   }
 }

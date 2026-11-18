@@ -1,7 +1,7 @@
 {
   "shortcuts": {
     "title": "Scorciatoie da tastiera",
-    "intro": "Cambia, spegni o ripristina i tasti dei comandi. Un tasto richiede Ctrl o Alt (da F1 a F12 possono stare da soli). Premi Esc durante la registrazione per annullare.",
+    "intro": "Cambia, spegni o ripristina i tasti dei comandi. Ogni modifica si salva subito. Premi Esc durante la registrazione per annullare.",
     "scope": {
       "global": "Ovunque nell'app",
       "reader": "Nel lettore PDF",
@@ -19,14 +19,10 @@
     "change": "Cambia",
     "turnOff": "Spegni",
     "default": "Predefinito",
-    "changeFor": "Cambia il tasto di: {{command}}",
-    "offFor": "Spegni il tasto di: {{command}}",
-    "defaultFor": "Ripristina il tasto predefinito ({{key}}) di: {{command}}",
-    "recording": "Premi il nuovo tasto…",
+    "recording": "Premi i tasti… · Esc annulla",
     "recordingLabel": "Premi il nuovo tasto per: {{command}}",
     "needsModifier": "Usa Ctrl o Alt insieme al tasto (solo da F1 a F12 si possono usare da soli).",
     "fixedKey": "{{key}} è un tasto fisso e non si può assegnare.",
-    "conflictShort": "Stesso tasto di un altro comando",
     "conflictsTitle": "Due comandi non possono avere lo stesso tasto. Risolvi per salvare:",
     "conflict": "\"{{a}}\" e \"{{b}}\" usano entrambi {{key}}.",
     "resetAll": "Ripristina tutti i predefiniti",
@@ -63,6 +59,14 @@
       "reader.comment": "Commenta l'annotazione selezionata",
       "reader.annotation.delete": "Elimina l'annotazione selezionata"
     },
-    "conflictRefused": "Impossibile salvare: la scorciatoia è già usata da un altro comando ({{commands}}). Risolvi il conflitto e salva di nuovo."
+    "conflictRefused": "Impossibile salvare: la scorciatoia è già usata da un altro comando ({{commands}}). Risolvi il conflitto e salva di nuovo.",
+    "actionsFor": "Azioni per: {{command}}",
+    "alreadyDefault": "Ha già il tasto predefinito",
+    "alreadyOff": "È già spenta",
+    "defaultKey": "Ripristina il predefinito ({{key}})",
+    "search": "Cerca comandi",
+    "undoChanges": "Annulla le modifiche",
+    "bareKey": "Gli strumenti del lettore usano un tasto singolo, senza Ctrl o Alt.",
+    "bareInvalid": "Usa una lettera, una cifra, Spazio o Canc."
   }
 }

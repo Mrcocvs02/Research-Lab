@@ -3,7 +3,8 @@ import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promise
 import os from 'node:os';
 import path from 'node:path';
 import { launchApp, type LaunchedApp } from './helpers/launch';
-import { ipcData } from './helpers/phase1';
+import { createLibraryViaWizard, ipcData } from './helpers/phase1';
+import { waitClaudeReady } from './helpers/settings';
 
 /**
  * Claude account channels (§10, B1) against a SIMULATED Claude Code: `RL_E2E_CLAUDE_SIM` (needs RL_E2E=1, development run)
@@ -90,4 +91,43 @@ test('without the auth commands the card gets no identity and the login opens th
   expect(acc.claudeCode).toMatchObject({ supportsAuthCommands: false, account: null, loggedIn: true });
   await ipcData(ctx!.window, 'ai:login', {});
   expect(await calls()).toContain('console ');
+});
+
+test('the Account card in the settings: state, mode, change account then check, sign out (simulated Claude Code)', async () => {
+  // The settings need a library (without one the first-run wizard covers the window): a new launch with a small synthetic one.
+  await ctx!.close();
+  ctx = await launchApp({ library: 'papers', dialogPath: true, offline: true, env: { RL_E2E: '1', RL_E2E_CLAUDE_SIM: sim, RL_AI_PROVIDER: 'mock' } });
+  const w = ctx.window;
+  await createLibraryViaWizard(w, { name: 'Account library' });
+  await ipcData(w, 'settings:set', { uiLanguage: 'en' });
+  await w.reload();
+  await waitClaudeReady(w);
+  const card = w.getByTestId('ai-account');
+  await expect(w.getByTestId('ai-account-state')).toHaveText('Connected with the Claude Code login');
+  await expect(w.getByTestId('ai-account-sub')).toContainText('first@example.test');
+
+  // The mode is chosen and saved at once.
+  await w.getByTestId('ai-auth-mode').getByRole('radio', { name: 'API key' }).click();
+  await expect(card).toHaveAttribute('data-effective', 'none');
+  await w.getByTestId('ai-auth-mode').getByRole('radio', { name: 'Automatic' }).click();
+  await expect(card).toHaveAttribute('data-effective', 'claude-code');
+
+  // Change account: the dialog says what happens, the console is opened with fixed arguments, "I'm done, check" is the primary button.
+  await w.getByTestId('ai-change-account').click();
+  await expect(w.getByTestId('ai-login-dialog')).toContainText('A Claude Code window will open');
+  await w.getByTestId('ai-login-open').click();
+  await expect(w.getByTestId('ai-login-wait')).toBeVisible();
+  expect(await calls()).toContain('console auth login --claudeai');
+  await writeFile(path.join(sim, 'state.json'), state({ email: 'second@example.test' }));
+  await w.getByTestId('ai-login-done').click();
+  await expect(w.getByTestId('ai-account-note')).toHaveText('Connected as second@example.test');
+  await expect(w.getByTestId('ai-account-sub')).toContainText('second@example.test');
+
+  // Sign out is in the menu, after a warning.
+  await w.getByTestId('ai-account-more').click();
+  await w.getByRole('menuitem', { name: 'Sign out of Claude Code…' }).click();
+  await expect(w.getByTestId('ai-logout-dialog')).toContainText('also in the terminal');
+  await w.getByTestId('ai-logout-yes').click();
+  await expect(card).toHaveAttribute('data-effective', 'none');
+  expect(await calls()).toContain('auth logout');
 });

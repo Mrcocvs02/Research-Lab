@@ -1,6 +1,6 @@
 import { copyFile, rename } from 'node:fs/promises';
 import path from 'node:path';
-import { AppError, appSettingsSchema, SCHEMA_VERSION, type AppNotice, type AppSettings, type Logger } from '@rl/core';
+import { AppError, appSettingsSchema, defaultAppSettings, SCHEMA_VERSION, type AppNotice, type AppSettings, type Logger } from '@rl/core';
 import { atomicWriteJson, readTextFileLimited } from '@rl/core/node';
 
 /** A settings file larger than this is not ours (it holds a handful of profiles). */
@@ -27,10 +27,12 @@ export class SettingsStore {
   constructor(
     private readonly file: string,
     private readonly log: Logger,
+    /** What the system reports (`app.getLocale()`): picks the language of a first run (D-357). */
+    private readonly locale?: string,
   ) {}
 
-  static forDir(userDataDir: string, log: Logger): SettingsStore {
-    return new SettingsStore(path.join(userDataDir, 'settings.json'), log);
+  static forDir(userDataDir: string, log: Logger, locale?: string): SettingsStore {
+    return new SettingsStore(path.join(userDataDir, 'settings.json'), log, locale);
   }
 
   async get(): Promise<AppSettings> {
@@ -90,7 +92,7 @@ export class SettingsStore {
   }
 
   private async writeDefaults(): Promise<AppSettings> {
-    const defaults = appSettingsSchema.parse({});
+    const defaults = defaultAppSettings(this.locale === undefined ? {} : { locale: this.locale });
     await atomicWriteJson(this.file, defaults);
     return defaults;
   }

@@ -139,6 +139,7 @@ test('export a project as a second brain, answer control questions from the fold
     // The entry point on the project page; the dialog starts from the project and estimates before running.
     await window.getByTestId('nav-projects').click();
     await window.getByTestId('project-open').click();
+    await window.getByTestId('project-more').click();
     await window.getByTestId('project-export').click();
     const dialog = window.getByTestId('export-dialog');
     await expect(dialog).toBeVisible();
@@ -212,6 +213,7 @@ test('export a project as a second brain, answer control questions from the fold
     const before = await walk(out);
 
     // The earlier export is easy to find: it is listed at the top of the dialog and updates in place.
+    await window.getByTestId('project-more').click();
     await window.getByTestId('project-export').click();
     await expect(dialog).toBeVisible();
     const past = dialog.getByTestId('export-past-item');

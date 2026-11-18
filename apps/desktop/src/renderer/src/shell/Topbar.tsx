@@ -23,7 +23,8 @@ export function crumbsOf(loc: NavLocation, title: string | null, label: (key: st
   if (loc.view === 'reader') return [{ ...root, to: { view: 'library' } }, { label: title ?? label('shell.crumbReader') }];
   if (loc.view === 'review') return [{ ...root, to: { view: 'review', tab: loc.tab ?? 'files' } }, { label: label(loc.tab === 'proposals' ? 'shell.crumbProposals' : 'shell.crumbFiles') }];
   // Settings: the title is the section; the first crumb is not a link (a click would forget the title).
-  if (title) return [view === 'settings' ? root : { ...root, to: { ...loc } }, { label: title }];
+  // The first crumb of a project goes to the list (the open project is not part of where it leads).
+  if (title) return [view === 'settings' ? root : { ...root, to: view === 'projects' ? { view } : { ...loc } }, { label: title }];
   return [root];
 }
 

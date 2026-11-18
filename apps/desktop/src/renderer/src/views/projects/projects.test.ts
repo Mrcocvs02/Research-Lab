@@ -6,8 +6,10 @@ import { AppError, type LibraryProfile } from '@rl/core';
 import i18n from '../../i18n';
 import { AiUiProvider } from '../../lib/aiUi';
 import { LibraryEventsProvider } from '../../lib/events';
+import { NavProvider, useNav } from '../../lib/nav';
 import { parseBlocks, renderBlocks } from '../../lib/markdown';
 import { NotifyProvider } from '../../lib/notify';
+import { crumbsOf } from '../../shell/Topbar';
 import { AppProvider } from '../../state/app-context';
 import { ExportProbe } from '../../testing/exportProbe';
 import { makeDocs, memoryLibrary } from '../../testing/memoryLibrary';
@@ -74,11 +76,17 @@ describe('markdown', () => {
   });
 });
 
+/** Stands for the crumb "Projects" of the top bar: goes back to the list. */
+function ToList() {
+  const nav = useNav();
+  return createElement('button', { type: 'button', 'data-testid': 'to-list', onClick: () => nav.navigate({ view: 'projects' }) });
+}
+
 function setup(init: Parameters<typeof memoryLibrary>[0] = {}, override: Record<string, (p: any) => unknown> = {}) {
   const lib = memoryLibrary({ docs: makeDocs(4), ...init });
   const { handlers } = memoryBackend({ profiles: [profile] });
   setHandlers({ ...handlers, ...lib.handlers, ...override });
-  render(createElement(AppProvider, null, createElement(LibraryEventsProvider, null, createElement(NotifyProvider, null, createElement(AiUiProvider, null, createElement(ProjectsView), createElement(ExportProbe))))));
+  render(createElement(AppProvider, null, createElement(NavProvider, null, createElement(LibraryEventsProvider, null, createElement(NotifyProvider, null, createElement(AiUiProvider, null, createElement(ProjectsView), createElement(ToList), createElement(ExportProbe)))))));
   return lib;
 }
 
@@ -94,21 +102,25 @@ describe('ProjectsView', () => {
     expect(row.textContent).toContain('Thesis');
     expect(within(row).getByTestId('project-summary').textContent).toContain('2 documents: 1 to read, 1 reading, 0 read');
 
+    fireEvent.click(screen.getByTestId('project-new'));
     fireEvent.change(screen.getByTestId('project-create-name'), { target: { value: 'Reading group' } });
     fireEvent.click(screen.getByTestId('project-kind-collection'));
+    expect(screen.getByTestId('project-kind-hint').textContent).toContain('just a set of documents');
     fireEvent.click(screen.getByTestId('project-create'));
     await screen.findByTestId('project-detail');
     expect(lib.state.projects.map((p) => [p.name, p.kind])).toContainEqual(['Reading group', 'collection']);
-    fireEvent.click(screen.getByTestId('project-back'));
+    fireEvent.click(screen.getByTestId('to-list'));
 
     const rows = await screen.findAllByTestId('project-row');
     expect(rows).toHaveLength(2);
-    fireEvent.click(within(rows.find((r) => r.textContent?.includes('Thesis'))!).getByTestId('project-archive'));
+    fireEvent.click(within(rows.find((r) => r.textContent?.includes('Thesis'))!).getByTestId('project-row-more'));
+    fireEvent.click(screen.getByTestId('project-archive'));
     await waitFor(() => expect(screen.queryAllByTestId('project-row')).toHaveLength(1));
-    fireEvent.click(screen.getByTestId('show-archived'));
+    fireEvent.click(within(screen.getByTestId('show-archived')).getByRole('button'));
     await waitFor(() => expect(screen.getAllByTestId('project-row')).toHaveLength(2));
     const archived = screen.getAllByTestId('project-row');
-    fireEvent.click(within(archived.find((r) => r.dataset.status === 'archived')!).getByTestId('project-restore'));
+    fireEvent.click(within(archived.find((r) => r.dataset.status === 'archived')!).getByTestId('project-row-more'));
+    fireEvent.click(screen.getByTestId('project-restore'));
     await waitFor(() => expect(lib.state.projects.find((p) => p.id === 'p1')?.status).toBe('active'));
   });
 
@@ -201,14 +213,14 @@ describe('ProjectsView', () => {
     let lib: ReturnType<typeof setup>;
     lib = setup(init, { 'projects:removeMembers': (p: any) => { if (fail) throw new AppError('INTERNAL', 'boom'); return lib.handlers['projects:removeMembers']!(p); } });
     fireEvent.click(await screen.findByTestId('project-open'));
-    fireEvent.click((await screen.findAllByRole('checkbox'))[0]!);
+    fireEvent.click((await screen.findAllByRole('checkbox'))[1]!);
     fireEvent.click(screen.getByTestId('members-remove'));
     fireEvent.click(screen.getByTestId('members-remove-confirm'));
     await screen.findAllByTestId('toast');
     expect(screen.getAllByTestId('toast').every((t) => t.dataset.kind === 'error')).toBe(true);
     expect(screen.queryByText(/removed from the project/)).toBeNull();
     fail = false;
-    fireEvent.click((await screen.findAllByRole('checkbox'))[0]!);
+    fireEvent.click((await screen.findAllByRole('checkbox'))[1]!);
     fireEvent.click(screen.getByTestId('members-remove'));
     fireEvent.click(screen.getByTestId('members-remove-confirm'));
     await screen.findByText(/removed from the project/);
@@ -219,7 +231,48 @@ describe('ProjectDetailView: second-brain export', () => {
   it('starts the export from the project page with the project and its name', async () => {
     setup({ projects: [{ id: 'p1', kind: 'project', name: 'Thesis', description: '', notes: '', status: 'active', revision: 0, members: [], plan: [] }] });
     fireEvent.click(await screen.findByTestId('project-open'));
+    fireEvent.click(await screen.findByTestId('project-more'));
     fireEvent.click(await screen.findByTestId('project-export'));
     expect(JSON.parse(screen.getByTestId('export-probe').textContent!)).toEqual({ projectId: 'p1', name: 'Thesis' });
+  });
+});
+
+describe('ProjectDetailView: header, menu and adding documents', () => {
+  const project = (members: string[] = []) => ({ id: 'p1', kind: 'project' as const, name: 'Thesis', description: '', notes: '', status: 'active' as const, revision: 0, members: members.map((docId) => ({ docId, addedAt: '' })), plan: [] });
+
+  it('puts the project name in the last crumb and sends the first crumb to the list', () => {
+    const label = (k: string) => k;
+    expect(crumbsOf({ view: 'projects', projectId: 'p1' }, 'Thesis', label)).toEqual([{ label: 'sections.projects', to: { view: 'projects' } }, { label: 'Thesis' }]);
+    expect(crumbsOf({ view: 'projects' }, null, label)).toEqual([{ label: 'sections.projects' }]);
+  });
+
+  it('keeps the menu of a project within the menu rule and renames it from a dialog', async () => {
+    const lib = setup({ projects: [project()] });
+    fireEvent.click(await screen.findByTestId('project-open'));
+    fireEvent.click(await screen.findByTestId('project-more'));
+    expect(screen.getAllByRole('menuitem').length).toBeLessThanOrEqual(7);
+    expect(screen.getAllByRole('group').length).toBeLessThanOrEqual(3);
+    fireEvent.click(screen.getByTestId('project-rename'));
+    fireEvent.change(await screen.findByTestId('project-name'), { target: { value: 'Thesis, chapter 2' } });
+    fireEvent.click(screen.getByTestId('project-rename-save'));
+    await waitFor(() => expect(lib.state.projects[0]?.name).toBe('Thesis, chapter 2'));
+    expect(callsTo('projects:update').at(-1)).toMatchObject({ id: 'p1', patch: { name: 'Thesis, chapter 2' }, expectedRevision: 0 });
+  });
+
+  it('shows an empty project with its one action and adds the documents picked from the library search', async () => {
+    const docs = makeDocs(3);
+    const lib = setup({ docs, projects: [project()] });
+    fireEvent.click(await screen.findByTestId('project-open'));
+    fireEvent.click(await screen.findByTestId('members-empty-add'));
+    const rows = await screen.findAllByTestId('adddocs-row');
+    expect(rows.length).toBe(3);
+    const confirm = screen.getByTestId('adddocs-confirm');
+    expect(confirm).toHaveProperty('disabled', true);
+    fireEvent.click(within(rows[0]!).getByRole('checkbox'));
+    fireEvent.click(within(rows[2]!).getByRole('checkbox'));
+    fireEvent.click(screen.getByTestId('adddocs-confirm'));
+    await waitFor(() => expect(lib.state.projects[0]?.members.map((m) => m.docId).sort()).toEqual([docs[0]!.docId, docs[2]!.docId].sort()));
+    await waitFor(() => expect(screen.queryByTestId('add-documents')).toBeNull());
+    await waitFor(() => expect(screen.getAllByTestId('member-row')).toHaveLength(2));
   });
 });

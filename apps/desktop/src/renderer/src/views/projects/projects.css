@@ -5,34 +5,73 @@
 .project-list {
   list-style: none;
   padding: 0;
+  margin: 0;
 }
+/* a row of 56 px: name and kind on the first line, the summary on the second, the menu at the end */
 .project-row {
-  padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-3);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: center;
+  column-gap: 12px;
+  min-height: 56px;
+  padding: 6px 4px 8px 12px;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+.project-row:hover {
+  background: var(--surface-2);
 }
 .project-row.archived {
   opacity: 0.7;
 }
-.project-main,
-.project-head {
+.project-row__main {
   display: flex;
-  gap: var(--space-2);
   align-items: center;
-  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
 }
-.project-head h2 {
+.project-row__kind,
+.project-row__date {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+.project-row__date {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.project-row .project-summary {
+  grid-column: 1;
   margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-row__more {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+.project-row .study-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  margin: 0;
+  border-radius: 0;
 }
 .project-name {
-  font-size: 16px;
-  font-weight: 650;
-}
-.project-summary {
-  margin: 4px 0;
-  color: var(--text-muted);
+  font-size: var(--fs-heading);
+  font-weight: 600;
+  text-align: left;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .study-bar {
   display: flex;
@@ -40,7 +79,6 @@
   background: var(--surface-2);
   border-radius: 3px;
   overflow: hidden;
-  margin-bottom: var(--space-2);
 }
 .study-bar-read {
   background: var(--ok);
@@ -48,22 +86,75 @@
 .study-bar-reading {
   background: var(--accent);
 }
-.project-fields {
-  display: grid;
-  grid-template-columns: 1fr 200px;
-  gap: var(--space-3);
-  margin: var(--space-3) 0;
+.project-create {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
 }
-.project-fields .wide {
-  grid-column: 1 / -1;
+.project-create .hint {
+  margin: 0;
 }
-.project-create .inline-form {
-  align-items: flex-end;
-  flex-wrap: wrap;
+.project-create__foot {
+  display: flex;
+  justify-content: flex-end;
 }
-.project-create .grow {
+.project-rename {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.project-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px 0 10px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+.project-status:hover {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.project-description {
+  margin: 0 0 var(--space-2);
+  color: var(--text-muted);
+  max-width: 70ch;
+}
+.project-detail .rl-tabs {
+  margin-bottom: var(--space-3);
+}
+.adddocs-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.adddocs-row label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 4px;
+  cursor: pointer;
+}
+.adddocs-row.is-member {
+  opacity: 0.65;
+}
+.adddocs-title {
   flex: 1;
-  min-width: 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.adddocs-meta {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
 }
 .members-table {
   width: 100%;

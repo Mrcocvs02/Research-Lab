@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
+import { Button } from '../../components/Button';
+import { EmptyState } from '../../components/EmptyState';
+import { IconDiscover } from '../../components/icons-shell';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { useNotify } from '../../lib/notify';
@@ -20,7 +23,7 @@ type CheckResult = ResponseOf<Channels, 'watch:check'>;
 const PAGE = 100;
 
 /** "New": works found by the followed sources. The only network use is "Check now". */
-export function NewItems({ sources, nonce, onChanged }: { sources: WatchSource[] | null; nonce: number; onChanged(): void }) {
+export function NewItems({ sources, nonce, onChanged, onManage }: { sources: WatchSource[] | null; nonce: number; onChanged(): void; onManage(): void }) {
   const { t } = useTranslation();
   const { reportError } = useNotify();
   const [filter, setFilter] = useState('');
@@ -29,7 +32,6 @@ export function NewItems({ sources, nonce, onChanged }: { sources: WatchSource[]
   const [error, setError] = useState<unknown>(null);
   const op = useWatchOp<CheckResult>('check');
   const { running: checking, result } = op;
-  const filterId = useId();
 
   useEffect(() => {
     let live = true;
@@ -81,22 +83,26 @@ export function NewItems({ sources, nonce, onChanged }: { sources: WatchSource[]
 
   return (
     <div data-testid="discover-new">
-      <p className="hint">{t('discover.watch.intro')}</p>
-      <div className="discover-bar">
-        <div className="field">
-          <label htmlFor={filterId}>{t('discover.watch.filter')}</label>
-          <select id={filterId} value={filter} onChange={(e) => setFilter(e.target.value)} data-testid="watch-filter">
+      <p className="hint discover-intro">{t('discover.watch.intro')}</p>
+      <div className="vbar" data-testid="watch-sources-row">
+        <span className="hint">{t('discover.watch.followed', { count: sources?.length ?? 0 })}</span>
+        <button type="button" className="link" onClick={onManage} data-testid="watch-sources-manage">
+          {t('discover.watch.manage')}
+        </button>
+        {sources !== null && sources.length > 1 && (
+          <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label={t('discover.watch.filter')} data-testid="watch-filter">
             <option value="">{t('discover.watch.allSources')}</option>
-            {(sources ?? []).map((s) => (
+            {sources.map((s) => (
               <option key={s.id} value={s.id}>
                 {safeText(sourceName(s, t(`discover.sources.kind_${s.kind}`)))}
               </option>
             ))}
           </select>
-        </div>
-        <button type="button" className="primary" onClick={check} disabled={checking || (sources !== null && sources.length === 0)} data-testid="watch-check">
+        )}
+        <span className="vbar__spacer" />
+        <Button variant="primary" onClick={check} disabled={checking || (sources !== null && sources.length === 0)} disabledReason={t('discover.watch.noSources')} data-testid="watch-check">
           {checking ? t('discover.watch.checking') : t('discover.watch.checkNow')}
-        </button>
+        </Button>
       </div>
       {checking && (
         <p role="status" data-testid="watch-progress">
@@ -106,7 +112,6 @@ export function NewItems({ sources, nonce, onChanged }: { sources: WatchSource[]
           </button>
         </p>
       )}
-      {sources !== null && sources.length === 0 && <p className="hint">{t('discover.watch.noSources')}</p>}
       {result && (
         <div role="status" data-testid="watch-result">
           <p>{t('discover.watch.checked', { count: result.checked, newItems: result.newItems })}</p>
@@ -124,9 +129,21 @@ export function NewItems({ sources, nonce, onChanged }: { sources: WatchSource[]
       {(error ?? (checking ? null : op.error)) !== null && <ErrorNote testId="watch-error">{errorMessage(error ?? op.error, t)}</ErrorNote>}
       {items === null && error === null && <p className="hint">{t('discover.watch.loading')}</p>}
       {items && items.length === 0 && (
-        <p className="empty" data-testid="watch-empty">
-          {t('discover.watch.empty')}
-        </p>
+        <div data-testid="watch-empty">
+          <EmptyState
+            icon={<IconDiscover size={24} />}
+            title={t('discover.watch.emptyTitle')}
+            action={
+              sources !== null && sources.length === 0 ? (
+                <Button variant="secondary" onClick={onManage} data-testid="watch-empty-add">
+                  {t('discover.watch.addSource')}
+                </Button>
+              ) : undefined
+            }
+          >
+            {sources !== null && sources.length === 0 ? t('discover.watch.noSources') : t('discover.watch.empty')}
+          </EmptyState>
+        </div>
       )}
       {items && items.length > 0 && (
         <ul className="work-list" aria-label={t('discover.tab_new')}>

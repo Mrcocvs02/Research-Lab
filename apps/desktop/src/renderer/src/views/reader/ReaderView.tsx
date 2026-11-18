@@ -1,32 +1,58 @@
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { STUDY_LIMITS, type Annotation, type StudyState } from '@rl/core';
+import { ANNOTATION_COLORS, STUDY_LIMITS, type Annotation } from '@rl/core';
 import { ErrorNote } from '../../components/ui';
 import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
-import { useShortcutMatcher } from '../../lib/keymap';
+import { useHistory } from '../../lib/history';
+import { resolveShortcut, useEffectiveShortcuts, useShortcutMatcher } from '../../lib/keymap';
 import { useNotify } from '../../lib/notify';
-import type { ReaderPanel, ReaderTarget } from '../../lib/reader';
+import type { ReaderTarget } from '../../lib/reader';
 import { rl } from '../../lib/rl';
 import { RlError } from '../../lib/rl-error';
 import { useLocalFlag } from '../../lib/useLocalFlag';
 import { NoteEditor } from '../notes/NoteEditor';
 import { NotesList } from '../notes/NotesList';
 import { safeText } from '../library/safeText';
-import { AnnotationBar, AnnotationLayers, AnnotationList } from './AnnotationParts';
+import { AnnotationLayers, AnnotationList } from './AnnotationParts';
+import { AnnotationPopover, ConfirmErase, SelectionPopover, type Anchor } from './AnnotationPopover';
+import { cursorFor } from './cursors';
 import { createViewer, ViewerError, type FindState, type SelectionPiece, type Viewer } from './engine';
-import { annotationAt, colorOf, type AnnotationColor } from './geometry';
+import { FindBar } from './FindBar';
+import { annotationAt, annotationsAt, colorOf, type AnnotationColor } from './geometry';
+import { ReaderBar, type ZoomChoice } from './ReaderBar';
 import { useRepair } from './repair';
+import { initialCtx, step, type ColorNo, type Ctx, type Env, type Ev, type Mode, type Result, type Tool } from './toolMachine';
 import { useAnnotations } from './useAnnotations';
 import { useReaderDoc } from './useReaderDoc';
 import './reader.css';
-
-const STUDY: StudyState[] = ['to-read', 'reading', 'read'];
-const TABS: ReaderPanel[] = ['annotations', 'pageNote', 'fileNote', 'notes'];
+import './cursors.css';
 
 type Failure = { kind: 'notPdf' | 'missing' | 'encrypted' | 'invalid' | 'failed' } | { kind: 'error'; error: unknown };
+type Side = 'annotations' | 'notes' | 'info';
+type Scope = 'pageNote' | 'fileNote' | 'notes';
+const SIDES: Side[] = ['annotations', 'notes', 'info'];
+const SCOPES: Scope[] = ['pageNote', 'fileNote', 'notes'];
+const TOOL_KEY = 'rl.readerTool';
+const SPACE_KEY = 'rl.readerSpaceHint';
+const OVERLAY = '.rl-popover, [role="dialog"][aria-modal="true"]';
+const TOOL_OF: Partial<Record<string, Tool>> = { 'reader.tool.select': 'select', 'reader.tool.highlight': 'highlight', 'reader.tool.underline': 'underline', 'reader.tool.eraser': 'eraser' };
 
 const isEditable = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
+const colorName = (n: ColorNo): AnnotationColor => ANNOTATION_COLORS[n - 1]!;
+
+/** The last tool and the colour are remembered (8.2.1); the reader always opens on Select. */
+function loadCtx(): Ctx {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(TOOL_KEY) ?? 'null') as Partial<Ctx> | null;
+    const tools: Tool[] = ['select', 'highlight', 'underline', 'eraser'];
+    if (v && tools.includes(v.prev as Tool) && [1, 2, 3, 4, 5].includes(v.color as number)) return { tool: 'select', prev: v.prev as Tool, color: v.color as ColorNo };
+  } catch {
+    // no storage, or not ours: the defaults
+  }
+  return initialCtx();
+}
 
 interface Props {
   target: ReaderTarget;
@@ -34,16 +60,16 @@ interface Props {
 }
 
 /**
- * The in-app PDF reader (phase 3). pdf.js draws only the pages that are on screen (with a text layer for selection and
- * find); the annotations of the user are drawn over them from data kept apart from the file, and the file is never written.
- * Keys (when the focus is not in a text box): n/j and p/k next and previous page, Ctrl+Home and Ctrl+End first and last,
- * Ctrl+F find, Ctrl+G go to page, Ctrl+plus, Ctrl+minus, Ctrl+0 zoom, Escape closes the bar or find box and then the reader.
+ * The in-app PDF reader. pdf.js draws only the pages on screen (with a text layer for selection and find); the annotations of the
+ * user are drawn over them from data kept apart from the file, and the file is never written. The user chooses a tool first
+ * (Select, Highlight, Underline, Eraser; `toolMachine.ts`) and then annotates. The bar of the reader (`ReaderBar`) takes the
+ * place of the top bar of the shell when the shell has a slot for it, and sits on top of the reader otherwise.
  */
 export function ReaderView({ target, onClose }: Props) {
   const { t } = useTranslation();
   const { reportError, fail, info: notifyInfo } = useNotify();
   const docId = target.docId;
-  const ids = { page: useId(), find: useId() };
+  const findId = useId();
 
   const [failure, setFailure] = useState<Failure | null>(null);
   const [info, setInfo] = useState<{ url: string; title: string | null } | null>(null);
@@ -56,36 +82,50 @@ export function ReaderView({ target, onClose }: Props) {
   const [findOpen, setFindOpen] = useState(false);
   const [findText, setFindText] = useState('');
   const [findState, setFindState] = useState<FindState>({ state: 'idle', current: 0, total: 0 });
-  const [tab, setTab] = useState<ReaderPanel>(target.panel ?? 'annotations');
+  const [side, setSide] = useState<Side>(target.panel === undefined || target.panel === 'annotations' ? 'annotations' : 'notes');
+  const [scope, setScope] = useState<Scope>(target.panel === 'fileNote' || target.panel === 'notes' ? target.panel : 'pageNote');
   const [sideOpen, setSideOpen] = useLocalFlag('rl.readerSide', true);
   const [pending, setPending] = useState<SelectionPiece[] | null>(null);
-  /** Pages inside the selection that were not drawn yet and so were left out (shown with the bar). */
+  /** Pages inside the selection that were not drawn yet and so were left out (shown with the popover). */
   const [skipped, setSkipped] = useState(0);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [hint, setHint] = useState('');
+  const [away, setAway] = useState(false);
+  const [eraseIds, setEraseIds] = useState<ReadonlySet<string>>(new Set());
+  const [confirm, setConfirm] = useState<{ ids: string[]; at: Anchor } | null>(null);
+  const [repositionId, setRepositionId] = useState<string | null>(null);
+  // The tool machine: its state is kept in a ref too, so a burst of events (a drag) always steps from the latest state.
+  const [machine, setMachine] = useState<{ ctx: Ctx; mode: Mode }>(() => ({ ctx: loadCtx(), mode: { m: 'idle', hasSelection: false } }));
+  const mref = useRef(machine);
+  const { ctx, mode } = machine;
+  const selectedId = mode.m === 'selected' || mode.m === 'commenting' ? mode.annId : null;
+  const color = colorName(ctx.color);
+
   // The chat uses the open document and page as its context.
   const { publishReader } = useAiUi();
   useEffect(() => {
     publishReader({ docId, page });
   }, [docId, page, publishReader]);
   useEffect(() => () => publishReader(null), [publishReader]);
-  const [color, setColor] = useState<AnnotationColor>('yellow');
-  const [comment, setComment] = useState('');
-  const [editComment, setEditComment] = useState('');
-  const [busy, setBusy] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerElRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
   const pageInputRef = useRef<HTMLInputElement>(null);
   const findInputRef = useRef<HTMLInputElement>(null);
+  const lastUp = useRef({ x: 0, y: 0 });
 
   const { doc, setStudyState, setUnderlined, applyUnderlined } = useReaderDoc(docId, reportError);
   const ann = useAnnotations(docId, applyUnderlined, reportError);
-  const [repositionId, setRepositionId] = useState<string | null>(null);
+  const history = useHistory();
   const repair = useRepair({ ready, loaded: ann.loaded, annotations: ann.annotations, layers, viewerRef, save: ann.save, info: notifyInfo, docId });
   const selected = ann.annotations.find((a) => a.id === selectedId) ?? null;
   const annotationsRef = useRef<readonly Annotation[]>([]);
   annotationsRef.current = ann.annotations;
+
+  // Where the bar goes: the slot of the shell's top bar (the reader replaces that bar), or on top of the reader without one.
+  const [slot, setSlot] = useState<HTMLElement | null | undefined>(undefined);
+  useLayoutEffect(() => setSlot(document.getElementById('reader-bar-slot')), []);
 
   // Open: ask the main process for the document URL, then give it to pdf.js (the chunk of pdf.js loads here).
   useEffect(() => {
@@ -156,7 +196,10 @@ export function ReaderView({ target, onClose }: Props) {
   useEffect(() => {
     if (target.nonce === firstNonce.current) return;
     if (target.page !== undefined) viewerRef.current?.goTo(target.page);
-    if (target.panel) setTab(target.panel);
+    if (target.panel) {
+      setSide(target.panel === 'annotations' ? 'annotations' : 'notes');
+      if (target.panel !== 'annotations') setScope(target.panel);
+    }
   }, [target.nonce, target.page, target.panel]);
 
   // The focus goes back to where it was when the reader closes.
@@ -167,103 +210,34 @@ export function ReaderView({ target, onClose }: Props) {
     };
   }, []);
 
-  // A text selection in the pages offers the annotation bar (read after the selection settles).
-  useEffect(() => {
-    if (!ready) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const onSelection = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        const read = viewerRef.current?.readSelection();
-        if (read && read.pieces.length > 0) {
-          setPending(read.pieces);
-          setSkipped(read.skipped);
-          setSelectedId(null);
-        }
-      }, 200);
-    };
-    document.addEventListener('selectionchange', onSelection);
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener('selectionchange', onSelection);
-    };
-  }, [ready]);
-
-  useEffect(() => setEditComment(selected?.comment ?? ''), [selected?.id, selected?.comment]);
-
-  // Find: typing searches after a short pause.
-  useEffect(() => {
-    if (!findOpen || !ready) return;
-    const timer = setTimeout(() => (findText === '' ? viewerRef.current?.clearFind() : viewerRef.current?.find(findText)), 250);
-    return () => clearTimeout(timer);
-  }, [findText, findOpen, ready]);
+  /* ---------------------------------------------------------------- the tool machine */
 
   const goTo = (n: number, y?: number) => viewerRef.current?.goTo(Math.min(Math.max(1, Math.round(n)), Math.max(1, pages)), y);
-  /** The last comment sent for an annotation, so blur, Enter, the button and closing the bar never send the same text twice. */
-  const sentComment = useRef<{ id: string; value: string } | null>(null);
-  const saveComment = (a: Annotation, value: string) => {
-    const next = value.trim();
-    const known = sentComment.current?.id === a.id ? sentComment.current.value : (a.comment ?? '');
-    if (next === known) return;
-    sentComment.current = { id: a.id, value: next };
-    // A failed save forgets it, so the next blur or Enter tries again.
-    void change(a, { comment: next }).then((ok) => {
-      if (!ok && sentComment.current?.id === a.id) sentComment.current = null;
-    });
-  };
-  const closeBar = () => {
-    // Closing the bar (Escape, the close button) must not drop a comment that was typed but not saved yet.
-    if (!pending && selected) saveComment(selected, editComment);
-    setPending(null);
-    setSkipped(0);
-    setSelectedId(null);
-    window.getSelection()?.removeAllRanges();
-  };
-
-  /**
-   * Saves one annotation per piece (page). The first failure stops everything: the pieces already saved are not offered
-   * again, the bar stays open with the rest so the user can retry, and the error is shown.
-   */
-  const createFrom = async (kind: 'highlight' | 'underline', pieces: SelectionPiece[], keepBar: boolean) => {
-    if (busy || pieces.length === 0) return;
-    setBusy(true);
+  const matches = useShortcutMatcher();
+  const keys = useEffectiveShortcuts();
+  const findOpenRef = useRef(false);
+  findOpenRef.current = findOpen;
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(hintTimer.current), []);
+  useEffect(() => {
     try {
-      const note = comment.trim();
-      for (const [i, piece] of pieces.entries()) {
-        const text = piece.text.slice(0, STUDY_LIMITS.annotationText);
-        const saved = await ann.save({ kind, page: piece.page, rects: piece.rects, text, color, geom: 2, ...(note ? { comment: note } : {}) });
-        if (!saved) {
-          // `ann.save` already showed why; say where it stopped.
-          fail(t('reader.createStopped', { page: piece.page }));
-          if (keepBar) setPending(pieces.slice(i));
-          return;
-        }
-      }
-      setComment('');
-      if (keepBar) closeBar();
-    } finally {
-      setBusy(false);
+      window.localStorage.setItem(TOOL_KEY, JSON.stringify({ tool: ctx.tool, prev: ctx.prev, color: ctx.color }));
+    } catch {
+      // no storage: not remembered
     }
-  };
-  /** "Riposiziona": the text selected again replaces the rectangles of the annotation under review (same page). */
-  const applyReposition = async () => {
-    const target = ann.annotations.find((a) => a.id === repositionId);
-    const piece = pending?.find((p) => p.page === target?.page);
-    if (!target || !piece) return fail(t('reader.repair.samePage'));
-    if (await repair.reposition(target, piece.rects, piece.text.slice(0, STUDY_LIMITS.annotationText))) {
-      setRepositionId(null);
-      closeBar();
-    }
-  };
-  const create = (kind: 'highlight' | 'underline') => (pending ? createFrom(kind, pending, true) : Promise.resolve());
+  }, [ctx.tool, ctx.prev, ctx.color]);
 
-  /** Keyboard path to annotate: the current find match becomes a highlight or underline (same normalisation as a selection). */
-  const annotateMatch = (kind: 'highlight' | 'underline') => {
-    const read = viewerRef.current?.readFindMatch();
-    if (!read || read.pieces.length === 0) return fail(t('reader.findNoMatch'));
-    void createFrom(kind, read.pieces, false);
-  };
+  // The cursor of the tool, with a dot in the colour of the stroke (read from the token, so it follows the theme).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const hex = getComputedStyle(el).getPropertyValue(`--hl-${color}`).trim() || 'currentColor';
+    const cursor = cursorFor(ctx.tool, hex);
+    if (cursor) el.style.setProperty('--reader-cursor', cursor);
+    else el.style.removeProperty('--reader-cursor');
+  }, [ctx.tool, color]);
 
+  const sentComment = useRef<{ id: string; value: string } | null>(null);
   const change = async (a: Annotation, patch: Partial<Pick<Annotation, 'kind' | 'color' | 'comment'>>): Promise<boolean> => {
     setBusy(true);
     try {
@@ -273,33 +247,223 @@ export function ReaderView({ target, onClose }: Props) {
       setBusy(false);
     }
   };
+  /** The last comment sent for an annotation, so blur, Enter, the button and Escape never send the same text twice. */
+  const saveComment = (a: Annotation, value: string) => {
+    const next = value.trim();
+    const known = sentComment.current?.id === a.id ? sentComment.current.value : (a.comment ?? '');
+    if (next === known) return;
+    sentComment.current = { id: a.id, value: next };
+    void change(a, { comment: next }).then((ok) => {
+      if (!ok && sentComment.current?.id === a.id) sentComment.current = null;
+    });
+  };
 
-  const remove = async (a: Annotation) => {
+  /** Deletes annotations and offers to bring them back (a copy is saved again: Undo). */
+  const removeMany = async (list: Annotation[]) => {
     setBusy(true);
     try {
-      if (await ann.remove(a.id)) setSelectedId(null);
+      const gone: Annotation[] = [];
+      for (const a of list) if (await ann.remove(a.id)) gone.push(a);
+      if (gone.length === 0) return;
+      notifyInfo(t('reader.erased', { count: gone.length }), {
+        label: t('reader.erase.undo'),
+        run: () => {
+          void (async () => {
+            for (const a of gone) await ann.save({ kind: a.kind, page: a.page, rects: a.rects, text: a.text, color: colorOf(a.color), ...(a.geom === 2 ? { geom: 2 as const } : {}), ...(a.comment ? { comment: a.comment } : {}) });
+          })();
+        },
+      });
     } finally {
       setBusy(false);
     }
   };
+  const removeIds = (idList: string[]) => removeMany(annotationsRef.current.filter((a) => idList.includes(a.id)));
+
+  const clearPending = () => {
+    setPending(null);
+    setSkipped(0);
+    window.getSelection()?.removeAllRanges();
+  };
+  /**
+   * Saves one annotation per piece (page). The first failure stops everything: the pieces already saved are not offered
+   * again, the popover stays open with the rest so the user can retry, and the error is shown.
+   */
+  const createFrom = async (kind: 'highlight' | 'underline', pieces: SelectionPiece[], keepPopover: boolean, paint: AnnotationColor) => {
+    if (busy || pieces.length === 0) return;
+    setBusy(true);
+    try {
+      for (const [i, piece] of pieces.entries()) {
+        const text = piece.text.slice(0, STUDY_LIMITS.annotationText);
+        const saved = await ann.save({ kind, page: piece.page, rects: piece.rects, text, color: paint, geom: 2 });
+        if (!saved) {
+          // `ann.save` already showed why; say where it stopped.
+          fail(t('reader.createStopped', { page: piece.page }));
+          if (keepPopover) setPending(pieces.slice(i));
+          return;
+        }
+      }
+      if (keepPopover) clearPending();
+    } finally {
+      setBusy(false);
+    }
+  };
+  const readPending = () => {
+    const read = viewerRef.current?.readSelection();
+    if (read && read.pieces.length > 0) {
+      setPending(read.pieces);
+      setSkipped(read.skipped);
+    }
+  };
+
+  const showHint = (tool: Tool) => {
+    setHint(t(`reader.tools.${tool}`));
+    clearTimeout(hintTimer.current);
+    hintTimer.current = setTimeout(() => setHint(''), 1000);
+  };
+  /** The first time (per profile) Space switches the tool: say that it does not scroll, and how to. */
+  const spaceHint = () => {
+    try {
+      if (window.localStorage.getItem(SPACE_KEY)) return;
+      window.localStorage.setItem(SPACE_KEY, '1');
+    } catch {
+      // no storage: say it every time rather than never
+    }
+    notifyInfo(t('reader.spaceHint'), { label: t('reader.gotIt'), run: () => {} });
+  };
+
+  /** Feeds one event to the machine and carries out what it asks. Returns the result (the caller may need to know if something changed). */
+  const dispatch = (ev: Ev, fromUi = false): Result => {
+    const before = mref.current;
+    // A click on a control is never a key that belongs to a text field or an open menu.
+    const env: Env = { inTextField: !fromUi && isEditable(document.activeElement), overlayOpen: !fromUi && document.querySelector(OVERLAY) !== null, findOpen: findOpenRef.current };
+    const r = step(before.ctx, before.mode, ev, env);
+    mref.current = { ctx: r.ctx, mode: r.mode };
+    setMachine(mref.current);
+    if (ev.e === 'down') setPending(null);
+    for (const fx of r.effects) {
+      switch (fx) {
+        case 'create':
+          if (before.mode.m === 'stroking') {
+            const read = viewerRef.current?.readSelection();
+            if (read && read.pieces.length > 0) {
+              if (read.skipped > 0) notifyInfo(t('reader.skipped', { count: read.skipped }));
+              void createFrom(before.mode.kind, read.pieces, false, colorName(before.ctx.color));
+            }
+          }
+          break;
+        case 'delete':
+          void removeIds(before.mode.m === 'erasing' ? before.mode.erased : before.mode.m === 'selected' ? [before.mode.annId] : []);
+          break;
+        case 'confirm-erase':
+          if (before.mode.m === 'erasing') setConfirm({ ids: before.mode.erased, at: { left: lastUp.current.x, top: lastUp.current.y, bottom: lastUp.current.y } });
+          break;
+        case 'erase-hint':
+          if (r.mode.m === 'erasing') setEraseIds(new Set(r.mode.erased));
+          break;
+        case 'recolor': {
+          const was = before.mode;
+          const a = was.m === 'selected' ? annotationsRef.current.find((x) => x.id === was.annId) : undefined;
+          if (a && ev.e === 'color') void change(a, { color: colorName(ev.n) });
+          break;
+        }
+        case 'save-comment': {
+          const was = before.mode;
+          const a = was.m === 'commenting' ? annotationsRef.current.find((x) => x.id === was.annId) : undefined;
+          if (a && was.m === 'commenting') saveComment(a, was.draft);
+          break;
+        }
+        case 'show-popover':
+          if (r.mode.m === 'idle') readPending();
+          else setPending(null);
+          break;
+        case 'clear-selection':
+          clearPending();
+          break;
+        case 'announce':
+          showHint(r.ctx.tool);
+          if (ev.e === 'swap') spaceHint();
+          break;
+        case 'close-find':
+          closeFind();
+          break;
+        case 'close-reader':
+          onClose();
+          break;
+        default:
+          break;
+      }
+    }
+    if (r.mode.m !== 'erasing') setEraseIds((cur) => (cur.size > 0 ? new Set() : cur));
+    return r;
+  };
+  const dispatchRef = useRef(dispatch);
+  dispatchRef.current = dispatch;
+
+  /** Opens a mode without an event (a click on an entry of the list selects that annotation). */
+  const setMode = (m: Mode) => {
+    mref.current = { ctx: mref.current.ctx, mode: m };
+    setMachine(mref.current);
+  };
+
+  // The window lost the focus: strokes and popovers are dropped (the tool stays).
+  useEffect(() => {
+    const onBlur = () => dispatchRef.current({ e: 'blur' });
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
+  }, []);
+
+  // With Select, a text selection made in any way (the keyboard too) offers the popover once it settles.
+  useEffect(() => {
+    if (!ready) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onSelection = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const now = mref.current;
+        if (now.ctx.tool !== 'select' || now.mode.m !== 'idle') return;
+        readPending();
+      }, 200);
+    };
+    document.addEventListener('selectionchange', onSelection);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('selectionchange', onSelection);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+
+  // Find: typing searches after a short pause.
+  useEffect(() => {
+    if (!findOpen || !ready) return;
+    const timer = setTimeout(() => (findText === '' ? viewerRef.current?.clearFind() : viewerRef.current?.find(findText)), 250);
+    return () => clearTimeout(timer);
+  }, [findText, findOpen, ready]);
+
+  /** "Riposiziona": the text selected again replaces the rectangles of the annotation under review (same page). */
+  const applyReposition = async () => {
+    const at = ann.annotations.find((a) => a.id === repositionId);
+    const piece = pending?.find((p) => p.page === at?.page);
+    if (!at || !piece) return fail(t('reader.repair.samePage'));
+    if (await repair.reposition(at, piece.rects, piece.text.slice(0, STUDY_LIMITS.annotationText))) {
+      setRepositionId(null);
+      clearPending();
+    }
+  };
+
+  /** Keyboard path to annotate: the current find match becomes a highlight or underline (same normalisation as a selection). */
+  const annotateMatch = (kind: 'highlight' | 'underline') => {
+    const read = viewerRef.current?.readFindMatch();
+    if (!read || read.pieces.length === 0) return fail(t('reader.findNoMatch'));
+    void createFrom(kind, read.pieces, false, color);
+  };
 
   const pick = (a: Annotation) => {
     setPending(null);
-    setSelectedId(a.id);
-    setTab('annotations');
+    setMode({ m: 'selected', annId: a.id });
+    setSide('annotations');
     goTo(a.page, a.rects[0]?.y);
   };
 
-  const onPagesClick = (e: ReactMouseEvent) => {
-    if (window.getSelection()?.isCollapsed === false) return; // the end of a text selection, not a click
-    const at = viewerRef.current?.pointAt(e);
-    if (!at) return setSelectedId(null);
-    const hit = annotationAt(annotationsRef.current, at.page, at.x, at.y);
-    setSelectedId(hit?.id ?? null);
-    if (hit) setPending(null);
-  };
-
-  const matches = useShortcutMatcher();
   const openFind = () => {
     setFindOpen(true);
     setTimeout(() => findInputRef.current?.select(), 0);
@@ -310,17 +474,48 @@ export function ReaderView({ target, onClose }: Props) {
     viewerRef.current?.clearFind();
     containerRef.current?.focus();
   };
+  const zoomTo = (v: ZoomChoice) => (v === 'fit-width' ? viewerRef.current?.fitWidth() : viewerRef.current?.zoomTo(v));
+
+  /* ---------------------------------------------------------------- pointer */
+
+  const hitAt = (e: ReactPointerEvent) => {
+    const at = viewerRef.current?.pointAt(e);
+    return at ? annotationAt(annotationsRef.current, at.page, at.x, at.y) : undefined;
+  };
+  const onPointerDown = (e: ReactPointerEvent) => {
+    if ((e.button !== 0 && e.button !== 5) || (e.target as Element).closest('a')) return;
+    const hit = hitAt(e);
+    const on = (e.target as Element).closest('.textLayer') ? 'text' : hit ? 'annotation' : 'empty';
+    dispatch({ e: 'down', on, ...(hit ? { annId: hit.id } : {}), pointerId: e.pointerId, pen: e.pointerType === 'pen' ? 'pen' : e.pointerType === 'touch' ? 'touch' : 'mouse', eraserButton: (e.buttons & 32) !== 0 });
+  };
+  const onPointerMove = (e: ReactPointerEvent) => {
+    if (mref.current.mode.m !== 'erasing') return;
+    const at = viewerRef.current?.pointAt(e);
+    if (at) dispatch({ e: 'move', annIdsUnder: annotationsAt(annotationsRef.current, at.page, at.x, at.y) });
+  };
+  const onPointerUp = (e: ReactPointerEvent) => {
+    const m = mref.current.mode.m;
+    if (m !== 'selecting' && m !== 'stroking' && m !== 'erasing') return;
+    lastUp.current = { x: e.clientX, y: e.clientY };
+    const hit = hitAt(e);
+    dispatch({ e: 'up', selectionText: window.getSelection()?.toString() ?? '', ...(hit ? { annId: hit.id } : {}) });
+  };
+
+  /* ---------------------------------------------------------------- keyboard */
 
   const onKeyDown = (e: ReactKeyboardEvent) => {
     const mod = e.ctrlKey || e.metaKey;
     const inField = isEditable(e.target);
-    // The reader shortcuts are the user's (keymap): find, and highlight or underline the current match.
+    const onButton = e.target instanceof HTMLElement && e.target.closest('button, [role^="menuitem"], [role="radio"]') !== null;
+    // The reader shortcuts are the user's (keymap): find, close, and highlight or underline the current match.
     if (matches(e, 'reader.find')) return (e.preventDefault(), openFind());
+    if (matches(e, 'reader.close')) return (e.preventDefault(), onClose());
     if (findOpen && matches(e, 'reader.highlight')) return (e.preventDefault(), annotateMatch('highlight'));
     if (findOpen && matches(e, 'reader.underline')) return (e.preventDefault(), annotateMatch('underline'));
     if (mod && !e.altKey) {
       const key = e.key.toLowerCase();
       if (key === 'g') return (e.preventDefault(), pageInputRef.current?.select());
+      if (key === 'h' && !inField) return (e.preventDefault(), document.querySelector<HTMLElement>('[data-testid="reader-more"]')?.click());
       if (key === '=' || key === '+') return (e.preventDefault(), viewerRef.current?.zoomBy(1));
       if (key === '-') return (e.preventDefault(), viewerRef.current?.zoomBy(-1));
       if (key === '0') return (e.preventDefault(), viewerRef.current?.fitWidth());
@@ -329,156 +524,126 @@ export function ReaderView({ target, onClose }: Props) {
       return;
     }
     if (e.key === 'Escape') {
-      if (e.target === findInputRef.current || findOpen) return (e.preventDefault(), closeFind());
-      if (pending || selectedId) return (e.preventDefault(), closeBar());
-      if (!inField) return (e.preventDefault(), onClose());
+      if (e.target === findInputRef.current) return (e.preventDefault(), closeFind());
+      if (confirm) return (e.preventDefault(), setConfirm(null));
+      if (pending) return (e.preventDefault(), clearPending());
+      const was = mref.current;
+      const r = dispatch({ e: 'esc' });
+      if (r.effects.length > 0 || r.ctx !== was.ctx || r.mode !== was.mode) e.preventDefault();
       return;
     }
     if (inField || e.altKey) return;
+    // Shift+Space scrolls back one screen, as in Chrome (plain Space switches tool: 8.2.2).
+    if (e.key === ' ' && e.shiftKey && !onButton) {
+      e.preventDefault();
+      containerRef.current?.scrollBy({ top: -(containerRef.current.clientHeight * 0.9) });
+      return;
+    }
+    const id = resolveShortcut(e, keys, 'reader-tool') ?? (e.key === 'Backspace' ? 'reader.annotation.delete' : null);
+    if (id) {
+      const tool = TOOL_OF[id];
+      const n = /^reader\.color\.([1-5])$/.exec(id)?.[1];
+      let ev: Ev | null = null;
+      if (tool) ev = { e: 'tool', tool };
+      else if (id === 'reader.tool.swap') ev = onButton ? null : { e: 'swap', repeat: e.repeat };
+      else if (n) ev = { e: 'color', n: Number(n) as ColorNo };
+      else if (id === 'reader.comment') ev = { e: 'comment', current: selected?.comment ?? '' };
+      else if (id === 'reader.annotation.delete') ev = { e: 'delete' };
+      if (ev) {
+        const was = mref.current;
+        const r = dispatch(ev);
+        // Space does not scroll when it switched the tool; the other keys are ours whenever they did something.
+        if (r.ctx !== was.ctx || r.mode !== was.mode || ev.e === 'swap') e.preventDefault();
+        return;
+      }
+    }
     if (e.key === 'n' || e.key === 'j') goTo(page + 1);
     else if (e.key === 'p' || e.key === 'k') goTo(page - 1);
   };
 
+  /* ---------------------------------------------------------------- render */
+
   const title = safeText(doc?.title?.trim() || info?.title || '') || t('reader.untitled');
-  const underlined = doc?.study.underlined;
   const errorText = failure === null ? null : failure.kind === 'error' ? errorMessage(failure.error, t) : t(`reader.errors.${failure.kind}`);
-  const findLabel = findState.state === 'notfound' ? t('reader.findNone') : findState.total > 0 ? t('reader.findCount', { current: findState.current, total: findState.total }) : '';
+  const markAnchor = useCallback((id: string): Anchor | null => {
+    const r = document.querySelector(`[data-testid="annotation-mark"][data-annotation-id="${id}"]`)?.getBoundingClientRect();
+    return r ? { left: r.left, top: r.top, bottom: r.bottom } : null;
+  }, []);
+  const selectionAnchor = useCallback((): Anchor | null => {
+    const sel = window.getSelection();
+    const r = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).getBoundingClientRect() : null;
+    return r && (r.width > 0 || r.height > 0) ? { left: r.left, top: r.top, bottom: r.bottom } : { left: lastUp.current.x, top: lastUp.current.y, bottom: lastUp.current.y };
+  }, []);
+
+  const bar = (
+    <ReaderBar
+      title={title}
+      ready={ready}
+      tool={ctx.tool}
+      color={ctx.color}
+      away={away}
+      onTool={(tool) => dispatch({ e: 'tool', tool }, true)}
+      onColor={(n) => dispatch({ e: 'color', n }, true)}
+      page={page}
+      pages={pages}
+      pageInput={pageInput}
+      pageInputRef={pageInputRef}
+      onPageInput={setPageInput}
+      onGoPage={(n) => {
+        goTo(n);
+        containerRef.current?.focus();
+      }}
+      zoom={zoom}
+      onZoom={zoomTo}
+      findOpen={findOpen}
+      onFind={() => (findOpen ? closeFind() : openFind())}
+      doc={doc}
+      onStudy={setStudyState}
+      onUnderlined={setUnderlined}
+      sideOpen={sideOpen}
+      onSide={() => setSideOpen(!sideOpen)}
+      canUndo={history.canUndo}
+      onUndo={() => void history.undo()}
+      onOpenFile={() => void rl.invoke('documents:open', { docId }).catch(reportError)}
+      onReveal={() => void rl.invoke('documents:reveal', { docId }).catch(reportError)}
+      onClose={onClose}
+    />
+  );
 
   return (
-    <section className="reader" aria-label={t('reader.regionLabel', { title })} data-testid="reader" data-doc-id={docId} onKeyDown={onKeyDown}>
-      <header className="reader-bar">
-        <button type="button" onClick={onClose} data-testid="reader-close">
-          <span aria-hidden="true">← </span>
-          {t('reader.back')}
-        </button>
-        <h2 className="reader-title" title={title} data-testid="reader-title">
-          {title}
-        </h2>
-        <span className="spacer" />
-        <div className="reader-group" role="group" aria-label={t('reader.navigation')}>
-          <button type="button" className="icon-button" aria-label={t('reader.prev')} title={t('reader.prev')} disabled={!ready || page <= 1} onClick={() => goTo(page - 1)} data-testid="reader-prev">
-            <span aria-hidden="true">‹</span>
-          </button>
-          <label htmlFor={ids.page} className="sr-only">
-            {t('reader.goToPage')}
-          </label>
-          <input
-            ref={pageInputRef}
-            id={ids.page}
-            className="reader-page-input"
-            type="number"
-            min={1}
-            max={Math.max(1, pages)}
-            value={pageInput}
-            disabled={!ready}
-            onChange={(e) => setPageInput(e.target.value)}
-            onBlur={() => setPageInput(String(page))}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                const n = Number.parseInt(pageInput, 10);
-                if (Number.isFinite(n)) goTo(n);
-                containerRef.current?.focus();
-              }
-            }}
-            data-testid="reader-page-input"
-          />
-          <span className="reader-pages" data-testid="reader-pages">
-            {t('reader.pageOf', { count: pages })}
-          </span>
-          <button type="button" className="icon-button" aria-label={t('reader.next')} title={t('reader.next')} disabled={!ready || page >= pages} onClick={() => goTo(page + 1)} data-testid="reader-next">
-            <span aria-hidden="true">›</span>
-          </button>
-        </div>
-        <div className="reader-group" role="group" aria-label={t('reader.zoom')}>
-          <button type="button" className="icon-button" aria-label={t('reader.zoomOut')} title={t('reader.zoomOut')} disabled={!ready} onClick={() => viewerRef.current?.zoomBy(-1)} data-testid="reader-zoom-out">
-            <span aria-hidden="true">−</span>
-          </button>
-          <span className="reader-zoom" role="status" aria-label={t('reader.zoomLevel', { percent: zoom.percent })} data-testid="reader-zoom">
-            {zoom.percent}%
-          </span>
-          <button type="button" className="icon-button" aria-label={t('reader.zoomIn')} title={t('reader.zoomIn')} disabled={!ready} onClick={() => viewerRef.current?.zoomBy(1)} data-testid="reader-zoom-in">
-            <span aria-hidden="true">+</span>
-          </button>
-          <button type="button" className={zoom.fit ? 'toggle on' : 'toggle'} aria-pressed={zoom.fit} disabled={!ready} onClick={() => viewerRef.current?.fitWidth()} data-testid="reader-fit">
-            {t('reader.fitWidth')}
-          </button>
-        </div>
-        <button type="button" className={findOpen ? 'toggle on' : 'toggle'} aria-pressed={findOpen} disabled={!ready} onClick={() => (findOpen ? closeFind() : openFind())} title={t('reader.findHint')} data-testid="reader-find-toggle">
-          {t('reader.find')}
-        </button>
-        <button type="button" className={sideOpen ? 'toggle on' : 'toggle'} aria-pressed={sideOpen} onClick={() => setSideOpen(!sideOpen)} data-testid="reader-side-toggle">
-          {t('reader.panel')}
-        </button>
-      </header>
-
-      <div className="reader-study" role="group" aria-label={t('reader.studyGroup')}>
-        <div className="radio-row" role="radiogroup" aria-label={t('doc.studyState')}>
-          {STUDY.map((s) => (
-            <label key={s} className="radio-chip">
-              <input type="radio" name={`${ids.page}-study`} checked={doc?.study.state === s} disabled={!doc} onChange={() => setStudyState(s)} data-testid={`reader-study-${s}`} />
-              <span>{t(`study.${s}`)}</span>
-            </label>
-          ))}
-        </div>
-        <div className="check">
-          <input id={`${ids.page}-ul`} type="checkbox" checked={underlined?.value ?? false} disabled={!doc} onChange={(e) => setUnderlined(e.target.checked)} data-testid="reader-underlined" />
-          <label htmlFor={`${ids.page}-ul`}>{t('doc.underlined')}</label>
-          {underlined?.value && (
-            <span className="hint" data-testid="reader-underlined-origin" data-origin={underlined.origin}>
-              {t(`reader.underlinedOrigin_${underlined.origin}`)}
-            </span>
-          )}
-        </div>
-        <span className="spacer" />
-        <span className="hint reader-keys">{t('reader.keys')}</span>
-      </div>
-
+    <section
+      className="reader"
+      aria-label={t('reader.regionLabel', { title })}
+      data-testid="reader"
+      data-doc-id={docId}
+      onKeyDown={onKeyDown}
+      onFocus={() => setAway(false)}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setAway(true)}
+    >
+      {slot === undefined ? null : slot ? createPortal(bar, slot) : bar}
       <div className={sideOpen ? 'reader-body with-side' : 'reader-body'}>
         <div className="reader-main">
           {findOpen && (
-            <div className="reader-find" role="search" data-testid="reader-find">
-              <label htmlFor={ids.find}>{t('reader.findLabel')}</label>
-              <input
-                ref={findInputRef}
-                id={ids.find}
-                type="search"
-                value={findText}
-                onChange={(e) => setFindText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    viewerRef.current?.find(findText, { again: true, backwards: e.shiftKey });
-                  }
-                }}
-                data-testid="reader-find-input"
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <button type="button" className="icon-button" aria-label={t('reader.findPrev')} title={t('reader.findPrev')} onClick={() => viewerRef.current?.find(findText, { again: true, backwards: true })} data-testid="reader-find-prev">
-                <span aria-hidden="true">↑</span>
-              </button>
-              <button type="button" className="icon-button" aria-label={t('reader.findNext')} title={t('reader.findNext')} onClick={() => viewerRef.current?.find(findText, { again: true })} data-testid="reader-find-next">
-                <span aria-hidden="true">↓</span>
-              </button>
-              <button type="button" disabled={findState.total === 0} onClick={() => annotateMatch('highlight')} title={t('reader.findAnnotateHint')} data-testid="reader-find-highlight">
-                {t('reader.findHighlight')}
-              </button>
-              <button type="button" disabled={findState.total === 0} onClick={() => annotateMatch('underline')} title={t('reader.findAnnotateHint')} data-testid="reader-find-underline">
-                {t('reader.findUnderline')}
-              </button>
-              <span className="hint" role="status" data-testid="reader-find-count">
-                {findLabel}
-              </span>
-              <button type="button" className="icon-button" aria-label={t('reader.findClose')} title={t('reader.findClose')} onClick={closeFind} data-testid="reader-find-close">
-                <span aria-hidden="true">×</span>
-              </button>
-            </div>
+            <FindBar
+              inputId={findId}
+              inputRef={findInputRef}
+              text={findText}
+              state={findState}
+              onText={setFindText}
+              onStep={(backwards) => viewerRef.current?.find(findText, { again: true, backwards })}
+              onAnnotate={annotateMatch}
+              onClose={closeFind}
+            />
           )}
           {ann.stale && (
             <p className="callout reader-stale" role="alert" data-testid="reader-stale">
               {t('reader.stale')}
             </p>
+          )}
+          {hint && (
+            <span className="reader-hint" role="status" aria-live="polite" data-testid="reader-tool-hint">
+              {hint}
+            </span>
           )}
           {errorText && (
             <div className="reader-error" role="alert" data-testid="reader-error" data-kind={failure?.kind}>
@@ -495,68 +660,76 @@ export function ReaderView({ target, onClose }: Props) {
           )}
           <div
             ref={containerRef}
-            className="reader-scroll"
+            className={`reader-scroll ann-${color}`}
             tabIndex={0}
             role="document"
             aria-label={t('reader.pagesLabel')}
             hidden={errorText !== null}
-            onClick={onPagesClick}
-            onMouseDown={() => setPending(null)}
+            data-tool={ctx.tool}
+            data-away={away ? '' : undefined}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={() => dispatch({ e: 'cancel' })}
             data-testid="reader-pages-area"
           >
             <div ref={viewerElRef} className="pdfViewer" />
-            <AnnotationLayers layers={layers} annotations={ann.annotations} selectedId={selectedId} staleIds={ann.staleIds} />
+            <AnnotationLayers layers={layers} annotations={ann.annotations} selectedId={selectedId} staleIds={ann.staleIds} erasing={eraseIds} />
           </div>
-          {(pending || selected) && (
-            <div className="ann-dock">
-              {pending ? (
-                <AnnotationBar
-                  mode="new"
-                  text={pending.map((p) => p.text).join(' … ')}
-                  color={color}
-                  comment={comment}
-                  busy={busy}
-                  notice={skipped > 0 ? t('reader.skipped', { count: skipped }) : undefined}
-                  onColor={setColor}
-                  onComment={setComment}
-                  onCreate={(k) => void create(k)}
-                  onReposition={repositionId ? () => void applyReposition() : undefined}
-                  onClose={closeBar}
-                />
-              ) : (
-                selected && (
-                  <AnnotationBar
-                    key={selected.id}
-                    mode="edit"
-                    annotation={selected}
-                    comment={editComment}
-                    busy={busy}
-                    onColor={(c) => void change(selected, { color: c })}
-                    onKind={(k) => void change(selected, { kind: k })}
-                    onComment={setEditComment}
-                    onSaveComment={() => saveComment(selected, editComment)}
-                    stale={ann.staleIds.has(selected.id)}
-                    onReconfirm={() => void change(selected, {})}
-                    onDelete={() => void remove(selected)}
-                    onClose={closeBar}
-                  />
-                )
-              )}
-            </div>
+          {pending && (
+            <SelectionPopover
+              anchor={selectionAnchor}
+              text={pending.map((p) => p.text).join(' … ')}
+              notice={skipped > 0 ? t('reader.skipped', { count: skipped }) : undefined}
+              busy={busy}
+              color={color}
+              onHighlight={() => void createFrom('highlight', pending, true, color)}
+              onCopy={() => void navigator.clipboard?.writeText(pending.map((p) => p.text).join(' ')).then(() => notifyInfo(t('reader.ann.copied')), reportError)}
+              onReposition={repositionId ? () => void applyReposition() : undefined}
+            />
+          )}
+          {!pending && selected && (
+            <AnnotationPopover
+              key={selected.id}
+              annotation={selected}
+              anchor={() => markAnchor(selected.id)}
+              commenting={mode.m === 'commenting'}
+              draft={mode.m === 'commenting' ? mode.draft : (selected.comment ?? '')}
+              busy={busy}
+              stale={ann.staleIds.has(selected.id)}
+              onColor={(n) => dispatch({ e: 'color', n }, true)}
+              onOpenComment={() => dispatch({ e: 'comment', current: selected.comment ?? '' }, true)}
+              onDraft={(v) => dispatch({ e: 'draft', value: v }, true)}
+              onCommit={() => dispatch({ e: 'commit-comment' }, true)}
+              onDelete={() => dispatch({ e: 'delete' }, true)}
+              onReconfirm={() => void change(selected, {})}
+            />
+          )}
+          {confirm && (
+            <ConfirmErase
+              anchor={() => confirm.at}
+              count={confirm.ids.length}
+              onConfirm={() => {
+                void removeIds(confirm.ids);
+                setConfirm(null);
+              }}
+              onCancel={() => setConfirm(null)}
+            />
           )}
         </div>
 
         {sideOpen && (
-          <aside className="reader-side" aria-label={t('reader.panel')} data-testid="reader-side">
-            <div className="tabs" role="tablist" aria-label={t('reader.panel')}>
-              {TABS.map((id) => (
-                <button key={id} type="button" role="tab" id={`reader-tab-${id}`} aria-selected={tab === id} aria-controls={`reader-tabpanel-${id}`} className={tab === id ? 'tab on' : 'tab'} onClick={() => setTab(id)} data-testid={`reader-tab-${id}`}>
-                  {t(`reader.tabs.${id}`)}
+          <aside className="reader-side" aria-label={t('reader.panel')} data-testid="reader-side-panel">
+            <div className="rl-tabs" role="tablist" aria-label={t('reader.panel')}>
+              {SIDES.map((id) => (
+                <button key={id} type="button" role="tab" id={`reader-panel-${id}`} aria-selected={side === id} aria-controls="reader-sidepanel" className={side === id ? 'rl-tab is-on' : 'rl-tab'} onClick={() => setSide(id)} data-testid={`reader-panel-${id}`}>
+                  {t(`reader.sides.${id}`)}
                 </button>
               ))}
             </div>
-            <div role="tabpanel" id={`reader-tabpanel-${tab}`} aria-labelledby={`reader-tab-${tab}`} className="reader-tabpanel">
-              {tab === 'annotations' && <AnnotationList
+            <div role="tabpanel" id="reader-sidepanel" aria-labelledby={`reader-panel-${side}`} className="reader-tabpanel">
+              {side === 'annotations' && (
+                <AnnotationList
                   annotations={ann.annotations}
                   selectedId={selectedId}
                   staleIds={ann.staleIds}
@@ -568,20 +741,52 @@ export function ReaderView({ target, onClose }: Props) {
                     pick(a);
                   }}
                   onAccept={(a) => void repair.accept(a)}
-                />}
-              {tab === 'pageNote' && <NoteEditor key={`page-${page}`} docId={docId} page={page} testId="note-page" />}
-              {tab === 'fileNote' && <NoteEditor key="file" docId={docId} testId="note-file" />}
-              {tab === 'notes' && (
-                <NotesList
-                  docId={docId}
-                  onOpen={(p) => {
-                    if (p === null) setTab('fileNote');
-                    else {
-                      setTab('pageNote');
-                      goTo(p);
-                    }
-                  }}
+                  onKind={(a, kind) => void change(a, { kind })}
+                  onDelete={(a) => void removeMany([a])}
                 />
+              )}
+              {side === 'notes' && (
+                <>
+                  <div className="rl-seg rl-seg--sm" role="radiogroup" aria-label={t('reader.sides.notes')}>
+                    {SCOPES.map((id) => (
+                      <button key={id} type="button" role="radio" aria-checked={scope === id} className={scope === id ? 'rl-seg__opt is-on' : 'rl-seg__opt'} onClick={() => setScope(id)} data-testid={`reader-tab-${id}`}>
+                        {t(`reader.tabs.${id}`)}
+                      </button>
+                    ))}
+                  </div>
+                  {scope === 'pageNote' && <NoteEditor key={`page-${page}`} docId={docId} page={page} testId="note-page" />}
+                  {scope === 'fileNote' && <NoteEditor key="file" docId={docId} testId="note-file" />}
+                  {scope === 'notes' && (
+                    <NotesList
+                      docId={docId}
+                      onOpen={(p) => {
+                        if (p === null) setScope('fileNote');
+                        else {
+                          setScope('pageNote');
+                          goTo(p);
+                        }
+                      }}
+                    />
+                  )}
+                </>
+              )}
+              {side === 'info' && (
+                <dl className="reader-info" data-testid="reader-info">
+                  <dt>{t('doc.studyState')}</dt>
+                  <dd data-testid="reader-info-state">{doc ? t(`study.${doc.study.state}`) : ''}</dd>
+                  <dt>{t('doc.underlined')}</dt>
+                  <dd>
+                    {doc?.study.underlined.value ? t('reader.info.yes') : t('reader.info.no')}
+                    {doc?.study.underlined.value && (
+                      <span className="hint" data-testid="reader-underlined-origin" data-origin={doc.study.underlined.origin}>
+                        {' · '}
+                        {t(`reader.underlinedOrigin_${doc.study.underlined.origin}`)}
+                      </span>
+                    )}
+                  </dd>
+                  <dt>{t('reader.info.pdf')}</dt>
+                  <dd data-testid="reader-info-pdf">{t('reader.pdfOnlyApp')}</dd>
+                </dl>
               )}
             </div>
           </aside>

@@ -3,18 +3,12 @@
     "back": "Torna alla libreria",
     "untitled": "(senza titolo)",
     "regionLabel": "Lettore: {{title}}",
-    "navigation": "Pagine",
     "goToPage": "Vai alla pagina",
     "pageOf": "di {{count}}",
-    "prev": "Pagina precedente",
-    "next": "Pagina successiva",
     "zoom": "Ingrandimento",
-    "zoomIn": "Ingrandisci",
-    "zoomOut": "Riduci",
     "zoomLevel": "Ingrandimento {{percent}}%",
     "fitWidth": "Adatta alla larghezza",
     "find": "Cerca",
-    "findHint": "Cerca nel documento (Ctrl+F)",
     "findLabel": "Cerca nel documento",
     "findPrev": "Risultato precedente",
     "findNext": "Risultato successivo",
@@ -31,8 +25,6 @@
     "panel": "Note ed evidenziazioni",
     "pagesLabel": "Pagine del documento",
     "loading": "Apertura del documento…",
-    "studyGroup": "Studio",
-    "keys": "Tasti: N pagina successiva, P precedente, Ctrl+F cerca, Ctrl+G vai a pagina, Ctrl+più/meno ingrandimento, Ctrl+0 adatta alla larghezza, Ctrl+Maiusc+H o U evidenzia o sottolinea il risultato della ricerca, Esc chiudi.",
     "stale": "Il file è cambiato dopo queste evidenziazioni: le posizioni potrebbero non corrispondere più al testo.",
     "errors": {
       "notPdf": "Nel lettore si aprono solo file PDF.",
@@ -42,7 +34,6 @@
       "failed": "Non è stato possibile aprire il documento."
     },
     "tabs": {
-      "annotations": "Evidenziazioni",
       "pageNote": "Nota di pagina",
       "fileNote": "Nota del file",
       "notes": "Tutte le note"
@@ -71,7 +62,12 @@
       "jump": "Vai a: {{kind}} a pagina {{page}}",
       "stale": "Forse fuori posto: il file è cambiato",
       "reconfirm": "La posizione è giusta",
-      "reconfirmHint": "La salva di nuovo sul file com'è adesso."
+      "reconfirmHint": "La salva di nuovo sul file com'è adesso.",
+      "copy": "Copia",
+      "copied": "Copiato",
+      "commentShort": "Commento",
+      "to_highlight": "Trasforma in evidenziazione",
+      "to_underline": "Trasforma in sottolineatura"
     },
     "notesList": {
       "empty": "Ancora nessuna nota su questo documento.",
@@ -90,6 +86,50 @@
       "job_one": "Controllo delle evidenziazioni: {{count}} documento",
       "job_other": "Controllo delle evidenziazioni: {{count}} documenti",
       "undo": "Annulla"
+    },
+    "later": "Disponibile in una versione successiva.",
+    "cropLater": "Il ritaglio arriva in una versione successiva.",
+    "tools": {
+      "label": "Strumenti",
+      "select": "Seleziona",
+      "highlight": "Evidenzia",
+      "underline": "Sottolinea",
+      "crop": "Ritaglia",
+      "eraser": "Gomma"
+    },
+    "colorPip": "Colore: {{name}}",
+    "fitPage": "Adatta alla pagina",
+    "pageTotal": "/ {{count}}",
+    "study": "Studio",
+    "studyState": "Stato di studio",
+    "pdfOnlyApp": "Solo nell'app",
+    "pdfStatus": "Nel PDF",
+    "pdfSave": "Salva anche nel PDF",
+    "pdfRemove": "Togli dal PDF…",
+    "pdfOff": "La scrittura nel PDF per ora è spenta.",
+    "more": "Altro",
+    "sideBySide": "Affianca un altro paper…",
+    "openDefault": "Apri con il programma predefinito",
+    "reveal": "Mostra nella cartella",
+    "exportCopy": "Esporta copia annotata…",
+    "guideMode": "Guida ✦ (sperimentale)",
+    "spaceHint": "Spazio cambia strumento. Per scorrere: PagGiù, o Maiusc+Spazio per tornare su.",
+    "gotIt": "Ho capito",
+    "erased_one": "1 annotazione eliminata",
+    "erased_other": "{{count}} annotazioni eliminate",
+    "erase": {
+      "confirm": "Eliminare {{count}} annotazioni?",
+      "undo": "Annulla"
+    },
+    "sides": {
+      "annotations": "Annotazioni",
+      "notes": "Note",
+      "info": "Info"
+    },
+    "info": {
+      "yes": "Sì",
+      "no": "No",
+      "pdf": "Nel PDF"
     }
   }
 }

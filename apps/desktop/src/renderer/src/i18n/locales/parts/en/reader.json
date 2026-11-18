@@ -3,18 +3,12 @@
     "back": "Back to the library",
     "untitled": "(untitled)",
     "regionLabel": "Reader: {{title}}",
-    "navigation": "Pages",
     "goToPage": "Go to page",
     "pageOf": "of {{count}}",
-    "prev": "Previous page",
-    "next": "Next page",
     "zoom": "Zoom",
-    "zoomIn": "Zoom in",
-    "zoomOut": "Zoom out",
     "zoomLevel": "Zoom {{percent}}%",
     "fitWidth": "Fit width",
     "find": "Find",
-    "findHint": "Find in the document (Ctrl+F)",
     "findLabel": "Find in the document",
     "findPrev": "Previous match",
     "findNext": "Next match",
@@ -31,8 +25,6 @@
     "panel": "Notes and highlights",
     "pagesLabel": "Pages of the document",
     "loading": "Opening the document…",
-    "studyGroup": "Study",
-    "keys": "Keys: N next page, P previous, Ctrl+F find, Ctrl+G go to page, Ctrl+plus/minus zoom, Ctrl+0 fit width, Ctrl+Shift+H or U highlight or underline the find match, Esc close.",
     "stale": "The file changed after you made these highlights: their positions may no longer match the text.",
     "errors": {
       "notPdf": "Only PDF files can be opened in the reader.",
@@ -42,7 +34,6 @@
       "failed": "The document could not be opened."
     },
     "tabs": {
-      "annotations": "Highlights",
       "pageNote": "Page note",
       "fileNote": "File note",
       "notes": "All notes"
@@ -71,7 +62,12 @@
       "jump": "Go to the {{kind}} on page {{page}}",
       "stale": "May be misplaced: the file changed",
       "reconfirm": "The position is right",
-      "reconfirmHint": "Saves it again on the file as it is now."
+      "reconfirmHint": "Saves it again on the file as it is now.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "commentShort": "Comment",
+      "to_highlight": "Change to a highlight",
+      "to_underline": "Change to an underline"
     },
     "notesList": {
       "empty": "No notes on this document yet.",
@@ -90,6 +86,50 @@
       "job_one": "Checking highlights: {{count}} document",
       "job_other": "Checking highlights: {{count}} documents",
       "undo": "Undo"
+    },
+    "later": "Available in a later version.",
+    "cropLater": "Crop arrives in a later version.",
+    "tools": {
+      "label": "Tools",
+      "select": "Select",
+      "highlight": "Highlight",
+      "underline": "Underline",
+      "crop": "Crop",
+      "eraser": "Eraser"
+    },
+    "colorPip": "Colour: {{name}}",
+    "fitPage": "Fit page",
+    "pageTotal": "/ {{count}}",
+    "study": "Study",
+    "studyState": "Study state",
+    "pdfOnlyApp": "Only in the app",
+    "pdfStatus": "In the PDF",
+    "pdfSave": "Also save in the PDF",
+    "pdfRemove": "Remove from the PDF…",
+    "pdfOff": "Writing into the PDF is switched off for now.",
+    "more": "More",
+    "sideBySide": "Open another paper beside this one…",
+    "openDefault": "Open with the default program",
+    "reveal": "Show in the folder",
+    "exportCopy": "Export an annotated copy…",
+    "guideMode": "Guide ✦ (experimental)",
+    "spaceHint": "Space switches tool. To scroll: PageDown, or Shift+Space to go back up.",
+    "gotIt": "Got it",
+    "erased_one": "1 annotation deleted",
+    "erased_other": "{{count}} annotations deleted",
+    "erase": {
+      "confirm": "Delete {{count}} annotations?",
+      "undo": "Undo"
+    },
+    "sides": {
+      "annotations": "Annotations",
+      "notes": "Notes",
+      "info": "Info"
+    },
+    "info": {
+      "yes": "Yes",
+      "no": "No",
+      "pdf": "In the PDF"
     }
   }
 }

@@ -29,6 +29,7 @@ const fake = vi.hoisted(() => {
     goTo: vi.fn(),
     zoomBy: vi.fn(),
     fitWidth: vi.fn(),
+    zoomTo: vi.fn(),
     find: vi.fn(),
     clearFind: vi.fn(),
     readSelection: vi.fn((): any => ({ pieces: [], skipped: 0 })),
@@ -82,6 +83,33 @@ function drawLayer(page: number): HTMLElement {
   return el;
 }
 
+/** A press and release on the text layer of the pages, as a mouse would: the machine reads the selection and the annotation under the point. */
+let selSpy: { mockRestore(): void } | undefined;
+function pointer(selection = '', at: { page: number; x: number; y: number } | null = null) {
+  const area = screen.getByTestId('reader-pages-area');
+  let text = area.querySelector('.textLayer');
+  if (!text) {
+    text = document.createElement('div');
+    text.className = 'textLayer';
+    area.append(text);
+  }
+  selSpy?.mockRestore();
+  selSpy = vi.spyOn(window, 'getSelection').mockReturnValue({ toString: () => selection, removeAllRanges() {}, rangeCount: 0, isCollapsed: selection === '' } as unknown as Selection);
+  fake.viewer.pointAt.mockReturnValue(at);
+  fireEvent.pointerDown(text, { button: 0, pointerId: 1, pointerType: 'mouse' });
+  fireEvent.pointerUp(text, { button: 0, pointerId: 1, pointerType: 'mouse' });
+}
+/** A stroke of the eraser across the point where every annotation of the tests sits. */
+function eraseStroke() {
+  const area = screen.getByTestId('reader-pages-area');
+  const text = area.querySelector('.textLayer') ?? area;
+  fake.viewer.pointAt.mockReturnValue({ page: 2, x: 0.2, y: 0.21 });
+  fireEvent.pointerDown(text, { button: 0, pointerId: 1, pointerType: 'mouse' });
+  fireEvent.pointerMove(text, { pointerId: 1, pointerType: 'mouse' });
+  fireEvent.pointerUp(text, { button: 0, pointerId: 1, pointerType: 'mouse' });
+}
+const press = (key: string, init: Record<string, unknown> = {}) => fireEvent.keyDown(screen.getByTestId('reader-pages-area'), { key, ...init });
+
 const SEL = [{ page: 2, text: 'selected words', rects: [{ x: 0.1, y: 0.2, w: 0.3, h: 0.02 }] }];
 async function select(pieces = SEL, skipped = 0) {
   fake.viewer.readSelection.mockReturnValue({ pieces, skipped });
@@ -104,7 +132,11 @@ beforeEach(async () => {
     // no storage
   }
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  selSpy?.mockRestore();
+  selSpy = undefined;
+  cleanup();
+});
 
 describe('geometry', () => {
   it('normalises client rectangles to the page and drops the ones that are not a line of text', () => {
@@ -170,7 +202,7 @@ describe('ReaderView: opening and errors', () => {
     expect(fake.viewer.open).toHaveBeenCalledWith(`rl-doc://doc/${DOC}?v=aaaaaaaa`, undefined);
     expect(screen.getByTestId('reader-title').textContent).toContain('Paper 0000');
     act(() => fake.state.handlers.onPages(5));
-    expect(screen.getByTestId('reader-pages').textContent).toBe('of 5');
+    expect(screen.getByTestId('reader-pages').textContent).toBe('/ 5');
   });
 
   it('shows a clear, localised error for a file that is not a PDF, is missing, encrypted or damaged', async () => {
@@ -213,21 +245,31 @@ describe('ReaderView: opening and errors', () => {
     await ready();
     act(() => fake.state.handlers.onPages(5));
     act(() => fake.state.handlers.onPage(2));
-    fireEvent.click(screen.getByTestId('reader-next'));
+    // No arrows: the page field, N/P and the keys (the bar has no previous/next buttons).
+    expect(screen.queryByTestId('reader-next')).toBeNull();
+    press('n');
     expect(fake.viewer.goTo).toHaveBeenLastCalledWith(3, undefined);
-    fireEvent.click(screen.getByTestId('reader-prev'));
+    press('p');
     expect(fake.viewer.goTo).toHaveBeenLastCalledWith(1, undefined);
     fireEvent.change(screen.getByTestId('reader-page-input'), { target: { value: '4' } });
     fireEvent.keyDown(screen.getByTestId('reader-page-input'), { key: 'Enter' });
     expect(fake.viewer.goTo).toHaveBeenLastCalledWith(4, undefined);
     fireEvent.keyDown(screen.getByTestId('reader-pages-area'), { key: 'n' });
     expect(fake.viewer.goTo).toHaveBeenLastCalledWith(3, undefined);
-    fireEvent.click(screen.getByTestId('reader-zoom-in'));
+    press('+', { ctrlKey: true });
     expect(fake.viewer.zoomBy).toHaveBeenLastCalledWith(1);
-    fireEvent.keyDown(screen.getByTestId('reader-pages-area'), { key: '-', ctrlKey: true });
+    press('-', { ctrlKey: true });
     expect(fake.viewer.zoomBy).toHaveBeenLastCalledWith(-1);
-    fireEvent.click(screen.getByTestId('reader-fit'));
+    // The zoom menu: fit the width, fit the page, 100 % and 150 %.
+    fireEvent.click(screen.getByTestId('reader-zoom'));
+    fireEvent.click(await screen.findByTestId('reader-fit'));
     expect(fake.viewer.fitWidth).toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('reader-zoom'));
+    fireEvent.click(await screen.findByTestId('reader-fit-page'));
+    expect(fake.viewer.zoomTo).toHaveBeenLastCalledWith('page-fit');
+    fireEvent.click(screen.getByTestId('reader-zoom'));
+    fireEvent.click(await screen.findByTestId('reader-zoom-150'));
+    expect(fake.viewer.zoomTo).toHaveBeenLastCalledWith(1.5);
 
     fireEvent.keyDown(screen.getByTestId('reader-pages-area'), { key: 'f', ctrlKey: true });
     const input = await screen.findByTestId('reader-find-input');
@@ -248,18 +290,18 @@ describe('ReaderView: opening and errors', () => {
 const mkAnn = (id: string, page: number) => ({ id, kind: 'highlight' as const, page, rects: [{ x: 0.1, y: 0.2, w: 0.3, h: 0.02 }], text: `text ${id}`, color: 'yellow', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' });
 
 describe('ReaderView: annotations', () => {
-  it('creates a highlight from a selection with colour and comment, and draws it on the page', async () => {
+  it('creates a highlight from a selection in the colour of the bar, and draws it on the page', async () => {
     setup();
     await ready();
     const layer = drawLayer(2);
     await select();
-    fireEvent.click(screen.getByTestId('ann-color-green'));
-    fireEvent.change(screen.getByTestId('ann-comment'), { target: { value: 'check this' } });
+    fireEvent.click(screen.getByTestId('ann-color'));
+    fireEvent.click(await screen.findByTestId('ann-color-green'));
     fireEvent.click(screen.getByTestId('ann-highlight'));
     await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(1));
     expect(callsTo('annotations:save')[0]).toEqual({
       docId: DOC,
-      annotation: { kind: 'highlight', page: 2, rects: SEL[0]!.rects, text: 'selected words', color: 'green', geom: 2, comment: 'check this' },
+      annotation: { kind: 'highlight', page: 2, rects: SEL[0]!.rects, text: 'selected words', color: 'green', geom: 2 },
     });
     await waitFor(() => expect(layer.querySelectorAll('[data-testid="annotation-mark"]')).toHaveLength(1));
     const mark = layer.querySelector<HTMLElement>('[data-testid="annotation-mark"]')!;
@@ -267,16 +309,19 @@ describe('ReaderView: annotations', () => {
     expect(mark.style.left).toBe('10%');
     expect(screen.queryByTestId('annotation-bar')).toBeNull();
     expect(screen.getAllByTestId('annotation-item')).toHaveLength(1);
-    // The flag the write reported is shown.
-    expect(screen.getByTestId('reader-underlined')).toHaveProperty('checked', true);
+    // The flag the write reported is shown (Info tab).
+    fireEvent.click(screen.getByTestId('reader-panel-info'));
     expect(screen.getByTestId('reader-underlined-origin').getAttribute('data-origin')).toBe('annotations');
   });
 
-  it('creates an underline, and one annotation per page for a selection across pages', async () => {
+  it('creates an underline with the Underline tool, and one annotation per page for a selection across pages', async () => {
     setup();
     await ready();
-    await select([...SEL, { page: 3, text: 'more words', rects: [{ x: 0.1, y: 0.1, w: 0.5, h: 0.02 }] }]);
-    fireEvent.click(screen.getByTestId('ann-underline'));
+    press('u');
+    expect(screen.getByTestId('reader-tool-underline').getAttribute('aria-pressed')).toBe('true');
+    fake.viewer.readSelection.mockReturnValue({ pieces: [...SEL, { page: 3, text: 'more words', rects: [{ x: 0.1, y: 0.1, w: 0.5, h: 0.02 }] }], skipped: 0 });
+    pointer('selected words more words');
+    expect(screen.queryByTestId('annotation-bar')).toBeNull(); // a brush creates at once: no popover
     await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(2));
     expect(callsTo('annotations:save').map((c) => [c.annotation.kind, c.annotation.page])).toEqual([['underline', 2], ['underline', 3]]);
   });
@@ -285,13 +330,13 @@ describe('ReaderView: annotations', () => {
     setup({}, {}, (lib) => lib.state.annotations.set(DOC, [{ id: 'a1', kind: 'highlight', page: 2, rects: [{ x: 0.1, y: 0.2, w: 0.3, h: 0.02 }], text: 'old text', color: 'yellow', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }]));
     await ready();
     await screen.findAllByTestId('annotation-item');
-    fake.viewer.pointAt.mockReturnValue({ page: 2, x: 0.2, y: 0.21 });
-    fireEvent.click(screen.getByTestId('reader-pages-area'));
+    pointer('', { page: 2, x: 0.2, y: 0.21 });
     const bar = await screen.findByTestId('annotation-bar');
     expect(bar.getAttribute('data-mode')).toBe('edit');
-    fireEvent.click(screen.getByTestId('ann-color-pink'));
+    fireEvent.click(screen.getByTestId('ann-pop-color-pink'));
     await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(1));
     expect(callsTo('annotations:save')[0].annotation).toMatchObject({ id: 'a1', color: 'pink', kind: 'highlight', text: 'old text' });
+    fireEvent.click(screen.getByTestId('ann-comment-open'));
     fireEvent.change(screen.getByTestId('ann-comment'), { target: { value: 'because' } });
     fireEvent.click(screen.getByTestId('ann-save-comment'));
     await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(2));
@@ -300,7 +345,10 @@ describe('ReaderView: annotations', () => {
     await waitFor(() => expect(callsTo('annotations:remove')).toEqual([{ docId: DOC, id: 'a1' }]));
     await waitFor(() => expect(screen.queryByTestId('annotation-bar')).toBeNull());
     expect(screen.getByTestId('annotation-empty')).toBeTruthy();
-    expect(screen.getByTestId('reader-underlined')).toHaveProperty('checked', false);
+    fireEvent.click(screen.getByTestId('reader-panel-info'));
+    expect(screen.queryByTestId('reader-underlined-origin')).toBeNull();
+    // Deleting offers to bring it back (the same annotation is saved again).
+    expect(screen.getByTestId('toasts').textContent).toMatch(/1 annotation deleted/);
   });
 
   it('lists annotations by page and jumps to one', async () => {
@@ -348,44 +396,40 @@ describe('ReaderView: annotations', () => {
     expect(screen.queryAllByTestId('annotation-stale')).toHaveLength(0);
   });
 
-  it('saves a comment that was typed when the bar is closed with Escape or the close button', async () => {
+  it('saves a comment that was typed when the comment box is closed with Escape, and sends nothing when it is unchanged', async () => {
     setup({}, {}, (lib) => lib.state.annotations.set(DOC, [mkAnn('a1', 2)]));
     await ready();
     await screen.findAllByTestId('annotation-item');
-    fake.viewer.pointAt.mockReturnValue({ page: 2, x: 0.2, y: 0.21 });
-    fireEvent.click(screen.getByTestId('reader-pages-area'));
+    pointer('', { page: 2, x: 0.2, y: 0.21 });
+    fireEvent.click(await screen.findByTestId('ann-comment-open'));
     const input = await screen.findByTestId('ann-comment');
     fireEvent.change(input, { target: { value: 'typed, never blurred' } });
     fireEvent.keyDown(input, { key: 'Escape' });
     await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(1));
     expect(callsTo('annotations:save')[0].annotation).toMatchObject({ id: 'a1', comment: 'typed, never blurred' });
+    // Escape closed the comment box and left the annotation selected; a second Escape closes the popover.
+    press('Escape');
     await waitFor(() => expect(screen.queryByTestId('annotation-bar')).toBeNull());
-
-    // The close button does the same; an unchanged comment sends nothing.
-    fireEvent.click(screen.getByTestId('reader-pages-area'));
-    const again = await screen.findByTestId('ann-comment');
-    await waitFor(() => expect((again as HTMLInputElement).value).toBe('typed, never blurred'));
-    fireEvent.click(screen.getByTestId('ann-close'));
-    await waitFor(() => expect(screen.queryByTestId('annotation-bar')).toBeNull());
+    // Opened again and left as it is: nothing is sent.
+    pointer('', { page: 2, x: 0.2, y: 0.21 });
+    fireEvent.click(await screen.findByTestId('ann-comment-open'));
+    await waitFor(() => expect((screen.getByTestId('ann-comment') as HTMLInputElement).value).toBe('typed, never blurred'));
+    fireEvent.keyDown(screen.getByTestId('ann-comment'), { key: 'Escape' });
     expect(callsTo('annotations:save')).toHaveLength(1);
-    fireEvent.click(screen.getByTestId('reader-pages-area'));
-    fireEvent.change(await screen.findByTestId('ann-comment'), { target: { value: 'edited again' } });
-    fireEvent.click(screen.getByTestId('ann-close'));
-    await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(2));
-    expect(callsTo('annotations:save')[1].annotation.comment).toBe('edited again');
   });
 
-  it('does not send the same comment twice when the box blurs and the bar closes', async () => {
+  it('does not send the same comment twice when the box blurs and then Escape comes', async () => {
     setup({}, {}, (lib) => lib.state.annotations.set(DOC, [mkAnn('a1', 2)]));
     await ready();
     await screen.findAllByTestId('annotation-item');
-    fake.viewer.pointAt.mockReturnValue({ page: 2, x: 0.2, y: 0.21 });
-    fireEvent.click(screen.getByTestId('reader-pages-area'));
+    pointer('', { page: 2, x: 0.2, y: 0.21 });
+    fireEvent.click(await screen.findByTestId('ann-comment-open'));
     const input = await screen.findByTestId('ann-comment');
     fireEvent.change(input, { target: { value: 'once' } });
     fireEvent.blur(input);
-    fireEvent.click(screen.getByTestId('ann-close'));
-    await waitFor(() => expect(screen.queryByTestId('annotation-bar')).toBeNull());
+    fireEvent.keyDown(input, { key: 'Escape' });
+    await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(1));
+    await new Promise((r) => setTimeout(r, 50));
     expect(callsTo('annotations:save')).toHaveLength(1);
   });
 
@@ -411,7 +455,7 @@ describe('ReaderView: annotations', () => {
     await waitFor(() => expect((screen.getByTestId('ann-highlight') as HTMLButtonElement).disabled).toBe(false));
     expect(callsTo('annotations:save')).toHaveLength(2); // page 4 was not tried
     expect(screen.getByTestId('annotation-bar').getAttribute('data-mode')).toBe('new');
-    expect(screen.getByTestId('ann-text').textContent).toBe('words on 3 … words on 4'); // page 2 is saved
+    expect(screen.getByTestId('ann-highlight').getAttribute('title')).toBe('words on 3 … words on 4'); // page 2 is saved
     expect(screen.getByTestId('toasts').textContent).toMatch(/Stopped at page 3/);
     expect(lib.state.annotations.get(DOC)).toHaveLength(1);
     fireEvent.click(screen.getByTestId('ann-highlight'));
@@ -425,10 +469,12 @@ describe('ReaderView: annotations', () => {
     await ready();
     await select(SEL, 2);
     expect(screen.getByTestId('ann-skipped').textContent).toMatch(/2 pages of the selection were not loaded/);
-    fireEvent.click(screen.getByTestId('ann-close'));
+    press('Escape');
+    await waitFor(() => expect(screen.queryByTestId('annotation-bar')).toBeNull());
     await select(SEL, 1);
     expect(screen.getByTestId('ann-skipped').textContent).toMatch(/1 page of the selection was not loaded/);
-    fireEvent.click(screen.getByTestId('ann-close'));
+    press('Escape');
+    await waitFor(() => expect(screen.queryByTestId('annotation-bar')).toBeNull());
     await select(SEL, 0);
     expect(screen.queryByTestId('ann-skipped')).toBeNull();
   });
@@ -490,11 +536,22 @@ describe('ReaderView: study state and underlined flag', () => {
   it('changes the study state and the underlined flag through documents:update', async () => {
     setup({ docs: makeDocs(1).map((d) => ({ ...d, underlined: true, underlinedOrigin: 'manual' as const })) });
     await ready();
-    await waitFor(() => expect(screen.getByTestId('reader-study-to-read')).toHaveProperty('checked', true));
-    expect(screen.getByTestId('reader-underlined-origin').getAttribute('data-origin')).toBe('manual');
+    const studyMenu = async () => {
+      fireEvent.click(screen.getByTestId('reader-study-menu'));
+      return screen.findByTestId('reader-study-reading');
+    };
+    fireEvent.click(screen.getByTestId('reader-panel-info'));
+    await waitFor(() => expect(screen.getByTestId('reader-underlined-origin').getAttribute('data-origin')).toBe('manual'));
+    // The PDF part of the menu says the highlights stay in the app (writing into the PDF is off) and its entries say why they are off.
+    await studyMenu();
+    expect(screen.getByTestId('reader-pdf-status').textContent).toBe('Only in the app');
+    expect(screen.getByTestId('reader-pdf-save').getAttribute('aria-disabled')).toBe('true');
+    expect(screen.getByTestId('reader-pdf-save').getAttribute('title')).toMatch(/switched off/);
+    await waitFor(() => expect(screen.getByTestId('reader-study-to-read').getAttribute('aria-checked')).toBe('true'));
     fireEvent.click(screen.getByTestId('reader-study-reading'));
-    await waitFor(() => expect(screen.getByTestId('reader-study-reading')).toHaveProperty('checked', true));
-    expect(callsTo('documents:update')[0]).toMatchObject({ docId: DOC, patch: { studyState: 'reading' } });
+    await waitFor(() => expect(callsTo('documents:update')[0]).toMatchObject({ docId: DOC, patch: { studyState: 'reading' } }));
+    await studyMenu();
+    await waitFor(() => expect(screen.getByTestId('reader-study-reading').getAttribute('aria-checked')).toBe('true'));
     fireEvent.click(screen.getByTestId('reader-underlined'));
     await waitFor(() => expect(callsTo('documents:update')[1]).toMatchObject({ patch: { underlined: false } }));
   });
@@ -503,6 +560,7 @@ describe('ReaderView: study state and underlined flag', () => {
 describe('Notes in the reader', () => {
   const openPageNote = async () => {
     await ready();
+    fireEvent.click(screen.getByTestId('reader-panel-notes'));
     fireEvent.click(screen.getByTestId('reader-tab-pageNote'));
     return screen.findByTestId('note-page-input');
   };
@@ -574,6 +632,7 @@ describe('Notes in the reader', () => {
       lib.state.notes.set(`${DOC}|3`, { body: 'on page three', createdAt: '2026-01-01T00:00:02.000Z', updatedAt: '2026-01-01T00:00:02.000Z' });
     });
     await ready();
+    fireEvent.click(screen.getByTestId('reader-panel-notes'));
     fireEvent.click(screen.getByTestId('reader-tab-notes'));
     const items = await screen.findAllByTestId('notes-list-item');
     expect(items.map((i) => i.getAttribute('data-page'))).toEqual(['', '3']);
@@ -670,5 +729,161 @@ describe('The document card', () => {
     expect(callsTo('notes:save')[0]).toEqual({ docId: docs[0]!.docId, body: 'file note from the card', expectedUpdatedAt: null });
     fireEvent.click(screen.getByTestId('open-reader'));
     expect(screen.getByTestId('probe').textContent).toBe(docs[0]!.docId);
+  });
+});
+
+describe('ReaderView: the bar and the tools', () => {
+  it('has 13 controls, like the approved prototype (D-410): close, 5 tools, colour dot, page field, zoom, find, Study, panel, more', async () => {
+    setup();
+    await ready();
+    const bar = screen.getByTestId('reader-bar');
+    const controls = [...bar.querySelectorAll<HTMLElement>('button, input, select, a[href], [role="menuitem"]')];
+    expect(controls.map((c) => c.getAttribute('data-testid'))).toEqual([
+      'reader-close',
+      'reader-tool-select',
+      'reader-tool-highlight',
+      'reader-tool-underline',
+      'reader-tool-crop',
+      'reader-tool-eraser',
+      'ann-color',
+      'reader-page-input',
+      'reader-zoom',
+      'reader-find-toggle',
+      'reader-study-menu',
+      'reader-side',
+      'reader-more',
+    ]);
+    expect(controls).toHaveLength(13);
+    // The toolbar is a toolbar with the five tools and the dot; Crop has its place but says why it does nothing yet.
+    expect(screen.getByTestId('reader-toolbar').getAttribute('role')).toBe('toolbar');
+    const crop = screen.getByTestId('reader-tool-crop');
+    expect(crop.getAttribute('aria-disabled')).toBe('true');
+    expect(crop.getAttribute('title')).toMatch(/later version/);
+    fireEvent.click(crop);
+    expect(screen.getByTestId('reader-tool-select').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('the page field follows the viewer and takes digits only', async () => {
+    setup();
+    await ready();
+    act(() => fake.state.handlers.onPages(5));
+    act(() => fake.state.handlers.onPage(3));
+    const field = screen.getByTestId('reader-page-input') as HTMLInputElement;
+    expect(field.value).toBe('3');
+    fireEvent.change(field, { target: { value: '4a' } });
+    expect(field.value).toBe('4');
+  });
+
+  it('chooses a tool by key and by click; Space switches between the current and the last tool; Escape goes back to Select', async () => {
+    const { onClose } = setup();
+    await ready();
+    const pressed = () => ['select', 'highlight', 'underline', 'eraser'].filter((t) => screen.getByTestId(`reader-tool-${t}`).getAttribute('aria-pressed') === 'true');
+    expect(pressed()).toEqual(['select']);
+    press('h');
+    expect(pressed()).toEqual(['highlight']);
+    expect(screen.getByTestId('reader-tool-hint').textContent).toBe('Highlight');
+    press('u');
+    expect(pressed()).toEqual(['underline']);
+    press(' ');
+    expect(pressed()).toEqual(['highlight']); // the last two chosen: Underline and Highlight
+    press(' ');
+    expect(pressed()).toEqual(['underline']);
+    fireEvent.click(screen.getByTestId('reader-tool-eraser'));
+    expect(pressed()).toEqual(['eraser']);
+    press('Escape');
+    expect(pressed()).toEqual(['select']);
+    expect(onClose).not.toHaveBeenCalled();
+    press('Escape'); // Select with nothing open: leaves the reader (D-329)
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('the first Space says that it does not scroll, once; Shift+Space and a text field are left alone', async () => {
+    setup();
+    await ready();
+    press(' ');
+    expect(screen.getByTestId('toasts').textContent).toMatch(/Space switches tool/);
+    expect(screen.getByTestId('reader-tool-highlight').getAttribute('aria-pressed')).toBe('true');
+    const scroll = screen.getByTestId('reader-pages-area');
+    scroll.scrollBy = vi.fn() as never;
+    press(' ', { shiftKey: true });
+    expect(scroll.scrollBy).toHaveBeenCalled();
+    expect(screen.getByTestId('reader-tool-highlight').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.keyDown(screen.getByTestId('reader-page-input'), { key: ' ' });
+    expect(screen.getByTestId('reader-tool-highlight').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.keyDown(screen.getByTestId('reader-tool-select'), { key: ' ' }); // a focused button keeps Space for itself
+    expect(screen.getByTestId('reader-tool-highlight').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('keys 1-5 and the colour dot set the colour used by the brushes; the choice is remembered', async () => {
+    setup();
+    await ready();
+    press('4');
+    expect(screen.getByTestId('ann-color').querySelector('.rbar__pip')!.className).toContain('ann-pink');
+    fireEvent.click(screen.getByTestId('ann-color'));
+    expect(await screen.findByTestId('ann-color-blue')).toBeTruthy();
+    expect(screen.getByTestId('ann-color-pink').getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByTestId('ann-color-blue'));
+    expect(JSON.parse(window.localStorage.getItem('rl.readerTool')!)).toMatchObject({ color: 3 });
+    press('u');
+    fake.viewer.readSelection.mockReturnValue({ pieces: SEL, skipped: 0 });
+    pointer('selected words');
+    await waitFor(() => expect(callsTo('annotations:save')).toHaveLength(1));
+    expect(callsTo('annotations:save')[0].annotation.color).toBe('blue');
+  });
+
+  it('a stroke with the eraser deletes up to three annotations at the release, with an Undo', async () => {
+    setup({}, {}, (lib) => lib.state.annotations.set(DOC, [mkAnn('a1', 2), mkAnn('a2', 2)]));
+    await ready();
+    await screen.findAllByTestId('annotation-item');
+    press('e');
+    eraseStroke();
+    await waitFor(() => expect(callsTo('annotations:remove')).toHaveLength(2));
+    expect(screen.queryByTestId('erase-confirm')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('toasts').textContent).toMatch(/2 annotations deleted/));
+  });
+
+  it('a stroke that touches more than three annotations asks first, and deletes nothing until confirmed', async () => {
+    const five = ['a1', 'a2', 'a3', 'a4', 'a5'].map((id) => mkAnn(id, 2));
+    setup({}, {}, (lib) => lib.state.annotations.set(DOC, five));
+    await ready();
+    await screen.findAllByTestId('annotation-item');
+    press('e');
+    eraseStroke();
+    const ask = await screen.findByTestId('erase-confirm');
+    expect(ask.textContent).toMatch(/Delete 5 annotations\?/);
+    expect(callsTo('annotations:remove')).toHaveLength(0);
+    fireEvent.click(screen.getByTestId('erase-confirm-no'));
+    expect(callsTo('annotations:remove')).toHaveLength(0);
+    eraseStroke();
+    fireEvent.click(await screen.findByTestId('erase-confirm-yes'));
+    await waitFor(() => expect(callsTo('annotations:remove')).toHaveLength(5));
+  });
+
+  it('with Select, a selection offers Copy and Highlight (no Underline: that is the U tool); a brush never shows the popover', async () => {
+    setup();
+    await ready();
+    await select();
+    expect(screen.getByTestId('ann-copy')).toBeTruthy();
+    expect(screen.getByTestId('ann-highlight')).toBeTruthy();
+    expect(screen.queryByTestId('ann-underline')).toBeNull();
+    press('Escape');
+    await waitFor(() => expect(screen.queryByTestId('annotation-bar')).toBeNull());
+    press('h');
+    fake.viewer.readSelection.mockReturnValue({ pieces: SEL, skipped: 0 });
+    act(() => void document.dispatchEvent(new Event('selectionchange')));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.queryByTestId('annotation-bar')).toBeNull();
+  });
+
+  it('the More menu has Undo, History and the file actions; entries that do not exist yet are disabled with a reason, never hidden', async () => {
+    setup();
+    await ready();
+    fireEvent.click(screen.getByTestId('reader-more'));
+    await screen.findByTestId('reader-history');
+    for (const id of ['reader-undo', 'reader-history', 'reader-side-by-side', 'reader-open-file', 'reader-reveal', 'reader-export-copy', 'reader-guide']) expect(screen.getByTestId(id)).toBeTruthy();
+    expect(screen.getByTestId('reader-side-by-side').getAttribute('aria-disabled')).toBe('true');
+    expect(screen.getByTestId('reader-export-copy').getAttribute('title')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('reader-reveal'));
+    await waitFor(() => expect(callsTo('documents:reveal')).toEqual([{ docId: DOC }]));
   });
 });

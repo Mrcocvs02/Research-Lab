@@ -8,6 +8,7 @@ import { InShellContext } from '../lib/history';
 import { useInbox } from '../lib/inbox';
 import type { NavView } from '../lib/nav';
 import { useNotify } from '../lib/notify';
+import { useReader } from '../lib/reader';
 import { useLocalFlag } from '../lib/useLocalFlag';
 import { useApp } from '../state/app-context';
 import { useScanStatus } from '../views/library/useScanStatus';
@@ -45,7 +46,7 @@ interface Props {
 const floating = () => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 1179px)').matches === true;
 
 /** Window layout (4.1): sidebar, top bar, banners, the view, and the Claude panel (no space when closed). */
-export function Shell({ section, onSection, onNewLibrary, reviewDocs = 0, reading = false, banner, children }: Props) {
+export function Shell({ section, onSection, onNewLibrary, reviewDocs = 0, reading: readingProp = false, banner, children }: Props) {
   const { t } = useTranslation();
   const { chatOpen, setChatOpen, paletteOpen, setPaletteOpen, exportInit, closeExport, guide, closeGuide } = useAiUi();
   const app = useApp();
@@ -54,6 +55,9 @@ export function Shell({ section, onSection, onNewLibrary, reviewDocs = 0, readin
   const inbox = useInbox();
   const scan = useScanStatus();
   const [collapsed, setCollapsed] = useLocalFlag('rl.sidebarCollapsed', false);
+  // While the reader is open the sidebar shrinks to its icons and the reader's own bar takes the place of the top bar (W10, D-441);
+  // `collapsed` stays the user's choice, so the sidebar comes back as they left it.
+  const reading = readingProp || (useReader().target !== null && section === 'library');
   const panel = useRef<HTMLElement>(null);
   // The chat is mounted the first time the panel opens and then kept (hidden when closed), so a running answer goes on.
   const [chatLoaded, setChatLoaded] = useState(chatOpen);
@@ -88,12 +92,18 @@ export function Shell({ section, onSection, onNewLibrary, reviewDocs = 0, readin
   const aiCount = app.config?.aiEnabledFolders.length ?? 0;
   return (
     <InShellContext.Provider value={true}>
-      <div className="shell" data-testid="shell" data-collapsed={collapsed || reading ? 'true' : undefined} data-chat={chatOpen ? 'open' : 'closed'}>
+      <div className="shell" data-testid="shell" data-collapsed={collapsed || reading ? 'true' : undefined} data-reading={reading ? 'true' : undefined} data-chat={chatOpen ? 'open' : 'closed'}>
         <a className="skip-link" href="#main">
           {t('shell.skip')}
         </a>
-        <Sidebar view={section} onSection={onSection} onNewLibrary={onNewLibrary} proposals={reviewDocs} documents={scan.status && app.activeProfile ? scan.status.indexed : null} collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} chatId={chatId} />
-        <Topbar scan={scan} />
+        <Sidebar view={section} onSection={onSection} onNewLibrary={onNewLibrary} proposals={reviewDocs} documents={scan.status && app.activeProfile ? scan.status.indexed : null} collapsed={collapsed || reading} onToggle={() => !reading && setCollapsed(!collapsed)} chatId={chatId} />
+        {reading ? (
+          <header className="topbar topbar--reader" data-testid="topbar">
+            <div id="reader-bar-slot" className="reader-bar-slot" />
+          </header>
+        ) : (
+          <Topbar scan={scan} />
+        )}
         <div className="banner-slot" data-testid="banner-slot">
           <NoticeBanner />
           {banner}

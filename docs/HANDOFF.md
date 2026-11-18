@@ -9,7 +9,7 @@ Stato di passaggio per riprendere il lavoro. Prima di fare qualunque cosa, legge
 1. `CLAUDE.md` (regole di lavoro, modelli per compito, commit, comandi);
 2. `docs/STATUS.md` (fase, onda, fatto, in corso, bloccato, prossimo);
 3. `docs/HANDOFF.md` (questo file);
-4. `docs/DECISIONS.md` (le ultime voci: D-429..D-446);
+4. `docs/DECISIONS.md` (le ultime voci: D-429..D-451);
 5. `docs/design/ARCHITETTURA-UI.md` §14 e §14.1 (ondate di implementazione e funzioni nuove);
 6. `docs/HISTORY.md` (facoltativo: cronologia).
 
@@ -18,10 +18,10 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 ## 2. Aggiornato
 
 - Data: 2026-11-18 (sera).
-- Ultimo commit su `main` prima di questo aggiornamento: `61e40d4`. Ultimo merge: `2354a9f` (`e3`).
-- Branch uniti e pubblicati: `h0`, `r0`, `s1`, `s2`, `w1-contracts`, `a1`, `b1`, `c2`, `a2`, `audit2`, `r2`, `fix-real`, `f4`, `tokcap`, `d3`, `g4b`, `e3`.
-- Ramo aperto: `g4a` (worktree `C:\dev\rl-wt\g4a`, da `main` 1300f23). Nessun commit; modifiche non committate. Da riprendere o rifare (sezione 5).
-- Worktree ancora su disco sotto `C:\dev\rl-wt`: rimuovibili tutti tranne `g4a`.
+- Ultimo merge su `main`: `8a42f58` (`g4a`). Questo aggiornamento è un commit dopo `8a42f58`.
+- Branch uniti e pubblicati: `h0`, `r0`, `s1`, `s2`, `w1-contracts`, `a1`, `b1`, `c2`, `a2`, `audit2`, `r2`, `fix-real`, `f4`, `tokcap`, `d3`, `g4b`, `e3`, `g4a`.
+- Ramo aperto: `m4` (worktree `C:\dev\rl-wt\m4`, subagent Sonnet in corso). Da unire dopo i quattro controlli (sezione 5).
+- Worktree ancora su disco sotto `C:\dev\rl-wt`: rimuovibili tutti tranne `m4`.
 - Tag: `phase-0`..`phase-3`, `phase-6`, `phase-7` pubblicati; `phase-4`, `phase-5`, `phase-8` senza tag.
 - Installer di rilascio costruito prima della riprogettazione (131 MB, non firmato): da rifare dopo le ondate.
 
@@ -33,31 +33,31 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 - Prova con dati reali (`fix-real`): bug corretti; le copie dei file di prova e il rapporto stanno in una cartella temporanea fuori dal repository.
 - Onda 3 unita: F4 (lettore), D3 (libreria), E3 (hub "Da rivedere"), G4b (identità del contenuto dei PDF). Tetto dei token con estensione (`tokcap`, D-442).
 - Risposte dell'utente: D-436, D-439, D-440, D-446. D-446 apre il compito T1 "pipeline di analisi".
-- Alla chiusura della sessione G4a era in corso e non è finita (vedi sezione 5).
+- G4a unita (`g4a`, merge `8a42f58`, 10 commit), ripresa in una chat nuova dopo lo stop del subagent con 2 commit: scrittore incrementale sincrono con consenso; `PDF_WRITE_ENABLED` resta `false` fino alla revisione di sicurezza (D-449..D-451).
 - Revisioni e test rimandati alla verifica finale (D-443).
 
 ## 4. Test: eseguiti
 
-- Dal D-443 nessun test è stato eseguito. Durante le ondate si eseguono solo `npm run typecheck`, `npm run build`, `npm run check:budget` e `npm run check:generality`. I task scrivono i test ma non li eseguono.
+- Dal D-443 nessun test è stato eseguito (anche i test scritti in G4a, vedi sotto). Durante le ondate si eseguono solo `npm run typecheck`, `npm run build`, `npm run check:budget` e `npm run check:generality`. I task scrivono i test ma non li eseguono.
 - Ultimi test noti, su `main` dopo H0 (2026-11-18): unitari 1707 passati, 12 saltati, 1 fallimento instabile in `McpSection.test.ts` (PORT_IN_USE con poca RAM; passa 17/17 da solo); e2e `reader-geometry` 4/4, `study-ui` 1/1, `smoke` 4/4.
 - Problemi noti da chiudere nella verifica finale (D-429, D-443, D-444): `McpSection` PORT_IN_USE; `export.test` sotto poca RAM; `ui-library.spec.ts` si blocca; 2 test di `reader.test.ts` rotti da D3; `design-audit.spec.ts` con testid cambiati; `firstContentMs` da rimisurare su macchina scarica.
+- G4a (D-449..D-451), da verificare nel passaggio finale: test scritti e non eseguiti (scrittore: oggetti, doc, geometria, scrittura con la proprietà del prefisso, riconciliazione, rifiuti, 500 mutazioni ostili; `pdf-sync.test.ts`; asserzioni di handler e procedura guidata; `e2e/pdf-annot.spec.ts`). Punti aperti: riscrittura completa di un PDF da un altro programma con lo stesso testo (D-445, regola 3) non gestita, trattata come cambiata (sicuro); lista "Da controllare" in Attività mancante (le scelte stanno nel pannello Info del lettore); `expectedWrites` riempito ma non letto; dubbi: l'e2e del pixel in una BrowserWindow nascosta può non disegnare (salta con nota), soglie del test ostile stimate, file ibridi e con predittore PNG affidati alla lettura dell'aggiornamento da parte di pdf.js.
 - Se la RAM libera non basta, la suite si ferma da sola: rieseguire solo i test mancanti, mai due pesanti insieme.
 
 ## 5. Stato e prossimi passi
 
-In corso: G4a (annotazioni nel PDF: scrittura sincrona, consenso, `LibraryAnnotationsGroup`, `writeToPdfConfirmedAt` nella configurazione della libreria e nella procedura guidata, divisione del budget in `tools/check-budget.mjs`). Stato verificato alla chiusura: ramo `g4a` senza commit; modifiche non committate in `packages/core` e nuovi file in `packages/data/src/pdf-annot/`.
+In corso: M4 (Mappa, giocosa, reti per tag, temi e autori) in un subagent Sonnet, worktree `C:\dev\rl-wt\m4`, ramo `m4`. G4a è unita (`8a42f58`): nessun lavoro aperto, resta la verifica finale (sezione 4).
 
 Passi, in ordine:
-1. Ramo `g4a`: se il lavoro è completo e il worktree pulito, revisione e merge su `main` (solo typecheck, build, check:budget, check:generality; `PDF_WRITE_ENABLED` resta `false`). Se è incompleto, riprendere il subagent con SendMessage, oppure rifare G4a da `docs/design/ARCHITETTURA-UI.md` §14, ondata 4.
-2. Ondata 4: M4 (Mappa, giocosa, reti per tag, temi e autori) in parallelo con G4a; poi G4c (PDF cifrati con password vuota) ∥ N4 (reti di entità in `main`), come in ARCHITETTURA-UI §14.
-3. Ondata 5: I5 (chat, export, viste secondarie) ∥ H5 (progetti e Scopri), poi J5. Il responsabile della guida i18n dell'ondata 5 applica le frasi in sospeso dai rapporti di F4 ed E3 (D-444, D-446): strumenti prima del lettore, Spazio, colori 1-5, barra laterale che si riduce durante la lettura, conferma della gomma oltre 3 annotazioni, "Solo nell'app" in Studio; schede "Nuovi file" e "Proposte di Claude" di Da rivedere, chip Modello e Ragionamento, Ignora/Conferma, "Segna tutti come visti", copie di conflitto, ✓/✗ per campo, "Accettate finora".
-4. T1 pipeline di analisi (D-446).
-5. Ondate 7-10: funzioni nuove X1..X8 (§14.1).
-6. Ondata 12: funzioni confermate (PRISMA, D-439; copia BibTeX/RIS, D-436; funzione 49).
-7. Verifica finale, una sola volta: revisione indipendente e revisione di sicurezza dedicata a G4a, G4b e G4c; correzioni; poi attivare `PDF_WRITE_ENABLED`; tutti i test, quelli pesanti uno alla volta, con RAM libera controllata (sezione 4).
-8. Fase 8: prova di installazione fatta dall'agente (installazione silenziosa in cartella temporanea, avvio, disinstallazione, controllo dei dati, con le impostazioni dell'account dell'utente salvate e ripristinate prima). Poi tag `phase-8` e versione 1.0.0 (D-262).
+1. Unire `m4` (solo typecheck, build, check:budget, check:generality), poi G4c ∥ N4 (attenzione al tetto di ingresso del main, D-449: il codice nuovo va pigro dove possibile). `PDF_WRITE_ENABLED` resta `false`.
+2. Ondata 5: I5 (chat, export, viste secondarie) ∥ H5 (progetti e Scopri), poi J5. Il responsabile della guida i18n dell'ondata 5 applica le frasi in sospeso dai rapporti di F4 ed E3 (D-444, D-446): strumenti prima del lettore, Spazio, colori 1-5, barra laterale che si riduce durante la lettura, conferma della gomma oltre 3 annotazioni, "Solo nell'app" in Studio; schede "Nuovi file" e "Proposte di Claude" di Da rivedere, chip Modello e Ragionamento, Ignora/Conferma, "Segna tutti come visti", copie di conflitto, ✓/✗ per campo, "Accettate finora".
+3. T1 pipeline di analisi (D-446).
+4. Ondate 7-10: funzioni nuove X1..X8 (§14.1).
+5. Ondata 12: funzioni confermate (PRISMA, D-439; copia BibTeX/RIS, D-436; funzione 49).
+6. Verifica finale, una sola volta: revisione indipendente e revisione di sicurezza dedicata a G4a, G4b e G4c; correzioni; poi attivare `PDF_WRITE_ENABLED`; tutti i test, quelli pesanti uno alla volta, con RAM libera controllata (sezione 4). Punti aperti di G4a: in sezione 4.
+7. Fase 8: prova di installazione fatta dall'agente (installazione silenziosa in cartella temporanea, avvio, disinstallazione, controllo dei dati, con le impostazioni dell'account dell'utente salvate e ripristinate prima). Poi tag `phase-8` e versione 1.0.0 (D-262).
 
-Budget (`check:budget` verde): JS iniziale del renderer 352,8/396 KiB; JS totale 1740,5/1785 KiB; totale 1852,1/1905 KiB; main 1057,9/1095 KiB (G4a lo divide in `entryJsKB` ≤ 1096 e `lazyJsKB` ≤ 120, D-445); preload 3,4/8 KiB.
+Budget (`check:budget` verde): JS iniziale del renderer 352,9/396 KiB; JS totale 1765,7/1785 KiB; totale 1877,8/1905 KiB; main entry 1093,8/1096 KiB, main lazy 42,5/120 KiB (chunk `writer` 42,5, tetto 44; D-449); preload 3,8/8 KiB.
 
 ## 6. Come lavorare (regole di lavoro dell'utente)
 

@@ -93,15 +93,46 @@ export function titleFromFirstPage(lines: TextLine[]): { title: string; endIndex
   return title.length >= 4 ? { title, endIndex: end } : undefined;
 }
 
-/** Authors: the first lines after the title that parse as names, before the abstract. */
+const ROLE = /\b(prof(?:essor|\.)?|dr\.?|supervisors?|co-?supervisors?|relatore|correlatore|relatrice|advisors?|advisers?|examiner|tutor|chiar\.?mo|ing\.)(?=\W|$)/i;
+const ROLE_ONLY = /^(?:(?:co-?)?supervisors?|relatore|correlatore|relatrice|advisors?|advisers?|examiner|tutor)\s*:?$/i;
+const CANDIDATE = /^(?:defended by|presented by|submitted by|written by|presentata da|presentato da|candidat[eoa]|author|autore|autrice)\s*:?\s*(.*)$/i;
+
+/**
+ * Authors: the first lines after the title that parse as names, before the abstract.
+ * On a thesis title page the candidate (after "Candidate", "Defended by", "Candidato"...) wins and role lines
+ * (supervisor, advisor, "Prof.") are never taken as authors.
+ */
 export function authorsFromFirstPage(lines: TextLine[], afterIndex: number): string[] {
   const out: string[] = [];
   let tried = 0;
-  for (let i = afterIndex + 1; i < lines.length && tried < 8; i++) {
+  let skipNext = false;
+  let candidateNext = false;
+  for (let i = afterIndex + 1; i < lines.length && tried < 12; i++) {
     const t = squash((lines[i] as TextLine).text);
     if (!t) continue;
     if (/^(abstract|riassunto|sommario|keywords?|introduction|1[.\s]+introduction)\b/i.test(t)) break;
     tried++;
+    if (candidateNext) {
+      candidateNext = false;
+      const names = parseAuthorLine(t);
+      if (names.length > 0) return names;
+    }
+    if (skipNext) {
+      skipNext = false;
+      continue;
+    }
+    const cand = CANDIDATE.exec(t);
+    if (cand) {
+      const names = cand[1] ? parseAuthorLine(cand[1]) : [];
+      if (names.length > 0) return names;
+      if (!cand[1]) candidateNext = true;
+      continue;
+    }
+    if (ROLE_ONLY.test(t)) {
+      skipNext = true;
+      continue;
+    }
+    if (ROLE.test(t)) continue;
     const names = parseAuthorLine(t);
     if (names.length > 0) out.push(...names);
     else if (out.length > 0) break; // the author block is over

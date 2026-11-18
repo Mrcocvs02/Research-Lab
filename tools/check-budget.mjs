@@ -59,7 +59,7 @@ function mainSplit() {
     if (seen.has(file)) continue;
     seen.add(file);
     const code = readFileSync(file, 'utf8');
-    for (const m of code.matchAll(/(?:from\s*|import\s*|require\()["'](\.\.?\/[^"']+\.js)["']/g)) {
+    for (const m of code.matchAll(/(?:from\s*|import\s*|require\()["'](\.\.?\/[^"']+\.js)["']/g)) {
       const target = path.join(path.dirname(file), m[1]);
       if (existsSync(target)) queue.push(target);
     }

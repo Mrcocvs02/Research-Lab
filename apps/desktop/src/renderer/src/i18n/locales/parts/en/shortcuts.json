@@ -1,7 +1,7 @@
 {
   "shortcuts": {
     "title": "Keyboard shortcuts",
-    "intro": "Change, turn off or restore the keys of the commands. A key needs Ctrl or Alt (F1 to F12 can stand alone). Press Escape while recording to cancel.",
+    "intro": "Change, turn off or restore the keys of the commands. A change is saved at once. Press Escape while recording to cancel.",
     "scope": {
       "global": "Everywhere in the app",
       "reader": "In the PDF reader",
@@ -19,14 +19,10 @@
     "change": "Change",
     "turnOff": "Turn off",
     "default": "Default",
-    "changeFor": "Change the key of: {{command}}",
-    "offFor": "Turn off the key of: {{command}}",
-    "defaultFor": "Restore the default key ({{key}}) of: {{command}}",
-    "recording": "Press the new key…",
+    "recording": "Press the keys… · Esc cancels",
     "recordingLabel": "Press the new key for: {{command}}",
     "needsModifier": "Use Ctrl or Alt with the key (only F1 to F12 can be used alone).",
     "fixedKey": "{{key}} is a fixed key and cannot be assigned.",
-    "conflictShort": "Same key as another command",
     "conflictsTitle": "Two commands cannot share a key. Fix this to save:",
     "conflict": "\"{{a}}\" and \"{{b}}\" both use {{key}}.",
     "resetAll": "Restore all defaults",
@@ -63,6 +59,14 @@
       "reader.comment": "Comment on the selected annotation",
       "reader.annotation.delete": "Delete the selected annotation"
     },
-    "conflictRefused": "Could not save: the shortcut is already used by another command ({{commands}}). Fix the conflict and save again."
+    "conflictRefused": "Could not save: the shortcut is already used by another command ({{commands}}). Fix the conflict and save again.",
+    "actionsFor": "Actions for: {{command}}",
+    "alreadyDefault": "It already has the default key",
+    "alreadyOff": "It is already off",
+    "defaultKey": "Restore the default ({{key}})",
+    "search": "Search commands",
+    "undoChanges": "Undo changes",
+    "bareKey": "Reader tools use a single key, without Ctrl or Alt.",
+    "bareInvalid": "Use a letter, a digit, Space or Delete."
   }
 }

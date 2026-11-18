@@ -50,9 +50,8 @@ export function AiLog({ reloadKey }: { reloadKey: unknown }) {
   const when = (iso: string) => new Date(iso).toLocaleString(i18n.language);
 
   return (
-    <div className="group" data-testid="ai-log">
-      <h3>{t('settings.ai.log.title')}</h3>
-      <p className="hint">{t('settings.ai.log.hint')}</p>
+    <div data-testid="ai-log" data-set="aiLog">
+      <p className="set-help">{t('settings.ai.log.hint')}</p>
       {error ? <ErrorNote>{errorMessage(error, t)}</ErrorNote> : null}
       {items?.length === 0 && <p className="hint">{t('settings.ai.log.empty')}</p>}
       {items && items.length > 0 && (

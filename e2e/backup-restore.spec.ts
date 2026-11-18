@@ -4,6 +4,7 @@ import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { launchApp, type LaunchedApp } from './helpers/launch';
 import { createLibraryViaWizard, ipcData, waitForScan } from './helpers/phase1';
+import { openSettings } from './helpers/settings';
 
 /**
  * Phase 8 criterion, written for the final run (NOT run while writing it): a second library with another language and
@@ -109,6 +110,17 @@ test('a second library (other language, other taxonomy) is backed up and restore
     expect(taxonomy.nodes.map((n) => n.label)).toEqual(expect.arrayContaining(['Primo tema', 'Secondo tema']));
     const after = await ipcData<{ documents: number }>(three.window, 'maintenance:report', { libraryId: newId });
     expect(after.documents).toBe(before.documents);
+
+    // The Backup section: the destination is valid, the backup is listed, the restore dialog keeps its footer in view and needs a folder.
+    await openSettings(three.window, 'backup');
+    await expect(three.window.getByTestId('backup-item')).toHaveCount(1);
+    await three.window.getByTestId('backup-restore').click();
+    const dialog = three.window.getByTestId('restore-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(three.window.getByTestId('restore-start')).toBeDisabled();
+    await expect(three.window.getByTestId('restore-start')).toBeInViewport();
+    await three.window.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
     await three.app.close();
   } finally {
     for (const a of apps) await a.close().catch(() => {});

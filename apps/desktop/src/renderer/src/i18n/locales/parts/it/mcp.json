@@ -36,7 +36,6 @@
     },
     "tools": "Strumenti offerti a Claude Code: {{list}}.",
     "write": {
-      "title": "Scrittura",
       "label": "Consenti a Claude Code di proporre campi AI",
       "warning": "Spenta per impostazione predefinita. Quando è accesa, Claude Code può solo PROPORRE campi AI (come un riassunto o dei tag): sono marcati come output AI e vanno alla tua revisione prima di essere accettati. Non può mai modificare le tue note né i tuoi campi.",
       "confirmTitle": "Consentire le proposte di Claude Code?",
@@ -45,7 +44,6 @@
       "reconnect": "Dopo aver acceso o spento la scrittura, ricollega Claude Code per vedere il cambiamento nell'elenco dei suoi strumenti."
     },
     "port": {
-      "title": "Porta",
       "label": "Porta",
       "hint": "Un numero tra {{min}} e {{max}}. Vuoto: l'app sceglie una porta libera e la ricorda su questo computer.",
       "auto": "Automatica",
@@ -84,6 +82,7 @@
       "ok": "OK",
       "failed": "Fallita ({{code}})",
       "more": "Mostra altre ({{shown}} di {{total}})"
-    }
+    },
+    "toolsTitle": "Strumenti disponibili"
   }
 }

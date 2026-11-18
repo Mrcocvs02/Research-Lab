@@ -1,3 +1,4 @@
+import { openAdvancedGroup } from './helpers/settings';
 import { mkdtemp, readFile, readdir, rm, stat, writeFile, appendFile, mkdir } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -319,7 +320,7 @@ test('MCP server from the settings: configuration from the clipboard, tools over
     const query = allowedFile!.title!;
 
     // Settings: off by default, then enabled through the interface.
-    await window.getByTestId('nav-settings').click();
+    await openAdvancedGroup(window, 'mcp');
     const section = window.getByTestId('mcp-settings');
     await expect(section).toBeVisible();
     await expect(section.getByTestId('mcp-state')).toHaveText('Off');
@@ -370,6 +371,7 @@ test('MCP server from the settings: configuration from the clipboard, tools over
     expect((await rpc(url, null, 'tools/list')).status).toBe(401);
 
     // The call log in the settings follows live, with tools and outcomes but no content.
+    await section.getByTestId('mcp-log').locator('summary').click();
     const rows = section.getByTestId('mcp-log-row');
     await expect.poll(() => rows.count(), { timeout: 30_000 }).toBeGreaterThan(3);
     await expect(section.getByTestId('mcp-log')).toContainText('get_document');

@@ -123,8 +123,8 @@ describe('backup section', () => {
         return baseSettings({ destination: dest });
       },
     });
-    const now = await screen.findByTestId('backup-now');
-    expect((now as HTMLButtonElement).disabled).toBe(true);
+    await screen.findByTestId('backup-no-destination');
+    expect(screen.queryByTestId('backup-now')).toBeNull();
     fireEvent.click(screen.getByTestId('backup-choose'));
     expect((await screen.findByTestId('backup-destination')).textContent).toBe('/tmp/chosen');
     await waitFor(() => expect((screen.getByTestId('backup-now') as HTMLButtonElement).disabled).toBe(false));
@@ -139,7 +139,9 @@ describe('backup section', () => {
       },
     });
     fireEvent.click(await screen.findByTestId('backup-choose'));
-    expect((await screen.findByTestId('backup-error')).textContent).toContain('inside a library folder');
+    expect((await screen.findByTestId('backup-refused')).textContent).toContain('inside a library folder');
+    expect(screen.queryByTestId('backup-now')).toBeNull();
+    expect(screen.getByTestId('backup-choose').textContent).toBe('Choose another folder…');
   });
 
   it('saves the schedule through backup:configure', async () => {
@@ -148,9 +150,9 @@ describe('backup section', () => {
       'backup:list': () => ({ items: [] }),
       'backup:configure': (p: any) => baseSettings(p),
     });
-    fireEvent.change(await screen.findByTestId('backup-auto'), { target: { value: 'weekly' } });
+    fireEvent.click(within(await screen.findByTestId('backup-auto')).getByRole('radio', { name: 'Weekly' }));
     await waitFor(() => expect(callsTo('backup:configure')).toEqual([{ auto: 'weekly' }]));
-    await waitFor(() => expect((screen.getByTestId('backup-keep') as HTMLInputElement).disabled).toBe(false));
+    await waitFor(() => expect(within(screen.getByTestId('backup-auto')).getByRole('radio', { name: 'Weekly' }).getAttribute('aria-checked')).toBe('true'));
   });
 
   it('removes a backup only after confirmation', async () => {
@@ -163,7 +165,8 @@ describe('backup section', () => {
         return { ok: true };
       },
     });
-    fireEvent.click(await screen.findByTestId('backup-remove'));
+    fireEvent.click(await screen.findByTestId('backup-more'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }));
     expect(callsTo('backup:remove')).toEqual([]);
     expect(screen.getByTestId('backup-remove-confirm').textContent).toContain('cannot be undone');
     fireEvent.click(screen.getByTestId('backup-remove-yes'));
@@ -197,7 +200,8 @@ describe('backup section', () => {
     expect(callsTo('backup:inspect')).toEqual([{ file: '/tmp/other.rlbackup' }]);
     expect((within(row).getByTestId('backup-restore') as HTMLButtonElement).disabled).toBe(true);
     // A file that is not in the destination list cannot be removed from here.
-    expect(within(row).queryByTestId('backup-remove')).toBeNull();
+    fireEvent.click(within(row).getByTestId('backup-more'));
+    expect((await screen.findByRole('menuitem', { name: 'Remove' })).getAttribute('aria-disabled')).toBe('true');
   });
 });
 
@@ -225,7 +229,7 @@ describe('restore dialog', () => {
     expect(callsTo('dialog:chooseFolder')[0]).toMatchObject({ purpose: 'library-root' });
     fireEvent.click(screen.getByTestId('restore-settings'));
     fireEvent.click(screen.getByTestId('restore-start'));
-    await waitFor(() => expect(callsTo('backup:restore')).toEqual([{ file: info().file, rootPath: '/tmp/new-root', restoreLocal: true, restoreSettings: true }]));
+    await waitFor(() => expect(callsTo('backup:restore')).toEqual([{ file: info().file, rootPath: '/tmp/new-root', name: expect.stringContaining('Alpha (restored on'), restoreLocal: true, restoreSettings: true }]));
     const secrets = await screen.findByTestId('restore-secrets');
     expect(within(secrets).getAllByRole('listitem').map((l) => l.getAttribute('data-secret'))).toEqual(['anthropic-api-key', 'mcp-token']);
     expect(secrets.textContent).toContain('Anthropic API key');
@@ -326,21 +330,24 @@ describe('maintenance section', () => {
 describe('shortcuts editor', () => {
   const rows = () => screen.getAllByTestId('shortcut-row');
   const row = (id: string) => rows().find((r) => r.getAttribute('data-command') === id)!;
+  const act1 = async (id: string, item: string | RegExp) => {
+    fireEvent.click(within(row(id)).getByTestId('shortcut-more'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: item }));
+  };
 
   it('records a new accelerator and saves only the overrides', async () => {
     setup(createElement(ShortcutsSection));
     await screen.findByTestId('shortcuts-section');
-    fireEvent.click(within(row('palette.open')).getByTestId('shortcut-change'));
+    await act1('palette.open', 'Change');
     const rec = await screen.findByTestId('shortcut-recorder');
     fireEvent.keyDown(rec, { key: 'p', ctrlKey: true });
     expect(within(row('palette.open')).getByTestId('shortcut-key').textContent).toBe('Ctrl+P');
-    fireEvent.click(screen.getByTestId('shortcuts-save'));
     await waitFor(() => expect(callsTo('settings:set')).toEqual([{ shortcuts: [{ id: 'palette.open', accelerator: 'Ctrl+P' }] }]));
   });
 
   it('refuses a fixed key and a key without Ctrl or Alt, and Escape cancels', async () => {
     setup(createElement(ShortcutsSection));
-    fireEvent.click(within(row('chat.toggle')).getByTestId('shortcut-change'));
+    await act1('chat.toggle', 'Change');
     let rec = await screen.findByTestId('shortcut-recorder');
     fireEvent.keyDown(rec, { key: 'c', ctrlKey: true });
     expect(screen.getByTestId('shortcut-problem').textContent).toContain('fixed key');
@@ -350,7 +357,7 @@ describe('shortcuts editor', () => {
     await waitFor(() => expect(screen.queryByTestId('shortcut-recorder')).toBeNull());
     expect(within(row('chat.toggle')).getByTestId('shortcut-key').textContent).toBe('Ctrl+J');
     expect(callsTo('settings:set')).toEqual([]);
-    fireEvent.click(within(row('chat.toggle')).getByTestId('shortcut-change'));
+    await act1('chat.toggle', 'Change');
     rec = await screen.findByTestId('shortcut-recorder');
     fireEvent.keyDown(rec, { key: 'Control', ctrlKey: true });
     expect(screen.queryByTestId('shortcut-problem')).toBeNull();
@@ -358,12 +365,12 @@ describe('shortcuts editor', () => {
 
   it('shows a conflict and refuses to save until it is solved', async () => {
     setup(createElement(ShortcutsSection));
-    fireEvent.click(within(row('chat.toggle')).getByTestId('shortcut-change'));
+    await act1('chat.toggle', 'Change');
     fireEvent.keyDown(await screen.findByTestId('shortcut-recorder'), { key: 'k', ctrlKey: true });
-    expect(screen.getByTestId('shortcuts-conflicts').textContent).toContain('both use Ctrl+K');
+    expect(screen.getAllByText(/both use Ctrl\+K/).length).toBeGreaterThan(0);
     expect(row('chat.toggle').getAttribute('data-conflict')).toBe('true');
-    expect((screen.getByTestId('shortcuts-save') as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(within(row('chat.toggle')).getByTestId('shortcut-default'));
+    expect(callsTo('settings:set')).toEqual([]);
+    await act1('chat.toggle', /Restore the default/);
     expect(screen.queryByTestId('shortcuts-conflicts')).toBeNull();
   });
 
@@ -373,15 +380,13 @@ describe('shortcuts editor', () => {
     expect(within(row('history.undo')).getByTestId('shortcut-key').textContent).toBe('Off');
     fireEvent.click(screen.getByTestId('shortcuts-reset'));
     expect(within(row('history.undo')).getByTestId('shortcut-key').textContent).toBe('Ctrl+Z');
-    fireEvent.click(screen.getByTestId('shortcuts-save'));
     await waitFor(() => expect(callsTo('settings:set')).toEqual([{ shortcuts: [] }]));
   });
 
   it('lets a command be turned off and saved', async () => {
     setup(createElement(ShortcutsSection));
     await screen.findByTestId('shortcuts-section');
-    fireEvent.click(within(row('nav.review')).getByTestId('shortcut-off'));
-    fireEvent.click(screen.getByTestId('shortcuts-save'));
+    await act1('nav.review', 'Turn off');
     await waitFor(() => expect(callsTo('settings:set')).toEqual([{ shortcuts: [{ id: 'nav.review', accelerator: null }] }]));
   });
 
@@ -479,9 +484,7 @@ describe('fixes of the phase 8 review', () => {
 
   it('says that a synced destination holds the backup files and which chats are included', async () => {
     setup(createElement(BackupSection));
-    const note = await screen.findByTestId('backup-sync-note');
-    expect(note.textContent).toContain('synced folder');
-    expect(note.textContent).toContain('chat history');
+    expect((await screen.findByText(/If the destination is in a synced folder/)).textContent).toContain('Automatic backups never include chat history');
   });
 
   it('shows the size of the internal safety copy and that it is not cleaned', async () => {
@@ -498,8 +501,8 @@ describe('fixes of the phase 8 review', () => {
       },
     });
     const off = (await screen.findAllByTestId('shortcut-row')).find((r) => r.getAttribute('data-command') === 'nav.review')!;
-    fireEvent.click(within(off).getByTestId('shortcut-off'));
-    fireEvent.click(screen.getByTestId('shortcuts-save'));
+    fireEvent.click(within(off).getByTestId('shortcut-more'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Turn off' }));
     const err = await screen.findByTestId('shortcuts-error');
     expect(err.textContent).toContain(t('shortcuts.commands.palette.open'));
     expect(err.textContent).toContain(t('shortcuts.commands.chat.toggle'));

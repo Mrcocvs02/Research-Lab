@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, McpStatus, ResponseOf } from '@rl/core';
-import { CheckField, ErrorNote, TextField } from '../components/ui';
+import { Banner } from '../components/Banner';
+import { Button } from '../components/Button';
+import { KeyValue } from '../components/KeyValue';
+import { Switch } from '../components/Switch';
+import { ErrorNote } from '../components/ui';
 import { errorMessage } from '../lib/errors';
 import { rl } from '../lib/rl';
 import { RlError } from '../lib/rl-error';
 import { useApp } from '../state/app-context';
 import { safeText } from '../views/library/safeText';
+import { Row } from './rows';
 import '../views/export/export.css';
 import './settings.css';
 
@@ -45,9 +50,9 @@ function CallLog({ stamp }: { stamp: string }) {
   }, [load, stamp]);
 
   return (
-    <div className="group" data-testid="mcp-log">
-      <h3>{t('mcp.log.title')}</h3>
-      <p className="hint">{t('mcp.log.hint')}</p>
+    <details data-testid="mcp-log" data-set="mcpLog">
+      <summary>{t('mcp.log.title')}</summary>
+      <p className="set-help">{t('mcp.log.hint')}</p>
       {error ? <ErrorNote>{errorMessage(error, t)}</ErrorNote> : null}
       {items.length === 0 && !error && <p className="hint">{t('mcp.log.empty')}</p>}
       {items.length > 0 && (
@@ -85,7 +90,7 @@ function CallLog({ stamp }: { stamp: string }) {
           </button>
         </div>
       )}
-    </div>
+    </details>
   );
 }
 
@@ -94,7 +99,7 @@ function CallLog({ stamp }: { stamp: string }) {
  * and stay current through `mcp:changed`; the token never reaches this window (the main process copies the line for
  * Claude Code to the clipboard and only a masked preview comes back).
  */
-export function McpSection() {
+export function McpSection({ embedded = false }: { embedded?: boolean }) {
   const { t, i18n } = useTranslation();
   const app = useApp();
   const libraryId = app.activeLibraryId;
@@ -157,9 +162,9 @@ export function McpSection() {
 
   if (!libraryId) {
     return (
-      <section className="card" aria-labelledby="settings-mcp">
-        <h2 id="settings-mcp">{t('mcp.title')}</h2>
-        <p className="hint">{t('settings.needsLibrary')}</p>
+      <section className={embedded ? undefined : 'card set-group'}>
+        {!embedded && <h2 id="settings-mcp">{t('mcp.title')}</h2>}
+        <p className="set-help">{t('settings.needsLibrary')}</p>
       </section>
     );
   }
@@ -182,74 +187,66 @@ export function McpSection() {
     }
   };
 
+  const sees = aiFolders.length === 0 ? t('mcp.seesNothing') : aiFolders.includes('') ? t('mcp.seesAll') : t('mcp.seesFolders', { count: aiFolders.length });
+  const Wrap = embedded ? 'div' : 'section';
+
   return (
-    <section className="card" aria-labelledby="settings-mcp" data-testid="mcp-settings">
-      <h2 id="settings-mcp">{t('mcp.title')}</h2>
-      <p className="hint">{t('mcp.intro')}</p>
-      <p className={aiFolders.length === 0 ? 'callout' : 'hint'} data-testid="mcp-sees">
-        {aiFolders.length === 0 ? t('mcp.seesNothing') : aiFolders.includes('') ? t('mcp.seesAll') : t('mcp.seesFolders', { count: aiFolders.length })}
+    <Wrap className={embedded ? undefined : 'card set-group'} data-testid="mcp-settings">
+      {!embedded && <h2 id="settings-mcp">{t('mcp.title')}</h2>}
+      <p className="set-help">{t('mcp.intro')}</p>
+      <p className={aiFolders.length === 0 ? 'callout' : 'set-help'} data-testid="mcp-sees">
+        {sees}
       </p>
 
       {!status && !error && <p className="hint">{t('common.loading')}</p>}
       {status && (
         <>
-          <div className="group">
-            <CheckField label={t('mcp.enable')} hint={t('mcp.enableHint')} checked={status.enabled} disabled={busy} onChange={(e) => void run(() => rl.invoke('mcp:setEnabled', { enabled: e.target.checked }))} data-testid="mcp-enable" />
-            <dl className="facts" data-testid="mcp-status" data-running={status.running ? 'true' : 'false'}>
-              <dt>{t('mcp.status.label')}</dt>
-              <dd>
-                <span className={status.running ? 'badge ok' : 'badge'} data-testid="mcp-state">
-                  {status.running ? t('mcp.status.running') : status.enabled ? t('mcp.status.failed') : t('mcp.status.off')}
-                </span>
-              </dd>
-              {status.running && status.url && (
-                <>
-                  <dt>{t('mcp.status.address')}</dt>
-                  <dd>
-                    <code className="mcp-url" data-testid="mcp-url">
-                      {status.url}
-                    </code>
-                  </dd>
-                </>
-              )}
-              <dt>{t('mcp.status.calls')}</dt>
-              <dd data-testid="mcp-calls">{status.lastCallAt ? t('mcp.status.callsLast', { count: status.calls, when: new Date(status.lastCallAt).toLocaleString(i18n.language) }) : t('mcp.status.callsCount', { count: status.calls })}</dd>
-            </dl>
-            {problem && (
-              <div className="callout warn" role="alert" data-testid="mcp-problem" data-code={problem.code}>
-                <p>
-                  <strong>{t(`mcp.problem.${problemKey(problem.code)}.title`)}</strong>
-                </p>
-                <p>{t(`mcp.problem.${problemKey(problem.code)}.what`, { port: status.port ?? '' })}</p>
-                {problemKey(problem.code) === 'OTHER' && <p className="hint">{safeText(problem.message)}</p>}
-              </div>
-            )}
-            {status.enabled && status.tools.length > 0 && (
-              <p className="hint" data-testid="mcp-tools">
-                {t('mcp.tools', { list: status.tools.join(', ') })}
-              </p>
-            )}
-          </div>
-
-          <div className="group" data-testid="mcp-write-group">
-            <h3>{t('mcp.write.title')}</h3>
-            <CheckField
-              label={t('mcp.write.label')}
-              checked={status.writeEnabled}
-              disabled={busy || !status.enabled}
-              onChange={(e) => {
-                if (e.target.checked) setAskWrite(true);
-                else {
-                  setAskWrite(false);
-                  void run(() => rl.invoke('mcp:setWriteEnabled', { writeEnabled: false }));
-                }
-              }}
-              data-testid="mcp-write"
+          <Row sid="mcpEnable" label={t('mcp.enable')} help={t('mcp.enableHint')}>
+            <Switch aria-label={t('mcp.enable')} checked={status.enabled} disabled={busy} onChange={(v) => void run(() => rl.invoke('mcp:setEnabled', { enabled: v }))} data-testid="mcp-enable" />
+          </Row>
+          <div data-testid="mcp-status" data-running={status.running ? 'true' : 'false'}>
+            <KeyValue
+              items={[
+                { label: t('mcp.status.label'), value: <span className={status.running ? 'badge ok' : 'badge'} data-testid="mcp-state">{status.running ? t('mcp.status.running') : status.enabled ? t('mcp.status.failed') : t('mcp.status.off')}</span> },
+                ...(status.running && status.url ? [{ label: t('mcp.status.address'), value: <code data-testid="mcp-url">{status.url}</code> }] : []),
+                { label: t('mcp.status.calls'), value: <span data-testid="mcp-calls">{status.lastCallAt ? t('mcp.status.callsLast', { count: status.calls, when: new Date(status.lastCallAt).toLocaleString(i18n.language) }) : t('mcp.status.callsCount', { count: status.calls })}</span> },
+              ]}
             />
-            <p className={status.writeEnabled ? 'callout warn' : 'hint'} data-testid="mcp-write-warning">
-              {t('mcp.write.warning')}
+          </div>
+          {problem && (
+            <div data-testid="mcp-problem" data-code={problem.code}>
+              <Banner tone="warning" action={problemKey(problem.code) === 'PORT_IN_USE' ? { label: t('mcp.port.useAuto'), onClick: () => void run(() => rl.invoke('mcp:setPort', { port: null })) } : undefined}>
+                <strong>{t(`mcp.problem.${problemKey(problem.code)}.title`)}</strong> {t(`mcp.problem.${problemKey(problem.code)}.what`, { port: status.port ?? '' })}
+                {problemKey(problem.code) === 'OTHER' && <> {safeText(problem.message)}</>}
+              </Banner>
+            </div>
+          )}
+          {status.enabled && status.tools.length > 0 && (
+            <details data-testid="mcp-tools">
+              <summary>{t('mcp.toolsTitle')}</summary>
+              <p className="set-help">{t('mcp.tools', { list: status.tools.join(', ') })}</p>
+            </details>
+          )}
+
+          <div data-testid="mcp-write-group">
+            <Row sid="mcpWrite" label={t('mcp.write.label')}>
+              <Switch
+                aria-label={t('mcp.write.label')}
+                checked={status.writeEnabled}
+                disabled={busy || !status.enabled}
+                onChange={(v) => {
+                  if (v) setAskWrite(true);
+                  else {
+                    setAskWrite(false);
+                    void run(() => rl.invoke('mcp:setWriteEnabled', { writeEnabled: false }));
+                  }
+                }}
+                data-testid="mcp-write"
+              />
+            </Row>
+            <p className="set-help" data-testid="mcp-write-warning">
+              {t('mcp.write.warning')} {t('mcp.write.reconnect')}
             </p>
-            <p className="hint">{t('mcp.write.reconnect')}</p>
             {askWrite && !status.writeEnabled && (
               <div className="callout warn" role="alertdialog" aria-label={t('mcp.write.confirmTitle')} data-testid="mcp-write-confirm">
                 <p>
@@ -257,9 +254,8 @@ export function McpSection() {
                 </p>
                 <p>{t('mcp.write.confirmBody')}</p>
                 <div className="actions start">
-                  <button
-                    type="button"
-                    className="danger"
+                  <Button
+                    variant="danger"
                     onClick={() => {
                       setAskWrite(false);
                       void run(() => rl.invoke('mcp:setWriteEnabled', { writeEnabled: true }));
@@ -267,52 +263,38 @@ export function McpSection() {
                     data-testid="mcp-write-yes"
                   >
                     {t('mcp.write.confirmYes')}
-                  </button>
-                  <button type="button" onClick={() => setAskWrite(false)}>
-                    {t('common.cancel')}
-                  </button>
+                  </Button>
+                  <Button onClick={() => setAskWrite(false)}>{t('common.cancel')}</Button>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="group" data-testid="mcp-port-group">
-            <h3>{t('mcp.port.title')}</h3>
-            <div className="inline-form">
-              <TextField
-                label={t('mcp.port.label')}
-                hint={t('mcp.port.hint', { min: PORT_MIN, max: PORT_MAX })}
-                inputMode="numeric"
-                value={port}
-                placeholder={t('mcp.port.auto')}
-                error={portValid ? undefined : t('mcp.port.invalid', { min: PORT_MIN, max: PORT_MAX })}
-                onChange={(e) => setPort(e.target.value)}
-                data-testid="mcp-port"
-              />
-              <button type="button" disabled={busy || !portValid || !portChanged} onClick={() => void run(() => rl.invoke('mcp:setPort', { port: portNumber }))} data-testid="mcp-port-apply">
+          <div data-testid="mcp-port-group">
+            <Row sid="mcpPort" label={t('mcp.port.label')} help={t('mcp.port.hint', { min: PORT_MIN, max: PORT_MAX })} htmlFor="mcp-port" error={portValid ? undefined : t('mcp.port.invalid', { min: PORT_MIN, max: PORT_MAX })}>
+              <input id="mcp-port" className="is-short" inputMode="numeric" value={port} placeholder={t('mcp.port.auto')} onChange={(e) => setPort(e.target.value)} data-testid="mcp-port" />
+              <Button size="sm" disabled={busy || !portValid || !portChanged} onClick={() => void run(() => rl.invoke('mcp:setPort', { port: portNumber }))} data-testid="mcp-port-apply">
                 {portNumber === null ? t('mcp.port.useAuto') : t('mcp.port.apply')}
-              </button>
-            </div>
-            <p className="hint" data-testid="mcp-port-squat">
+              </Button>
+            </Row>
+            <p className="set-help" data-testid="mcp-port-squat">
               {t('mcp.port.squat')}
             </p>
           </div>
 
-          <div className="group mcp-copy" data-testid="mcp-copy-group">
-            <h3>{t('mcp.copy.title')}</h3>
-            <p className="hint">{t('mcp.copy.hint')}</p>
-            <div className="actions start">
-              <button type="button" disabled={!status.running} onClick={() => void copy('cli')} data-testid="mcp-copy-cli">
+          <div data-testid="mcp-copy-group">
+            <Row sid="mcpCopy" label={t('mcp.copy.title')} help={t('mcp.copy.hint')}>
+              <Button size="sm" disabled={!status.running} onClick={() => void copy('cli')} data-testid="mcp-copy-cli">
                 {t('mcp.copy.cli')}
-              </button>
-              <button type="button" disabled={!status.running} onClick={() => void copy('json')} data-testid="mcp-copy-json">
+              </Button>
+              <Button size="sm" disabled={!status.running} onClick={() => void copy('json')} data-testid="mcp-copy-json">
                 {t('mcp.copy.json')}
-              </button>
-            </div>
-            <p className="callout warn" data-testid="mcp-json-warning">
+              </Button>
+            </Row>
+            <p className="set-help" data-testid="mcp-json-warning">
               {t('mcp.copy.jsonWarning')}
             </p>
-            {!status.running && <p className="hint">{t('mcp.copy.notRunning')}</p>}
+            {!status.running && <p className="set-help">{t('mcp.copy.notRunning')}</p>}
             {copyError && <ErrorNote testId="mcp-copy-error">{copyError}</ErrorNote>}
             {copied && (
               <div role="status" data-testid="mcp-copied">
@@ -322,14 +304,12 @@ export function McpSection() {
             )}
           </div>
 
-          <div className="group" data-testid="mcp-rotate-group">
-            <h3>{t('mcp.rotate.title')}</h3>
-            <p className="hint">{t('mcp.rotate.hint')}</p>
-            <div className="actions start">
-              <button type="button" disabled={busy || !status.enabled} onClick={() => setAskRotate(true)} data-testid="mcp-rotate">
+          <div data-testid="mcp-rotate-group">
+            <Row sid="mcpRotate" label={t('mcp.rotate.title')} help={t('mcp.rotate.hint')}>
+              <Button size="sm" disabled={busy || !status.enabled} onClick={() => setAskRotate(true)} data-testid="mcp-rotate">
                 {t('mcp.rotate.button')}
-              </button>
-            </div>
+              </Button>
+            </Row>
             {askRotate && (
               <div className="callout warn" role="alertdialog" aria-label={t('mcp.rotate.confirmTitle')} data-testid="mcp-rotate-confirm">
                 <p>
@@ -337,9 +317,8 @@ export function McpSection() {
                 </p>
                 <p>{t('mcp.rotate.confirmBody')}</p>
                 <div className="actions start">
-                  <button
-                    type="button"
-                    className="danger"
+                  <Button
+                    variant="danger"
                     onClick={() => {
                       setAskRotate(false);
                       setCopied(null);
@@ -352,10 +331,8 @@ export function McpSection() {
                     data-testid="mcp-rotate-yes"
                   >
                     {t('mcp.rotate.confirmYes')}
-                  </button>
-                  <button type="button" onClick={() => setAskRotate(false)}>
-                    {t('common.cancel')}
-                  </button>
+                  </Button>
+                  <Button onClick={() => setAskRotate(false)}>{t('common.cancel')}</Button>
                 </div>
               </div>
             )}
@@ -369,6 +346,6 @@ export function McpSection() {
       )}
       {error ? <ErrorNote testId="mcp-error">{errorMessage(error, t)}</ErrorNote> : null}
       {status && <CallLog stamp={`${status.calls}|${status.lastCallAt ?? ''}`} />}
-    </section>
+    </Wrap>
   );
 }

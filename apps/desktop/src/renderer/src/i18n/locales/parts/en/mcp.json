@@ -36,7 +36,6 @@
     },
     "tools": "Tools offered to Claude Code: {{list}}.",
     "write": {
-      "title": "Writing",
       "label": "Allow Claude Code to propose AI fields",
       "warning": "Off by default. When on, Claude Code can only PROPOSE AI fields (such as a summary or tags): they are marked as AI output and go to your review before anything is accepted. It can never change your notes or your own fields.",
       "confirmTitle": "Allow proposals from Claude Code?",
@@ -45,7 +44,6 @@
       "reconnect": "After turning writing on or off, reconnect Claude Code to see the change in its list of tools."
     },
     "port": {
-      "title": "Port",
       "label": "Port",
       "hint": "A number between {{min}} and {{max}}. Empty: the app picks a free port and remembers it on this computer.",
       "auto": "Automatic",
@@ -84,6 +82,7 @@
       "ok": "OK",
       "failed": "Failed ({{code}})",
       "more": "Show more ({{shown}} of {{total}})"
-    }
+    },
+    "toolsTitle": "Available tools"
   }
 }

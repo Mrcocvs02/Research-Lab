@@ -43,6 +43,9 @@ export function isPermanentFailure(e: unknown): boolean {
   return e.code === 'INVALID_REQUEST';
 }
 
+let writer: Promise<typeof import('@rl/data/pdf-annot')> | undefined;
+const loadWriter = () => (writer ??= import('@rl/data/pdf-annot'));
+
 const abortError = () => Object.assign(new Error('aborted'), { name: 'AbortError' });
 const MAX_COMMIT_ATTEMPTS = 8;
 
@@ -135,6 +138,19 @@ export function createWorkerService(deps: WorkerDeps): LibraryWorker {
     repairAnnotations({ rootPath, path, queries }: RepairArgs, hooks: WorkerHooks<ExtractProgress> = {}) {
       // Read-only: the rectangles are computed here, the caller writes them to the annotation store.
       return repairQuotes(rootPath, path, queries, { signal: hooks.signal, onPage: (page) => hooks.onEvent?.({ page }) });
+    },
+
+    // The annotation writer is a lazy chunk (§13): nothing of it is loaded until the first call.
+    async pdfSync(args) {
+      return (await loadWriter()).planSync(args);
+    },
+
+    async pdfVerify(args) {
+      return (await loadWriter()).verifyFile(args);
+    },
+
+    async pdfInspect({ path, baseSize }) {
+      return (await loadWriter()).inspectFile(path, baseSize);
     },
 
     async index({ rootPath, cacheDir, jobs }: { rootPath: string; cacheDir: string; jobs: IndexJob[] }) {

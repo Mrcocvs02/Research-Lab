@@ -5,7 +5,7 @@
 import { mergeRegistries } from '../registry.js';
 import { aiChannels, aiEvents } from './ai.js';
 import { backupChannels, backupEvents } from './backup.js';
-import { annotationsChannels } from './annotations.js';
+import { annotationsChannels, annotationsEvents } from './annotations.js';
 import { appChannels, appEvents } from './app.js';
 import { chatChannels, chatEvents } from './chat.js';
 import { citationsChannels, citationsEvents, recommendChannels } from './citations.js';
@@ -35,7 +35,7 @@ import { settingsChannels } from './settings.js';
 
 export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels, citationsChannels, recommendChannels, watchChannels, graphChannels, exploreChannels, exportChannels, mcpChannels, backupChannels, maintenanceChannels);
 
-export const events = mergeRegistries(aiEvents, appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, watchEvents, graphEvents, exportEvents, mcpEvents, backupEvents);
+export const events = mergeRegistries(aiEvents, annotationsEvents, appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, watchEvents, graphEvents, exportEvents, mcpEvents, backupEvents);
 
 export type Channels = typeof channels;
 export type Events = typeof events;
@@ -52,7 +52,7 @@ export { taxonomyOpSchema, taxonomyViewSchema, taxonomyNodeViewSchema, nodeCount
 export { historyItemSchema, historyResultSchema } from './history.js';
 export { projectDetailSchema, projectSummarySchema, projectMemberViewSchema, readingPlanItemViewSchema, studyCountsSchema, type ProjectDetail } from './projects.js';
 export { noteViewSchema, noteListItemSchema, type NoteView } from './notes.js';
-export { annotationColorSchema, annotationInputSchema, type AnnotationInput } from './annotations.js';
+export { annotationColorSchema, annotationInputSchema, pdfReasonSchema, pdfStateSchema, type AnnotationInput, type PdfReason, type PdfState } from './annotations.js';
 export { thumbItemSchema } from './thumbs.js';
 export { aiAccountSchema, aiAuthSchema, aiPreviewSchema, aiSendViewSchema, aiStatusSchema, type AiAccount, type AiTokenUsage, aiTokenUsageSchema } from './ai.js';
 export { chatCardSchema, chatConversationSummarySchema, chatTurnSchema, chatUsageSchema } from './chat.js';

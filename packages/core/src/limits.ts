@@ -87,3 +87,41 @@ export const INBOX_LIMITS = {
   /** Characters of an abstract kept from the online record. */
   abstract: 20_000,
 } as const;
+
+/**
+ * Compile-time switch of the whole path that writes highlights and underlines INTO the original PDFs (D-354, D-316).
+ * Off in the merge: the annotations stay in the app and the reader says "Only in the app". It is turned on only after
+ * the dedicated security review; tests turn it on locally.
+ */
+export const PDF_WRITE_ENABLED = false;
+
+/** Limits of the PDF annotation writer (ARCHITETTURA-UI §8.3.10, §8.3.12). */
+export const PDF_WRITE_LIMITS = {
+  maxBytes: 512 * 1024 * 1024,
+  maxRevisions: 200,
+  /** A write after this long without changes to the annotations of the open document. */
+  idleWriteMs: 120_000,
+  /** At most one idle write per document in this time. */
+  minIntervalMs: 600_000,
+  /** Above this size nothing is written while the document is open (only at close or change). */
+  idleWriteMaxBytes: 50 * 1024 * 1024,
+  /** The app waits this long at quit for the pending writes. */
+  closeWaitMs: 5000,
+  /** A `locked` file that stays pending this long becomes a "to look at" line and a banner. */
+  lockedBannerMs: 600_000,
+  /** The last `startxref` is searched in this many final bytes. */
+  tailSearchBytes: 65_536,
+  /** Entries of `pdfWrite.own` kept. */
+  ownHashes: 20,
+  maxDepth: 64,
+  maxStringBytes: 65_536,
+  maxObjStmObjects: 100_000,
+  maxInflatedBytes: 64 * 1024 * 1024,
+  maxPrevChain: 1000,
+  /** Time the worker may spend on one file. */
+  workerTimeoutMs: 10_000,
+  /** Longest `/Contents` written; longer comments are cut with an ellipsis. */
+  maxContentsChars: 8000,
+  /** Waits (ms) between the attempts to replace a file that another program holds open. */
+  renameRetryMs: [200, 600, 1500],
+} as const;

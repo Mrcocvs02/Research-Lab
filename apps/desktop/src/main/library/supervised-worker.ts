@@ -17,6 +17,8 @@ export interface WatchdogOptions {
   scanMs: number;
   /** Index calls and the open/reset/remove calls. Default 60 s. */
   indexMs: number;
+  /** A PDF annotation write call (plan, verify, inspect): the writer itself stops after 10 s, so a worker silent for this long is stuck. Default 30 s. */
+  pdfMs: number;
   /** After a cancel (abort), how long the worker has to answer before it is killed. Default 5 s. */
   abortGraceMs: number;
   /** `dispose()` asks the worker to close politely; after this it is killed. Default 3 s. */
@@ -33,6 +35,7 @@ export const DEFAULT_WATCHDOG: WatchdogOptions = {
   extractPageMs: 20_000,
   scanMs: 300_000,
   indexMs: 60_000,
+  pdfMs: 30_000,
   abortGraceMs: 5_000,
   disposeMs: 3_000,
   idleCloseMs: 60_000,
@@ -46,7 +49,7 @@ export interface SupervisedWorkerOptions {
   note?(message: string, details?: Record<string, unknown>): void;
 }
 
-type Op = 'openIndex' | 'resetIndex' | 'scan' | 'extract' | 'repairAnnotations' | 'index' | 'remove';
+type Op = 'openIndex' | 'resetIndex' | 'scan' | 'extract' | 'repairAnnotations' | 'pdfSync' | 'pdfVerify' | 'pdfInspect' | 'index' | 'remove';
 
 const abortError = () => Object.assign(new Error('aborted'), { name: 'AbortError' });
 
@@ -157,7 +160,7 @@ export function createSupervisedWorker(options: SupervisedWorkerOptions): Librar
       let progressed = false;
       let timer: ReturnType<typeof setTimeout> | undefined;
       let abortTimer: ReturnType<typeof setTimeout> | undefined;
-      const idleMs = () => (op === 'extract' ? (progressed ? wd.extractPageMs : wd.extractFileMs) : op === 'scan' ? wd.scanMs : wd.indexMs);
+      const idleMs = () => (op === 'extract' ? (progressed ? wd.extractPageMs : wd.extractFileMs) : op === 'scan' ? wd.scanMs : op.startsWith('pdf') ? wd.pdfMs : wd.indexMs);
       const finish = (settle: () => void) => {
         if (settled) return;
         settled = true;
@@ -215,6 +218,9 @@ export function createSupervisedWorker(options: SupervisedWorkerOptions): Librar
     scan: (args, hooks) => run('scan', hooks, (w, h) => w.client.scan(args, h)),
     extract: (args, hooks) => run('extract', hooks, (w, h) => w.client.extract(args, h)),
     repairAnnotations: (args, hooks) => run('repairAnnotations', hooks, (w, h) => w.client.repairAnnotations(args, h)),
+    pdfSync: (args, hooks) => run('pdfSync', hooks, (w, h) => w.client.pdfSync!(args, h)),
+    pdfVerify: (args, hooks) => run('pdfVerify', hooks, (w, h) => w.client.pdfVerify!(args, h)),
+    pdfInspect: (args, hooks) => run('pdfInspect', hooks, (w, h) => w.client.pdfInspect!(args, h)),
     index: (args) => run('index', undefined, (w) => w.client.index(args)),
     remove: (ids) => run('remove', undefined, (w) => w.client.remove(ids)),
     alive: () => raw !== null,

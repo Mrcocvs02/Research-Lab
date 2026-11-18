@@ -21,6 +21,8 @@ import { cursorFor } from './cursors';
 import { createViewer, ViewerError, type FindState, type SelectionPiece, type Viewer } from './engine';
 import { FindBar } from './FindBar';
 import { annotationAt, annotationsAt, colorOf, type AnnotationColor } from './geometry';
+import { PdfConsentBanner, PdfConsentDialog } from './PdfConsentDialog';
+import { PdfConfirmDialogs, PdfInfoRow, usePdfWrite } from './PdfWriteChip';
 import { ReaderBar, type ZoomChoice } from './ReaderBar';
 import { useRepair } from './repair';
 import { initialCtx, step, type ColorNo, type Ctx, type Env, type Ev, type Mode, type Result, type Tool } from './toolMachine';
@@ -120,6 +122,18 @@ export function ReaderView({ target, onClose }: Props) {
 
   const { doc, setStudyState, setUnderlined, applyUnderlined } = useReaderDoc(docId, reportError);
   const ann = useAnnotations(docId, applyUnderlined, reportError);
+  // Writing into the PDF (G4a): the state of the PDF group, the consent (banner at the first annotation, dialog once when closing).
+  const pdf = usePdfWrite(docId, reportError);
+  const [consentDialog, setConsentDialog] = useState(false);
+  const askedConsent = useRef(false);
+  const closeRef = useRef<() => void>(() => {});
+  closeRef.current = () => {
+    if (!askedConsent.current && pdf.consentOpen(ann.annotations.length)) {
+      askedConsent.current = true;
+      setConsentDialog(true);
+    } else onClose();
+  };
+  const closeReader = useCallback(() => closeRef.current(), []);
   const history = useHistory();
   const repair = useRepair({ ready, loaded: ann.loaded, annotations: ann.annotations, layers, viewerRef, save: ann.save, info: notifyInfo, docId });
   const selected = ann.annotations.find((a) => a.id === selectedId) ?? null;
@@ -391,7 +405,7 @@ export function ReaderView({ target, onClose }: Props) {
           closeFind();
           break;
         case 'close-reader':
-          onClose();
+          closeReader();
           break;
         case 'root-hint':
           // Escape does not close the reader (D-329): once per session it says how.
@@ -520,7 +534,7 @@ export function ReaderView({ target, onClose }: Props) {
     const onButton = e.target instanceof HTMLElement && e.target.closest('button, [role^="menuitem"], [role="radio"]') !== null;
     // The reader shortcuts are the user's (keymap): find, close, and highlight or underline the current match.
     if (matches(e, 'reader.find')) return (e.preventDefault(), openFind());
-    if (matches(e, 'reader.close')) return (e.preventDefault(), onClose());
+    if (matches(e, 'reader.close')) return (e.preventDefault(), closeReader());
     if (findOpen && matches(e, 'reader.highlight')) return (e.preventDefault(), annotateMatch('highlight'));
     if (findOpen && matches(e, 'reader.underline')) return (e.preventDefault(), annotateMatch('underline'));
     if (mod && !e.altKey) {
@@ -609,6 +623,7 @@ export function ReaderView({ target, onClose }: Props) {
       findOpen={findOpen}
       onFind={() => (findOpen ? closeFind() : openFind())}
       doc={doc}
+      pdf={pdf}
       onStudy={setStudyState}
       onUnderlined={setUnderlined}
       sideOpen={sideOpen}
@@ -617,7 +632,7 @@ export function ReaderView({ target, onClose }: Props) {
       onUndo={() => void history.undo()}
       onOpenFile={() => void rl.invoke('documents:open', { docId }).catch(reportError)}
       onReveal={() => void rl.invoke('documents:reveal', { docId }).catch(reportError)}
-      onClose={onClose}
+      onClose={closeReader}
     />
   );
 
@@ -632,6 +647,22 @@ export function ReaderView({ target, onClose }: Props) {
       onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setAway(true)}
     >
       {slot === undefined ? null : slot ? createPortal(bar, slot) : bar}
+      {pdf.consentOpen(ann.annotations.length) && !consentDialog && <PdfConsentBanner onChoose={pdf.choose} />}
+      {consentDialog && (
+        <PdfConsentDialog
+          onChoose={(c) => {
+            setConsentDialog(false);
+            pdf.choose(c);
+            onClose();
+          }}
+          onClose={() => {
+            setConsentDialog(false);
+            onClose();
+          }}
+        />
+      )}
+      {pdf.ask === 'consent' && <PdfConsentDialog onChoose={pdf.choose} onClose={() => pdf.setAsk(null)} />}
+      <PdfConfirmDialogs pdf={pdf} />
       <div className={sideOpen ? 'reader-body with-side' : 'reader-body'}>
         <div className="reader-main">
           {findOpen && (
@@ -796,7 +827,9 @@ export function ReaderView({ target, onClose }: Props) {
                     )}
                   </dd>
                   <dt>{t('reader.info.pdf')}</dt>
-                  <dd data-testid="reader-info-pdf">{t('reader.pdfOnlyApp')}</dd>
+                  <dd>
+                    <PdfInfoRow pdf={pdf} />
+                  </dd>
                 </dl>
               )}
             </div>

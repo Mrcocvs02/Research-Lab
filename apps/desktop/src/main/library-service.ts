@@ -41,6 +41,7 @@ export class LibraryService {
     dataDirName?: string;
     aiEnabledFolders?: string[];
     taxonomyFilePath?: string;
+    writeToPdf?: boolean;
   }): Promise<LibraryProfile> {
     const rootPath = this.approved.resolve(input.rootPath, 'library-root');
     if (rootPath === null) {
@@ -83,6 +84,9 @@ export class LibraryService {
     if (!exists) {
       const config = defaultLibraryConfig({ name: profile.name, language: input.language ?? current.uiLanguage });
       config.aiEnabledFolders = input.aiEnabledFolders ?? [];
+      // D-348: the wizard's switch is the consent (on) or the refusal (off); without it the first highlight asks.
+      if (input.writeToPdf === true) config.annotations.writeToPdfConfirmedAt = new Date().toISOString();
+      else if (input.writeToPdf === false) config.annotations.writeToPdf = false;
       await atomicWriteJson(configFile, libraryConfigSchema.parse(config));
     }
     if (taxonomy) {

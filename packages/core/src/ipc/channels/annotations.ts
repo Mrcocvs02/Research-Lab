@@ -1,9 +1,38 @@
 import { z } from 'zod';
-import { documentIdSchema, itemIdSchema } from '../../common.js';
+import { documentIdSchema, isoDateSchema, itemIdSchema } from '../../common.js';
 import { ANNOTATION_COLORS, STUDY_LIMITS } from '../../limits.js';
 import { annotationSchema, normRectSchema } from '../../model/annotation.js';
 import { underlinedSchema } from '../../model/document.js';
-import { defineChannels } from '../registry.js';
+import { defineChannels, defineEvents } from '../registry.js';
+
+/** Why a PDF is not (or not yet) written (§8.3.5); `locked` and `unavailable` are waits, not refusals. */
+export const pdfReasonSchema = z.enum(['encrypted', 'permission', 'signed', 'xfa', 'damaged', 'read-only', 'too-large', 'too-many-revisions', 'verify-failed', 'locked', 'unavailable', 'changed']);
+export type PdfReason = z.infer<typeof pdfReasonSchema>;
+
+/** What the reader shows about the PDF of a document (group PDF of the Study menu). */
+export const pdfStateSchema = z.object({
+  mode: z.enum(['write', 'app-only', 'off']),
+  state: z.enum(['synced', 'pending', 'writing', 'refused', 'none']),
+  /** The library has not answered the question "write into the PDFs too?" yet (D-348). */
+  needsConsent: z.boolean(),
+  /** Annotations without `geom: 2`: never written (§8.1.2). */
+  needsRepair: z.number().int().nonnegative(),
+  reason: pdfReasonSchema.optional(),
+  /** Annotations that are only in the app (not written yet, or never written). */
+  appOnly: z.number().int().nonnegative(),
+  /** Annotations of other programs found in the PDF (read-only). */
+  external: z.number().int().nonnegative().default(0),
+  /** Written by us and no longer in the PDF: waiting for the user's choice. */
+  missing: z.number().int().nonnegative().default(0),
+  lastWrittenAt: isoDateSchema.optional(),
+  /** The PDF holds a copy of the original (restore is possible). */
+  canRestore: z.boolean().default(false),
+  /** Annotations of other programs that a byte-exact restore would drop; present when the PDF was written by us. */
+  droppedOnRestore: z.number().int().nonnegative().optional(),
+});
+export type PdfState = z.infer<typeof pdfStateSchema>;
+
+const jobId = z.object({ jobId: z.string().min(1).max(100) });
 
 export const annotationColorSchema = z.enum(ANNOTATION_COLORS);
 
@@ -62,4 +91,47 @@ export const annotationsChannels = defineChannels('annotations', {
     request: z.object({ docId: documentIdSchema, id: itemIdSchema }),
     response: z.object({ removed: z.boolean(), underlined: underlinedSchema }),
   },
+  /** State of the PDF of a document: what is written, what waits, why a file is refused. Reads only. */
+  pdfState: {
+    request: z.object({
+      docId: documentIdSchema,
+      /** Also count the annotations of other programs that a byte-exact restore would drop (reads the file: only before the restore dialog). */
+      inspect: z.boolean().optional(),
+    }),
+    response: pdfStateSchema,
+  },
+  /** Writes the pending changes now (the reader sends it when it closes a document). Never throws for a refusal: the state says it. */
+  writeNow: { request: z.object({ docId: documentIdSchema }), response: pdfStateSchema },
+  /** "Keep only in the app for this document" / "Write again". */
+  setPdfMode: { request: z.object({ docId: documentIdSchema, mode: z.enum(['write', 'app-only']) }), response: pdfStateSchema },
+  /** The answer of the consent banner or dialog (D-348): 'pdf' sets `writeToPdfConfirmedAt`, 'app-only' turns `writeToPdf` off. */
+  confirmPdfWrite: { request: z.object({ choice: z.enum(['pdf', 'app-only']) }), response: z.object({ choice: z.enum(['pdf', 'app-only']), confirmedAt: isoDateSchema.nullable() }) },
+  /** Takes the annotations of Research Lab out of the PDF with one more revision (the prefix stays intact); then the document is 'app-only'. */
+  removeFromPdf: { request: z.object({ docId: documentIdSchema }), response: pdfStateSchema },
+  /** Truncates the file to its original bytes (or restores the safety copy). */
+  restoreOriginal: { request: z.object({ docId: documentIdSchema }), response: z.object({ restored: z.boolean(), droppedExternal: z.number().int().nonnegative() }) },
+  /** Annotations written by us and taken out of the PDF elsewhere: 'rewrite' writes them again, 'delete' deletes them in the app too. */
+  resolveMissing: { request: z.object({ docId: documentIdSchema, choice: z.enum(['rewrite', 'delete']), ids: z.array(itemIdSchema).max(10_000).optional() }), response: pdfStateSchema },
+  /** Writes the existing annotations of the whole library into the PDFs, one file at a time (Activity, cancellable). */
+  migrate: { request: z.object({}), response: jobId },
+  /** Restores every written PDF to its original bytes, one file at a time. */
+  restoreAll: { request: z.object({}), response: jobId },
+  jobCancel: { request: jobId, response: z.object({}) },
+  /** Safety copies of the originals (Advanced): how many, how much space, where. */
+  backups: { request: z.object({}), response: z.object({ count: z.number().int().nonnegative(), bytes: z.number().nonnegative(), location: z.enum(['data', 'local']) }) },
+  deleteBackups: { request: z.object({}), response: z.object({ deleted: z.number().int().nonnegative() }) },
+  /** What `migrate` would do: files, estimated space of the copies, documents skipped (annotations to check). */
+  migrationPlan: { request: z.object({}), response: z.object({ files: z.number().int().nonnegative(), bytes: z.number().nonnegative(), skipped: z.number().int().nonnegative(), written: z.number().int().nonnegative() }) },
+});
+
+/** Progress of a write of one document (`docId`) or of a job over the library (`jobId`). */
+export const annotationsEvents = defineEvents('annotations', {
+  pdfProgress: z.object({
+    docId: documentIdSchema.optional(),
+    jobId: z.string().optional(),
+    state: z.enum(['writing', 'synced', 'pending', 'refused', 'running', 'done', 'cancelled']),
+    reason: pdfReasonSchema.optional(),
+    done: z.number().int().nonnegative().optional(),
+    total: z.number().int().nonnegative().optional(),
+  }),
 });

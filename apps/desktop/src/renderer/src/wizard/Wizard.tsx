@@ -55,8 +55,7 @@ export function Wizard({ onFinished, onCancel }: Props) {
   const [taxonomy, setTaxonomy] = useState<Taxonomy>('empty');
   const [taxonomyFile, setTaxonomyFile] = useState<Picked | null>(null);
   const [aiFolders, setAiFolders] = useState<string[]>([]);
-  // D-348: completing the wizard with the switch on is the library's consent to write highlights into the PDFs. The build does not write
-  // into PDFs yet (PDF_WRITE_ENABLED is false), so the choice is only kept here: `library:create` has no field for it until the writer lands.
+  // D-348: completing the wizard with the switch on is the library's consent to write highlights into the PDFs (`library:create` stores it).
   const [writeToPdf, setWriteToPdf] = useState(true);
   const [scan, setScan] = useState<ScanStatus | null>(null);
 
@@ -188,6 +187,7 @@ export function Wizard({ onFinished, onCancel }: Props) {
         language: docLanguage,
         dataDirName: dataDirName.trim(),
         aiEnabledFolders: aiFolders,
+        writeToPdf,
         ...(taxonomy === 'file' && taxonomyFile && !importLegacy ? { taxonomyFilePath: taxonomyFile.path } : {}),
       });
       await flushAll(); // unsaved notes belong to the library that is active until now

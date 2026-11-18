@@ -5,12 +5,10 @@ import { Lazy, lazyView } from '../../components/Lazy';
 import { Popover } from '../../components/Popover';
 import { Icon } from '../../shell/shellIcons';
 import { ColorDots } from './AnnotationPopover';
+import { usePdfGroup, type PdfWrite } from './PdfWriteChip';
 import { ReaderMenu, type RGroup } from './ReaderMenu';
 import type { ColorNo, Tool } from './toolMachine';
 import type { ReaderDoc } from './useReaderDoc';
-
-/** Writing annotations into the PDF itself is off (the user's decision, wave 4 turns it on): the Studio menu says "Only in the app". */
-export const PDF_WRITE_ENABLED = false;
 
 // The list of changes loads when "History" is chosen.
 const HistoryPanel = lazyView(() => import('../../lib/HistoryPanel').then((m) => ({ default: m.HistoryPanel })), ['history']);
@@ -61,6 +59,8 @@ interface Props {
   findOpen: boolean;
   onFind(): void;
   doc: ReaderDoc | null;
+  /** The PDF group of the Study menu (G4a). */
+  pdf: PdfWrite;
   onStudy(s: StudyState): void;
   onUnderlined(v: boolean): void;
   sideOpen: boolean;
@@ -122,6 +122,7 @@ export function ReaderBar(p: Props) {
     },
   ];
   const study = p.doc?.study;
+  const pdfGroup = usePdfGroup(p.pdf);
   const studyGroups: RGroup[] = [
     {
       id: 'state',
@@ -131,15 +132,7 @@ export function ReaderBar(p: Props) {
         { id: 'ul', label: t('doc.underlined'), checked: study?.underlined.value ?? false, testId: 'reader-underlined', onSelect: () => p.onUnderlined(!(study?.underlined.value ?? false)) },
       ],
     },
-    {
-      id: 'pdf',
-      heading: PDF_WRITE_ENABLED ? t('reader.pdfStatus') : t('reader.pdfOnlyApp'),
-      headingId: 'reader-pdf-status',
-      items: [
-        { id: 'save', label: t('reader.pdfSave'), testId: 'reader-pdf-save', disabled: t('reader.pdfOff'), onSelect: () => {} },
-        { id: 'remove', label: t('reader.pdfRemove'), testId: 'reader-pdf-remove', disabled: t('reader.pdfOff'), onSelect: () => {} },
-      ],
-    },
+    pdfGroup,
   ];
   const moreGroups: RGroup[] = [
     {

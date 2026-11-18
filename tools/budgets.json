@@ -11,7 +11,12 @@
     "readerResourcesKB": 2760
   },
   "main": {
-    "totalJsKB": 1095
+    "entryJsKB": 1096,
+    "lazyJsKB": 120,
+    "lazyChunkKB": 30,
+    "lazyChunkOverrides": {
+      "writer": 44
+    }
   },
   "preload": {
     "totalKB": 8

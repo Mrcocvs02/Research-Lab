@@ -257,6 +257,20 @@ export const scanConfigPatchSchema = z.object({
   pruneDeletedDays: scanFields.pruneDeletedDays.optional(),
 });
 
+/**
+ * Highlights and underlines written INTO the original PDFs (§8.3.9, D-316). Synced with the library: every computer behaves
+ * the same. A PDF is written only with `writeToPdf` on AND a `writeToPdfConfirmedAt` (D-348); the confirmation is set by the
+ * wizard or by the consent banner (`annotations:confirmPdfWrite`), never by `library:setConfig`. `author` and `backupLocation`
+ * have provisional defaults (D-327, D-328).
+ */
+export const annotationsConfigSchema = z.object({
+  writeToPdf: z.boolean().default(true),
+  writeToPdfConfirmedAt: isoDateSchema.nullable().default(null),
+  author: z.enum(['profile', 'none']).default('none'),
+  backupLocation: z.enum(['data', 'local']).default('data'),
+});
+export type AnnotationsConfig = z.infer<typeof annotationsConfigSchema>;
+
 const mcpFields = { enabled: z.boolean(), writeEnabled: z.boolean() };
 
 export const libraryConfigSchema = z
@@ -270,6 +284,7 @@ export const libraryConfigSchema = z
     aiEnabledFolders: z.array(relativePathSchema).default([]),
     ai: libraryAiConfigSchema.prefault({}),
     scan: scanConfigSchema.prefault({}),
+    annotations: annotationsConfigSchema.prefault({}),
     exportPresets: z.array(exportPresetSchema).default([]),
     mcp: z
       .object({
@@ -299,6 +314,8 @@ export const libraryConfigPatchSchema = z.object({
   aiEnabledFolders: z.array(relativePathSchema).optional(),
   ai: libraryAiPatchSchema.optional(),
   scan: scanConfigPatchSchema.optional(),
+  /** `writeToPdfConfirmedAt` is not here: only the consent channel sets it. */
+  annotations: annotationsConfigSchema.pick({ writeToPdf: true, author: true, backupLocation: true }).partial().optional(),
   exportPresets: z.array(exportPresetSchema).optional(),
   mcp: z.object({ enabled: mcpFields.enabled.optional(), writeEnabled: mcpFields.writeEnabled.optional() }).optional(),
 });

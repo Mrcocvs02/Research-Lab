@@ -1,4 +1,5 @@
 import type { QuoteOutcome, QuoteQuery } from '@rl/data';
+import type { InspectResult, SyncRequest, SyncResult, VerifyRequest, VerifyResult } from '@rl/data/pdf-annot';
 import type { DocumentRecord, ExtractedMeta, IndexableDocument, ScanOptions, ScanProgress, ScanResult } from '@rl/core';
 
 /**
@@ -115,6 +116,15 @@ export interface LibraryWorker {
   extract(args: ExtractArgs, hooks?: WorkerHooks<ExtractProgress>): Promise<ExtractResult>;
   /** One outcome per query, in order. Throws `AppError` for an unreadable file; one `ExtractProgress` event per page read. */
   repairAnnotations(args: RepairArgs, hooks?: WorkerHooks<ExtractProgress>): Promise<QuoteOutcome[]>;
+  /**
+   * Annotation writer (§8.3.3 step 3): reads the PDF, reconciles it with the annotations of the app and builds the bytes to append.
+   * It never writes the PDF: the main process does. The writer code is a lazy chunk loaded at the first call.
+   */
+  pdfSync?(args: SyncRequest, hooks?: WorkerHooks<never>): Promise<SyncResult>;
+  /** Verifies a written temporary file before it replaces the original (§8.3.3 step 6). */
+  pdfVerify?(args: VerifyRequest, hooks?: WorkerHooks<never>): Promise<VerifyResult>;
+  /** Counts the annotations of other programs in a file and in its original prefix. */
+  pdfInspect?(args: { path: string; baseSize?: number }, hooks?: WorkerHooks<never>): Promise<InspectResult>;
   index(args: { rootPath: string; cacheDir: string; jobs: IndexJob[] }): Promise<void>;
   remove(docIds: string[]): Promise<void>;
   dispose(): Promise<void>;
@@ -124,7 +134,7 @@ export interface LibraryWorker {
   alive?(): boolean;
 }
 
-type Op = 'openIndex' | 'resetIndex' | 'scan' | 'extract' | 'repairAnnotations' | 'index' | 'remove' | 'dispose';
+type Op = 'openIndex' | 'resetIndex' | 'scan' | 'extract' | 'repairAnnotations' | 'pdfSync' | 'pdfVerify' | 'pdfInspect' | 'index' | 'remove' | 'dispose';
 
 /** Messages over the thread boundary. */
 export type ToWorker =

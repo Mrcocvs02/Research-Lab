@@ -9,6 +9,8 @@
     "pdfjs-dist": "6.5.438"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./pdf-annot": "./src/pdf-annot/writer.ts",
+    "./pdf-annot-testkit": "./src/pdf-annot/testkit.ts"
   }
 }

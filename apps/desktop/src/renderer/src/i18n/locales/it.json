@@ -48,7 +48,8 @@
     "doiOwned": "Un altro documento della libreria ha già questo DOI, quindi la versione pubblicata non è stata applicata.",
     "STOPPED": "non provata: le fonti precedenti continuavano a fallire",
     "PARTIAL": "più lavori di quelli che un controllo legge: controlla di nuovo per continuare",
-    "OWN_AUTHOR_UNKNOWN": "nessun autore OpenAlex corrisponde al tuo profilo: aggiungi il tuo id autore OpenAlex nelle Impostazioni"
+    "OWN_AUTHOR_UNKNOWN": "nessun autore OpenAlex corrisponde al tuo profilo: aggiungi il tuo id autore OpenAlex nelle Impostazioni",
+    "OPENALEX_KEY_REQUIRED": "serve una chiave OpenAlex: aggiungila nelle Impostazioni"
   },
   "notices": {
     "settingsReset": "Il file delle impostazioni non era utilizzabile ({{reason}}): l\\’app è ripartita con le impostazioni predefinite. Il file danneggiato è stato conservato come \"{{backup}}\" nella cartella dati dell\\’app; le librerie vanno aggiunte di nuovo.",

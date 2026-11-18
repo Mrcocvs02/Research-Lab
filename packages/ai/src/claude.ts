@@ -465,7 +465,8 @@ export function createClaudeProvider(options: ClaudeProviderOptions): AiProvider
       const key = await getKey();
       const sdk = await loadSdk();
       await mkdir(options.workDir, { recursive: true });
-      const jsonSchema = z.toJSONSchema(request.schema) as Record<string, unknown>;
+      // Draft-7 without `$schema`: Claude Code rejects the draft 2020-12 meta-schema reference ("no schema with key or ref").
+      const { $schema: _meta, ...jsonSchema } = z.toJSONSchema(request.schema, { target: 'draft-7' }) as Record<string, unknown>;
       const system = `${request.system}\nAnswer with a single JSON value that matches the requested schema and nothing else.`;
       let lastIssue = '';
       let total: TokenUsage = { inputTokens: 0, outputTokens: 0 };

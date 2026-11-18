@@ -155,6 +155,18 @@ export interface PdfExtraction {
 
 const isItem = (i: PdfTextItem | Record<string, unknown>): i is PdfTextItem => typeof (i as PdfTextItem).str === 'string' && Array.isArray((i as PdfTextItem).transform);
 
+const SPACING_ACCENT: Record<string, string> = { '¨': '̈', '´': '́', '`': '̀', 'ˆ': '̂', '^': '̂', '˜': '̃' };
+
+/** TeX-style accents that pdf.js extracts as a spacing mark before the letter ("M¨unchen") become the composed letter. */
+export function fixAccents(text: string): string {
+  return text.replace(/(\p{L})?([¨´`ˆ^˜])(\p{L})/gu, (all, before: string | undefined, mark: string, letter: string) => {
+    // Quote-like marks (` ^) are accents only inside a word; the others may also start one ("¨Uber").
+    if (!before && (mark === '`' || mark === '^')) return all;
+    const composed = (letter + SPACING_ACCENT[mark]).normalize('NFC');
+    return composed.length === 1 ? (before ?? '') + composed : all;
+  });
+}
+
 /** Joins pdf.js text items into lines (new line when the baseline moves or the item ends a line). */
 function toLines(items: Array<PdfTextItem | Record<string, unknown>>): TextLine[] {
   const lines: TextLine[] = [];
@@ -163,7 +175,7 @@ function toLines(items: Array<PdfTextItem | Record<string, unknown>>): TextLine[
   let curY = Number.NaN;
   let prevEnd = Number.NaN;
   const flush = () => {
-    if (cur.trim()) lines.push({ text: cur, size: curSize });
+    if (cur.trim()) lines.push({ text: fixAccents(cur), size: curSize });
     cur = '';
     curSize = 0;
     curY = Number.NaN;

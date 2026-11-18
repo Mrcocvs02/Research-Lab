@@ -50,18 +50,24 @@ function confident(ref: SourceRef, c: { title?: string | undefined; year?: numbe
 /* --------------------------------------------- OpenAlex --------------------------------------------- */
 
 const OA = 'https://api.openalex.org';
-const LINK_FIELDS = 'id,doi,title,publication_year,authorships,primary_location';
+const LINK_FIELDS = 'id,doi,title,publication_year,authorships,primary_location,locations';
 const FULL_FIELDS = `${LINK_FIELDS},type,locations,biblio,cited_by_count,referenced_works,is_retracted`;
 const oaId = (u: unknown): string | undefined => (typeof u === 'string' ? /W\d+$/.exec(u)?.[0] : undefined);
 const oaAuthors = (w: Obj): string[] => names(arr(w['authorships']).map((a) => asObj(asObj(a)['author'])['display_name']));
 const oaVenue = (w: Obj): string | undefined => clean(asObj(asObj(w['primary_location'])['source'])['display_name'], 500) ?? undefined;
+
+/** The arXiv id of a work from its locations (a preprint under another title carries only the journal DOI). */
+const arxivFromLocations = (w: Obj): string | undefined =>
+  arr(w['locations'])
+    .map((l) => /arxiv\.org\/abs\/([^\s?#]+)/i.exec(String(asObj(l)['landing_page_url'] ?? ''))?.[1])
+    .find(Boolean);
 
 export function openAlexLink(w: Obj, at: string): CitationLink {
   const doi = doiOf(w['doi']);
   return compact({
     externalId: oaId(w['id']),
     doi,
-    arxivId: arxivFromDoi(doi) ?? undefined,
+    arxivId: arxivFromDoi(doi) ?? arxivFromLocations(w) ?? undefined,
     title: clean(w['title'] ?? w['display_name'], L.text) ?? undefined,
     authors: oaAuthors(w),
     year: yearOf(w['publication_year']),
@@ -135,9 +141,7 @@ export function createOpenAlex(net: Net, now: () => Date): CitationSourceX {
       const w = await resolve(ref, signal);
       if (!w) return null;
       const doi = doiOf(w['doi']);
-      const fromLocation = arr(w['locations'])
-        .map((l) => /arxiv\.org\/abs\/([^\s?#]+)/i.exec(String(asObj(l)['landing_page_url'] ?? ''))?.[1])
-        .find(Boolean);
+      const fromLocation = arxivFromLocations(w);
       return compact({
         title: clean(w['title'] ?? w['display_name'], L.text) ?? undefined,
         authors: oaAuthors(w),

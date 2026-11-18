@@ -203,6 +203,8 @@ describe('claude provider structured output and availability', () => {
         const out = calls === 1 ? { wrong: true } : { tags: ['a'] };
         expect(params.options.tools).toEqual([]);
         expect(params.options.outputFormat.type).toBe('json_schema');
+        expect(params.options.outputFormat.schema).not.toHaveProperty('$schema');
+        expect(params.options.outputFormat.schema).toMatchObject({ type: 'object' });
         return Object.assign((async function* () { yield resultMsg({ structured_output: out }); })(), { close() {} });
       },
     } as unknown as SdkModule;

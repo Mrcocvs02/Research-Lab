@@ -33,13 +33,13 @@ async function makePdf(file: string, rotate = 0): Promise<void> {
   await writeFile(file, await doc.save());
 }
 
-/** The glyph box of `piece` inside line `line` (fractions of the page, y from the top): baseline minus cap height down to the descender. */
+/** The glyph box of `piece` inside line `line` (fractions of the page, y from the top): the line box the reader measures (0.9 above the baseline, 0.2 below, in font sizes: calibrated on a real measurement). */
 function glyphBox(line: number, piece: string): NormRect {
   const l = LINES[line]!;
   const before = font.widthOfTextAtSize(l.text.slice(0, l.text.indexOf(piece)), SIZE);
   const w = font.widthOfTextAtSize(piece, SIZE);
-  const top = H - l.y - 0.72 * SIZE;
-  return { x: (LEFT + before) / W, y: top / H, w: w / W, h: (0.93 * SIZE) / H };
+  const top = H - l.y - 0.9 * SIZE;
+  return { x: (LEFT + before) / W, y: top / H, w: w / W, h: (1.1 * SIZE) / H };
 }
 
 /** What a stretched page saved: x measured against a box that was too narrow (factor 1.49, then limited to 1). */

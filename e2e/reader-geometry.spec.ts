@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { documentIdFromHash } from '@rl/core';
 import { PDFDocument } from 'pdf-lib';
-import type { LaunchedApp } from './helpers/launch';
+import { launchApp, type LaunchedApp } from './helpers/launch';
 import { leakedRules } from './helpers/leaked-rules';
 import { ipcData, skipUnlessChannels } from './helpers/phase1';
 import { openSyntheticLibrary, rowByTitle } from './helpers/ui';
@@ -274,5 +274,114 @@ test.describe.serial('reader geometry (H0)', () => {
     await window.getByTestId('annotation-review-item').first().getByTestId('ann-accept').click();
     await expect(window.getByTestId('annotation-review-item')).toHaveCount(1);
     await setViewport(1280, 800, 1);
+  });
+});
+
+/**
+ * R0 (D-373): at the first start after the update, a background job places the highlights that were saved while the page
+ * was stretched, from the text of the PDF and without opening the reader. App A makes the data (a right highlight from
+ * the reader, stretched copies of it, two that cannot be placed) with the job held off; app B starts on the same data and
+ * the job runs. The PDF files are never written.
+ */
+test.describe.serial('annotation check job (R0)', () => {
+  let a: LaunchedApp;
+  let b: LaunchedApp | undefined;
+  let docId = '';
+  let good: Ann;
+  let legacy: Ann;
+  let noText: Ann;
+  let lost: Ann;
+  let stretched: Rect[] = [];
+
+  test.afterAll(async () => {
+    await b?.close();
+    await a?.close();
+  });
+
+  test('the job places stretched highlights from the PDF text, leaves the rest, and undo clears geom', async ({}, testInfo) => {
+    test.setTimeout(420_000);
+    process.env['RL_REPAIR_DELAY_MS'] = '3600000'; // app A: the job waits, the data stays as the old reader made it
+    try {
+      const opened = await openSyntheticLibrary(testInfo, 'papers');
+      a = opened.ctx;
+    } finally {
+      delete process.env['RL_REPAIR_DELAY_MS'];
+    }
+    const win = a.window;
+    await skipUnlessChannels(win, testInfo, CHANNELS);
+    const file = a.library!.manifest!.files.find((f) => f.format === 'pdf' && f.title && f.hasText !== false);
+    test.skip(!file, 'needs a PDF with text and a title');
+    docId = documentIdFromHash(file!.sha256);
+    await win.getByTestId('search-sort').selectOption('title');
+
+    // The reader makes the right highlight (geom 2): the ground truth, measured on the drawn text.
+    const row = rowByTitle(win, file!.title!);
+    await row.hover();
+    await row.getByTestId('row-read').click();
+    await expect(win.getByTestId('reader')).toBeVisible();
+    await expect
+      .poll(() => win.evaluate(() => !!document.querySelector('.reader-scroll .page[data-page-number="1"] .textLayer span')), { timeout: 60_000 })
+      .toBe(true);
+    await win.waitForTimeout(1500);
+    const picked = await win.evaluate(() => {
+      const spans = Array.from(document.querySelectorAll('.reader-scroll .page[data-page-number="1"] .textLayer span'));
+      const compact = (v: string) => v.toLowerCase().replace(/[\s-]/g, '');
+      const all = compact(spans.map((s) => s.textContent ?? '').join(''));
+      for (const el of spans) {
+        const t = (el.textContent ?? '').trim();
+        if (t.length < 10 || !/[a-z]{4,}/i.test(t) || all.split(compact(t)).length !== 2) continue;
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = document.getSelection()!;
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return t;
+      }
+      return '';
+    });
+    expect(picked, 'page 1 needs a line of text that is not repeated').not.toBe('');
+    await expect(win.getByTestId('annotation-bar')).toBeVisible({ timeout: 10_000 });
+    await win.getByTestId('ann-highlight').click();
+    await expect(win.getByTestId('annotation-mark').first()).toBeVisible();
+    good = (await ipcData<{ annotations: Ann[] }>(win, 'annotations:list', { docId })).annotations[0]!;
+    expect(good.geom).toBe(2);
+    await win.getByTestId('reader-close').click();
+
+    // What the old reader stored: x and width stretched by 1.49 and cut at 1.
+    stretched = good.rects.map((r) => {
+      const x = Math.min(1, r.x * 1.49);
+      return { x, y: r.y, w: Math.min(1 - x, r.w * 1.49), h: r.h };
+    });
+    const input = (text: string) => ({ kind: 'highlight', page: 1, rects: stretched, text, color: 'blue' });
+    legacy = (await ipcData<{ annotation: Ann }>(win, 'annotations:save', { docId, annotation: input(good.text) })).annotation;
+    noText = (await ipcData<{ annotation: Ann }>(win, 'annotations:save', { docId, annotation: input('') })).annotation;
+    lost = (await ipcData<{ annotation: Ann }>(win, 'annotations:save', { docId, annotation: input('zz qq text that is not on this page') })).annotation;
+    expect(legacy.geom).toBeUndefined();
+    expect(iou(legacy.rects, good.rects)).toBeLessThan(0.7);
+
+    // Second start on the same data: the job runs by itself, nobody opens the reader.
+    await a.app.close();
+    b = await launchApp({ offline: true, env: { RL_USER_DATA_DIR: a.userDataDir, RL_LOCAL_DATA_DIR: a.localDataDir, RL_REPAIR_DELAY_MS: '500' } });
+    const list = () => ipcData<{ annotations: Ann[] }>(b!.window, 'annotations:list', { docId }).then((r) => r.annotations);
+    await expect.poll(async () => (await list()).find((x) => x.id === legacy.id)?.geom, { timeout: 180_000, intervals: [1000] }).toBe(2);
+
+    const after = await list();
+    const fixed = after.find((x) => x.id === legacy.id)!;
+    const overlap = iou(fixed.rects, good.rects);
+    console.log(`R0 job: repaired highlight overlap with the glyphs measured by the reader: ${(overlap * 100).toFixed(1)}%`);
+    expect(overlap).toBeGreaterThanOrEqual(0.9);
+    expect(after.find((x) => x.id === good.id)!.rects).toEqual(good.rects);
+    // Not placeable: untouched, still without geom, for the reader's "To check" group.
+    for (const x of [noText, lost]) {
+      const now = after.find((y) => y.id === x.id)!;
+      expect(now.geom).toBeUndefined();
+      expect(now.rects).toEqual(stretched);
+    }
+    await a.verifyLibraryUntouched(); // the PDF files were only read
+
+    // Undoing a repair restores the old rectangles AND clears geom (it is the gate for writing into the PDF).
+    const undone = await ipcData<{ annotation: Ann }>(b.window, 'annotations:save', { docId, annotation: { id: fixed.id, kind: 'highlight', page: 1, rects: stretched, text: fixed.text, color: 'blue', geom: null } });
+    expect(undone.annotation.geom).toBeUndefined();
+    expect((await list()).find((x) => x.id === fixed.id)!.geom).toBeUndefined();
   });
 });

@@ -32,7 +32,7 @@ async function makePdf(file: string): Promise<Uint8Array> {
 
 const glyphBox = (line: number, piece: string): NormRect => {
   const before = font.widthOfTextAtSize(LINES[line]!.slice(0, LINES[line]!.indexOf(piece)), SIZE);
-  return { x: (LEFT + before) / W, y: (H - Y[line]! - 0.72 * SIZE) / H, w: font.widthOfTextAtSize(piece, SIZE) / W, h: (0.93 * SIZE) / H };
+  return { x: (LEFT + before) / W, y: (H - Y[line]! - 0.9 * SIZE) / H, w: font.widthOfTextAtSize(piece, SIZE) / W, h: (1.1 * SIZE) / H };
 };
 const skewed = (r: NormRect): NormRect => {
   const x = Math.min(1, r.x * 1.49);
@@ -139,7 +139,7 @@ describe('runRepair', () => {
     const a = files.get(hex(2))!.annotations[0]!;
     expect(a.geom).toBe(2);
     expect(a.rects).toEqual([right]);
-    expect(out).toMatchObject({ confirmed: 1, repaired: 0 });
+    expect(out).toMatchObject({ repaired: 0, left: 0, done: 1 });
   });
 
   it('skips annotations made on another version of the file, missing files and documents without annotations', async () => {

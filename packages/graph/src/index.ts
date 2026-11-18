@@ -3,8 +3,10 @@
  * TF-IDF vectors, nearest neighbours combined with shared citations and tags, seeded Louvain clustering in levels, a
  * seeded force layout, incremental placement of new documents, and zoomable exploration of topics, authors and venues.
  */
-export { MAX_EXPLORE_NODES, authorKey, createExploreIndex, fold } from './explore.js';
-export type { ExploreDimension, ExploreDoc, ExploreIndex, ExploreKind, ExploreNode, ExploreTaxonomy, PathStep } from './explore.js';
+export { MAX_EXPLORE_NODES, NO_ALIASES, authorKey, createExploreIndex, fold, resolveAuthor } from './explore.js';
+export { ENTITY_LIMIT, TOP_EDGES_PER_NODE, CONSORTIUM, buildEntityNetwork, communities, topEdges } from './entity-network.js';
+export type { EntityDoc, EntityEdge, EntityInput, EntityNetwork, EntityNode, EntityRequest } from './entity-network.js';
+export type { AuthorAliases, ExploreDimension, ExploreDoc, ExploreIndex, ExploreKind, ExploreNode, ExploreTaxonomy, PathStep } from './explore.js';
 export { MAX_CITATION_KEYS, citationKey, citationSignals } from './citation-keys.js';
 export { GRAPH_K, STORE_K, TEXT_REASON_MIN, WEIGHTS, analyze, combine, makeAnalysis, reasonsOf, similarTo } from './analysis.js';
 export type { Analysis, Neighbor, Reason } from './analysis.js';

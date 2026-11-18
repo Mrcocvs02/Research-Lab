@@ -1,7 +1,6 @@
 /**
- * The shape of `graph:entityNetwork` (D-387, §4.21.3). The channel is written by N4 in the main process; until it exists the
- * view derives the same shape from the channels that are there (`entityData.ts`), so these types are the contract between the
- * two and nothing here imports `@rl/core`.
+ * The shape of `graph:entityNetwork` (D-387, D-454, §4.21.3), computed by the main process (`packages/graph/src/entity-network.ts`).
+ * The contract itself is in `@rl/core`; these are the view's own types, so nothing here imports it.
  */
 export type EntityMode = 'tag' | 'topic' | 'author';
 export const MODES = ['doc', 'tag', 'topic', 'author'] as const;
@@ -57,8 +56,3 @@ export interface EntityRequest {
   minWeight: number;
   limit: number;
 }
-
-export const ENTITY_LIMIT = 800;
-export const TOP_EDGES_PER_NODE = 8;
-/** Works with more authors than this count for each author but create no co-authorship edges (consortia). */
-export const CONSORTIUM = 25;

@@ -27,6 +27,8 @@ export const searchFiltersSchema = z.object({
   folders: z.array(relativePathSchema).max(SEARCH_LIMITS.filterValues).optional(),
   /** Restrict the result to an explicit set of documents (the Library filtered on a scan report list, §9). */
   docIds: z.array(documentIdSchema).max(SCAN_LIMITS.reportIds).optional(),
+  /** Documents of one topic (a cluster id of the graph model, any level); the main process turns it into `docIds`, so no cap of 500 applies. Nothing matches without a built model. */
+  topic: z.string().min(1).max(100).optional(),
   folder: relativePathSchema.optional(),
   includeSubfolders: z.boolean().optional(),
   yearFrom: z.number().int().min(1000).max(3000).optional(),

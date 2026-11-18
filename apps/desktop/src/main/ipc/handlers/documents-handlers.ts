@@ -1,9 +1,10 @@
 import type { DomainHandlers } from '../types.js';
+import { withTopic } from './search-handlers.js';
 import type { MainServices } from './services.js';
 
 export const documentsHandlers = (s: MainServices): Pick<DomainHandlers<'documents'>, 'documents:list' | 'documents:get' | 'documents:ids'> => ({
-  'documents:list': async ({ filters, sort, limit, offset }) => (await s.runtime.require()).list({ filters, sort, limit, offset }),
-  'documents:ids': async ({ text, filters, sort, limit }) => (await s.runtime.require()).ids({ text: text ?? '', filters, sort, limit }),
+  'documents:list': async ({ filters, sort, limit, offset }) => (await s.runtime.require()).list({ filters: await withTopic(s, filters), sort, limit, offset }),
+  'documents:ids': async ({ text, filters, sort, limit }) => (await s.runtime.require()).ids({ text: text ?? '', filters: await withTopic(s, filters), sort, limit }),
   'documents:get': async ({ docId }) => {
     // `legacy` holds verbatim leftovers of the old index (it can carry absolute paths): it never reaches the renderer.
     const { legacy: _legacy, ...view } = await (await s.runtime.require()).getDocument(docId);

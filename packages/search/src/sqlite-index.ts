@@ -118,6 +118,11 @@ function buildWhere(f: SearchFilters | undefined, t: TextFilters | undefined): W
       params.push(folder);
     }
   }
+  if (f?.docIds !== undefined) {
+    // One JSON parameter: a topic can hold thousands of documents, more than a statement has placeholders for.
+    cond.push('d.id IN (SELECT value FROM json_each(?))');
+    params.push(JSON.stringify(f.docIds));
+  }
   const from = Math.max(f?.yearFrom ?? -Infinity, t?.yearFrom ?? -Infinity);
   const to = Math.min(f?.yearTo ?? Infinity, t?.yearTo ?? Infinity);
   if (Number.isFinite(from)) {

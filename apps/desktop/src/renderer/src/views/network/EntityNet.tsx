@@ -9,10 +9,10 @@ import { useLocalFlag } from '../../lib/useLocalFlag';
 import { isDarkTheme } from '../../lib/theme';
 import { useApp } from '../../state/app-context';
 import { safeText } from '../library/safeText';
-import { readAliases, useAliasVersion } from './authorAliases';
+import { migrateAliases, useAliasVersion } from './authorAliases';
 import { assignKeyTints, haloSprite, mix, readableColor, readTheme, withAlpha, type MapTheme } from './colors';
 import { controlPoint, edgeAlpha, fillTapered, MAX_CURVED } from './edges';
-import { authorKey, fetchEntityNetwork, loadDeriveInput, type DeriveInput } from './entityData';
+import { authorKey, fetchEntityNetwork } from './entityData';
 import { layoutAnchors, nodeRadius } from './entityLayout';
 import type { EntityMode, EntityNetwork, EntityNode } from './entityTypes';
 import { MAX_NET_NODES, Network, type NetNode, type RawEdge, type RawNode } from './forceSim';
@@ -66,7 +66,6 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
   const taxVersion = useChangeVersion('taxonomy');
   const aliasVersion = useAliasVersion();
   const net = useMemo(() => new Network(), []);
-  const input = useRef<{ key: string; p: Promise<DeriveInput> } | null>(null);
   const centroids = useRef(new Map<string, { x: number; y: number }>());
   const docsOfCluster = useRef(new Map<string, string[]>());
   const [depth, setDepth] = useState(1);
@@ -479,10 +478,9 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
   }
 
   async function load(lvl: number): Promise<EntityNetwork> {
-    const key = `${lib}:${docsVersion}:${taxVersion}`;
-    if (input.current?.key !== key) input.current = { key, p: loadDeriveInput() };
+    await migrateAliases(lib);
     const req = { mode, level: lvl, ...(tagScope ? { scope: { tagId: tagScope } } : {}), ...(years ? { years } : {}), minDocs, minWeight, limit: MAX_NET_NODES };
-    return fetchEntityNetwork(req, () => input.current!.p, readAliases(lib));
+    return fetchEntityNetwork(req);
   }
 
   // The Panorama gives the starting positions (centroids) and the depth of the topic levels.

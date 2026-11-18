@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { active, FLIGHT_MS, flightAt, makeFlight, newMotion, stepInertia, stepMotion, stepZoom, zoomBy } from './camera';
 import { adjacencyOf, assignKeyTints, assignTints, contrast, mix, nearestTint, readableColor, withAlpha, TINTS, type TintGroup } from './colors';
 import { edgeAlpha, taperedPolygon } from './edges';
-import { authorKey, communities, deriveEntityNetwork, resolveAuthor, topEdges, type DeriveInput } from './entityData';
+import { authorKey } from './entityData';
 import { layoutAnchors, nodeRadius } from './entityLayout';
-import type { EntityEdge, EntityNode, EntityRequest } from './entityTypes';
+import type { EntityNode } from './entityTypes';
 import { Network } from './forceSim';
 import { capsule, centroidOf, chaikin, circleAt, convexHull, growPolygon, hullShape, inPolygon, type Pt } from './hulls';
 import { overlaps, pickLabels, shortLabel, type LabelCandidate } from './labelsLod';
@@ -371,109 +371,12 @@ describe('keyboard of the map', () => {
 });
 
 describe('entity networks', () => {
-  const docs = (list: Array<[string, string[], number | null, string[]]>): DeriveInput['docs'] => list.map(([docId, authors, year, tags]) => ({ docId, authors, year, tags, path: 'a/b.pdf' }));
-  const req = (mode: EntityRequest['mode'], more: Partial<EntityRequest> = {}): EntityRequest => ({ mode, minDocs: 1, minWeight: 0, limit: 800, ...more });
-  const input = (d: DeriveInput['docs'], extra: Partial<DeriveInput> = {}): DeriveInput => ({ docs: d, tax: [], clusters: [], docClusters: new Map(), ...extra });
-
-  it('normalises author names like Explore and applies merges and splits', () => {
+  it('normalises author names like Explore', () => {
     expect(authorKey('Rossi, Anna')).toBe('rossi a');
     expect(authorKey('Anna Rossi')).toBe('rossi a');
     expect(authorKey('Ánna Rossi')).toBe('rossi a');
     expect(authorKey('Rossi')).toBe('rossi');
     expect(authorKey('  ')).toBe('');
-    expect(resolveAuthor('Anna Rossi', { merge: { 'rossi a': 'bianchi g' }, split: [] })).toBe('bianchi g');
-    expect(resolveAuthor('Anna Rossi', { merge: {}, split: ['rossi a'] })).toBe('rossi a|anna rossi');
-    expect(resolveAuthor('Andrea Rossi', { merge: {}, split: ['rossi a'] })).toBe('rossi a|andrea rossi');
-  });
-
-  it('builds the author network: variants, co-authorship, consortia without edges, minimum documents, years', () => {
-    const consortium = Array.from({ length: 30 }, (_, i) => `Person ${String.fromCharCode(65 + (i % 26))}${i}`);
-    const d = docs([
-      ['1', ['Rossi, Anna', 'Bianchi, Giulia'], 2016, []],
-      ['2', ['Anna Rossi', 'Giulia Bianchi', 'Neri, Luca'], 2020, []],
-      ['3', ['Andrea Rossi'], 2024, []],
-      ['4', consortium, 2024, []],
-    ]);
-    const n = deriveEntityNetwork(input(d), req('author'));
-    const rossi = n.nodes.find((x) => x.id === 'author:rossi a')!;
-    expect(rossi.count).toBe(3);
-    expect(rossi.variants).toContain('Andrea Rossi');
-    expect(rossi.years.reduce((a, b) => a + b, 0)).toBe(3);
-    expect(n.yearRange).toEqual([2016, 2024]);
-    const e = n.edges.find((x) => x.a.includes('bianchi') && x.b.includes('rossi')) ?? n.edges.find((x) => x.a.includes('rossi') && x.b.includes('bianchi'))!;
-    expect(e.n).toBe(2);
-    expect(e.w).toBeCloseTo(1, 5);
-    // The consortium counts for each author but links nobody.
-    expect(n.nodes.filter((x) => x.label.startsWith('Person')).length).toBe(30);
-    const members = new Set(n.nodes.filter((x) => x.label.startsWith('Person')).map((x) => x.id));
-    expect(n.edges.some((x) => members.has(x.a) || members.has(x.b))).toBe(false);
-    expect(deriveEntityNetwork(input(d), req('author', { minDocs: 2 })).nodes.map((x) => x.id).sort()).toEqual(['author:bianchi g', 'author:rossi a']);
-    expect(deriveEntityNetwork(input(d), req('author', { years: [2020, 2020] })).nodes.every((x) => x.count === 1)).toBe(true);
-  });
-
-  it('builds the tag network with cosine co-occurrence, implied edges and the branch as group', () => {
-    const tax = [
-      { id: 'phys', label: 'Physics', parents: [], implies: [], status: 'active' as const },
-      { id: 'optics', label: 'Optics', parents: ['phys'], implies: [], status: 'active' as const, color: '#fffff0' },
-      { id: 'laser', label: 'Laser', parents: ['optics'], implies: ['optics'], status: 'active' as const },
-      { id: 'stats', label: 'Statistics', parents: [], implies: [], status: 'active' as const },
-      { id: 'old', label: 'Old', parents: [], implies: [], status: 'deprecated' as const },
-    ];
-    const d = docs([
-      ['1', [], 2020, ['laser', 'optics', 'phys']],
-      ['2', [], 2021, ['laser', 'optics', 'phys', 'stats']],
-      ['3', [], 2022, ['optics', 'phys']],
-      ['4', [], 2022, ['stats', 'old']],
-    ]);
-    const n = deriveEntityNetwork(input(d, { tax }), req('tag'));
-    expect(n.nodes.some((x) => x.id === 'old')).toBe(false);
-    const laser = n.nodes.find((x) => x.id === 'laser')!;
-    expect(laser.group).toBe('phys');
-    expect(laser.groupLabel).toBe('Physics');
-    const co = n.edges.find((x) => !x.implies && [x.a, x.b].sort().join() === 'laser,optics')!;
-    expect(co.n).toBe(2);
-    expect(co.w).toBeCloseTo(2 / Math.sqrt(2 * 3), 6);
-    expect(n.edges.some((x) => x.implies && x.a === 'laser' && x.b === 'optics')).toBe(true);
-    expect(n.nodes.find((x) => x.id === 'optics')!.colorKey).toBe('#fffff0');
-  });
-
-  it('builds the topic network from the clusters of a level', () => {
-    const clusters = ['c0', 'c1', 'c2'].map((id, i) => ({ id, parent: null, level: 0, size: 2, topTerms: [`t${i}`, 'x'], aiLabel: null, centroid: { x: i * 10, y: 0 } }));
-    const d = docs([
-      ['1', [], 2020, ['a', 'b']],
-      ['2', [], 2020, ['a']],
-      ['3', [], 2021, ['a', 'b']],
-      ['4', [], 2021, ['z']],
-    ]);
-    const docClusters = new Map([['1', ['c0']], ['2', ['c0']], ['3', ['c1']], ['4', ['c2']]]);
-    const n = deriveEntityNetwork(input(d, { clusters, docClusters }), req('topic'));
-    expect(n.nodes.map((x) => x.id).sort()).toEqual(['c0', 'c1', 'c2']);
-    expect(n.nodes.find((x) => x.id === 'c0')!.label).toBe('t0, x');
-    expect(n.edges.some((x) => [x.a, x.b].sort().join() === 'c0,c1')).toBe(true);
-    expect(n.edges.some((x) => x.a === 'c2' || x.b === 'c2')).toBe(false);
-  });
-
-  it('caps the nodes at 800 and keeps the 8 heaviest edges of each node', () => {
-    const many = Array.from({ length: 1000 }, (_, i) => [`d${i}`, [`G Fam${i}`, `G Fam${(i + 1) % 1000}`], 2020, []] as [string, string[], number, string[]]);
-    const n = deriveEntityNetwork(input(docs(many)), req('author'));
-    expect(n.nodes).toHaveLength(800);
-    expect(n.total).toBe(1000);
-    expect(n.truncated).toBe(true);
-    const edges: EntityEdge[] = Array.from({ length: 20 }, (_, i) => ({ a: 'hub', b: `n${i}`, w: i / 20, n: i }));
-    const kept = topEdges(edges, 0);
-    // Each leaf wants its one edge, so all stay: the hub keeps 8 by itself, the leaves keep the others.
-    expect(kept.length).toBe(20);
-    const hubOnly = topEdges(edges.filter((e) => e.b !== 'n0'), 0.5);
-    expect(hubOnly.every((e) => e.w >= 0.5)).toBe(true);
-  });
-
-  it('finds communities by label propagation', () => {
-    const e = (a: string, b: string, w = 1): EntityEdge => ({ a, b, w, n: 1 });
-    const edges = [e('a', 'b'), e('b', 'c'), e('a', 'c'), e('x', 'y'), e('y', 'z'), e('x', 'z'), e('c', 'x', 0.1)];
-    const lab = communities(['a', 'b', 'c', 'x', 'y', 'z'], edges);
-    expect(lab.get('a')).toBe(lab.get('b'));
-    expect(lab.get('x')).toBe(lab.get('y'));
-    expect(lab.get('a')).not.toBe(lab.get('z'));
   });
 
   it('starts the nodes at the centroid of their topic, scaled to the size of the network', () => {

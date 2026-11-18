@@ -3,6 +3,7 @@ import { createScannerImpl, type ScannerOptions } from './scanner.js';
 import { createTextExtractorImpl, type TextExtractorOptions } from './extract/text-extractor.js';
 
 export { readCachedText } from './extract/text-extractor.js';
+export { overlapRatio, quoteOccurrences, locateQuote, repairQuotes, type GeometryOptions, type NormRect, type PageGeometry, type QuoteOutcome, type QuoteQuery } from './extract/pdf-geometry.js';
 import { createLegacyImporterImpl, type LegacyImporterOptions, type LegacyImporterWithExtras } from './legacy-importer.js';
 
 export { backupDataDir, copyDataDir } from './backup.js';

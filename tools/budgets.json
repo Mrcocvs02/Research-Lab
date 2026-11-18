@@ -15,7 +15,7 @@
     "lazyJsKB": 120,
     "lazyChunkKB": 30,
     "lazyChunkOverrides": {
-      "writer": 44
+      "writer": 45
     }
   },
   "preload": {

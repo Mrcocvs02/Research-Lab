@@ -66,6 +66,14 @@ export const aiNewTagSchema = z.object({
 });
 export type AiNewTag = z.infer<typeof aiNewTagSchema>;
 
+export const aiTagScoreSchema = z.object({
+  id: itemIdSchema,
+  weight: z.number().min(0).max(1),
+  origin: z.enum(['ai', 'ancestor']).default('ai'),
+  reason: z.string().max(500).optional(),
+});
+export type AiTagScore = z.infer<typeof aiTagScoreSchema>;
+
 /** AI-generated fields, always wrapped; never mixed with user fields. */
 export const documentAiSchema = z.object({
   summary: aiFieldSchema(z.string().max(L.aiText)).optional(),
@@ -80,6 +88,12 @@ export const documentAiSchema = z.object({
   suggestedTags: aiFieldSchema(z.array(itemIdSchema).max(L.aiList)).optional(),
   /** Proposed NEW taxonomy nodes, same review rules as `suggestedTags` (an accepted one is created, then tagged). */
   suggestedNewTags: aiFieldSchema(z.array(aiNewTagSchema).max(20)).optional(),
+  /**
+   * Weight and reason of each proposed tag (D-447): `weight` 0-1 is the relevance given by Claude (an ancestor added by the
+   * hierarchical closure has the attenuated weight of its best descendant, `origin: 'ancestor'`). Rides along `suggestedTags`:
+   * the review of the tags is the review of these scores.
+   */
+  suggestedTagScores: aiFieldSchema(z.array(aiTagScoreSchema).max(L.aiList)).optional(),
   relations: aiFieldSchema(z.array(aiRelationSchema).max(L.aiList)).optional(),
   suggestedType: aiFieldSchema(z.string().max(L.shortText)).optional(),
 });

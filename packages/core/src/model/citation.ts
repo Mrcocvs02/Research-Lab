@@ -18,6 +18,8 @@ export const citationLinkSchema = z.object({
   authors: z.array(z.string().max(L.author)).max(L.authors).default([]),
   year: z.number().int().min(1000).max(3000).optional(),
   venue: z.string().max(L.text).optional(),
+  /** 0-1 relevance to the citing work (mentions in the text, co-citation with the library, similarity with the note; D-446). */
+  relevance: z.number().min(0).max(1).optional(),
   /** Id of the library document this work was matched to, if owned. */
   matchedDocId: documentIdSchema.nullable().default(null),
   source: citationSourceIdSchema,

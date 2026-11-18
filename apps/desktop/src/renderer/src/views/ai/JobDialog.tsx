@@ -54,7 +54,7 @@ export function JobDialog({ docIds, onClose }: { docIds: string[]; onClose(): vo
   }, [noFolders]);
 
   const tooMany = docIds.length > AI_LIMITS.jobDocs;
-  const request = useMemo(() => ({ kind: 'suggest' as const, docIds, fields, model, reasoning, regenerate }), [docIds, fields, model, reasoning, regenerate]);
+  const request = useMemo(() => ({ kind: 'suggest' as const, docIds, fields, model, reasoning, regenerate, pipeline: 'analysis' as const }), [docIds, fields, model, reasoning, regenerate]);
 
   useEffect(() => {
     setEstimate(null);

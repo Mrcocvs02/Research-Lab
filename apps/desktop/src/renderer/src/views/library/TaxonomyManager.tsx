@@ -218,9 +218,16 @@ function NodeEditor({ node, onGone, onSelect }: { node: TaxonomyNodeView; onGone
             {t('tax.restore')}
           </button>
         ) : (
-          <button type="button" onClick={() => void apply([{ op: 'deprecate', id: node.id }])} data-testid="deprecate-node">
-            {t('tax.deprecate')}
-          </button>
+          <>
+            {node.status === 'candidate' && (
+              <button type="button" onClick={() => void apply([{ op: 'restore', id: node.id }])} data-testid="accept-candidate">
+                {t('tax.acceptCandidate')}
+              </button>
+            )}
+            <button type="button" onClick={() => void apply([{ op: 'deprecate', id: node.id }])} data-testid="deprecate-node">
+              {t('tax.deprecate')}
+            </button>
+          </>
         )}
       </div>
 

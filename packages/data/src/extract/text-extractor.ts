@@ -6,6 +6,7 @@ import { toFsPath } from '../fs-util.js';
 import { withRetry, type RetryOptions } from '../retry.js';
 import { extractNonPdf, formatOf } from './formats.js';
 import {
+  ABSTRACT_MAX_PAGES,
   abstractFromText,
   authorsFromFirstPage,
   authorsFromInfo,
@@ -257,7 +258,8 @@ export function createTextExtractorImpl(options: TextExtractorOptions = {}): Tex
 
     const year = (ownArxiv && arxivYear(ownArxiv.id)) || yearFromText(firstText) || yearFromDate(pdf.info['CreationDate']) || yearFromDate(pdf.info['ModDate']);
     if (year) meta.year = year;
-    const abstract = abstractFromText(twoPages);
+    // Papers: the first two pages. A longer document (thesis): up to ABSTRACT_MAX_PAGES, where the abstract may sit later.
+    const abstract = abstractFromText(twoPages) ?? (pages.length > 2 ? abstractFromText(pages.slice(0, ABSTRACT_MAX_PAGES).map((p) => p.text).join('\n')) : undefined);
     if (abstract) meta.abstract = abstract;
 
     return { pages, meta, noTextLayer: !hasText, hasText, needsOcr: !hasText && pdf.pageCount > 0, format: 'pdf', truncated, hash };

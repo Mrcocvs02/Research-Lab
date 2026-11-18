@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { activeTagNodes, cleanSuggestion, folderOf, aiVisible, suggestPrompt, suggestSchema, suggestSystem, taxonomyBlock, type SuggestClean, type SuggestField, type SuggestRaw } from '@rl/ai';
-import { AI_LIMITS, AppError, type AiJobStatus, type AiMeta, type DocumentId, type DocumentRecord, type ReasoningLevel, type ReviewStatus, type TokenUsage } from '@rl/core';
+import { AI_LIMITS, AppError, type AiTagScore, type AiJobStatus, type AiMeta, type DocumentId, type DocumentRecord, type ReasoningLevel, type ReviewStatus, type TokenUsage } from '@rl/core';
 import type { z } from 'zod';
 import type { aiJobRequestSchema, aiPreviewSchema } from '@rl/core';
 import type { MainServices } from '../ipc/handlers/services.js';
@@ -15,6 +15,8 @@ type Preview = z.infer<typeof aiPreviewSchema>;
 
 /** Pages characters of the excerpt one document sends (plus its metadata): a few thousand, never the whole text. */
 export const JOB_EXCERPT_CHARS = 4000;
+/** Characters one document sends in the analysis pipeline, for the preview: the note step reads up to 60000 (a thesis sends more, chapter by chapter; every call is capped before it starts). */
+const ANALYSIS_DOC_CHARS = 40_000;
 /** Pages read for the excerpt. */
 const EXCERPT_PAGES = [1, 2, 3];
 /** Consecutive provider failures after which a job stops (Claude unavailable would otherwise fail every document). */
@@ -85,6 +87,7 @@ async function plan(s: MainServices, ctx: AiCtx, req: JobRequest) {
     model: req.model,
     docIds: [...todo.map((d) => d.id), ...classified.refused.map((r) => r.docId)],
     promptChars: fixed * todo.length,
+    ...(req.pipeline === 'analysis' ? { perDocChars: ANALYSIS_DOC_CHARS } : {}),
   });
   return { todo, skipped, preview: preview as Preview };
 }
@@ -278,6 +281,28 @@ async function suggestOne(a: OneArgs): Promise<void> {
   const { s, ctx, provider, host, j, rec, fields } = a;
   const { rt, cfg } = ctx;
   const req = j.req;
+  if (req.pipeline === 'analysis') {
+    const { analyseOne } = await import('../analysis/pipeline.js');
+    await analyseOne({
+      r: { s, ctx, provider, signal: j.controller.signal, confirmed: j.confirmed, deviceId: a.deviceId, addUsd: (u) => void (j.status.usd += u) },
+      rec,
+      fields,
+      model: req.model,
+      reasoning: req.reasoning as ReasoningLevel,
+      regenerate: req.regenerate,
+      pageTexts: (d, pages) => host.pageTexts(d, pages),
+      async write(clean, meta) {
+        // The job may have been cancelled, or another library opened, while the model was answering: write nothing then.
+        if (j.controller.signal.aborted) throw new AppError('CANCELLED', 'Cancelled');
+        const active = await s.runtime.require().catch(() => null);
+        if (!active || active.libraryId !== j.libraryId) throw new AppError('CANCELLED', 'The library changed');
+        await writeProposals(s, rt, rec.id, clean, meta, a.deviceId);
+      },
+    });
+    j.status.done++;
+    emit(j, false);
+    return;
+  }
   const tax = fields.includes('tags') ? await rt.store.readTaxonomy().catch(() => null) : null;
   const nodes = activeTagNodes(tax);
   const pages = await host.pageTexts(rec, EXCERPT_PAGES);
@@ -331,7 +356,7 @@ async function suggestOne(a: OneArgs): Promise<void> {
 }
 
 /** Writes the cleaned fields as PROPOSED; never over an accepted or edited value, nothing empty. Logged like the AI tool's writes. */
-export async function writeProposals(s: MainServices, rt: AiCtx['rt'], docId: string, c: SuggestClean, meta: AiMeta, deviceId: string): Promise<string[]> {
+export async function writeProposals(s: MainServices, rt: AiCtx['rt'], docId: string, c: SuggestClean & { scores?: AiTagScore[] }, meta: AiMeta, deviceId: string): Promise<string[]> {
   const written: string[] = [];
   const now = new Date().toISOString();
   const field = <T>(value: T) => ({ value, meta, review: { status: 'proposed' as const } });
@@ -345,6 +370,7 @@ export async function writeProposals(s: MainServices, rt: AiCtx['rt'], docId: st
       written.push(key);
     };
     put('suggestedTags', c.tags as never, !c.tags || c.tags.length === 0);
+    if (written.includes('suggestedTags') && c.scores && c.scores.length > 0) put('suggestedTagScores', c.scores as never, false);
     put('suggestedNewTags', c.newTags as never, !c.newTags || c.newTags.length === 0);
     put('description', c.description as never, !c.description);
     put('summary', c.summary as never, !c.summary);

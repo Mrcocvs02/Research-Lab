@@ -171,7 +171,15 @@ export function yearFromDate(raw: string | undefined | null): number | undefined
 
 const MAX_ABSTRACT_SEARCH = 200_000;
 const ABSTRACT_START = /(?:^|\n)[ \t]*(?:abstract|riassunto|sommario|résumé|zusammenfassung)[ \t]*[:.—–-]*[ \t]*/i;
-const ABSTRACT_END = /\n[ \t]*(?:keywords?|key words|index terms|parole chiave|mots[- ]clés|ccs concepts|(?:1|i)[.\s]+(?:introduction|introduzione)|introduction|introduzione)\b/i;
+/**
+ * What ends a labelled abstract: a keywords line, or a SHORT heading line (so that a wrapped line of the abstract that
+ * happens to start with "Introduction" or "Contents" does not cut it: the thesis abstract was truncated that way).
+ */
+const ABSTRACT_END = /\n[ \t]*(?:(?:keywords?|key words|index terms|parole chiave|mots[- ]clés|ccs concepts)\b|(?:(?:(?:1|i)[.\s]+)?(?:introduction|introduzione)|(?:table of )?contents?|indice|sommario|acknowledge?ments?|ringraziamenti|dedication|list of (?:figures|tables)|preface|prefazione)[ \t]*(?=\n|$))/i;
+/** The abstract of a thesis may sit a few pages in (title page, copyright page, abstract). */
+export const ABSTRACT_MAX_PAGES = 8;
+/** Longest abstract kept (a thesis abstract runs longer than a paper's). */
+export const ABSTRACT_MAX_CHARS = 6000;
 
 const INTRO_LINE = /^[ \t]*(?:(?:1|i)[.\s]+)?(?:introduction|introduzione)\b/i;
 const NOT_ABSTRACT = /@|\(dated|^\s*(?:received|accepted|published|arxiv|doi|pacs|keywords?)\b|https?:|www\./i;
@@ -198,7 +206,7 @@ function unlabelledAbstract(text: string, maxChars: number): string | undefined 
 }
 
 /** The abstract, when an "Abstract" heading is found in the given text (first pages). */
-export function abstractFromText(text: string, maxChars = 3000): string | undefined {
+export function abstractFromText(text: string, maxChars = ABSTRACT_MAX_CHARS): string | undefined {
   text = text.slice(0, MAX_ABSTRACT_SEARCH); // the abstract is at the start; the bound keeps the scans cheap on hostile text
   const start = ABSTRACT_START.exec(text);
   if (!start) return unlabelledAbstract(text, maxChars);

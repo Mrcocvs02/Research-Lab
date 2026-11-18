@@ -9,7 +9,6 @@
     "tab_readnext": "Da leggere dopo",
     "tab_new": "Novità",
     "tab_published": "Pubblicati",
-    "tab_sources": "Fonti",
     "dismiss": "Nascondi",
     "unknownSource": "fonte rimossa",
     "readnext": {
@@ -26,12 +25,13 @@
       "empty": "Niente da suggerire con queste impostazioni.",
       "few_one": "Solo {{count}} documento ha citazioni salvate finora, quindi c’è poco da confrontare.",
       "few_other": "Solo {{count}} documenti hanno citazioni salvate finora, quindi c’è poco da confrontare.",
-      "fewHint": "Seleziona documenti nella libreria e usa «Aggiorna citazioni» per scaricarne altre; aiuta anche abbassare il minimo.",
-      "none": "Nessun documento ha ancora citazioni salvate. Seleziona documenti nella libreria e usa prima «Aggiorna citazioni».",
+      "fewHint": "Aggiorna le citazioni per averne di più; abbassare il minimo aiuta.",
+      "none": "Aggiorna le citazioni della libreria per vedere cosa leggere dopo.",
       "why": "Perché: citata da {{count}} dei tuoi documenti",
       "citingMore": "+{{count}} altri",
       "dismissed": "Nascosta dall’elenco.",
-      "year": "Anno {{year}}"
+      "year": "Anno {{year}}",
+      "noneTitle": "Ancora nessuna citazione salvata"
     },
     "watch": {
       "intro": "Opere trovate dalle fonti che segui. Niente viene controllato in background: usa «Controlla ora» quando vuoi guardare.",
@@ -43,11 +43,16 @@
       "failedSource": "Impossibile controllare «{{source}}»: {{reason}}",
       "filter": "Fonte",
       "allSources": "Tutte le fonti",
-      "empty": "Nessuna novità. Aggiungi fonti nella scheda Fonti, poi controlla.",
+      "empty": "Nulla di nuovo. Usa «Controlla ora» per cercare.",
       "loading": "Caricamento…",
       "published": "Pubblicato il {{date}}",
       "firstSeen": "Trovato il {{date}}",
-      "noSources": "Non segui ancora nessuna fonte. Aggiungine una nella scheda Fonti."
+      "noSources": "Non segui ancora nessuna fonte. Segui un autore, un argomento o una sede per vedere qui i lavori nuovi.",
+      "followed_one": "{{count}} fonte seguita",
+      "followed_other": "{{count}} fonti seguite",
+      "manage": "Gestisci",
+      "emptyTitle": "Ancora nulla di nuovo",
+      "addSource": "Segui una fonte"
     },
     "published": {
       "intro": "Preprint della tua libreria che potrebbero avere ora una versione pubblicata. Non cambia nulla finché non confermi una proposta.",
@@ -73,7 +78,7 @@
       "undo": "Annulla"
     },
     "sources": {
-      "intro": "Ciò che segui. I controlli partono solo su richiesta, dalla scheda Novità.",
+      "intro": "Ciò che segui. I controlli partono solo quando lo chiedi, dalla scheda Novità.",
       "add": "Aggiungi una fonte",
       "edit": "Modifica",
       "remove": "Rimuovi",
@@ -101,7 +106,14 @@
       "empty": "Nessuna fonte per ora.",
       "queryRequired": "Scrivi cosa seguire.",
       "loading": "Caricamento…",
-      "disabled": "disattivata"
-    }
+      "disabled": "disattivata",
+      "title": "Fonti seguite"
+    },
+    "filters": "Filtri",
+    "filtersActive_one": "{{count}} filtro",
+    "filtersActive_other": "{{count}} filtri",
+    "refresh": "Aggiorna le citazioni",
+    "refreshHint": "Usa la rete: scarica in background le citazioni dei tuoi documenti.",
+    "more": "Altro in Scopri"
   }
 }

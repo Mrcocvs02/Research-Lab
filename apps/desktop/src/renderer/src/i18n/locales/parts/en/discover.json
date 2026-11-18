@@ -9,7 +9,6 @@
     "tab_readnext": "Read next",
     "tab_new": "New",
     "tab_published": "Published",
-    "tab_sources": "Sources",
     "dismiss": "Dismiss",
     "unknownSource": "removed source",
     "readnext": {
@@ -26,12 +25,13 @@
       "empty": "Nothing to recommend with these settings.",
       "few_one": "Only {{count}} document has stored citations so far, so there is little to compare.",
       "few_other": "Only {{count}} documents have stored citations so far, so there is little to compare.",
-      "fewHint": "Select documents in the library and use “Refresh citations” to fetch more; lowering the minimum also helps.",
-      "none": "No document has stored citations yet. Select documents in the library and use “Refresh citations” first.",
+      "fewHint": "Refresh citations to fetch more; lowering the minimum also helps.",
+      "none": "Refresh the citations of your library to see what to read next.",
       "why": "Why: cited by {{count}} of your documents",
       "citingMore": "+{{count}} more",
       "dismissed": "Hidden from the list.",
-      "year": "Year {{year}}"
+      "year": "Year {{year}}",
+      "noneTitle": "No citations stored yet"
     },
     "watch": {
       "intro": "Works found by the sources you follow. Nothing is checked in the background: use “Check now” when you want to look.",
@@ -43,11 +43,16 @@
       "failedSource": "Could not check “{{source}}”: {{reason}}",
       "filter": "Source",
       "allSources": "All sources",
-      "empty": "Nothing new. Add sources in the Sources tab, then check.",
+      "empty": "Nothing new. Use “Check now” to look.",
       "loading": "Loading…",
       "published": "Published {{date}}",
       "firstSeen": "Found {{date}}",
-      "noSources": "You follow no sources yet. Add one in the Sources tab."
+      "noSources": "You follow no sources yet. Follow an author, topic or venue to see new work here.",
+      "followed_one": "{{count}} followed source",
+      "followed_other": "{{count}} followed sources",
+      "manage": "Manage",
+      "emptyTitle": "Nothing new yet",
+      "addSource": "Follow a source"
     },
     "published": {
       "intro": "Preprints of your library that may now have a published version. Nothing changes until you confirm a proposal.",
@@ -101,7 +106,14 @@
       "empty": "No sources yet.",
       "queryRequired": "Enter what to follow.",
       "loading": "Loading…",
-      "disabled": "disabled"
-    }
+      "disabled": "disabled",
+      "title": "Followed sources"
+    },
+    "filters": "Filters",
+    "filtersActive_one": "{{count}} filter",
+    "filtersActive_other": "{{count}} filters",
+    "refresh": "Refresh citations",
+    "refreshHint": "Uses the network: fetches the citations of your documents in the background.",
+    "more": "More in Discover"
   }
 }

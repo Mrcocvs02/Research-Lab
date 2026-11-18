@@ -51,6 +51,9 @@ async function mount(c = memoryCitations(), extra: Record<string, (p: any) => un
   return c;
 }
 const tab = (id: string) => fireEvent.click(screen.getByTestId(`discover-tab-${id}`));
+/** The filters of "Read next" are a row closed until opened. */
+const openFilters = () => fireEvent.click(within(screen.getByTestId('readnext-filters-toggle')).getByRole('button'));
+const manageSources = () => fireEvent.click(screen.getByTestId('watch-sources-manage'));
 const NETWORK_CHANNELS = ['watch:check', 'watch:checkPublished', 'citations:refresh', 'citations:refreshMany'];
 
 beforeEach(async () => {
@@ -60,14 +63,33 @@ beforeEach(async () => {
 afterEach(() => cleanup());
 
 describe('Discover: tabs and the network', () => {
-  it('opens on "Read next" with the four tabs and makes no network call by itself', async () => {
+  it('opens on "Read next" with the three tabs and makes no network call by itself', async () => {
     const c = memoryCitations({ sources: [source('s1')] });
     await mount(c);
-    for (const id of ['readnext', 'new', 'published', 'sources']) expect(screen.getByTestId(`discover-tab-${id}`)).toBeTruthy();
+    for (const id of ['readnext', 'new', 'published']) expect(screen.getByTestId(`discover-tab-${id}`)).toBeTruthy();
     expect(screen.getByTestId('discover-tab-readnext').getAttribute('aria-selected')).toBe('true');
-    for (const id of ['new', 'published', 'sources', 'readnext']) tab(id);
+    for (const id of ['new', 'published', 'readnext']) tab(id);
+    expect(screen.queryByTestId('discover-tab-sources')).toBeNull();
     await waitFor(() => expect(callsTo('recommend:readNext').length).toBeGreaterThan(0));
     for (const ch of NETWORK_CHANNELS) expect(callsTo(ch)).toEqual([]);
+  });
+
+  it('refreshes the citations of the library from the menu of the view, and only then', async () => {
+    await mount(memoryCitations(), { 'documents:ids': () => ({ total: 2, ids: ['d1', 'd2'] }) });
+    expect(callsTo('citations:refreshMany')).toEqual([]);
+    fireEvent.click(screen.getByTestId('discover-more'));
+    expect(screen.getAllByRole('menuitem')).toHaveLength(1);
+    fireEvent.click(screen.getByTestId('discover-refresh'));
+    await waitFor(() => expect(callsTo('citations:refreshMany')).toEqual([{ docIds: ['d1', 'd2'] }]));
+  });
+
+  it('manages the followed sources from the row of "New", not from a tab', async () => {
+    await mount(memoryCitations({ sources: [source('s1')] }));
+    tab('new');
+    expect(screen.getByTestId('watch-sources-row').textContent).toContain('1 followed source');
+    manageSources();
+    expect(await screen.findByTestId('watch-sources-dialog')).toBeTruthy();
+    await screen.findByTestId('watch-source-item');
   });
 });
 
@@ -112,7 +134,8 @@ describe('Discover: read next', () => {
 
   it('says so when no document has stored citations at all', async () => {
     await mount();
-    expect((await screen.findByTestId('readnext-few')).textContent).toContain('No document has stored citations yet');
+    expect((await screen.findByTestId('readnext-few')).textContent).toContain('Refresh the citations of your library');
+    expect(screen.getByTestId('readnext-refresh')).toBeTruthy();
   });
 
   it('limits the scope to a project or a folder and passes the minimum', async () => {
@@ -122,6 +145,8 @@ describe('Discover: read next', () => {
       'library:listFolders': (p: any) => ({ folders: p.parent ? [] : [{ path: 'alpha', name: 'alpha', hasChildren: false }] }),
     });
     await screen.findByTestId('readnext-few');
+    expect(screen.queryByTestId('readnext-scope')).toBeNull();
+    openFilters();
     fireEvent.change(screen.getByTestId('readnext-scope'), { target: { value: 'project' } });
     const before = callsTo('recommend:readNext').length;
     fireEvent.change(await screen.findByTestId('readnext-project'), { target: { value: 'p1' } });
@@ -258,7 +283,8 @@ describe('Discover: sources', () => {
   it('adds a source (a query is required), edits, disables and removes with a confirmation', async () => {
     const c = memoryCitations({ sources: [source('s1', { lastCheckedAt: NOW })], items: [seen('s1', 1), seen('s1', 2)] });
     await mount(c);
-    tab('sources');
+    tab('new');
+    manageSources();
     const row = await screen.findByTestId('watch-source-item');
     expect(row.textContent).toContain('Source s1');
     expect(row.textContent).toContain('Last checked: 2026-11-17');
@@ -306,7 +332,8 @@ describe('Discover: sources', () => {
   it('shows an empty state and the error of a refused save', async () => {
     const c = memoryCitations();
     await mount(c);
-    tab('sources');
+    tab('new');
+    manageSources();
     await screen.findByTestId('watch-source-empty');
     c.state.saveError = new AppError('INVALID_REQUEST', 'bad');
     fireEvent.click(screen.getByTestId('watch-source-add'));
@@ -392,7 +419,7 @@ describe('Discover: long checks', () => {
     fireEvent.click(screen.getByTestId('published-check'));
     act(() => emitEvent('watch:progress', { op: 'checkPublished', done: 3, total: 9, failed: 1 }));
     expect((await screen.findByTestId('published-progress')).textContent).toContain('3 of 9 documents');
-    tab('sources');
+    tab('new');
     tab('published');
     expect((await screen.findByTestId('published-progress')).textContent).toContain('Looking');
     expect(screen.getByTestId('published-check')).toHaveProperty('disabled', true);
@@ -428,6 +455,7 @@ describe('Discover: long checks', () => {
   it('waits for a pause before asking again when the minimum changes', async () => {
     await mount();
     await screen.findByTestId('readnext-few');
+    openFilters();
     const before = callsTo('recommend:readNext').length;
     fireEvent.change(screen.getByTestId('readnext-min'), { target: { value: '3' } });
     fireEvent.change(screen.getByTestId('readnext-min'), { target: { value: '4' } });

@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
+import { Button } from '../../components/Button';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { useLibraryEvents } from '../../lib/events';
@@ -59,8 +60,8 @@ export function Published() {
   const none = t('discover.published.none');
   return (
     <div data-testid="discover-published">
-      <p className="hint">{t('discover.published.intro')}</p>
-      <div className="discover-bar">
+      <p className="hint discover-intro">{t('discover.published.intro')}</p>
+      <div className="vbar">
         <div className="check">
           <input id={ownId} type="checkbox" checked={ownOnly} onChange={(e) => setOwnOnly(e.target.checked)} aria-describedby={`${ownId}-hint`} data-testid="published-own-only" />
           <label htmlFor={ownId}>{t('discover.published.ownOnly')}</label>
@@ -68,9 +69,10 @@ export function Published() {
             {t('discover.published.ownOnlyHint')}
           </p>
         </div>
-        <button type="button" className="primary" onClick={check} disabled={checking} data-testid="published-check">
+        <span className="vbar__spacer" />
+        <Button variant="primary" onClick={check} disabled={checking} data-testid="published-check">
           {checking ? t('discover.published.checking') : t('discover.published.check')}
-        </button>
+        </Button>
       </div>
       {checking && (
         <p role="status" data-testid="published-progress">
@@ -126,9 +128,9 @@ export function Published() {
                 </p>
               )}
               <div className="work-actions">
-                <button type="button" className="primary" onClick={() => void confirm(p)} disabled={applying !== null || Boolean(p.ownedBy)} aria-label={`${t('discover.published.confirm')}: ${title}`} data-testid="published-confirm">
+                <Button variant="primary" size="sm" onClick={() => void confirm(p)} disabled={applying !== null || Boolean(p.ownedBy)} aria-label={`${t('discover.published.confirm')}: ${title}`} data-testid="published-confirm">
                   {applying === p.docId ? t('discover.published.confirming') : t('discover.published.confirm')}
-                </button>
+                </Button>
                 {link && (
                   <button type="button" className="link" onClick={() => void openWork(link).catch(reportError)} aria-label={t('citations.openExternal', { target: t('citations.openDoi'), title })} data-testid="published-open">
                     {t('citations.openDoi')}

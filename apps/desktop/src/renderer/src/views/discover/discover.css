@@ -1,4 +1,15 @@
+.view.discover-page {
+  max-width: 1000px;
+}
+.discover-panel {
+  padding-top: var(--space-3);
+}
+.discover-intro {
+  margin: 0 0 var(--space-2);
+  max-width: 70ch;
+}
 .discover-bar {
+  margin-bottom: var(--space-3);
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);

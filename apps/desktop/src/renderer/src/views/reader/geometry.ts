@@ -85,3 +85,25 @@ export const excerpt = (text: string, max = 120): string => {
   const flat = text.replace(/\s+/g, ' ').trim();
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 };
+
+/**
+ * The page with the most visible area (N17): pdf.js reports the first page that shows at all, so the field would still say
+ * page 3 while page 4 fills the window. `pages` are `[number, top, bottom]` in the same coordinates as `viewport`.
+ */
+export function dominantPage(pages: ReadonlyArray<readonly [number, number, number]>, viewport: { top: number; bottom: number }): number | null {
+  let best: number | null = null;
+  let most = 0;
+  for (const [n, top, bottom] of pages) {
+    const seen = Math.min(bottom, viewport.bottom) - Math.max(top, viewport.top);
+    if (seen > most) {
+      most = seen;
+      best = n;
+    }
+  }
+  return best;
+}
+
+/** Every annotation under a point of a page (fractions): what an eraser stroke touches. */
+export function annotationsAt(annotations: readonly Annotation[], page: number, x: number, y: number): string[] {
+  return annotations.filter((a) => a.page === page && a.rects.some((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h)).map((a) => a.id);
+}

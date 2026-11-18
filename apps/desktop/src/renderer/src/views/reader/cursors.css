@@ -1,0 +1,28 @@
+/* Cursor and edge of the pages area per tool (4.3, 8.2.7). The cursor drawing itself is set by the reader in --reader-cursor (cursors.ts). */
+/* --reader-cursor is overwritten by the reader with the drawing of the tool (cursors.ts); `text` is the plain fallback. */
+.reader-scroll {
+  --reader-cursor: text;
+  border-top: 2px solid transparent;
+  transition: border-color var(--dur);
+}
+.reader-scroll[data-tool='highlight'],
+.reader-scroll[data-tool='underline'],
+.reader-scroll[data-tool='eraser'] {
+  cursor: var(--reader-cursor, text);
+}
+.reader-scroll[data-tool='highlight'],
+.reader-scroll[data-tool='underline'] {
+  border-top-color: var(--ann-ul);
+  touch-action: none;
+}
+.reader-scroll[data-tool='eraser'] {
+  border-top-color: var(--danger);
+  touch-action: none;
+}
+/* Focus outside the reader: the keys do not act here, and the edge and the tools say so. */
+.reader-scroll[data-away] {
+  border-top-color: var(--border);
+}
+.ann.ann-erase {
+  outline: 2px solid var(--danger);
+}

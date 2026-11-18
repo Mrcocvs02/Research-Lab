@@ -43,7 +43,33 @@ function initialRenderer() {
   return { bytes: sum([...seen]) + dictBytes, chunks: [...seen].map((f) => path.basename(f)) };
 }
 
+/**
+ * The JS of the main process (workers included) split in two (D-445): what is reachable by static `import` from the entry files
+ * (`entryJsKB`, loaded at start) and the chunks loaded with `import()` at the first use of a function (`lazyJsKB`, each one
+ * capped by `lazyChunkKB`, or by its own cap in `lazyChunkOverrides`: the annotation writer is the one big chunk, D-446).
+ */
+function mainSplit() {
+  const dir = path.join(out, 'main');
+  const all = files(dir, '.js');
+  const entries = all.filter((f) => path.dirname(f) === dir);
+  const seen = new Set();
+  const queue = [...entries];
+  while (queue.length > 0) {
+    const file = queue.pop();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const code = readFileSync(file, 'utf8');
+    for (const m of code.matchAll(/(?:from\s*|import\s*|require\()["'](\.\.?\/[^"']+\.js)["']/g)) {
+      const target = path.join(path.dirname(file), m[1]);
+      if (existsSync(target)) queue.push(target);
+    }
+  }
+  const lazy = all.filter((f) => !seen.has(f));
+  return { entry: sum([...seen]), lazy: sum(lazy), lazyChunks: lazy.map((f) => ({ name: path.basename(f), bytes: statSync(f).size })) };
+}
+
 const initial = initialRenderer();
+const main = mainSplit();
 // `renderer/pdfjs/` holds files pdf.js fetches only for the PDFs that need them (fonts, CMaps, image decoders, D-193):
 // they have their own budget and do not count in the code of the app.
 const RESOURCES = path.join(out, 'renderer', 'pdfjs');
@@ -53,7 +79,8 @@ const measured = {
   'renderer.totalJsKB': kib(sum(app('.js'))),
   'renderer.totalKB': kib(sum(app('.js')) + sum(app('.css')) + sum(app('.html'))),
   'renderer.readerResourcesKB': kib(sum(files(RESOURCES, ''))),
-  'main.totalJsKB': kib(sum(files(path.join(out, 'main'), '.js'))),
+  'main.entryJsKB': kib(main.entry),
+  'main.lazyJsKB': kib(main.lazy),
   'preload.totalKB': kib(sum([...files(path.join(out, 'preload'), '.cjs'), ...files(path.join(out, 'preload'), '.js')])),
 };
 
@@ -66,8 +93,20 @@ if (measured['renderer.totalJsKB'] === 0) {
   process.exit(2);
 }
 
+// Each lazy chunk of the main process has its own cap (a module of a function stays small; the writer is the declared exception).
+const chunkFailures = [];
+for (const c of main.lazyChunks) {
+  const name = c.name.replace(/-[\w-]{6,}\.js$/, '');
+  const cap = budgets.main?.lazyChunkOverrides?.[name] ?? budgets.main?.lazyChunkKB;
+  if (typeof cap === 'number') {
+    const over = kib(c.bytes) > cap;
+    console.log(`${over ? 'X' : ' '} lazy chunk ${name.padEnd(18)} ${String(kib(c.bytes)).padStart(8)} KiB   cap ${cap} KiB${over ? '   OVER' : ''}`);
+    if (over) chunkFailures.push(name);
+  }
+}
+
 const limitOf = (key) => key.split('.').reduce((o, k) => o?.[k], budgets);
-let failed = 0;
+let failed = chunkFailures.length;
 for (const [key, value] of Object.entries(measured)) {
   const limit = limitOf(key);
   if (typeof limit !== 'number') {

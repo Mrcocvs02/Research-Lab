@@ -9,5 +9,5 @@ import { resolveRuntimeConfig } from './runtime.js';
  */
 export function e2eDialogOverride(env: NodeJS.ProcessEnv, isPackaged: boolean, purpose?: string): string | null {
   const c = resolveRuntimeConfig(env, isPackaged);
-  return (purpose === 'export-destination' ? c.exportDialogPath : purpose === 'backup-destination' ? c.backupDialogPath : null) ?? c.dialogPath;
+  return (purpose === 'export-destination' ? c.exportDialogPath : purpose === 'backup-destination' ? c.backupDialogPath : purpose === 'bib-source' ? c.bibDialogPath : null) ?? c.dialogPath;
 }

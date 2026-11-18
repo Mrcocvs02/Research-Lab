@@ -44,5 +44,12 @@
       "more": "e altri {{count}}",
       "truncated": "L'elenco è parziale: i conteggi sono completi."
     }
-  }
+  },
+  "addMenu": {
+    "more": "Altri modi per aggiungere",
+    "pdf": "PDF…",
+    "zotero": "Da Zotero o BibTeX…"
+  },
+  "copyBib": "Copia i riferimenti BibTeX",
+  "copiedBib": "Riferimenti BibTeX copiati negli appunti ({{count}})."
 }

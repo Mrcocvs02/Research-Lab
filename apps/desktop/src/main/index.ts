@@ -138,11 +138,15 @@ async function main(): Promise<void> {
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
     async pickFile(purpose, title) {
+      if (purpose === 'bib-source') {
+        const override = e2eDialogOverride(process.env, dialogHooksPackaged, purpose);
+        if (override) return override;
+      }
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
       const options: Electron.OpenDialogOptions = {
         title,
         properties: ['openFile'],
-        filters: purpose === 'backup-file' ? [{ name: 'Research Lab backup', extensions: ['rlbackup'] }] : [{ name: 'JSON', extensions: ['json'] }],
+        filters: purpose === 'backup-file' ? [{ name: 'Research Lab backup', extensions: ['rlbackup'] }] : purpose === 'bib-source' ? [{ name: 'BibTeX, CSL JSON, RDF, Zotero', extensions: ['bib', 'json', 'rdf', 'sqlite'] }] : [{ name: 'JSON', extensions: ['json'] }],
       };
       const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
       return result.canceled ? null : (result.filePaths[0] ?? null);

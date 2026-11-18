@@ -1,0 +1,55 @@
+{
+  "import": {
+    "title": "From Zotero or BibTeX",
+    "steps": "Steps",
+    "step": {
+      "file": "File",
+      "match": "Match",
+      "summary": "Summary"
+    },
+    "chooseTitle": "Choose a Zotero or BibTeX file",
+    "fileHint": "BibTeX or BibLaTeX (.bib), CSL JSON (.json), Zotero RDF (.rdf) or the Zotero database (zotero.sqlite). The file is only read.",
+    "choose": "Choose the file…",
+    "counts": "{{withFile}} with a file to add · {{noFile}} without a file · {{inLibrary}} already in the library",
+    "matchHint": "{{count}} entries read. PDFs are matched by path or content; the other entries by DOI, arXiv id or title.",
+    "next": "Next",
+    "optTags": "Import tags ({{count}})",
+    "optCollections": "Collections ({{count}})",
+    "colProjects": "Create projects",
+    "colTags": "Use as tags",
+    "colIgnore": "Do not import",
+    "optNotes": "Notes on the file ({{count}})",
+    "optQueue": "Add the PDFs found to Arrivals ({{count}})",
+    "optQueueHint": "They are copied into the library only after you confirm.",
+    "originals": "Originals are never moved or changed. Every change can be undone.",
+    "run": "Import",
+    "result": "Updated {{updated}} documents, {{tagged}} tags, {{projects}} projects, {{notes}} notes; {{queued}} PDFs in Arrivals.",
+    "undone": "Import undone.",
+    "undo": "Undo the import",
+    "notImported": "Not imported ({{count}})",
+    "reason": {
+      "no-file": "no file",
+      "not-queued": "file not added",
+      "empty": "empty entry",
+      "not-pdf": "not a PDF",
+      "too-large": "too large",
+      "not-found": "file not found",
+      "in-library": "already in the library",
+      "other": "other reason"
+    },
+    "linkTitle": "Link a .bib file",
+    "linkHint": "The app rewrites the file whenever the project changes, but only if nobody changed it outside the app. The first line is a warning: edits made by hand are overwritten.",
+    "linkCurrent": "Linked to {{file}}.",
+    "linkChoose": "Choose the folder…",
+    "linkFolderTitle": "Folder of the .bib file",
+    "linkName": "File name",
+    "link": "Link",
+    "unlink": "Unlink",
+    "linkNeedsFolder": "Choose the folder first",
+    "linkError": {
+      "not-ours": "A file with this name exists and was not written by the app: choose another name.",
+      "inside-library": "The file cannot be inside the library folder.",
+      "invalid-name": "Not a valid file name."
+    }
+  }
+}

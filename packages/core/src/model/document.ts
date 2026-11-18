@@ -191,6 +191,8 @@ export const documentRecordSchema = z.object({
   legacy: legacySchema.optional(),
   /** What the extractor found in the file for the empty fields it filled (see `extractedMetaSchema`). */
   extracted: extractedMetaSchema.optional(),
+  /** BibTeX key, assigned once (imported or derived) and never changed again: the linked .bib file depends on it. */
+  citeKey: z.string().max(L.shortText).optional(),
 });
 export type DocumentRecord = z.infer<typeof documentRecordSchema>;
 

@@ -1206,3 +1206,18 @@ button.page-chip {
 .doc-card .doc-sub {
   flex-wrap: wrap;
 }
+
+/* "+ Add" split button (17.4.1): the body adds a PDF, the arrow opens the menu. */
+.add-split {
+  display: inline-flex;
+  align-items: stretch;
+}
+.add-split > .rl-btn {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.add-split__arrow {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: -1px;
+}

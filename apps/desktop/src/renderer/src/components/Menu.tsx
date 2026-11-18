@@ -14,6 +14,8 @@ export type MenuItem = {
   danger?: boolean;
   /** `data-testid` of the entry (tests and the e2e specs reach a menu entry by it). */
   testId?: string;
+  /** Tooltip of an enabled entry (a status such as "Updated at 10:42" never takes a line of the menu, 17.1 rule 7). */
+  title?: string;
   onSelect(): void;
 } & ({ disabled?: false; disabledReason?: undefined } | { disabled: true; disabledReason: string });
 
@@ -84,7 +86,7 @@ function MenuList({ groups, onClose, anchor }: { groups: MenuGroups; onClose(): 
                 tabIndex={-1}
                 aria-disabled={item.disabled || undefined}
                 data-testid={item.testId}
-                title={item.disabled ? item.disabledReason : undefined}
+                title={item.disabled ? item.disabledReason : item.title}
                 className={cx('rl-menu__item', item.danger && 'is-danger', item.disabled && 'is-disabled')}
                 onClick={() => select(item)}
                 onKeyDown={(e) => {

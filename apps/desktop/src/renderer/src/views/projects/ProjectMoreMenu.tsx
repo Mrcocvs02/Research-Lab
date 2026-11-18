@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../../components/IconButton';
 import { IconMore } from '../../components/icons';
-import { Menu, type MenuGroups, type MenuItem } from '../../components/Menu';
+import { Menu, type MenuGroup, type MenuGroups, type MenuItem } from '../../components/Menu';
 
 interface Props {
   archived: boolean;
@@ -14,6 +14,11 @@ interface Props {
   /** Absent in the list (the name is edited in the project). */
   onRename?: (() => void) | undefined;
   onToggleArchive(): void;
+  /** "Link a .bib file" and "Copy BibTeX" (project page only). */
+  onLinkBib?: (() => void) | undefined;
+  onCopyBib?: (() => void) | undefined;
+  /** Tooltip of the link entry: what it is linked to and when it was updated. */
+  bibTitle?: string | undefined;
   size?: 'sm' | 'md';
 }
 
@@ -21,16 +26,27 @@ interface Props {
  * The menu of a project (1.1, D-412): "Export…" (second brain and bibliography), then Rename and Archive. Later waves add their
  * entries here (link a .bib file, Claude's report, comparison table, citation suggestions) up to seven in three groups.
  */
-export function ProjectMoreMenu({ archived, testId, label, onExport, onRename, onToggleArchive, size = 'md' }: Props) {
+export function ProjectMoreMenu({ archived, testId, label, onExport, onRename, onToggleArchive, onLinkBib, onCopyBib, bibTitle, size = 'md' }: Props) {
   const { t } = useTranslation();
   const anchor = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
   const archive: MenuItem = { id: 'archive', testId: archived ? 'project-restore' : 'project-archive', label: archived ? t('projects.restore') : t('projects.archive'), onSelect: onToggleArchive };
-  const groups: MenuGroups = onRename
-    ? [
-        { id: 'export', items: [{ id: 'export', testId: 'project-export', label: t('secondBrain.button'), onSelect: onExport }] },
-        { id: 'manage', items: [{ id: 'rename', testId: 'project-rename', label: t('projects.rename'), onSelect: onRename }, archive] },
-      ]
+  const exportGroup: MenuGroup = { id: 'export', items: [{ id: 'export', testId: 'project-export', label: t('secondBrain.button'), onSelect: onExport }] };
+  const bibGroup: MenuGroup | null =
+    onRename && onLinkBib && onCopyBib
+      ? {
+          id: 'bib',
+          items: [
+            { id: 'copy-bib', testId: 'project-copy-bib', label: t('projects.bib.copy'), onSelect: onCopyBib },
+            { id: 'link-bib', testId: 'project-link-bib', label: t('projects.bib.link'), ...(bibTitle ? { title: bibTitle } : {}), onSelect: onLinkBib },
+          ],
+        }
+      : null;
+  const manage: MenuGroup | null = onRename ? { id: 'manage', items: [{ id: 'rename', testId: 'project-rename', label: t('projects.rename'), onSelect: onRename }, archive] } : null;
+  const groups: MenuGroups = manage
+    ? bibGroup
+      ? [exportGroup, bibGroup, manage]
+      : [exportGroup, manage]
     : [{ id: 'project', items: [archive, { id: 'export', testId: 'project-export', label: t('secondBrain.button'), onSelect: onExport }] }];
   return (
     <>

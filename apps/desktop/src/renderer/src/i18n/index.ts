@@ -27,6 +27,7 @@ export type StringPart =
   | 'doc-review'
   | 'guide'
   | 'history'
+  | 'import'
   | 'inbox'
   | 'export'
   | 'jobs'

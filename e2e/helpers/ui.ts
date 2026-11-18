@@ -9,8 +9,8 @@ export const PHASE2_CHANNELS = ['taxonomy:get', 'history:list', 'projects:list',
  * Launches the app on a synthetic library, creates the library with the wizard (no AI folders, empty taxonomy),
  * waits for the scan and for the list to show every document.
  */
-export async function openSyntheticLibrary(testInfo: TestInfo, kind: 'papers' | 'full' = 'papers'): Promise<{ ctx: LaunchedApp; window: Page; total: number }> {
-  const ctx = await launchApp({ library: kind, dialogPath: true, offline: true });
+export async function openSyntheticLibrary(testInfo: TestInfo, kind: 'papers' | 'full' = 'papers', env?: Record<string, string>): Promise<{ ctx: LaunchedApp; window: Page; total: number }> {
+  const ctx = await launchApp({ library: kind, dialogPath: true, offline: true, ...(env ? { env } : {}) });
   const { window } = ctx;
   await createLibraryViaWizard(window, { name: 'UI library' });
   await skipUnlessChannels(window, testInfo, PHASE2_CHANNELS);

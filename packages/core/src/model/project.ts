@@ -39,6 +39,8 @@ export const projectSchema = z.object({
   readingPlan: z.array(readingPlanItemSchema).max(PROJECT_LIMITS.members).default([]),
   /** Status before archiving (`projects:delete`), restored by `projects:restore`. */
   archivedFrom: projectStatusSchema.optional(),
+  /** The managed .bib file (D-421): folder and name, hash of the last write by the app, and when. */
+  bibLink: z.object({ dir: z.string().max(1024), file: z.string().max(200), hash: z.string().max(64), at: isoDateSchema }).optional(),
   createdAt: isoDateSchema,
   updatedAt: isoDateSchema,
 });

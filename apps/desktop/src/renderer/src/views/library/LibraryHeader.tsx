@@ -1,13 +1,13 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../../components/Button';
+import { AddMenu } from './AddMenu';
 import { IconButton } from '../../components/IconButton';
-import { IconChevronDown, IconFolder, IconMore, IconPlus } from '../../components/icons';
+import { IconChevronDown, IconFolder, IconMore } from '../../components/icons';
 import { Menu, type MenuGroups } from '../../components/Menu';
 import { Popover } from '../../components/Popover';
 import { Segmented } from '../../components/Segmented';
 import { useAiUi } from '../../lib/aiUi';
-import { useInbox } from '../../lib/inbox';
 import type { ViewMode } from './DocViews';
 import { SORTS, type BrowseState } from './docQuery';
 import { IconPanelRight } from './libraryIcons';
@@ -38,7 +38,6 @@ interface Props {
 export function LibraryHeader({ count, view, onView, sort, hasText, onSort, scanning, onScan, onCancelScan, onManageTags, detailOpen, onDetail, navOpen, onNav }: Props) {
   const { t } = useTranslation();
   const { openExport } = useAiUi();
-  const inbox = useInbox();
   const viewAnchor = useRef<HTMLSpanElement>(null);
   const moreAnchor = useRef<HTMLSpanElement>(null);
   const [viewOpen, setViewOpen] = useState(false);
@@ -95,9 +94,7 @@ export function LibraryHeader({ count, view, onView, sort, hasText, onSort, scan
             </label>
           </div>
         </Popover>
-        <Button variant="primary" icon={<IconPlus size={16} />} onClick={() => void inbox.choose()} data-testid="add-pdf">
-          {t('library.addPdf')}
-        </Button>
+        <AddMenu />
         <span ref={moreAnchor}>
           <IconButton label={t('library.more')} variant="secondary" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)} data-testid="library-more">
             <IconMore size={20} />

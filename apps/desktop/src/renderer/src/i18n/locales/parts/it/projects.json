@@ -80,5 +80,20 @@
     "moved": "{{title}} è ora il numero {{position}} di {{total}}",
     "addAll": "Aggiungi i {{count}} documenti non nel piano",
     "addOne": "Aggiungi: {{title}}"
+  },
+  "bib": {
+    "copy": "Copia i riferimenti BibTeX",
+    "link": "Collega un file .bib…",
+    "linkedTo": "Collegato a {{file}}. Aggiornato alle {{time}}",
+    "copied": "Riferimenti BibTeX copiati negli appunti ({{count}}).",
+    "overwrite": "Sovrascrivi",
+    "recreate": "Ricrea",
+    "retry": "Riprova",
+    "unlink": "Scollega",
+    "state": {
+      "changed-outside": "Il file .bib è stato modificato fuori dall'app: non lo riscrivo.",
+      "missing": "Il file {{file}} non c'è più.",
+      "error": "Non riesco a scrivere il file {{file}}."
+    }
   }
 }

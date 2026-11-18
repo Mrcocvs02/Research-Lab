@@ -44,5 +44,12 @@
       "more": "and {{count}} more",
       "truncated": "The list is partial: the counts are complete."
     }
-  }
+  },
+  "addMenu": {
+    "more": "More ways to add",
+    "pdf": "PDF…",
+    "zotero": "From Zotero or BibTeX…"
+  },
+  "copyBib": "Copy BibTeX references",
+  "copiedBib": "BibTeX references copied to the clipboard ({{count}})."
 }

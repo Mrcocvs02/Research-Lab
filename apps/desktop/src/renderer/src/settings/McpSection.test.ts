@@ -122,7 +122,7 @@ describe('McpSection', () => {
   it('warns about writing, asks to confirm before allowing proposals, and turns it off at once', async () => {
     setup({ status: running });
     const box = (await screen.findByTestId('mcp-write')) as HTMLInputElement;
-    expect(screen.getByTestId('mcp-write-warning').textContent).toContain('can only PROPOSE AI fields');
+    expect(screen.getByTestId('mcp-write-warning').textContent).toContain('can only propose AI fields');
     expect(screen.getByTestId('mcp-write-warning').textContent).toContain('your review');
     fireEvent.click(box);
     const confirm = await screen.findByTestId('mcp-write-confirm');

@@ -120,6 +120,8 @@
       "done": "Ho finito, verifica",
       "notYet": "Non sei ancora collegato. Finisci nella finestra di Claude Code e verifica di nuovo.",
       "connectedAs": "Collegato come {{who}}",
+      "notUsed": "non usato",
+      "recheck": "Ricontrolla",
       "unknownAccount": "un account",
       "keyHelp": "Solo nell’archivio sicuro del computer, mai mostrata.",
       "usage": "Uso di questo mese",

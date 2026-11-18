@@ -45,7 +45,7 @@ export function useSecret(name: KeyName, scope: 'app' | 'library', onChanged?: (
 }
 
 /** One key as a control: state, "Add key…" / "Replace…" (a password field, never shown back) and "Remove". */
-export function SecretControl({ name, scope, onChanged }: { name: KeyName; scope: 'app' | 'library'; onChanged?: () => void }) {
+export function SecretControl({ name, scope, onChanged, primary }: { name: KeyName; scope: 'app' | 'library'; onChanged?: () => void; /** The "Add key…" button is the primary action of the card (an API key is what is missing). */ primary?: boolean }) {
   const { t } = useTranslation();
   const s = useSecret(name, scope, onChanged);
   const [editing, setEditing] = useState(false);
@@ -74,7 +74,7 @@ export function SecretControl({ name, scope, onChanged }: { name: KeyName; scope
         </>
       ) : (
         <>
-          <Button size="sm" onClick={() => setEditing(true)} data-testid={`secret-add-${name}`}>
+          <Button size="sm" variant={primary && !s.stored ? 'primary' : 'secondary'} onClick={() => setEditing(true)} data-testid={`secret-add-${name}`}>
             {s.stored ? t('settings.keys.replace') : t('settings.keys.add')}
           </Button>
           {s.stored && (

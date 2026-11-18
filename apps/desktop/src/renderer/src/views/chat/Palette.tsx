@@ -2,6 +2,7 @@ import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ShortcutId } from '@rl/core';
 import { Dialog } from '../../components/Dialog';
+import { Kbd } from '../../components/Kbd';
 import { useAiUi } from '../../lib/aiUi';
 import { useHistory } from '../../lib/history';
 import { useInbox } from '../../lib/inbox';
@@ -207,6 +208,7 @@ export function Palette({ onClose }: { onClose(): void }) {
         aria-label={t('chat.paletteSearch')}
         role="combobox"
         aria-expanded="true"
+        className="palette-field"
         aria-controls={listId}
         aria-activedescendant={items[at] ? `${listId}-${at}` : undefined}
         onChange={(e) => setQuery(e.target.value)}
@@ -247,13 +249,14 @@ export function Palette({ onClose }: { onClose(): void }) {
               <span>{safeText(c.label)}</span>
               {c.custom && <span className="badge">{t('chat.paletteCustom')}</span>}
               {c.disabledReason && <span className="palette-why">{c.disabledReason}</span>}
-              {c.shortcut && keys[c.shortcut] && <kbd className="palette-key">{keys[c.shortcut]}</kbd>}
+              {c.shortcut && keys[c.shortcut] && <Kbd>{keys[c.shortcut]}</Kbd>}
             </li>
           </Fragment>
         ))}
         {items.length === 0 && <li className="hint">{t('chat.paletteNone')}</li>}
       </ul>
-      <p className="hint">{t('chat.paletteHint')}</p>
+      {/* The sentence about filling the message box is true only for the commands for Claude. */}
+      {items[at]?.group === 'claude' && <p className="hint">{t('chat.paletteHint')}</p>}
     </Dialog>
   );
 }

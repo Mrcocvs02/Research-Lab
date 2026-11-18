@@ -121,6 +121,8 @@
       "notYet": "Not signed in yet. Finish in the Claude Code window, then check again.",
       "connectedAs": "Connected as {{who}}",
       "unknownAccount": "an account",
+      "notUsed": "not used",
+      "recheck": "Check again",
       "keyHelp": "Only in the secure storage of your computer, never shown.",
       "usage": "Usage this month",
       "usageLibrary": "library “{{name}}”",

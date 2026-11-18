@@ -37,7 +37,7 @@
     "tools": "Tools offered to Claude Code: {{list}}.",
     "write": {
       "label": "Allow Claude Code to propose AI fields",
-      "warning": "Off by default. When on, Claude Code can only PROPOSE AI fields (such as a summary or tags): they are marked as AI output and go to your review before anything is accepted. It can never change your notes or your own fields.",
+      "warning": "Off by default. When on, Claude Code can only propose AI fields (such as a summary or tags): they are marked as AI output and go to your review before anything is accepted. It can never change your notes or your own fields.",
       "confirmTitle": "Allow proposals from Claude Code?",
       "confirmBody": "Claude Code will be able to add proposed AI fields to documents in the folders it can see. Each proposal waits for your review. You can turn this off at any time.",
       "confirmYes": "Allow proposals",

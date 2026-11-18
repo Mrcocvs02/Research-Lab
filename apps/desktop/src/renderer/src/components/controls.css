@@ -156,7 +156,12 @@ button.rl-iconbtn:disabled {
   cursor: not-allowed;
   outline: none;
   background: transparent;
+  border-color: transparent;
   color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+}
+
+button.rl-iconbtn--secondary:disabled {
+  border-color: var(--border);
 }
 
 /* ---- Segmented ---- */

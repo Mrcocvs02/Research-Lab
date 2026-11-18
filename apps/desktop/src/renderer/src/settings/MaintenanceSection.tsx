@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MAINTENANCE_TARGETS, type Channels, type ResponseOf } from '@rl/core';
 import { Button } from '../components/Button';
 import { CheckField, ErrorNote } from '../components/ui';
+import { KeyValue } from '../components/KeyValue';
 import { errorMessage } from '../lib/errors';
 import { rl } from '../lib/rl';
 import { RlError } from '../lib/rl-error';
@@ -101,28 +102,16 @@ export function MaintenanceSection({ embedded = false }: { embedded?: boolean })
         <h3>{t('maintenance.sizes')}</h3>
         {report ? (
           <>
-            <dl className="kv" data-testid="maintenance-report">
-              {sizeRows.map(([k, v]) => (
-                <div key={k} className="fact-row">
-                  <dt>{t(`maintenance.rows.${k}`)}</dt>
-                  <dd data-testid={`maintenance-${k}`}>{v}</dd>
-                </div>
-              ))}
-              <div className="fact-row">
-                <dt>{t('maintenance.rows.memory')}</dt>
-                <dd data-testid="maintenance-memory">{t('maintenance.memoryValue', { rss: n(Math.round(report.process.rssMb)), heap: n(Math.round(report.process.heapMb)) })}</dd>
-              </div>
-              {report.process.startupMs !== null && (
-                <div className="fact-row">
-                  <dt>{t('maintenance.rows.startup')}</dt>
-                  <dd>{t('maintenance.startupValue', { ms: n(Math.round(report.process.startupMs)) })}</dd>
-                </div>
-              )}
-              <div className="fact-row">
-                <dt>{t('maintenance.rows.workers')}</dt>
-                <dd>{n(report.workers)}</dd>
-              </div>
-            </dl>
+            <div data-testid="maintenance-report">
+              <KeyValue
+                items={[
+                  ...sizeRows.map(([k, v]) => ({ label: t(`maintenance.rows.${k}`), value: v, testId: `maintenance-${k}` })),
+                  { label: t('maintenance.rows.memory'), value: t('maintenance.memoryValue', { rss: n(Math.round(report.process.rssMb)), heap: n(Math.round(report.process.heapMb)) }), testId: 'maintenance-memory' },
+                  ...(report.process.startupMs !== null ? [{ label: t('maintenance.rows.startup'), value: t('maintenance.startupValue', { ms: n(Math.round(report.process.startupMs)) }) }] : []),
+                  { label: t('maintenance.rows.workers'), value: n(report.workers) },
+                ]}
+              />
+            </div>
           {typeof report.local.backups === 'number' && (
             <p className="hint" data-testid="maintenance-backups-note">
               {t('maintenance.backupsNote')}

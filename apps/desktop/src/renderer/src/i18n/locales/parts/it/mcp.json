@@ -37,7 +37,7 @@
     "tools": "Strumenti offerti a Claude Code: {{list}}.",
     "write": {
       "label": "Consenti a Claude Code di proporre campi AI",
-      "warning": "Spenta per impostazione predefinita. Quando è accesa, Claude Code può solo PROPORRE campi AI (come un riassunto o dei tag): sono marcati come output AI e vanno alla tua revisione prima di essere accettati. Non può mai modificare le tue note né i tuoi campi.",
+      "warning": "Spenta per impostazione predefinita. Quando è accesa, Claude Code può solo proporre campi AI (come un riassunto o dei tag): sono marcati come output AI e vanno alla tua revisione prima di essere accettati. Non può mai modificare le tue note né i tuoi campi.",
       "confirmTitle": "Consentire le proposte di Claude Code?",
       "confirmBody": "Claude Code potrà aggiungere campi AI proposti ai documenti delle cartelle che vede. Ogni proposta aspetta la tua revisione. Puoi spegnerlo in qualsiasi momento.",
       "confirmYes": "Consenti le proposte",

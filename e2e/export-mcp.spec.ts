@@ -379,7 +379,7 @@ test('MCP server from the settings: configuration from the clipboard, tools over
     expect(await section.getByTestId('mcp-log').innerText()).not.toContain(query);
 
     // Writing: only proposals, after an explicit confirmation; the tool list then has it.
-    await expect(section.getByTestId('mcp-write-warning')).toContainText('PROPOSE');
+    await expect(section.getByTestId('mcp-write-warning')).toContainText(/propose/i);
     await section.getByTestId('mcp-write').click();
     await section.getByTestId('mcp-write-yes').click();
     await expect.poll(async () => ((await rpc(url, token, 'tools/list')).json.result.tools as Array<{ name: string }>).map((t) => t.name)).toContain('write_ai_field');

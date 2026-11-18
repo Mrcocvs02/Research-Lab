@@ -90,7 +90,7 @@ test('bulk AI job with estimate and confirmation, review with partial accept, un
     await window.locator(`[data-testid="review-item"][data-field="tags"][data-doc-id="${docId}"]`).getByTestId('review-accept').click();
     await expect(window.locator(`[data-testid="review-item"][data-field="tags"][data-doc-id="${docId}"]`)).toHaveCount(0, { timeout: 30_000 });
     const descItem = window.locator('[data-testid="review-item"][data-field="description"]').first();
-    await expect(descItem.getByTestId('review-ai-mark')).toBeVisible();
+    await expect(window.locator(`[data-testid="review-group"][data-doc-id="${(await descItem.getAttribute('data-doc-id'))!}"]`).getByTestId('review-ai-mark')).toBeVisible();
     await descItem.getByTestId('review-reject').click();
 
     // 6. The statistics count the reviewed tags.

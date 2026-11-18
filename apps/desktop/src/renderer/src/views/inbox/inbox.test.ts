@@ -134,8 +134,8 @@ describe('inbox: an item', () => {
   it('shows the file, identifiers and lookup state, retries a failed lookup, and follows inbox:changed', async () => {
     const work = setup({ tweak: (w) => void (w.state.inbox = [w.makeItem('paper.pdf', { lookup: { state: 'offline' }, metadata: null })]) });
     await screen.findByTestId('inbox-item');
+    fireEvent.click(screen.getByTestId('inbox-edit'));
     expect(screen.getByTestId('inbox-file-name').textContent).toBe('paper.pdf');
-    expect(screen.getByTestId('inbox-kind').textContent).toBe('dropped');
     expect(screen.getByTestId('inbox-size').textContent).toBe('2 KB');
     expect(screen.getByTestId('inbox-detected').textContent).toContain('DOI 10.1000/test');
     expect(screen.getByTestId('inbox-lookup').getAttribute('data-state')).toBe('offline');
@@ -154,6 +154,7 @@ describe('inbox: an item', () => {
   it('confirms a dropped file with the edited metadata, name and folder, and offers undo', async () => {
     const work = setup({ tweak: (w) => void (w.state.inbox = [w.makeItem('paper.pdf', { proposal: { name: 'paper.pdf', folder: '', tagIds: ['tag-a'], newTags: [], tagsFrom: 'similar' } })]) });
     await screen.findByTestId('inbox-item');
+    fireEvent.click(screen.getByTestId('inbox-edit'));
     expect(screen.getByTestId('inbox-meta-source').textContent).toContain('online record (OpenAlex)');
     expect((screen.getByTestId('inbox-title') as HTMLInputElement).value).toBe('Online title');
     expect(screen.getByTestId('inbox-tags-from').textContent).toContain('similar documents');
@@ -188,7 +189,7 @@ describe('inbox: an item', () => {
     await screen.findByTestId('inbox-item');
     expect(screen.queryByTestId('inbox-name')).toBeNull();
     expect(screen.queryByTestId('inbox-folder')).toBeNull();
-    expect(screen.getByTestId('inbox-kind').textContent).toBe('found in the library');
+    expect(screen.getByTestId('inbox-item').getAttribute('data-kind')).toBe('library');
     fireEvent.click(screen.getByTestId('inbox-confirm'));
     await waitFor(() => expect(work.state.confirms).toHaveLength(1));
     expect(work.state.confirms[0]).not.toHaveProperty('name');
@@ -206,13 +207,11 @@ describe('inbox: an item', () => {
     });
     const [same, other] = await screen.findAllByTestId('inbox-item');
     expect((within(same!).getByTestId('inbox-confirm') as HTMLButtonElement).disabled).toBe(true);
-    expect(within(same!).queryByTestId('inbox-allow-duplicate')).toBeNull();
     await waitFor(() => expect(within(same!).getByTestId('lab-chip').textContent).toBe('Existing Paper'));
 
     const confirm = within(other!).getByTestId('inbox-confirm') as HTMLButtonElement;
-    expect(confirm.disabled).toBe(true);
-    fireEvent.click(within(other!).getByTestId('inbox-allow-duplicate'));
     expect(confirm.disabled).toBe(false);
+    expect(confirm.textContent).toBe('Add anyway');
     fireEvent.click(confirm);
     await waitFor(() => expect(work.state.confirms).toHaveLength(1));
     expect(work.state.confirms[0]).toMatchObject({ allowDuplicate: true });
@@ -230,6 +229,16 @@ describe('inbox: an item', () => {
     expect(screen.getByTestId('inbox-item')).toBeTruthy();
   });
 
+  it('shows a sync conflict copy with a link to its document, and leaves it out of the bulk confirm', async () => {
+    setup({ tweak: (w) => void (w.state.inbox = [w.makeItem('copy.pdf', { conflictOf: { docId: 'cccccccccccccccc', title: 'Annotated one' } }), w.makeItem('a.pdf'), w.makeItem('b.pdf')]) });
+    const rows = await screen.findAllByTestId('inbox-item');
+    const conflict = within(rows[0]!).getByTestId('inbox-conflict');
+    expect(conflict.textContent).toContain('Annotated one');
+    expect(within(rows[0]!).queryByTestId('inbox-select')).toBeNull();
+    fireEvent.click(screen.getByTestId('inbox-select-all'));
+    expect(screen.getByTestId('inbox-confirm-selected').textContent).toBe('Confirm the 2 selected');
+  });
+
   it('dismisses an item', async () => {
     const work = setup({ tweak: (w) => void (w.state.inbox = [w.makeItem('paper.pdf')]) });
     fireEvent.click(await screen.findByTestId('inbox-dismiss'));
@@ -242,6 +251,7 @@ describe('inbox: tags with Claude', () => {
   it('previews what goes, then asks for tags with confirmed: true and shows the new nodes with keep boxes', async () => {
     const work = setup({ tweak: (w) => void (w.state.inbox = [w.makeItem('paper.pdf', { proposal: { name: 'paper.pdf', folder: 'alpha', tagIds: [], newTags: [], tagsFrom: 'none' } })]) });
     await screen.findByTestId('inbox-item');
+    fireEvent.click(screen.getByTestId('inbox-edit'));
     await waitFor(() => expect(within(screen.getByTestId('inbox-folder')).getAllByRole('option').length).toBeGreaterThan(1));
     fireEvent.click(screen.getByTestId('inbox-propose-tags'));
     const dialog = await screen.findByTestId('send-preview');
@@ -264,6 +274,7 @@ describe('inbox: tags with Claude', () => {
   it('keeps the new nodes that stay checked', async () => {
     const work = setup({ tweak: (w) => void (w.state.inbox = [w.makeItem('paper.pdf', { proposal: { name: 'paper.pdf', folder: 'alpha', tagIds: [], newTags: [], tagsFrom: 'none' } })]) });
     await screen.findByTestId('inbox-item');
+    fireEvent.click(screen.getByTestId('inbox-edit'));
     fireEvent.click(screen.getByTestId('inbox-propose-tags'));
     fireEvent.click(await screen.findByTestId('preview-confirm'));
     await screen.findByTestId('inbox-new-tags');
@@ -275,6 +286,7 @@ describe('inbox: tags with Claude', () => {
   it('says clearly when the target folder is not enabled for the AI, without sending anything', async () => {
     const work = setup({ tweak: (w) => void (w.state.inbox = [w.makeItem('paper.pdf', { proposal: { name: 'paper.pdf', folder: 'beta', tagIds: [], newTags: [], tagsFrom: 'none' } })]) });
     await screen.findByTestId('inbox-item');
+    fireEvent.click(screen.getByTestId('inbox-edit'));
     fireEvent.click(screen.getByTestId('inbox-propose-tags'));
     expect((await screen.findByTestId('inbox-ai-error')).textContent).toContain('not enabled for sending to Claude');
     expect(screen.queryByTestId('send-preview')).toBeNull();
@@ -289,6 +301,7 @@ describe('inbox: tags with Claude', () => {
       },
     });
     await screen.findByTestId('inbox-item');
+    fireEvent.click(screen.getByTestId('inbox-edit'));
     fireEvent.click(screen.getByTestId('inbox-propose-tags'));
     fireEvent.click(await screen.findByTestId('preview-confirm'));
     expect((await screen.findByTestId('inbox-ai-error')).textContent).toContain('cannot be reached');

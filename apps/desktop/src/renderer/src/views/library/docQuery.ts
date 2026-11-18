@@ -17,6 +17,17 @@ export interface BrowseState {
   includeSub: boolean;
 }
 
+/** The starting filter asked by another view (`lib/libraryIntent.ts`), or the empty one. */
+export const browseFromIntent = (i: { tags?: string[]; authors?: string[]; docIds?: string[] } | null): BrowseState => {
+  const b = initialBrowse();
+  if (!i) return b;
+  if (i.tags?.length) b.tags = { include: i.tags, exclude: [], mode: 'all' };
+  if (i.authors?.length) b.filters = { ...b.filters, authors: i.authors };
+  // `docIds` is in the request schema; the search service applies it as D3 / N4 land.
+  if (i.docIds?.length) b.filters = { ...b.filters, docIds: i.docIds } as BrowseState['filters'];
+  return b;
+};
+
 export const initialBrowse = (): BrowseState => ({
   text: '',
   sort: 'relevance',

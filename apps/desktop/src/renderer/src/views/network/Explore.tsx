@@ -84,6 +84,8 @@ function Docs({ dim, id, onOpen, selectedDoc }: { dim: Dim; id: string; onOpen(d
 interface Props {
   selectedDoc: string | null;
   onOpenDoc(docId: string): void;
+  /** `L` on the map: show this dimension (a new `nonce` asks again). */
+  dimRequest?: { dim: Dim; nonce: number } | undefined;
 }
 
 /**
@@ -91,7 +93,7 @@ interface Props {
  * depth), the breadcrumb and Back keep the way down, the selection and the scroll position of every level, and a node
  * leads to its documents or, through "Related", to the nodes of another dimension aligned on it (Back returns to the start).
  */
-export function Explore({ selectedDoc, onOpenDoc }: Props) {
+export function Explore({ selectedDoc, onOpenDoc, dimRequest }: Props) {
   const { t } = useTranslation();
   const [loc, setLoc] = useState<Loc>({ dim: 'topic', parentId: null, selected: null });
   const [back, setBack] = useState<BackEntry[]>([]);
@@ -100,6 +102,12 @@ export function Explore({ selectedDoc, onOpenDoc }: Props) {
   const [rel, setRel] = useState<RelState | null>(null);
   const [relError, setRelError] = useState<unknown>(null);
   const cache = useRef(new Map<string, Level>());
+  const asked = useRef(0);
+  useEffect(() => {
+    if (!dimRequest || dimRequest.nonce === asked.current) return;
+    asked.current = dimRequest.nonce;
+    setLoc({ dim: dimRequest.dim, parentId: null, selected: null });
+  }, [dimRequest]);
   const scroll = useRef(new Map<string, number>());
   const list = useRef<HTMLUListElement>(null);
   const key = locKey(loc.dim, loc.parentId);

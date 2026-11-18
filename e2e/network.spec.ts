@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { launchApp, type LaunchedApp } from './helpers/launch';
 import { createLibraryViaWizard, ipcData, percentile, skipUnlessChannels, waitForScan } from './helpers/phase1';
 
@@ -25,7 +25,16 @@ interface MapData {
 
 const assignment = (m: MapData) => JSON.stringify(m.points.map((p) => [p.docId, p.clusters]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
 
-test('network, map, clusters, expandable graph and zoomable exploration (phase 6)', async ({}, testInfo) => {
+/** Sets a range input the way a user does (React listens to the input event). */
+async function setRange(locator: Locator, value: number): Promise<void> {
+  await locator.evaluate((el, v) => {
+    const input = el as HTMLInputElement;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, String(v));
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }, value);
+}
+
+test('network, map, clusters, expandable graph and zoomable exploration (phase 6, M4)', async ({}, testInfo) => {
   test.setTimeout(1_200_000);
   let ctx: LaunchedApp | undefined;
   try {
@@ -172,7 +181,8 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
         const x = box.x + (box.width * col) / 13;
         const y = box.y + (box.height * row) / 9;
         await window.mouse.move(x, y);
-        await window.waitForTimeout(25);
+        // The card of a node appears after the pointer rested 150 ms.
+        await window.waitForTimeout(200);
         if ((await window.getByTestId('net-tooltip').count()) > 0) grab = { x, y };
       }
     }
@@ -265,6 +275,102 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     await window.getByTestId('explore-back').click();
     await expect(panel).toHaveAttribute('data-dim', 'author');
     await expect(author).toHaveAttribute('aria-pressed', 'true');
+
+    // 8. M4: the map is playable. The Overview (map tab) has the hover card, the minimap and Mescola, no frame at rest.
+    await window.getByTestId('net-tab-map').click();
+    const pano = window.getByTestId('map-canvas');
+    await expect(window.getByTestId('minimap')).toBeVisible();
+    await window.getByTestId('map-shuffle').click();
+    await window.waitForTimeout(1200);
+    const frames = async () => Number((await pano.getAttribute('data-frames')) ?? 0);
+    const idle = await frames();
+    await window.waitForTimeout(600);
+    expect(await frames(), 'no frame is drawn while the Overview rests').toBe(idle);
+    await pano.focus();
+    await window.keyboard.press('ArrowRight');
+    await expect(window.getByTestId('map-focus')).not.toHaveText('');
+
+    // 9. M4: the four modes of the Links tab, with the entity card, the Library filter and the keyboard.
+    await window.getByTestId('net-tab-network').click();
+    await expect(window.getByTestId('net-mode-doc')).toHaveAttribute('aria-checked', 'true');
+    for (const mode of ['tag', 'topic', 'author'] as const) {
+      await window.getByTestId(`net-mode-${mode}`).click();
+      await expect(window.getByTestId('entity-panel')).toHaveAttribute('data-mode', mode);
+      await expect(window.getByTestId('ent-canvas')).toHaveAttribute('data-loading', 'false', { timeout: 60_000 });
+    }
+    // Authors: at least 1 document per author, then the card of Test Author A.
+    await setRange(window.getByTestId('ent-min-docs'), 1);
+    const entities = window.getByTestId('ent-canvas');
+    await expect.poll(async () => Number(await entities.getAttribute('data-nodes')), { timeout: 60_000 }).toBeGreaterThan(0);
+    await window.getByTestId('ent-fit').click();
+    await window.waitForTimeout(1500);
+    const eb = (await entities.boundingBox())!;
+    let found: { x: number; y: number } | null = null;
+    for (let row = 1; row < 9 && !found; row++) {
+      for (let col = 1; col < 13 && !found; col++) {
+        const x = eb.x + (eb.width * col) / 13;
+        const y = eb.y + (eb.height * row) / 9;
+        await window.mouse.move(x, y);
+        await window.waitForTimeout(200);
+        if ((await window.getByTestId('net-tooltip').count()) > 0) found = { x, y };
+      }
+    }
+    expect(found, 'a node under the pointer').not.toBeNull();
+    await expect(window.getByTestId('net-tooltip').getByTestId('year-bars')).toBeVisible();
+    await window.mouse.click(found!.x, found!.y);
+    await expect(window.getByTestId('entity-detail')).toBeVisible();
+    await expect(window.getByTestId('entity-count')).not.toHaveText('');
+    // "Open in the Library" carries the author as a filter.
+    await window.getByTestId('entity-open-library').click();
+    await expect(window.getByTestId('section-library')).toBeVisible();
+    await expect(window.getByTestId('active-filters')).toBeVisible();
+    await window.getByTestId('nav-map').click();
+    await window.getByTestId('net-tab-network').click();
+    // M goes to the next mode (authors -> documents), and the mode of the library is remembered.
+    await expect(window.getByTestId('net-mode-author')).toHaveAttribute('aria-checked', 'true');
+    await window.getByTestId('ent-canvas').focus();
+    await window.keyboard.press('m');
+    await expect(window.getByTestId('net-mode-doc')).toHaveAttribute('aria-checked', 'true');
+    await window.keyboard.press('m');
+    await expect(window.getByTestId('net-mode-tag')).toHaveAttribute('aria-checked', 'true');
+    // Reduced motion: no flight, the layout is settled before it is drawn.
+    await window.emulateMedia({ reducedMotion: 'reduce' });
+    await window.getByTestId('net-mode-topic').click();
+    await expect(window.getByTestId('ent-canvas')).toHaveAttribute('data-loading', 'false', { timeout: 60_000 });
+    await window.getByTestId('ent-fit').click();
+    const settled = Number((await window.getByTestId('ent-canvas').getAttribute('data-frames')) ?? 0);
+    await window.waitForTimeout(500);
+    expect(Number((await window.getByTestId('ent-canvas').getAttribute('data-frames')) ?? 0), 'nothing animates with reduced motion').toBeLessThanOrEqual(settled + 1);
+    await window.emulateMedia({ reducedMotion: 'no-preference' });
+
+    // 10. Real frame rate of the Overview while panning (heavy runs only: one test at a time, D-379). The corpus is the 600
+    // documents of this run; the 5000-point and 20000-point fixtures are generated by the heavy suite and use the same probe.
+    if (process.env['RL_HEAVY_TESTS'] === '1') {
+      await window.getByTestId('net-tab-map').click();
+      const box2 = (await pano.boundingBox())!;
+      const fps = await window.evaluate(async () => {
+        let n = 0;
+        const t0 = performance.now();
+        await new Promise<void>((done) => {
+          const loop = (t: number) => {
+            n++;
+            if (t - t0 < 2000) requestAnimationFrame(loop);
+            else done();
+          };
+          requestAnimationFrame(loop);
+        });
+        return (n * 1000) / (performance.now() - t0);
+      });
+      // Pan while the probe runs would need both at once: sample the browser's own pace first, then pan and compare.
+      await window.mouse.move(box2.x + box2.width / 2, box2.y + box2.height / 2);
+      await window.mouse.down();
+      const t0 = Date.now();
+      let moves = 0;
+      while (Date.now() - t0 < 2000) await window.mouse.move(box2.x + box2.width / 2 + 200 * Math.sin(moves++ / 12), box2.y + box2.height / 2 + 120 * Math.cos(moves / 12));
+      await window.mouse.up();
+      console.log(`NET-FPS overview idle-pace ${fps.toFixed(1)} fps, ${moves} pointer moves in 2 s`);
+      expect(fps, 'frame rate of the window itself').toBeGreaterThan(50);
+    }
   } finally {
     await ctx?.close();
   }

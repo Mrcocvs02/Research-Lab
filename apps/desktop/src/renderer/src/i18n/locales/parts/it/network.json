@@ -43,10 +43,10 @@
       "layout": "Disposizione della mappa"
     },
     "tab": {
-      "map": "Mappa",
-      "network": "Rete",
+      "map": "Panorama",
+      "network": "Collegamenti",
       "explore": "Esplora",
-      "surprising": "Coppie inattese"
+      "surprising": "Vicini inattesi"
     },
     "scope": {
       "label": "Ambito",
@@ -101,12 +101,16 @@
         "contains": "contiene"
       },
       "empty": "Scegli un documento, una cartella o un tag per avviare la rete.",
-      "help": "Doppio clic su un nodo (o Espandi, o Invio) per aggiungere i suoi vicini; trascina i nodi per spostarli; rotella per ingrandire; ] e [ scelgono il nodo successivo o precedente.",
+      "help": "Doppio clic su un nodo per mettere a fuoco il suo vicinato ed espanderlo (o Espandi, o Invio due volte); trascina i nodi per spostarli (restano dove li lasci, P li libera); rotella per lo zoom; le frecce vanno al nodo più vicino, ] e [ al successivo o al precedente; Maiusc+clic su un secondo nodo per il percorso più breve.",
       "label": "Rete di documenti, cartelle e tag",
       "noKinds": "Nessuno dei tipi scelti vale per questo nodo.",
       "alreadyExpanded": "Questo nodo è già espanso.",
-      "capped": "La rete è limitata a {{limit}} nodi.",
-      "nothingNew": "Nessun nuovo vicino."
+      "capped": "+{{count}} non mostrati (tetto {{limit}} nodi)",
+      "nothingNew": "Nessun nuovo vicino.",
+      "onlyThese": "Mostra solo questi",
+      "announce": "{{name}}, {{kind}}, {{links}} legami",
+      "surprise": "Vicini nel contenuto, lontani negli argomenti. Parole in comune: {{terms}}.",
+      "emptyTitle": "Scegli un documento da cui partire"
     },
     "explore": {
       "documents": "Documenti",
@@ -153,6 +157,122 @@
       "surprisingTitle": "Vicini ma non sembra",
       "surprisingHint": "Simili nel contenuto, ma senza tag, citazioni o cartella in comune.",
       "noSurprising": "Nessuna coppia inattesa trovata."
+    },
+    "roleMap": "mappa",
+    "announce": {
+      "doc": "{{title}}, {{topic}}"
+    },
+    "card": {
+      "topic": "Argomento: {{topic}}"
+    },
+    "minimap": "Mostra la minimappa",
+    "minimapLabel": "Minimappa: trascina il rettangolo per spostare la vista",
+    "unpinAll": "Libera tutti i nodi fissati",
+    "more": "Altre opzioni",
+    "play": {
+      "shuffle": "Mescola",
+      "surprise": "Sorprendimi"
+    },
+    "search": {
+      "go": "Vai a…",
+      "goDoc": "Vai a un documento…",
+      "goEntity": "Vai a {{kind}}…"
+    },
+    "noMapTitle": "Costruisci la mappa dei tuoi documenti",
+    "mapFiltered": "{{from}} → {{to}} documenti",
+    "fewDocs": "Servono almeno 3 documenti perché la mappa dica qualcosa. Aggiungi PDF alla libreria e costruiscila di nuovo.",
+    "mode": {
+      "label": "Rete di:",
+      "doc": "Documenti",
+      "tag": "Tag",
+      "topic": "Argomenti",
+      "author": "Autori",
+      "hint": "M cambia modo"
+    },
+    "ent": {
+      "groupOf": "Gruppo di {{name}}",
+      "you": "Tu",
+      "noPath": "Questi due nodi non sono collegati.",
+      "dotsMore_one": "{{shown}} documento su {{total}}.",
+      "dotsMore_other": "{{shown}} documenti su {{total}}.",
+      "lastLevel": "Questo argomento non si può dividere oltre.",
+      "noSurprise": "Qui non c'è nessuna coppia sorprendente.",
+      "years": "Anni",
+      "yearFrom": "Primo anno",
+      "yearTo": "Ultimo anno",
+      "minDocs": "Almeno N documenti",
+      "minWeight": "Legami",
+      "level": "Livello",
+      "tagAny": "Qualsiasi tag",
+      "cap": "{{shown}} di {{total}} {{kind}}",
+      "count_one": "{{count}} {{kind}}",
+      "count_other": "{{count}} {{kind}}",
+      "documents_one": "{{count}} documento",
+      "documents_other": "{{count}} documenti",
+      "up": "Torna al livello",
+      "label": "Rete di {{kind}}: trascina per spostare, rotella per lo zoom, le frecce vanno al nodo più vicino, Invio seleziona, M cambia modo, L apre Esplora.",
+      "forms_one": "{{count}} forma",
+      "forms_other": "{{count}} forme",
+      "namesake_one": "Possibile omonimia: {{count}} forma del nome",
+      "namesake_other": "Possibile omonimia: {{count}} forme del nome",
+      "groupLine": {
+        "tag": "Ramo: {{name}}",
+        "topic": "Parte di: {{name}}",
+        "author": "Gruppo di {{name}}"
+      },
+      "links": {
+        "tag": "Spesso con",
+        "topic": "Vicino a",
+        "author": "Coautori"
+      },
+      "announce": {
+        "tag": "Tag {{name}}, {{count}} documenti, {{links}} legami",
+        "topic": "Argomento {{name}}, {{count}} documenti, {{links}} legami",
+        "author": "Autore {{name}}, {{count}} documenti, {{links}} coautori"
+      },
+      "surprise": {
+        "tag": "{{a}} e {{b}} compaiono insieme in {{n}} documenti.",
+        "topic": "{{a}} e {{b}} sono lontani nel Panorama ma condividono {{n}} documenti con gli stessi tag.",
+        "author": "{{a}} e {{b}} potrebbero conoscersi: {{n}} coautori in comune, mai un articolo insieme."
+      },
+      "kind": {
+        "tag": "tag",
+        "topic": "argomenti",
+        "author": "autori"
+      },
+      "empty": {
+        "build": {
+          "title": "Costruisci la mappa dei tuoi documenti",
+          "text": "Gli argomenti vengono dal modello della mappa. La costruzione legge i documenti già in libreria; nulla viene inviato online.",
+          "action": "Costruisci la mappa"
+        },
+        "tags": {
+          "title": "Non ci sono ancora tag",
+          "text": "Aggiungi tag ad alcuni documenti e la rete dei tag compare qui.",
+          "action": "Gestisci tag"
+        },
+        "review": {
+          "title": "I documenti non hanno autori",
+          "text": "Completa i dati in Da rivedere, o aggiorna le citazioni, e gli autori compaiono qui.",
+          "action": "Completa i dati"
+        },
+        "few": {
+          "title": "Allarga i filtri",
+          "text": "Meno di 3 nodi passano i filtri.",
+          "action": "Togli i filtri"
+        }
+      },
+      "detail": "Entità selezionata",
+      "also": "anche: {{names}}",
+      "openLibrary": "Apri nella Libreria",
+      "split": "Separa queste forme",
+      "mergeWith": "Unisci con…",
+      "merge": "Unisci",
+      "docs": "Documenti",
+      "related": {
+        "author": "Autori correlati",
+        "topic": "Argomenti correlati"
+      }
     }
   }
 }

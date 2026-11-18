@@ -1,0 +1,43 @@
+/*
+ * Categorical palette of the Map (D-367, D-379): ten tints, each at least 3:1 on the view background in both themes
+ * (network.test.ts reads this file and checks it). The first six repeat the tokens of tokens.css; the light 3, 6 and 7
+ * are darkened here because the prototype values were under 3:1 on --bg.
+ */
+:root {
+  --cat-1: #3e63dd;
+  --cat-2: #1f9d6b;
+  --cat-3: #c76f12;
+  --cat-4: #8e4ec6;
+  --cat-5: #d6409f;
+  --cat-6: #0b8c9c;
+  --cat-7: #9a8700;
+  --cat-8: #e5484d;
+  --cat-9: #5b6b8c;
+  --cat-10: #6e56cf;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --cat-1: #7d97f0;
+    --cat-2: #56c79a;
+    --cat-3: #f0a860;
+    --cat-4: #b58ce6;
+    --cat-5: #ee7dbe;
+    --cat-6: #4fc6d4;
+    --cat-7: #dcc64f;
+    --cat-8: #ff7f83;
+    --cat-9: #8d9dbf;
+    --cat-10: #9d8af0;
+  }
+}
+:root[data-theme='dark'] {
+  --cat-1: #7d97f0;
+  --cat-2: #56c79a;
+  --cat-3: #f0a860;
+  --cat-4: #b58ce6;
+  --cat-5: #ee7dbe;
+  --cat-6: #4fc6d4;
+  --cat-7: #dcc64f;
+  --cat-8: #ff7f83;
+  --cat-9: #8d9dbf;
+  --cat-10: #9d8af0;
+}

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { active, makeFlight, newMotion, reducedMotion, stepMotion, zoomBy, FLIGHT_MS, type Motion } from './camera';
 import { fitView, toWorldX, toWorldY, zoomAt, type Bounds, type View } from './geometry';
 
 /**
- * What a canvas view (the map, the network) provides; the hook owns the pointer, wheel and keyboard handling, the pan and
- * zoom, the size (with the pixel ratio) and the frame loop. Frames are requested only when something changed (a pointer
- * move that matters, a zoom, the simulation still moving): nothing runs while the view is idle.
+ * What a canvas view (the map, the networks) provides; the hook owns the pointer, wheel and keyboard handling, the camera
+ * (smooth zoom, drag inertia, flights, see camera.ts), the size (with the pixel ratio) and the frame loop. Frames are
+ * requested only when something changed (a pointer move that matters, a camera motion, the simulation still hot): nothing
+ * runs while the view is idle, and `data-frames` on the canvas counts the frames drawn so a test can check it.
  */
 export interface CanvasOptions<T> {
   /** Draws one frame; the context is already scaled to CSS pixels. */
@@ -12,10 +14,13 @@ export interface CanvasOptions<T> {
   /** What is under the screen point (CSS pixels), or null. */
   hit(sx: number, sy: number, view: View, width: number, height: number): T | null;
   onHover(hit: T | null, sx: number, sy: number): void;
-  onClick(hit: T | null): void;
-  onDoubleClick?(hit: T | null): void;
+  onClick(hit: T | null, shift: boolean): void;
+  /** Return true when the double click was handled (else a double click on the background zooms in by 2). */
+  onDoubleClick?(hit: T | null): boolean | void;
   /** The area to show when the view is reset (null: nothing yet). */
   bounds(): Bounds | null;
+  /** Largest zoom `fit` may reach (small graphs are not blown up past a node of 40 px). */
+  maxFit?(): number;
   /** One simulation step per frame; return true while more steps are needed. */
   tick?(): boolean;
   /** Dragging a hit (a node) instead of the background: return true to take the drag. */
@@ -35,39 +40,105 @@ export function useCanvasView<T>(opts: CanvasOptions<T>) {
   const size = useRef({ w: 0, h: 0, dpr: 1 });
   const raf = useRef(0);
   const fitted = useRef(false);
+  const motion = useRef<Motion>(newMotion());
+  const last = useRef(0);
+  const frames = useRef(0);
+  /** Called after each frame (the minimap draws itself from here). */
+  const hooks = useRef(new Set<() => void>());
 
-  const frame = useCallback(() => {
+  const frame = useCallback((now: number) => {
     raf.current = 0;
     const el = canvas.current;
     const ctx = el?.getContext('2d');
     if (!el || !ctx) return;
     const { w, h, dpr } = size.current;
     if (w === 0 || h === 0) return;
+    const dt = last.current === 0 ? 16.7 : Math.min(now - last.current, 50);
+    last.current = now;
+    const m = motion.current;
+    if (active(m)) view.current = stepMotion(m, view.current, dt, w, h);
     const more = o.current.tick?.() ?? false;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
     o.current.draw(ctx, w, h, view.current);
-    if (more) requestDraw();
+    frames.current++;
+    el.dataset['frames'] = String(frames.current);
+    for (const hook of hooks.current) hook();
+    if (more || active(m)) requestDraw();
+    else last.current = 0;
   }, []);
   const requestDraw = useCallback((): void => {
     if (raf.current === 0) raf.current = requestAnimationFrame(frame);
   }, [frame]);
 
-  /** Shows the whole content (the first time there is some, or when asked). */
-  const fit = useCallback(() => {
-    const b = o.current.bounds();
-    const { w, h } = size.current;
-    if (!b || w === 0) return;
-    const v = fitView(b, w, h);
-    base.current = v.k;
-    view.current = v;
-    fitted.current = true;
-    requestDraw();
-  }, [requestDraw]);
+  /** Stops every camera motion (a drag, a new command). */
+  const stop = useCallback(() => {
+    const m = motion.current;
+    m.vx = 0;
+    m.vy = 0;
+    m.zoom = null;
+    m.flight = null;
+  }, []);
+
+  /** Flies to a view (centre and zoom): 700 ms, zooming out and in for a long way; at once with reduced motion. */
+  const flyTo = useCallback(
+    (x: number, y: number, k?: number, ms = FLIGHT_MS) => {
+      const to = { cx: x, cy: y, k: k ?? view.current.k };
+      stop();
+      if (reducedMotion()) view.current = to;
+      else motion.current.flight = makeFlight(view.current, to, ms, size.current.w, size.current.h);
+      requestDraw();
+    },
+    [requestDraw, stop],
+  );
+
+  /** Shows the whole content (the first time there is some, or when asked: then in 600 ms). */
+  const fit = useCallback(
+    (animate = false) => {
+      const b = o.current.bounds();
+      const { w, h } = size.current;
+      if (!b || w === 0) return;
+      const v = fitView(b, w, h);
+      const cap = o.current.maxFit?.();
+      if (cap !== undefined && v.k > cap) v.k = cap;
+      base.current = v.k;
+      if (animate && fitted.current && !reducedMotion()) {
+        stop();
+        motion.current.flight = makeFlight(view.current, v, 600, w, h);
+      } else view.current = v;
+      fitted.current = true;
+      requestDraw();
+    },
+    [requestDraw, stop],
+  );
 
   const centerOn = useCallback(
     (x: number, y: number, k?: number) => {
+      stop();
       view.current = { cx: x, cy: y, k: k ?? view.current.k };
+      requestDraw();
+    },
+    [requestDraw, stop],
+  );
+
+  /** Sets the view at once (the minimap drags the rectangle). */
+  const jump = useCallback(
+    (v: View) => {
+      stop();
+      view.current = v;
+      requestDraw();
+    },
+    [requestDraw, stop],
+  );
+
+  const zoom = useCallback(
+    (factor: number, sx?: number, sy?: number) => {
+      const { w, h } = size.current;
+      const x = sx ?? w / 2;
+      const y = sy ?? h / 2;
+      motion.current.flight = null;
+      if (reducedMotion()) view.current = zoomAt(view.current, x, y, factor, w, h, base.current);
+      else zoomBy(motion.current, view.current, x, y, factor, base.current);
       requestDraw();
     },
     [requestDraw],
@@ -95,9 +166,7 @@ export function useCanvasView<T>(opts: CanvasOptions<T>) {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const r = el.getBoundingClientRect();
-      const { w, h } = size.current;
-      view.current = zoomAt(view.current, e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.0015), w, h, base.current);
-      requestDraw();
+      zoom(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     const dark = window.matchMedia?.('(prefers-color-scheme: dark)');
@@ -112,10 +181,10 @@ export function useCanvasView<T>(opts: CanvasOptions<T>) {
       if (raf.current) cancelAnimationFrame(raf.current);
       raf.current = 0;
     };
-  }, [fit, requestDraw]);
+  }, [fit, requestDraw, zoom]);
 
   // Pointer state of the current gesture.
-  const gesture = useRef<{ id: number; sx: number; sy: number; vx: number; vy: number; moved: boolean; hit: T | null; dragging: boolean } | null>(null);
+  const gesture = useRef<{ id: number; sx: number; sy: number; vx: number; vy: number; moved: boolean; hit: T | null; dragging: boolean; lx: number; ly: number; lt: number; pvx: number; pvy: number } | null>(null);
 
   const local = (e: { clientX: number; clientY: number }) => {
     const r = canvas.current!.getBoundingClientRect();
@@ -127,8 +196,9 @@ export function useCanvasView<T>(opts: CanvasOptions<T>) {
       if (e.button !== 0) return;
       const { sx, sy } = local(e);
       const { w, h } = size.current;
+      stop();
       const hit = o.current.hit(sx, sy, view.current, w, h);
-      gesture.current = { id: e.pointerId, sx, sy, vx: view.current.cx, vy: view.current.cy, moved: false, hit, dragging: false };
+      gesture.current = { id: e.pointerId, sx, sy, vx: view.current.cx, vy: view.current.cy, moved: false, hit, dragging: false, lx: sx, ly: sy, lt: performance.now(), pvx: 0, pvy: 0 };
       e.currentTarget.setPointerCapture(e.pointerId);
     },
     onPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -143,7 +213,17 @@ export function useCanvasView<T>(opts: CanvasOptions<T>) {
         }
         if (g.moved) {
           if (g.dragging && g.hit !== null) o.current.dragMove?.(g.hit, toWorldX(view.current, sx, w), toWorldY(view.current, sy, h));
-          else view.current = { ...view.current, cx: g.vx - (sx - g.sx) / view.current.k, cy: g.vy - (sy - g.sy) / view.current.k };
+          else {
+            view.current = { ...view.current, cx: g.vx - (sx - g.sx) / view.current.k, cy: g.vy - (sy - g.sy) / view.current.k };
+            // Velocity in px per 60 Hz frame, smoothed, for the inertia at release.
+            const now = performance.now();
+            const dt = Math.max(now - g.lt, 1);
+            g.pvx = g.pvx * 0.5 + ((sx - g.lx) / dt) * (1000 / 60) * 0.5;
+            g.pvy = g.pvy * 0.5 + ((sy - g.ly) / dt) * (1000 / 60) * 0.5;
+            g.lx = sx;
+            g.ly = sy;
+            g.lt = now;
+          }
           requestDraw();
         }
         return;
@@ -155,7 +235,11 @@ export function useCanvasView<T>(opts: CanvasOptions<T>) {
       if (!g || g.id !== e.pointerId) return;
       gesture.current = null;
       if (g.dragging && g.hit !== null) o.current.dragEnd?.(g.hit);
-      else if (!g.moved) o.current.onClick(g.hit);
+      else if (!g.moved) o.current.onClick(g.hit, e.shiftKey);
+      else if (!reducedMotion() && performance.now() - g.lt < 80 && Math.hypot(g.pvx, g.pvy) > 1) {
+        motion.current.vx = g.pvx;
+        motion.current.vy = g.pvy;
+      }
       requestDraw();
     },
     onPointerCancel(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -169,7 +253,9 @@ export function useCanvasView<T>(opts: CanvasOptions<T>) {
     onDoubleClick(e: React.MouseEvent<HTMLCanvasElement>) {
       const { sx, sy } = local(e);
       const { w, h } = size.current;
-      o.current.onDoubleClick?.(o.current.hit(sx, sy, view.current, w, h));
+      const hit = o.current.hit(sx, sy, view.current, w, h);
+      if (o.current.onDoubleClick?.(hit) === true) return;
+      if (hit === null) zoom(2, sx, sy);
     },
     onKeyDown(e: ReactKeyboardEvent<HTMLCanvasElement>) {
       const { w, h } = size.current;
@@ -191,15 +277,17 @@ export function useCanvasView<T>(opts: CanvasOptions<T>) {
           break;
         case '+':
         case '=':
-          next = zoomAt(v, w / 2, h / 2, 1.25, w, h, base.current);
-          break;
+          e.preventDefault();
+          zoom(1.25);
+          return;
         case '-':
         case '_':
-          next = zoomAt(v, w / 2, h / 2, 0.8, w, h, base.current);
-          break;
+          e.preventDefault();
+          zoom(0.8);
+          return;
         case '0':
         case 'Home':
-          fit();
+          fit(true);
           e.preventDefault();
           return;
         case 'Escape':
@@ -209,10 +297,11 @@ export function useCanvasView<T>(opts: CanvasOptions<T>) {
           return;
       }
       e.preventDefault();
+      stop();
       view.current = next;
       requestDraw();
     },
   };
 
-  return { canvas, view, size, requestDraw, fit, centerOn, handlers };
+  return { canvas, view, size, requestDraw, fit, centerOn, flyTo, jump, zoom, stop, hooks, handlers };
 }

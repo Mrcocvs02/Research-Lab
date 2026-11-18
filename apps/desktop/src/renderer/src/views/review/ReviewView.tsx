@@ -1,20 +1,24 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
+import { Button } from '../../components/Button';
+import { EmptyState } from '../../components/EmptyState';
+import { IconCheck } from '../../components/icons';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { useChangeVersion } from '../../lib/events';
-import { HistoryControls } from '../../lib/history';
 import { useJobs } from '../../lib/jobs';
 import { rl } from '../../lib/rl';
 import { DocChip } from '../chat/ChatParts';
 import { safeText } from '../library/safeText';
-import { ReviewItemView, type ReviewItemData } from './ReviewItem';
+import { AiMark, ReviewItemView, type ReviewItemData } from './ReviewItem';
 import { useDecide, type ReviewField } from './useDecide';
 import '../inbox/inbox.css';
 
 type Stats = ResponseOf<Channels, 'review:stats'>;
 const PAGE = 50;
+const CONFIRM_OVER = 20;
+type Bulk = 'accept' | 'reject';
 /** A running job writes a proposal per document: the queue (a pass over every document) follows it at most this often. */
 const JOB_RELOAD_MS = 2000;
 
@@ -56,6 +60,8 @@ export function ReviewView() {
   const [error, setError] = useState<unknown>(null);
   const [tick, setTick] = useState(0);
   const [busy, setBusy] = useState(false);
+  // A bulk decision over more than CONFIRM_OVER elements asks for a second click on the same button.
+  const [armed, setArmed] = useState<Bulk | null>(null);
   // A running job writes proposals as they arrive: the queue follows its progress.
   const jobKey = job ? `${job.jobId}:${job.done}:${job.state}` : '';
   // Progress and the change events of each written proposal arrive together: one throttled trigger for both.
@@ -88,11 +94,13 @@ export function ReviewView() {
     return [...map.values()];
   }, [data]);
 
-  const bulk = async (decision: 'accept' | 'reject') => {
-    if (!data || data.items.length === 0) return;
+  const bulk = async (decision: Bulk, only?: ReviewItemData[]) => {
+    const list = only ?? data?.items ?? [];
+    if (list.length === 0) return;
     setBusy(true);
+    setArmed(null);
     await decideMany(
-      data.items.map((i) => ({ docId: i.docId, field: i.field, metaDate: i.meta.date })),
+      list.map((i) => ({ docId: i.docId, field: i.field, metaDate: i.meta.date })),
       decision,
     );
     setBusy(false);
@@ -101,84 +109,85 @@ export function ReviewView() {
 
   const pages = data ? Math.max(1, Math.ceil(data.total / PAGE)) : 1;
   const rate = stats?.tags.rate;
+  const n = data?.items.length ?? 0;
+  const ask = (d: Bulk) => (n > CONFIRM_OVER && armed !== d ? setArmed(d) : void bulk(d));
+  const bulkLabel = (d: Bulk) => (armed === d ? t('review.confirmMany', { count: n }) : t(d === 'accept' ? 'review.acceptAll' : 'review.rejectAll'));
   return (
-    <div className="review" data-testid="review-view">
-      <header className="review-head">
-        <section className="review-stats" aria-label={t('review.statsLabel')} data-testid="review-stats">
-          {stats && (
-            <>
-              <span data-testid="review-pending">{t('review.pending', { count: Object.values(stats.pending).reduce((a, b) => a + b, 0) })}</span>
-              {FIELDS.filter((f) => (stats.pending[f] ?? 0) > 0).map((f) => (
-                <span key={f} className="badge" data-testid={`review-pending-${f}`}>
-                  {t(`review.fields.${f}`)}: {stats.pending[f]}
-                </span>
-              ))}
-              <span data-testid="review-rate">{rate === null || rate === undefined ? t('review.rateNone') : t('review.rate', { percent: Math.round(rate * 100), accepted: stats.tags.accepted, proposed: stats.tags.proposed })}</span>
-            </>
-          )}
-        </section>
-        <HistoryControls />
-      </header>
-      <div className="library-tools">
-        <label htmlFor={filterId}>{t('review.filter')}</label>
+    <div className='review' data-testid='review-view'>
+      <div className='rh-bar'>
+        <label htmlFor={filterId} className='sr-only'>
+          {t('review.filter')}
+        </label>
         <select
           id={filterId}
           value={field}
           onChange={(e) => {
             setField(e.target.value as ReviewField | '');
             setPage(0);
+            setArmed(null);
           }}
-          data-testid="review-filter"
+          data-testid='review-filter'
         >
-          <option value="">{t('review.allFields')}</option>
+          <option value=''>{t('review.allFields')}</option>
           {FIELDS.map((f) => (
             <option key={f} value={f}>
               {t(`review.fields.${f}`)}
             </option>
           ))}
         </select>
-        <span className="spacer" />
-        <button type="button" className="primary" disabled={busy || !data || data.items.length === 0} onClick={() => void bulk('accept')} data-testid="review-accept-all">
-          {t('review.acceptAll')}
-        </button>
-        <button type="button" disabled={busy || !data || data.items.length === 0} onClick={() => void bulk('reject')} data-testid="review-reject-all">
-          {t('review.rejectAll')}
-        </button>
+        <span className='rh-rate' data-testid='review-rate'>
+          {rate === null || rate === undefined ? t('review.rateNone') : t('review.rate', { percent: Math.round(rate * 100) })}
+        </span>
+        <span className='spacer' />
+        <Button size='sm' disabled={busy || n === 0} onClick={() => ask('accept')} variant={armed === 'accept' ? 'primary' : 'secondary'} data-testid='review-accept-all'>
+          {bulkLabel('accept')}
+        </Button>
+        <Button size='sm' disabled={busy || n === 0} onClick={() => ask('reject')} variant={armed === 'reject' ? 'primary' : 'secondary'} data-testid='review-reject-all'>
+          {bulkLabel('reject')}
+        </Button>
       </div>
-      {error ? <ErrorNote testId="review-error">{errorMessage(error, t)}</ErrorNote> : null}
+      {error ? <ErrorNote testId='review-error'>{errorMessage(error, t)}</ErrorNote> : null}
       {data && data.items.length === 0 && (
-        <p className="empty" data-testid="review-empty">
-          {t('review.empty')}
-        </p>
+        <EmptyState icon={<IconCheck size={24} />} title={t('review.emptyTitle')} className='rh-empty'>
+          <span data-testid='review-empty'>{t('review.empty')}</span>
+        </EmptyState>
       )}
-      <ul className="review-groups" aria-label={t('review.listLabel')}>
+      <ul className='review-groups' aria-label={t('review.listLabel')}>
         {groups.map((items) => {
           const first = items[0]!;
           return (
-            <li key={first.docId} className="review-group card" data-testid="review-group" data-doc-id={first.docId}>
-              <header className="review-group-head">
-                <h3 data-testid="review-doc-title">{safeText(first.title?.trim() || first.path.split('/').pop() || first.path)}</h3>
-                <p className="result-path">{safeText(first.path)}</p>
-                <span data-testid="review-open-doc">
+            <li key={first.docId} className='review-group' data-testid='review-group' data-doc-id={first.docId}>
+              <header className='review-group-head'>
+                <div className='rh-title'>
+                  <p className='rh-name' data-testid='review-doc-title'>
+                    {safeText(first.title?.trim() || first.path.split('/').pop() || first.path)}
+                  </p>
+                  <p className='hint'>{safeText(first.path)}</p>
+                </div>
+                <span data-testid='review-open-doc'>
                   <DocChip docId={first.docId} />
                 </span>
+                <Button size='sm' disabled={busy} onClick={() => void bulk('accept', items)} data-testid='review-accept-doc'>
+                  {t('review.acceptDoc')}
+                </Button>
               </header>
-              <ul className="review-items">
+              <ul className='review-items'>
                 {items.map((it) => (
                   <ReviewItemView key={`${it.field}:${it.revision}:${it.meta.date}`} item={it} onDone={reload} />
                 ))}
               </ul>
+              <AiMark meta={first.meta} />
             </li>
           );
         })}
       </ul>
       {data && data.total > PAGE && (
-        <nav className="pager" aria-label={t('review.pages')}>
-          <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)} data-testid="review-page-prev">
+        <nav className='pager' aria-label={t('review.pages')}>
+          <button type='button' disabled={page === 0} onClick={() => setPage(page - 1)} data-testid='review-page-prev'>
             {t('review.prev')}
           </button>
-          <span data-testid="review-page">{t('review.pageOf', { page: page + 1, pages })}</span>
-          <button type="button" disabled={page + 1 >= pages} onClick={() => setPage(page + 1)} data-testid="review-page-next">
+          <span data-testid='review-page'>{t('review.pageOf', { page: page + 1, pages })}</span>
+          <button type='button' disabled={page + 1 >= pages} onClick={() => setPage(page + 1)} data-testid='review-page-next'>
             {t('review.next')}
           </button>
         </nav>

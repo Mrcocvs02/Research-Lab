@@ -66,16 +66,15 @@ describe('review of AI proposals', () => {
     expect(within(groups[0]!).getAllByTestId('review-item')).toHaveLength(2);
     expect(within(groups[0]!).getByTestId('review-doc-title').textContent).toBe('Paper One');
     expect(within(row('tags')).getAllByTestId('review-tag').map((b) => b.textContent)).toEqual(['Alpha tag', 'Beta tag']);
-    expect(within(row('description')).getByTestId('review-ai-mark').textContent).toContain('claude-haiku-5-5');
-    expect(screen.getByTestId('review-pending').textContent).toBe('3 proposals to review');
-    expect(screen.getByTestId('review-rate').textContent).toBe('Tags accepted: 75% (3 of 4)');
+    expect(within(groups[0]!).getByTestId('review-ai-mark').textContent).toContain('claude-haiku-5-5');
+    expect(screen.getByTestId('review-rate').textContent).toBe('Accepted so far: 75%');
   });
 
   it('accepts a subset of the tags with the revision, and offers undo of that change', async () => {
     const w = setup([item(D1, 'tags', ['tag-a', 'tag-b'])]);
     await screen.findByTestId('review-item');
     fireEvent.click(within(row('tags')).getAllByTestId('review-tag')[1]!);
-    expect(within(row('tags')).getByTestId('review-accept').textContent).toBe('Accept 1 tag');
+    expect(within(row('tags')).getByTestId('review-accept').getAttribute('aria-label')).toBe('Accept 1 tag');
     fireEvent.click(within(row('tags')).getByTestId('review-accept'));
     await waitFor(() => expect(w.state.decisions).toHaveLength(1));
     expect(w.state.decisions[0]).toEqual({ docId: D1, field: 'tags', decision: 'accept', keepTagIds: ['tag-a'], expectedRevision: 3 });
@@ -141,6 +140,24 @@ describe('review of AI proposals', () => {
     expect(w.state.manyDecisions[0]).toEqual({ items: [{ docId: D1, field: 'description', metaDate: meta.date }, { docId: D2, field: 'summary', metaDate: meta.date }], decision: 'accept' });
     await waitFor(() => expect(screen.getByTestId('review-empty')).toBeTruthy());
     expect((await screen.findAllByTestId('toast'))[0]!.textContent).toContain('2 proposals accepted');
+  });
+
+  it('asks for a second click when a bulk decision covers more than 20 elements', async () => {
+    const w = setup(Array.from({ length: 25 }, (_, i) => item(String(i).padStart(16, '0'), 'description', `text ${i}`)));
+    await screen.findAllByTestId('review-item');
+    fireEvent.click(screen.getByTestId('review-reject-all'));
+    expect(screen.getByTestId('review-reject-all').textContent).toBe('Confirm: 25 proposals');
+    expect(w.state.manyDecisions).toHaveLength(0);
+    fireEvent.click(screen.getByTestId('review-reject-all'));
+    await waitFor(() => expect(w.state.manyDecisions).toHaveLength(1));
+  });
+
+  it('accepts all the elements of one document with its own button', async () => {
+    const w = setup([item(D1, 'description', 'a'), item(D1, 'keywords', ['x']), item(D2, 'summary', 'b')]);
+    const groups = await screen.findAllByTestId('review-group');
+    fireEvent.click(within(groups[0]!).getByTestId('review-accept-doc'));
+    await waitFor(() => expect(w.state.manyDecisions).toHaveLength(1));
+    expect(w.state.manyDecisions[0]!.items.map((i: any) => i.docId)).toEqual([D1, D1]);
   });
 
   it('rejects the whole page', async () => {

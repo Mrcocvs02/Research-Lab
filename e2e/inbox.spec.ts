@@ -63,14 +63,16 @@ test('a dropped PDF gets its metadata, a proposed name and folder, and is copied
     await expect(window.getByTestId('inbox-badge')).toContainText('1');
 
     // 2. DOI read from the file, metadata found, name proposed.
-    await expect(card.getByTestId('inbox-detected')).toContainText(DOI, { timeout: 30_000 });
     await expect(card.getByTestId('inbox-lookup')).toHaveAttribute('data-state', 'found', { timeout: 30_000 });
+    await card.getByTestId('inbox-edit').click();
+    await expect(card.getByTestId('inbox-detected')).toContainText(DOI, { timeout: 30_000 });
     await expect(card.getByTestId('inbox-title')).toHaveValue(RECORD.title);
     await expect(card.getByTestId('inbox-year')).toHaveValue(String(RECORD.year));
     const name = await card.getByTestId('inbox-name').inputValue();
     expect(name).toMatch(/2025/);
     expect(name).toMatch(/\.pdf$/);
     await card.getByTestId('inbox-folder').selectOption('papers');
+    await expect(card.getByTestId('inbox-target')).toContainText('papers');
 
     // 3. Confirm: a new file in the library, with the metadata, under a minute.
     await card.getByTestId('inbox-confirm').click();

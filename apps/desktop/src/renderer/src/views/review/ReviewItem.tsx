@@ -1,6 +1,9 @@
 import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
+import { Button } from '../../components/Button';
+import { IconButton } from '../../components/IconButton';
+import { IconCheck, IconClose } from '../../components/icons';
 import { splitLines } from '../../lib/validate';
 import { DocChip } from '../chat/ChatParts';
 import { safeText } from '../library/safeText';
@@ -205,43 +208,37 @@ export function ReviewItemView({ item, onDone }: { item: ReviewItemData; onDone(
   }
 
   const editable = isText || isList;
+  const fieldName = t(`review.fields.${item.field}`);
   return (
-    <li className="review-item" data-testid="review-item" data-doc-id={item.docId} data-field={item.field} data-status={item.status}>
-      <div className="review-item-head">
-        <h4>{t(`review.fields.${item.field}`)}</h4>
-        <span className="badge" data-testid="review-status">
-          {t(`ai.review.${item.status}`)}
-        </span>
+    <li className='review-item' data-testid='review-item' data-doc-id={item.docId} data-field={item.field} data-status={item.status}>
+      <div className='review-item-head'>
+        <h4>{fieldName}</h4>
+        <div className='review-item-body'>{body}</div>
+        {proposed && !editing && (
+          <div className='review-item-acts'>
+            {editable && (
+              <Button variant='ghost' size='sm' disabled={busy} onClick={() => setEditing(true)} data-testid='review-edit'>
+                {t('review.edit')}
+              </Button>
+            )}
+            <IconButton label={t('review.rejectField', { field: fieldName })} size='sm' disabled={busy} onClick={() => void run({ decision: 'reject' })} data-testid='review-reject'>
+              <IconClose size={16} />
+            </IconButton>
+            <IconButton label={item.field === 'tags' && keepTags.size < item.value.length ? t('review.acceptSome', { count: keepTags.size }) : t('review.acceptField', { field: fieldName })} size='sm' variant='secondary' disabled={busy || nothingKept} onClick={() => void accept()} data-testid='review-accept'>
+              <IconCheck size={16} />
+            </IconButton>
+          </div>
+        )}
       </div>
-      <AiMark meta={item.meta} />
-      {body}
-      {item.originalValue !== undefined && !editing && <p className="hint">{t('review.edited')}</p>}
-      {proposed && (
-        <div className="actions start">
-          {editing ? (
-            <>
-              <button type="button" className="primary" disabled={busy || draft.trim() === ''} onClick={() => void saveEdit()} data-testid="review-edit-save">
-                {t('review.saveEdit')}
-              </button>
-              <button type="button" disabled={busy} onClick={() => setEditing(false)} data-testid="review-edit-cancel">
-                {t('common.cancel')}
-              </button>
-            </>
-          ) : (
-            <>
-              <button type="button" className="primary" disabled={busy || nothingKept} onClick={() => void accept()} data-testid="review-accept">
-                {item.field === 'tags' && keepTags.size < item.value.length ? t('review.acceptSome', { count: keepTags.size }) : t('review.accept')}
-              </button>
-              {editable && (
-                <button type="button" disabled={busy} onClick={() => setEditing(true)} data-testid="review-edit">
-                  {t('review.edit')}
-                </button>
-              )}
-              <button type="button" disabled={busy} onClick={() => void run({ decision: 'reject' })} data-testid="review-reject">
-                {t('review.reject')}
-              </button>
-            </>
-          )}
+      {item.originalValue !== undefined && !editing && <p className='hint'>{t('review.edited')}</p>}
+      {proposed && editing && (
+        <div className='actions start'>
+          <Button variant='primary' size='sm' disabled={busy || draft.trim() === ''} onClick={() => void saveEdit()} data-testid='review-edit-save'>
+            {t('review.saveEdit')}
+          </Button>
+          <Button size='sm' disabled={busy} onClick={() => setEditing(false)} data-testid='review-edit-cancel'>
+            {t('common.cancel')}
+          </Button>
         </div>
       )}
     </li>

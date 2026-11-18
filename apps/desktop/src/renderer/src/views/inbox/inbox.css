@@ -1,6 +1,12 @@
 .inbox-list,
 .review-groups,
-.review-items,
+.review-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
 .review-newtags {
   list-style: none;
   margin: 0;
@@ -8,26 +14,227 @@
   display: grid;
   gap: var(--space-3);
 }
-.inbox-item-head,
-.review-group-head,
-.review-item-head,
 .inbox-ids {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
 }
-.review-head {
+.pager {
   display: flex;
-  justify-content: space-between;
   gap: var(--space-3);
   align-items: center;
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+
+/* The hub: header, the two tabs, then the panel */
+.view.rh-page {
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.rh-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
   flex-wrap: wrap;
 }
-.review-stats {
+.rh-head h1 {
+  margin: 0;
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
+  font-weight: 600;
+}
+.rh-count {
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+}
+.rh-head__acts {
   display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
   flex-wrap: wrap;
+}
+.rh-panel {
+  margin-top: var(--space-2);
+}
+.rh-bar {
+  display: flex;
+  align-items: center;
   gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+.rh-rate {
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+.rh-empty {
+  padding: var(--space-6) 0;
+}
+
+/* Groups of new files */
+.rh-group {
+  margin-bottom: var(--space-5);
+}
+.rh-group__head {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.rh-group__head > div {
+  flex: 1;
+  min-width: 0;
+}
+.rh-group__head .hint {
+  margin: 0;
+}
+.rh-caption {
+  margin: 0;
+  color: var(--text-muted);
+  font: 600 var(--fs-caption) / var(--lh-caption) var(--font);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.rh-all {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-small);
+}
+
+/* A file row: 64-84 px closed. File names are never in capitals. */
+.rh-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  transition: background-color 160ms;
+}
+.rh-row.is-open {
+  border-color: var(--border-strong);
+}
+.rh-row__main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+}
+.rh-check {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+.rh-row__body {
+  flex: 1;
+  min-width: 0;
+}
+.rh-row__acts {
+  display: flex;
+  flex: none;
+  gap: var(--space-2);
+  align-items: center;
+}
+.rh-name {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.rh-size {
+  margin-left: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  font-weight: 400;
+}
+.rh-line {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+}
+.rh-issue {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 2px 0 0;
+  color: var(--warning);
+  font-size: var(--fs-small);
+}
+.rh-edit {
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 900px) {
+  .rh-row__main {
+    flex-wrap: wrap;
+  }
+  .rh-row__acts {
+    margin-left: 28px;
+  }
+}
+
+/* Claude's proposals: one group per document, a 3 px AI line on the left */
+.review-group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ai);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+}
+.review-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.rh-title {
+  flex: 1;
+  min-width: 0;
+}
+.rh-title .hint {
+  margin: 0;
+}
+.review-item {
+  padding: var(--space-1) 0;
+  border-top: 1px solid var(--border);
+}
+.review-item-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.review-item-head h4 {
+  flex: none;
+  width: 96px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  font-weight: 600;
+}
+.review-item-body {
+  flex: 1;
+  min-width: 0;
+}
+.review-item-body .ai-text,
+.review-item-body ul {
+  margin: 0;
+}
+.review-item-acts {
+  display: flex;
+  flex: none;
+  gap: var(--space-1);
   align-items: center;
 }
 .review-tags {
@@ -35,10 +242,6 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
-.pager {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  justify-content: center;
+.review-group > .ai-mark {
+  margin: var(--space-1) 0 0;
 }
-

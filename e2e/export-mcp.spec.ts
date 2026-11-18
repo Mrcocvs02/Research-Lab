@@ -152,8 +152,12 @@ test('export a project as a second brain, answer control questions from the fold
     await expect(dialog.getByTestId('export-dest-path')).toBeVisible();
     await dialog.getByTestId('export-folder-name').fill(EXPORT_DIR);
     await expect(dialog.getByTestId('export-target-note')).toHaveAttribute('data-state', 'new', { timeout: 30_000 });
+    // The size for an AI assistant is a word with a rounded figure, and the buttons sit in the fixed footer (4.15).
+    await expect(dialog.getByTestId('est-size')).toContainText('tokens');
+    await expect(dialog.getByTestId('export-run')).toBeVisible();
     await dialog.getByTestId('export-run').click();
-    // The papers are in folders not enabled for AI: the export asks before writing them (D-241).
+    // The papers are in folders not enabled for AI: the export asks before writing them (D-241), in the footer, with the focus on the answer (N7).
+    await expect(dialog.getByTestId('export-confirm-yes')).toBeFocused();
     await dialog.getByTestId('export-confirm-yes').click();
     const result = dialog.getByTestId('export-result');
     await expect(result).toHaveAttribute('data-state', 'done', { timeout: 120_000 });

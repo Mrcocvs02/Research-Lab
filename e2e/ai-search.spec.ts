@@ -53,6 +53,8 @@ test('advanced search: estimate, then a streamed answer with cards and chips in 
     await expect(answer).toBeVisible({ timeout: 30_000 });
     await expect(window.getByTestId('chat-cancel')).toHaveCount(0, { timeout: 60_000 });
     await expect(answer.getByTestId('chat-card').first()).toBeVisible();
+    // The tool is shown with its translated name, the technical text stays closed (4.12).
+    await expect(answer.getByTestId('chat-card').first()).toContainText('Library search');
     await expect(answer.locator('[data-testid="lab-chip"][data-kind="doc"]').first()).toBeVisible();
     await expect(answer.getByTestId('turn-error')).toHaveCount(0);
     // The normal results are still there.

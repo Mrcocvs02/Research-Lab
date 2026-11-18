@@ -81,6 +81,8 @@ export const jobsChannels = defineChannels('jobs', {
     request: aiJobRequestSchema.extend({ confirmed: z.boolean().default(false) }),
     response: z.object({ jobId: z.string() }),
   },
+  /** Starts again a job of this session with its own request (after the token cap was raised, D-442); documents already done are skipped by the plan. */
+  restart: { request: z.object({ jobId: z.string().max(100) }), response: z.object({ jobId: z.string() }) },
   /** Stops a job; documents already done keep their proposals. */
   cancel: { request: z.object({ jobId: z.string().max(100) }), response: z.object({ cancelled: z.boolean() }) },
   /** Jobs of this session, newest first. */

@@ -101,6 +101,25 @@ describe('Account card', () => {
   });
 });
 
+describe('Token cap row (D-442)', () => {
+  it('shows the tokens of the month against the cap with a bar, saves a typed cap and the "no cap" preset', async () => {
+    const { ai } = setup();
+    ai.monthTokens = 123456;
+    ai.tokenCap = 500000;
+    const text = await screen.findByTestId('token-usage-text');
+    await waitFor(() => expect(text.textContent).toBe('123,456 / 500,000 (25%)'));
+    expect(screen.getAllByRole('progressbar').length).toBeGreaterThan(0);
+    const input = screen.getByTestId('token-cap-input') as HTMLInputElement;
+    expect(input.value).toBe('500000');
+    fireEvent.change(input, { target: { value: '1000000' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(callsTo('ai:setTokenCap').at(-1)).toMatchObject({ monthlyTokens: 1000000 }));
+    fireEvent.click(screen.getByTestId('token-cap-none'));
+    await waitFor(() => expect(callsTo('ai:setTokenCap').at(-1)).toMatchObject({ monthlyTokens: null }));
+    expect(ai.tokenCap).toBeNull();
+  });
+});
+
 describe('Change account', () => {
   it('explains first, opens the Claude Code window, then waits with "I\'m done, check" as the primary button', async () => {
     setup();

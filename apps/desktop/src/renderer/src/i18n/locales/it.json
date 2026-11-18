@@ -49,7 +49,8 @@
     "STOPPED": "non provata: le fonti precedenti continuavano a fallire",
     "PARTIAL": "più lavori di quelli che un controllo legge: controlla di nuovo per continuare",
     "OWN_AUTHOR_UNKNOWN": "nessun autore OpenAlex corrisponde al tuo profilo: aggiungi il tuo id autore OpenAlex nelle Impostazioni",
-    "OPENALEX_KEY_REQUIRED": "serve una chiave OpenAlex: aggiungila nelle Impostazioni"
+    "OPENALEX_KEY_REQUIRED": "serve una chiave OpenAlex: aggiungila nelle Impostazioni",
+    "AI_TOKEN_CAP_REACHED": "Richiesta non eseguita: tetto mensile di token raggiunto."
   },
   "notices": {
     "settingsReset": "Il file delle impostazioni non era utilizzabile ({{reason}}): l\\’app è ripartita con le impostazioni predefinite. Il file danneggiato è stato conservato come \"{{backup}}\" nella cartella dati dell\\’app; le librerie vanno aggiunte di nuovo.",
@@ -75,7 +76,8 @@
     "defaultModel": "Scegli uno dei modelli dell'elenco.",
     "monthlyUsd": "Inserisci un importo positivo oppure lascia vuoto per nessun tetto.",
     "confirmBatchAboveUsd": "Inserisci un importo pari a zero o maggiore.",
-    "citedDepth": "Inserisci un numero intero da 0 a 3."
+    "citedDepth": "Inserisci un numero intero da 0 a 3.",
+    "tokenCap": "Inserisci un numero intero positivo di token oppure lascia vuoto per nessun tetto."
   },
   "sections": {
     "library": "Libreria",

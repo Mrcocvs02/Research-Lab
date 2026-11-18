@@ -1,0 +1,16 @@
+{
+  "tokenCap": {
+    "refused": "Richiesta non eseguita: tetto mensile di {{cap}} token raggiunto",
+    "refusedJob": "Lavoro fermato: tetto mensile di {{cap}} token raggiunto",
+    "plus25": "Aumenta del 25%",
+    "double": "Raddoppia",
+    "set": "Imposta…",
+    "raised": "Tetto portato a {{cap}} token",
+    "retry": "Riprova",
+    "warn": "Hai usato il {{pct}}% del tetto mensile ({{tokens}} token).",
+    "meter": "{{used}} / {{cap}} ({{pct}}%)",
+    "meterNone": "{{used}} token",
+    "title": "Token usati questo mese: {{used}}",
+    "label": "Token del mese"
+  }
+}

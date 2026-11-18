@@ -131,3 +131,39 @@ test('the Account card in the settings: state, mode, change account then check, 
   await expect(card).toHaveAttribute('data-effective', 'none');
   expect(await calls()).toContain('auth logout');
 });
+
+test('token cap: a refused chat message offers the raise, "Double" lifts the cap and "Retry" sends it (mock provider)', async () => {
+  test.setTimeout(240_000);
+  await ctx!.close();
+  ctx = await launchApp({ library: 'papers', dialogPath: true, offline: true, env: { RL_E2E: '1', RL_E2E_CLAUDE_SIM: sim, RL_AI_PROVIDER: 'mock' } });
+  const w = ctx.window;
+  await createLibraryViaWizard(w, { name: 'Cap library' });
+  await ipcData(w, 'settings:set', { uiLanguage: 'en' });
+  await ipcData(w, 'library:setConfig', { patch: { ai: { confirmBeforeSend: false } } });
+  await w.reload();
+  await w.getByTestId('chat-toggle').click();
+  const ask = async (text: string) => {
+    await w.getByTestId('chat-input').fill(text);
+    await w.getByTestId('chat-send').click();
+  };
+  // A first answer gives the month some tokens; the cap is then set to exactly what was used.
+  await ask('Tell me about the methods of the papers in this library, '.repeat(4));
+  await expect(w.getByTestId('chat-turn-ai').first()).toBeVisible({ timeout: 60_000 });
+  await expect.poll(async () => (await ipcData<{ monthTokens: number }>(w, 'ai:tokenUsage', {})).monthTokens, { timeout: 30_000 }).toBeGreaterThan(0);
+  const used = (await ipcData<{ monthTokens: number }>(w, 'ai:tokenUsage', {})).monthTokens;
+  await ipcData(w, 'ai:setTokenCap', { monthlyTokens: used });
+  await expect(w.getByTestId('token-meter')).toContainText('100%');
+
+  // The next message is refused before it is sent, with the notification and its actions.
+  await ask('ok');
+  const banner = w.getByTestId('chat-banner');
+  await expect(banner).toHaveAttribute('data-kind', 'tokenCap');
+  await expect(banner).toContainText('Request not run: monthly cap of');
+  await banner.getByRole('button', { name: 'Double' }).click();
+  expect((await ipcData<{ tokenCap: number }>(w, 'ai:tokenUsage', {})).tokenCap).toBe(used * 2);
+
+  // After the raise the same request is offered again and goes.
+  await w.getByTestId('toasts').getByRole('button', { name: 'Retry' }).click();
+  await expect(w.getByTestId('chat-turn-ai')).toHaveCount(2, { timeout: 60_000 });
+  await expect(w.getByTestId('chat-banner')).toHaveCount(0);
+});

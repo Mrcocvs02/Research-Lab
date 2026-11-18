@@ -5,11 +5,12 @@ import { ErrorNote } from '../../components/ui';
 import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
 import { useApp } from '../../state/app-context';
+import { useCapActions } from '../ai/tokenCap';
 import { safeText } from '../library/safeText';
 import { TurnView } from './ChatParts';
 import { formatUsd } from './format';
 import { PreviewDialog } from './PreviewDialog';
-import { useChat, type Banner } from './useChat';
+import { useChat, type Banner, type SendRequest } from './useChat';
 import { useDocTitle } from './useLabels';
 import './chat.css';
 
@@ -28,8 +29,24 @@ function ContextChip({ docId, onRemove }: { docId: string; onRemove(): void }) {
   );
 }
 
-function BannerView({ banner, onSettings }: { banner: NonNullable<Banner>; onSettings(): void }) {
+function TokenCapBanner({ cap, onRetry }: { cap: number; onRetry(): void }) {
+  const { t, i18n } = useTranslation();
+  const actions = useCapActions()(onRetry);
+  return (
+    <div className="error-note chat-banner" role="alert" data-testid="chat-banner" data-kind="tokenCap">
+      <p>{t('tokenCap.refused', { cap: new Intl.NumberFormat(i18n.language).format(cap) })}</p>
+      {actions.map((a) => (
+        <button key={a.label} type="button" className="link" onClick={a.run} data-testid="token-cap-action">
+          {a.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function BannerView({ banner, onSettings, onRetry }: { banner: NonNullable<Banner>; onSettings(): void; onRetry(req: SendRequest): void }) {
   const { t } = useTranslation();
+  if (banner.kind === 'tokenCap') return <TokenCapBanner cap={banner.cap} onRetry={() => onRetry(banner.req)} />;
   const text =
     banner.kind === 'turnRunning'
       ? t('chat.errors.turnRunning')
@@ -241,7 +258,7 @@ export function ChatPanel() {
             </ol>
           )}
 
-          {chat.banner && <BannerView banner={chat.banner} onSettings={ui.openSettings} />}
+          {chat.banner && <BannerView banner={chat.banner} onSettings={ui.openSettings} onRetry={(r) => void chat.send(r)} />}
 
           {kept.length > 0 && (
             <div className="chat-context" data-testid="chat-context">

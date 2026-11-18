@@ -17,6 +17,7 @@ import type { MainServices } from '../ipc/handlers/services.js';
 import { ChatStore, titleFrom, type ChatTurn } from './chat-store.js';
 import { ensureGuide } from './guide-files.js';
 import { createToolsHost } from './tools-host.js';
+import { assertTokenCap, noteSend } from './token-cap.js';
 import { monthOf, summariseUsage, type UsageSummary } from './usage.js';
 
 export type AiPreview = z.infer<typeof aiPreviewSchema>;
@@ -333,6 +334,7 @@ async function prepareTurn(s: MainServices, ctx: AiCtx, input: SendInput, turnId
   const monthUsd = (await monthUsage(rt, monthOf(new Date()))).usd;
   const cap = cfg.ai.usageCap.monthlyUsd;
   if (cap !== null && monthUsd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached', { monthUsd, capUsd: cap });
+  await assertTokenCap(s, 0);
   // 2. Access: nothing else of the app depends on it.
   const av = await availability(s, provider);
   if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
@@ -343,6 +345,7 @@ async function prepareTurn(s: MainServices, ctx: AiCtx, input: SendInput, turnId
   if (notEnabled.length > 0) throw new AppError('FOLDER_NOT_AI_ENABLED', 'Some documents are in folders not enabled for AI', { docIds: notEnabled });
   if (docs.refused.length > 0) throw new AppError('NOT_FOUND', 'Some context documents are unknown or missing', { docIds: docs.refused.map((r) => r.docId) });
   if (cap !== null && preview.overCap) throw new AppError('AI_BUDGET_EXCEEDED', 'This send would go over the monthly AI spending cap', { monthUsd, capUsd: cap, estimatedUsd: preview.estimatedUsd });
+  await assertTokenCap(s, preview.approxInputTokens);
   // 4. Confirmation (D-227): documents go, or the conversation was never confirmed and the agent may read the enabled folders.
   if (preview.needsConfirmation && !input.confirmed) throw new AppError('CONFLICT', 'The send needs the confirmation of the user', { reason: 'needs-confirmation', preview });
   // What the user confirmed, truthfully: this send, or an earlier one of the same conversation.
@@ -515,6 +518,7 @@ async function runTurn(a: RunArgs): Promise<void> {
       ...(view.usd !== null ? { estimatedCostUsd: view.usd } : {}),
       confirmed: a.confirmed,
     });
+    await noteSend(s, 'chat', view.inputTokens, view.outputTokens);
   } catch (e) {
     s.log.error('could not write the AI-send log entry of a chat turn', { error: e });
   }

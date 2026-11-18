@@ -130,7 +130,12 @@
       "sends_one": "{{count}} send",
       "sends_other": "{{count}} sends",
       "usageAll": "Total of all libraries",
-      "usageAllResult": "Libraries: {{count}} · not reachable: {{unreachable}} · total {{usd}}"
+      "usageAllResult": "Libraries: {{count}} · not reachable: {{unreachable}} · total {{usd}}",
+      "tokenMonth": "Tokens this month",
+      "tokenHelp": "Input + output of all libraries. Over the cap, requests do not start.",
+      "tokenOf": "{{used}} / {{cap}} ({{pct}}%)",
+      "tokenUsedNoCap": "{{used}} (no cap)",
+      "tokenNoCap": "No cap"
     },
     "claude": {
       "title": "Claude",

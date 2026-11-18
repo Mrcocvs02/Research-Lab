@@ -1,0 +1,16 @@
+{
+  "tokenCap": {
+    "refused": "Request not run: monthly cap of {{cap}} tokens reached",
+    "refusedJob": "Job stopped: monthly cap of {{cap}} tokens reached",
+    "plus25": "Increase by 25%",
+    "double": "Double",
+    "set": "Set…",
+    "raised": "Cap raised to {{cap}} tokens",
+    "retry": "Retry",
+    "warn": "You have used {{pct}}% of the monthly cap ({{tokens}} tokens).",
+    "meter": "{{used}} / {{cap}} ({{pct}}%)",
+    "meterNone": "{{used}} tokens",
+    "title": "Tokens used this month: {{used}}",
+    "label": "Tokens this month"
+  }
+}

@@ -17,7 +17,8 @@ import { Topbar } from './Topbar';
 import { Icon } from './shellIcons';
 
 // The chat and the command palette (and all the AI code with them) load the first time they are shown.
-const ChatPanel = lazyView(() => import('../views/chat/ChatPanel').then((m) => ({ default: m.ChatPanel })), ['chat', 'chat-preview']);
+const ChatPanel = lazyView(() => import('../views/chat/ChatPanel').then((m) => ({ default: m.ChatPanel })), ['chat', 'chat-preview', 'tokenCap']);
+const TokenCapMeter = lazyView(() => import('../views/ai/TokenCapMeter'), ['tokenCap']);
 const Palette = lazyView(() => import('../views/chat/Palette').then((m) => ({ default: m.Palette })), ['palette', 'settings']);
 // The second-brain export dialog loads when an entry point (project, cluster, selection, palette) opens it.
 const ExportDialog = lazyView(() => import('../views/export/ExportDialog').then((m) => ({ default: m.ExportDialog })), ['export']);
@@ -122,6 +123,11 @@ export function Shell({ section, onSection, onNewLibrary, reviewDocs = 0, readin
               <span className="chat-head__status" data-testid="status-ai">
                 {aiCount === 0 ? t('status.aiNone') : t('status.aiFolders', { count: aiCount })}
               </span>
+            )}
+            {app.activeProfile && (
+              <Lazy>
+                <TokenCapMeter />
+              </Lazy>
             )}
             <IconButton label={t('chat.collapse')} keys="Ctrl+J" size="sm" onClick={() => setChatOpen(false)} data-testid="chat-close">
               <Icon name="close" size={16} />

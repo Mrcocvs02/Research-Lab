@@ -12,6 +12,8 @@ export type MenuItem = {
   /** Shortcut, shown with Kbd. */
   keys?: string;
   danger?: boolean;
+  /** `data-testid` of the entry (tests and the e2e specs reach a menu entry by it). */
+  testId?: string;
   onSelect(): void;
 } & ({ disabled?: false; disabledReason?: undefined } | { disabled: true; disabledReason: string });
 
@@ -81,6 +83,7 @@ function MenuList({ groups, onClose, anchor }: { groups: MenuGroups; onClose(): 
                 role="menuitem"
                 tabIndex={-1}
                 aria-disabled={item.disabled || undefined}
+                data-testid={item.testId}
                 title={item.disabled ? item.disabledReason : undefined}
                 className={cx('rl-menu__item', item.danger && 'is-danger', item.disabled && 'is-disabled')}
                 onClick={() => select(item)}

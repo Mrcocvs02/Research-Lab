@@ -23,6 +23,7 @@ export function Tabs({
   onChange,
   label,
   idBase,
+  testIdBase,
   className,
 }: {
   tabs: readonly TabItem[];
@@ -31,6 +32,8 @@ export function Tabs({
   label: string;
   /** Base for the ids that link tabs and panels (see `tabIds`); defaults to a generated one. */
   idBase?: string | undefined;
+  /** When set, each tab gets `data-testid="<testIdBase>-<id>"`. */
+  testIdBase?: string | undefined;
   className?: string | undefined;
 }) {
   const generated = useId();
@@ -66,6 +69,7 @@ export function Tabs({
             type="button"
             role="tab"
             id={ids.tabId}
+            data-testid={testIdBase ? `${testIdBase}-${t.id}` : undefined}
             aria-selected={on}
             aria-controls={ids.panelId}
             aria-disabled={t.disabled || undefined}

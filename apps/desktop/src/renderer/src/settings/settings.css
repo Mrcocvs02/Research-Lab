@@ -1,10 +1,19 @@
 /* Settings (4.6-4.8): a 220 px sub-navigation and a content column of at most 760 px. Colours are tokens only. */
 .set {
   display: grid;
-  grid-template-columns: 220px minmax(0, 760px);
-  gap: var(--sp-8);
+  grid-template-columns: 200px minmax(0, 760px);
+  gap: var(--sp-7);
   margin-top: var(--sp-3);
   align-items: start;
+}
+.set-body {
+  min-width: 0;
+}
+/* W14: from 1600 px the nav and the content sit in the middle of the free space, not against the left edge. */
+@media (min-width: 1600px) {
+  .set {
+    justify-content: center;
+  }
 }
 .set-nav {
   position: sticky;
@@ -56,6 +65,17 @@
 .set-search input {
   width: 100%;
   height: var(--h-md);
+  padding-left: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+.set-search__icon {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
 }
 .set-results {
   position: absolute;
@@ -113,9 +133,9 @@ h3.caption {
 }
 .srow {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 200px minmax(0, 1fr);
   gap: var(--sp-5);
-  align-items: center;
+  align-items: start;
   padding: var(--sp-4) 0;
   border-top: 1px solid var(--border);
 }
@@ -123,8 +143,13 @@ h3.caption {
 h3.caption + .srow {
   border-top: 0;
 }
+.srow__c {
+  min-width: 0;
+}
 .srow__t,
 .srow__l label {
+  display: block;
+  padding-top: 6px;
   font-weight: 500;
 }
 .srow__l .help,
@@ -217,12 +242,24 @@ h3.caption + .srow {
   text-decoration: underline;
 }
 /* Account card (4.7) */
+.set-model {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 72px 72px auto;
+  gap: var(--sp-2);
+  align-items: center;
+  margin-bottom: var(--sp-2);
+}
+.set-model--head {
+  color: var(--text-muted);
+  font: 600 var(--fs-caption) / var(--lh-caption) var(--font);
+}
 .acct {
   display: grid;
   gap: var(--sp-3);
 }
 .acct__top {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--sp-5);
   align-items: flex-start;
 }
@@ -241,7 +278,7 @@ h3.caption + .srow {
   background: var(--warning);
 }
 .acct__what {
-  flex: 1;
+  flex: 1 1 260px;
   min-width: 0;
 }
 .acct__state {
@@ -348,7 +385,7 @@ h3.caption + .srow {
     grid-template-columns: 1fr;
   }
   .srow {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-2);
   }
 }

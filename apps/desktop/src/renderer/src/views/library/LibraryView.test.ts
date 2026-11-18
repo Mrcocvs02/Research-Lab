@@ -437,7 +437,10 @@ describe('LibraryView: undo, redo and history', () => {
     await waitFor(() => expect((screen.getByTestId('undo-button') as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(screen.getByTestId('undo-button'));
     await waitFor(() => expect(lib.state.docs[0]!.tags).toEqual([]));
-    await waitFor(() => expect((screen.getByTestId('redo-button') as HTMLButtonElement).disabled).toBe(false));
+    // Redo is no longer a top-bar button (D-441): the History popover offers it and Ctrl+Y does it.
+    fireEvent.click(screen.getByTestId('history-toggle'));
+    await screen.findByTestId('history-redo-item');
+    fireEvent.click(screen.getByTestId('history-toggle'));
     fireEvent.keyDown(window, { key: 'y', ctrlKey: true });
     await waitFor(() => expect(lib.state.docs[0]!.tags).toEqual(['stats']));
     fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
@@ -676,11 +679,15 @@ describe('LibraryView: phase 2 review fixes', () => {
     await waitFor(() => expect(lib.state.docs[0]!.tags).toEqual(['stats']));
     await waitFor(() => expect((screen.getByTestId('undo-button') as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(screen.getByTestId('undo-button'));
-    await waitFor(() => expect((screen.getByTestId('redo-button') as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('history-toggle'));
+    await screen.findByTestId('history-redo-item');
+    fireEvent.click(screen.getByTestId('history-toggle'));
     await addTag('tag-input', 'appren');
     await waitFor(() => expect(lib.state.docs[0]!.tags).toEqual(['ml']));
     // the undone entry is still listed as undone, but the main process says it cannot be redone any more
-    await waitFor(() => expect((screen.getByTestId('redo-button') as HTMLButtonElement).disabled).toBe(true));
+    // The top bar has no Redo button (D-441); the history entry that was undone is still listed, as undone.
+    fireEvent.click(screen.getByTestId('history-toggle'));
+    expect(await screen.findAllByTestId('history-item')).not.toHaveLength(0);
   });
 
   it('applies taxonomy operations one after the other: a blur and a click right after it do not conflict', async () => {

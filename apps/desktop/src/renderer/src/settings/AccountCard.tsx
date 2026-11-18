@@ -68,9 +68,9 @@ function Usage({ account }: { account: AiAccount }) {
           </span>
         )}
         {ACCOUNT_USAGE_SCOPE === 'library' && (
-          <Button size="sm" variant="ghost" onClick={loadAll} data-testid="ai-usage-all">
+          <button type="button" className="link" onClick={loadAll} data-testid="ai-usage-all">
             {t('settings.account.usageAll')}
-          </Button>
+          </button>
         )}
       </div>
       {all && (
@@ -92,7 +92,7 @@ function Usage({ account }: { account: AiAccount }) {
  * Code login, API key), "Change account…" (opens the Claude Code window; then "I'm done, check"), the API key and the usage of the month.
  */
 export function AccountCard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { account, accountError, reloadAccount, setAccount, goTo } = useSettings();
   const mode = useAutoSave();
   const [test, setTest] = useState<{ busy: boolean; result: Test | 'offline' | null }>({ busy: false, result: null });
@@ -113,6 +113,23 @@ export function AccountCard() {
     }
   }, [waiting, account, email, t]);
 
+  // W4: the account is read again every time the Claude section is entered, not only when the settings page opens.
+  useEffect(() => {
+    void reloadAccount();
+  }, [reloadAccount]);
+
+  // W3: a test result or a note belongs to the account that was in use; when the account in use changes they are old.
+  const effective = account?.effective;
+  const authMode = account?.authMode;
+  const seen = useRef({ effective, authMode });
+  useEffect(() => {
+    if (seen.current.effective === effective && seen.current.authMode === authMode) return;
+    const modeChanged = seen.current.authMode !== authMode;
+    seen.current = { effective, authMode };
+    setTest({ busy: false, result: null });
+    if (modeChanged || !waiting) setNote(null);
+  }, [effective, authMode, waiting]);
+
   if (!account) {
     return (
       <section className="card set-group" data-testid="ai-account" data-state="loading">
@@ -127,7 +144,11 @@ export function AccountCard() {
   const state = account.effective === 'claude-code' ? t('settings.account.viaClaudeCode') : account.effective === 'api-key' ? t('settings.account.viaKey') : missing ? t('settings.account.noProgram') : t('settings.account.notConnected');
   const who = [cc.account?.email, cc.account?.plan ? t('settings.account.plan', { plan: cc.account.plan }) : null].filter(Boolean).join(' · ');
   const program = cc.path === null ? null : cc.version ? t('settings.account.programFound', { version: cc.version, where: t(`settings.ai.exe.source_${cc.source}`) }) : t(`settings.ai.exe.source_${cc.source}`);
-  const sub = [account.effective === 'api-key' ? t('settings.account.keyOnly') : who, program].filter(Boolean).join(' · ');
+  // The Claude Code identity is not what is used while the mode is API key: it is shown as "not used", not as the account in use.
+  const keyNeeded = account.authMode === 'api-key' && !account.apiKey.stored;
+  const identity = account.effective === 'api-key' ? t('settings.account.keyOnly') : account.authMode === 'api-key' && who ? `${who} (${t('settings.account.notUsed')})` : who;
+  const sub = [identity, program].filter(Boolean).join(' · ');
+  const seconds = (ms: number) => new Intl.NumberFormat(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(ms / 1000);
 
   const guard = async (fn: () => Promise<unknown>) => {
     setError(null);
@@ -195,7 +216,7 @@ export function AccountCard() {
           </Button>
           {result && (
             <p className="acct__result" role="status" data-testid="ai-test-result" data-ok={result === 'offline' ? false : result.ok}>
-              {result === 'offline' ? t('settings.account.testOffline') : result.ok ? t('settings.account.testOk', { s: (result.ms / 1000).toFixed(1), model: modelLabel }) : t(`settings.account.testError.${result.error?.code ?? 'error'}`, { defaultValue: t('settings.account.testError.error') })}
+              {result === 'offline' ? t('settings.account.testOffline') : result.ok ? t('settings.account.testOk', { s: seconds(result.ms), model: modelLabel }) : t(`settings.account.testError.${result.error?.code ?? 'error'}`, { defaultValue: t('settings.account.testError.error') })}
             </p>
           )}
         </div>
@@ -237,7 +258,7 @@ export function AccountCard() {
         </div>
       ) : (
         <Row sid="account" label={t('settings.account.account')}>
-          <Button size="sm" variant={account.effective === 'none' && !missing ? 'primary' : 'secondary'} disabled={missing} disabledReason={t('settings.account.noProgram')} onClick={() => setAskLogin(true)} data-testid="ai-change-account">
+          <Button size="sm" variant={account.effective === 'none' && !missing && !keyNeeded ? 'primary' : 'secondary'} disabled={missing} disabledReason={t('settings.account.noProgram')} onClick={() => setAskLogin(true)} data-testid="ai-change-account">
             {account.claudeCode.loggedIn ? t('settings.account.change') : t('settings.account.login')}
           </Button>
           <span ref={more}>
@@ -254,6 +275,7 @@ export function AccountCard() {
               {
                 id: 'account',
                 items: [
+                  { id: 'recheck', label: t('settings.account.recheck'), onSelect: () => void reloadAccount() },
                   cc.loggedIn && cc.supportsAuthCommands
                     ? { id: 'logout', label: t('settings.account.logout'), danger: true, onSelect: () => setAskLogout(true) }
                     : { id: 'logout', label: t('settings.account.logout'), disabled: true, disabledReason: t('settings.account.logoutOff'), onSelect: () => {} },
@@ -270,7 +292,7 @@ export function AccountCard() {
       )}
 
       <Row sid="secretAnthropic" label={t('settings.keys.names.anthropic-api-key')} help={t('settings.account.keyHelp')}>
-        <SecretControl name="anthropic-api-key" scope="app" onChanged={() => void reloadAccount()} />
+        <SecretControl name="anthropic-api-key" scope="app" onChanged={() => void reloadAccount()} primary={keyNeeded} />
       </Row>
 
       <Usage account={account} />

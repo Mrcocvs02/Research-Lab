@@ -75,6 +75,8 @@ describe('Button: each variant in each state', () => {
     expect(decl('button.rl-btn:disabled', 'box-shadow')).toBe('none');
     expect(decl('button.rl-btn:disabled', 'filter')).toBe('none');
     expect(decl('button.rl-iconbtn:disabled', 'outline')).toBe('none');
+    // W5: a disabled ghost icon button keeps the transparent border of its resting state (the base button:disabled border must not show).
+    expect(decl('button.rl-iconbtn:disabled', 'border-color')).toBe('transparent');
   });
 
   it('disabled primary is surface-3 with muted text (5.5.1) and secondary disabled has the quiet border', () => {

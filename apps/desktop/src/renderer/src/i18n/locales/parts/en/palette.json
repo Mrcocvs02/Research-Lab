@@ -47,7 +47,7 @@
         "label": "Go to Projects"
       },
       "goReview": {
-        "label": "Go to To review"
+        "label": "Open To review"
       },
       "goSettings": {
         "label": "Open settings"

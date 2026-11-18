@@ -16,6 +16,13 @@ import { useApp } from '../state/app-context';
 import { Group, NeedsLibrary, Row, SectionHead, TextRow, useLibraryPatch } from './rows';
 import { useAutoSave } from './useAutoSave';
 
+/** The last two folders of a path, the rest as an ellipsis (`…\Thesis\Drafts`); the whole path is in the tooltip (W22). */
+export function shortPath(p: string): string {
+  const sep = p.includes('\\') ? '\\' : '/';
+  const parts = p.split(/[\\/]+/).filter(Boolean);
+  return parts.length > 2 ? `…${sep}${parts.slice(-2).join(sep)}` : p;
+}
+
 /** One library of the list: name, path and its actions; "Rename" turns the name into a field, "Remove from list" asks first (files are never deleted). */
 function LibraryItem({ p, active, run }: { p: LibraryProfile; active: boolean; run(fn: () => Promise<unknown>): Promise<void> }) {
   const { t } = useTranslation();
@@ -57,7 +64,7 @@ function LibraryItem({ p, active, run }: { p: LibraryProfile; active: boolean; r
             {active && <span className="badge ok">{t('settings.libraries.active')}</span>}
           </>
         )}
-        <span className="path">{p.rootPath}</span>
+        <span className="set-help" title={p.rootPath}>{shortPath(p.rootPath)}</span>
       </div>
       {!active && !renaming && (
         <Button

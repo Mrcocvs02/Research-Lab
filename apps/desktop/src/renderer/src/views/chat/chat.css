@@ -175,7 +175,16 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.palette-field {
+  width: 100%;
+  box-sizing: border-box;
+}
+.palette-item .rl-kbd {
+  margin-left: var(--space-3);
+}
 .palette-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
   list-style: none;
   margin: var(--space-2) 0;
   padding: 0;

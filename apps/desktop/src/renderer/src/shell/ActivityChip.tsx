@@ -80,7 +80,7 @@ export function ActivityChip({ scan: scanApi }: { scan: ReturnType<typeof useSca
         aria-haspopup="dialog"
         aria-expanded={activityOpen}
         aria-label={`${t('activity.title')}: ${text}${extra}`}
-        title={t('activity.title')}
+        title={`${t('activity.title')}: ${text}${extra}`}
         onClick={() => setActivityOpen(!activityOpen)}
       >
         <Ring value={sum.running > 0 ? sum.progress : 1} />

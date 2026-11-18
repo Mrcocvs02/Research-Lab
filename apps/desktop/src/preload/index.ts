@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
+import { createEventBus } from './eventBus';
 import type { IpcEnvelope, RlBridge } from '@rl/core';
 // Plain name lists, not the registry: the preload runs in every window at start and must not load zod and every schema.
 import { CHANNEL_NAMES, EVENT_NAMES, IPC_EVENT_CHANNEL, IPC_INVOKE_CHANNEL } from '@rl/core/ipc-names';
@@ -11,6 +12,17 @@ const unknownChannel: IpcEnvelope = { ok: false, error: { code: 'UNKNOWN_CHANNEL
  * The only thing the renderer gets: two functions, no Electron objects, no generic ipcRenderer.
  * Unknown channel names are refused here and again in the main process.
  */
+// One ipcRenderer listener for all the subscribers of the window (see eventBus.ts).
+const onIpc = (_e: unknown, name: string, payload: unknown) => dispatchEvent(name, payload);
+let dispatchEvent: (name: string, payload: unknown) => void = () => {};
+const events = createEventBus(
+  (dispatch) => {
+    dispatchEvent = dispatch;
+    ipcRenderer.on(IPC_EVENT_CHANNEL, onIpc);
+  },
+  () => ipcRenderer.removeListener(IPC_EVENT_CHANNEL, onIpc),
+);
+
 const bridge: RlBridge = {
   async invokeRaw(channel, payload): Promise<IpcEnvelope> {
     if (typeof channel !== 'string' || !CHANNELS.has(channel)) return unknownChannel;
@@ -18,13 +30,7 @@ const bridge: RlBridge = {
   },
   subscribe(event, listener) {
     if (typeof event !== 'string' || !EVENTS.has(event)) throw new Error('Unknown event');
-    const handler = (_e: unknown, name: string, payload: unknown) => {
-      if (name === event) listener(payload);
-    };
-    ipcRenderer.on(IPC_EVENT_CHANNEL, handler);
-    return () => {
-      ipcRenderer.removeListener(IPC_EVENT_CHANNEL, handler);
-    };
+    return events.subscribe(event, listener);
   },
   pathForFile(file) {
     try {

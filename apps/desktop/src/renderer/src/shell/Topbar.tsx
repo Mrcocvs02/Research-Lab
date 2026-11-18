@@ -22,7 +22,8 @@ export function crumbsOf(loc: NavLocation, title: string | null, label: (key: st
   const root: Crumb = { label: label(`sections.${view}`) };
   if (loc.view === 'reader') return [{ ...root, to: { view: 'library' } }, { label: title ?? label('shell.crumbReader') }];
   if (loc.view === 'review') return [{ ...root, to: { view: 'review', tab: loc.tab ?? 'files' } }, { label: label(loc.tab === 'proposals' ? 'shell.crumbProposals' : 'shell.crumbFiles') }];
-  if (title) return [{ ...root, to: { ...loc } }, { label: title }];
+  // Settings: the title is the section; the first crumb is not a link (a click would forget the title).
+  if (title) return [view === 'settings' ? root : { ...root, to: { ...loc } }, { label: title }];
   return [root];
 }
 

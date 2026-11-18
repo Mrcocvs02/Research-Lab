@@ -2,6 +2,8 @@ import { useCallback, useEffect, useId, useMemo, useState, type KeyboardEvent } 
 import { useTranslation } from 'react-i18next';
 import { Lazy, lazyView } from '../components/Lazy';
 import { useAiUi } from '../lib/aiUi';
+import { useNav } from '../lib/nav';
+import { Icon } from '../shell/shellIcons';
 import { daysSince, STALE_BACKUP_DAYS } from './backupAge';
 import { GeneralSection } from './GeneralSection';
 import { LibraryConfigSection } from './LibraryConfigSection';
@@ -53,6 +55,7 @@ function SettingsSearch({ onPick }: { onPick(m: SettingsMatch): void }) {
   };
   return (
     <div className="set-search">
+      <Icon name="search" size={16} className="set-search__icon" />
       <input
         type="search"
         role="combobox"
@@ -92,6 +95,12 @@ function SettingsSearch({ onPick }: { onPick(m: SettingsMatch): void }) {
 function Page({ section, setSection, onNewLibrary }: { section: SettingsSectionId; setSection(s: SettingsSectionId): void; onNewLibrary(): void }) {
   const { t } = useTranslation();
   const { account, backup, target, goTo } = useSettings();
+  // W12: the crumbs say "Settings > Claude".
+  const { setTitle } = useNav();
+  useEffect(() => {
+    setTitle(t(`settings.sec.${section}`));
+    return () => setTitle(null);
+  }, [section, setTitle, t]);
 
   // The control a search or a link points at is found once its section (and the group, in Advanced) has been drawn.
   useEffect(() => {

@@ -91,6 +91,13 @@ function ModelsEditor({ config }: { config: LibraryConfig }) {
   return (
     <Row sid="claudeModels" label={t('settings.ai.modelsTitle')} help={t('settings.advanced.modelsHelp')} save={save} error={problem ?? undefined}>
       <div className="srow__tree" data-testid="ai-models">
+        <div className="set-model set-model--head" aria-hidden="true">
+          <span>{t('settings.library.modelId')}</span>
+          <span>{t('settings.library.modelLabel')}</span>
+          <span>{t('settings.advanced.priceIn')}</span>
+          <span>{t('settings.advanced.priceOut')}</span>
+          <span />
+        </div>
         {rows.map((m, i) => (
           <div className="set-model" key={i} data-testid="ai-model-row">
             <input aria-label={t('settings.library.modelId')} value={m.id} placeholder={t('settings.library.modelId')} onChange={(e) => edit(i, { id: e.target.value })} onBlur={() => commit(rows)} />

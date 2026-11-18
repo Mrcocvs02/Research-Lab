@@ -196,6 +196,21 @@ export function SettingsProvider({ children, target = null, goTo = () => {} }: {
     void reloadBackup();
     return rl.on('ai:accountChanged', setAccount);
   }, [reloadAccount, reloadBackup]);
+  // W4: the user may sign out of Claude Code in a terminal; the account is read again when the window gets the focus back (at most once every 30 s).
+  useEffect(() => {
+    let last = Date.now();
+    const again = () => {
+      if (document.visibilityState === 'hidden' || Date.now() - last < 30_000) return;
+      last = Date.now();
+      void reloadAccount();
+    };
+    window.addEventListener('focus', again);
+    document.addEventListener('visibilitychange', again);
+    return () => {
+      window.removeEventListener('focus', again);
+      document.removeEventListener('visibilitychange', again);
+    };
+  }, [reloadAccount]);
   const value = useMemo(() => ({ target, account, accountError, reloadAccount, setAccount, backup, reloadBackup, goTo }), [target, account, accountError, reloadAccount, backup, reloadBackup, goTo]);
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }

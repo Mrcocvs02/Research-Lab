@@ -421,7 +421,7 @@
     "running": "Proposte AI: {{done}}/{{total}} · {{usd}}",
     "ended_done": "Proposte AI pronte: {{done}}/{{total}} · {{usd}}",
     "ended_cancelled": "Proposte AI interrotte: {{done}}/{{total}} fatti",
-    "ended_failed": "Proposte AI non riuscite: {{done}}/{{total}} fatti, {{failed}} falliti",
+    "ended_failed": "Proposte AI non riuscite: {{done}}/{{total}} fatti, errori: {{failed}}",
     "cancel": "Annulla",
     "review": "Rivedi",
     "dismiss": "Nascondi",
@@ -445,9 +445,9 @@
     "job": {
       "label": "Aggiornamento delle citazioni",
       "running": "Citazioni: {{done}}/{{total}}",
-      "ended_done": "Citazioni aggiornate: {{done}}/{{total}} ({{skipped}} saltati, {{notFound}} non trovati, {{failed}} falliti)",
+      "ended_done": "Citazioni aggiornate: {{done}}/{{total}} ({{skipped}} saltati, {{notFound}} non trovati, errori: {{failed}})",
       "ended_cancelled": "Citazioni interrotte: {{done}}/{{total}} fatti",
-      "ended_failed": "Aggiornamento delle citazioni fallito: {{done}}/{{total}} fatti, {{failed}} falliti",
+      "ended_failed": "Aggiornamento delle citazioni fallito: {{done}}/{{total}} fatti, errori: {{failed}}",
       "cancel": "Annulla",
       "dismiss": "Nascondi"
     }

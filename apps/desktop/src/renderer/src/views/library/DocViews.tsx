@@ -1,6 +1,10 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RlError } from '../../lib/rl-error';
+import { Button } from '../../components/Button';
+import { IconButton } from '../../components/IconButton';
+import { IconCheck, IconMore } from '../../components/icons';
+import { Menu, type MenuGroups } from '../../components/Menu';
 import { VirtualList } from '../../components/VirtualList';
 import { rl } from '../../lib/rl';
 import { useNotify } from '../../lib/notify';
@@ -8,6 +12,7 @@ import { thumbs, useThumbUrl } from '../../lib/thumbs';
 import { canRead, useReader, type ReaderPanel } from '../../lib/reader';
 import type { DocList, DocRow } from './useDocumentList';
 import { clickSelect, emptySelection, indexOfId, moveSelect, rangeHasHoles, selectAll, toggleActive, type SelectionState } from './selection';
+import { baseName, fileExt } from './fileName';
 import { formatSize } from './formatSize';
 import { safeText } from './safeText';
 import { plainSnippet, Snippet } from './Snippet';
@@ -15,16 +20,11 @@ import { TagChip } from './TagParts';
 import { resolveId } from './taxonomyModel';
 import { useTaxonomy } from './useTaxonomy';
 
+export { baseName, fileExt };
 export type ViewMode = 'list' | 'grid';
 
-export const ROW_HEIGHT = { browse: 76, search: 116, card: 188 } as const;
+export const ROW_HEIGHT = { browse: 60, search: 100, card: 188 } as const;
 const CARD_MIN_WIDTH = 236;
-
-export const fileExt = (path: string): string => {
-  const m = /\.([A-Za-z0-9]{1,5})$/.exec(path);
-  return m ? m[1]!.toLowerCase() : '';
-};
-export const baseName = (path: string): string => path.slice(path.lastIndexOf('/') + 1);
 
 /**
  * The first page of a PDF in the grid (D-196), or the type icon: while the image is not there yet, for every other
@@ -94,10 +94,30 @@ interface ItemProps {
   onRead(page?: number, panel?: ReaderPanel): void;
   /** Opens the card (the place of the file note). */
   onDetail(): void;
+  /** The checkbox of the row: adds it to or takes it out of the selection (as Ctrl+click). */
+  onToggle(): void;
+  /** The list is sorted by size: the size of the file is shown. */
+  showSize: boolean;
 }
 
-const DocItem = memo(function DocItem({ row, view, selected, active, searching, onClick, onDoubleClick, onOpenFile, onReveal, onRead, onDetail }: ItemProps) {
+/** The menu of a row: the two actions that leave the app (D-333; the reader and the card have buttons). */
+function rowMenu(t: ReturnType<typeof useTranslation>['t'], missing: boolean, openFile: () => void, reveal: () => void): MenuGroups {
+  const why = t('docs.missing');
+  return [
+    {
+      id: 'file',
+      items: [
+        missing ? { id: 'open', label: t('library.openDefault'), disabled: true, disabledReason: why, onSelect: openFile } : { id: 'open', label: t('library.openDefault'), onSelect: openFile },
+        missing ? { id: 'reveal', label: t('docs.reveal'), disabled: true, disabledReason: why, onSelect: reveal } : { id: 'reveal', label: t('docs.reveal'), onSelect: reveal },
+      ],
+    },
+  ];
+}
+
+const DocItem = memo(function DocItem({ row, view, selected, active, searching, onClick, onDoubleClick, onOpenFile, onReveal, onRead, onDetail, onToggle, showSize }: ItemProps) {
   const { t } = useTranslation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const moreRef = useRef<HTMLSpanElement>(null);
   if (!row) return <div className={`doc-${view === 'grid' ? 'card' : 'row'} skeleton`} aria-hidden="true" />;
   const title = safeText(row.title?.trim() || baseName(row.path));
   const authors = safeText(row.authors.slice(0, 3).join(', ')) + (row.authors.length > 3 ? ' …' : '');
@@ -116,13 +136,18 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
       onClick={onClick}
       onDoubleClick={onDoubleClick}
     >
+      <span className={selected ? 'doc-cb is-on' : 'doc-cb'} aria-hidden="true" data-testid="row-check" onClick={(e) => { e.stopPropagation(); onToggle(); }} onDoubleClick={(e) => e.stopPropagation()}>
+        {selected && <IconCheck size={16} />}
+      </span>
       {view === 'grid' ? <GridThumb docId={row.docId} path={row.path} missing={row.missing} /> : <TypeIcon path={row.path} />}
       <div className="doc-main">
         <h3 className="result-title" data-testid="result-title" title={title}>
           {title}
         </h3>
-        {meta.length > 0 && <p className="result-meta">{meta.join(' · ')}</p>}
-        <Tags tags={row.tags} max={view === 'grid' ? 3 : 6} />
+        <div className="doc-sub">
+          {meta.length > 0 && <p className="result-meta">{meta.join(' · ')}</p>}
+          <Tags tags={row.tags} max={view === 'grid' ? 3 : 4} />
+        </div>
         {view === 'list' && searching && row.snippet && (
           <p className="result-snippet" data-testid="result-snippet" data-field={row.field}>
             {(row.field === 'note' || row.field === 'annotation') && (
@@ -164,32 +189,43 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
             ))}
           </p>
         )}
-        {view === 'list' && (
-          <p className="result-path" data-testid="result-path">
-            {safeText(row.path)}
-          </p>
-        )}
       </div>
       <div className="doc-side">
-        {view === 'list' && (
+        {showSize && (
           <span className="doc-size" data-testid="doc-size" title={t('docs.sizeTitle', { bytes: row.size })}>
             {formatSize(row.size)}
           </span>
         )}
         <StudyBadge state={row.studyState} />
         {row.missing && <span className="badge badge-warn">{t('docs.missing')}</span>}
-        <span className="doc-actions">
-          {readable && (
-            <button type="button" className="icon-button" tabIndex={-1} title={t('docs.read')} aria-label={t('docs.read')} onClick={(e) => { e.stopPropagation(); onRead(); }} data-testid="row-read">
-              <span aria-hidden="true">▤</span>
-            </button>
+        <span className="doc-actions" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+          {readable ? (
+            <Button size="sm" variant="primary" tabIndex={-1} onClick={() => onRead()} data-testid="row-read">
+              {t('docs.read')}
+            </Button>
+          ) : (
+            <Button size="sm" variant="primary" tabIndex={-1} disabled={row.missing} disabledReason={t('docs.missing')} onClick={onOpenFile} data-testid="row-open">
+              {t('library.open')}
+            </Button>
           )}
-          <button type="button" className="icon-button" tabIndex={-1} title={t('docs.openFile')} aria-label={t('docs.openFile')} disabled={row.missing} onClick={(e) => { e.stopPropagation(); onOpenFile(); }} data-testid="row-open-file">
-            <span aria-hidden="true">↗</span>
-          </button>
-          <button type="button" className="icon-button" tabIndex={-1} title={t('docs.reveal')} aria-label={t('docs.reveal')} disabled={row.missing} onClick={(e) => { e.stopPropagation(); onReveal(); }} data-testid="row-reveal">
-            <span aria-hidden="true">⌂</span>
-          </button>
+          <Button size="sm" tabIndex={-1} onClick={onDetail} data-testid="row-detail">
+            {t('docs.details')}
+          </Button>
+          <span ref={moreRef}>
+            <IconButton label={t('library.rowMore')} variant="secondary" size="sm" tabIndex={-1} aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)} data-testid="row-more">
+              <IconMore size={16} />
+            </IconButton>
+          </span>
+          {menuOpen && (
+            <Menu
+              anchor={moreRef}
+              open
+              onClose={() => setMenuOpen(false)}
+              label={t('library.rowMore')}
+              width={260}
+              groups={rowMenu(t, row.missing, onOpenFile, onReveal)}
+            />
+          )}
         </span>
       </div>
     </div>
@@ -207,10 +243,12 @@ interface Props {
   /** Delete / Backspace: never deletes by itself; the view asks before doing anything. */
   onDeleteKey(): void;
   ariaLabel: string;
+  /** The list is sorted by file size: rows show it. */
+  showSize?: boolean;
 }
 
 /** The documents as a virtualised list or grid with multi-selection and keyboard navigation. */
-export function DocViews({ list, view, searching, selection, onSelection, onOpenDetail, onDeleteKey, ariaLabel }: Props) {
+export function DocViews({ list, view, searching, selection, onSelection, onOpenDetail, onDeleteKey, ariaLabel, showSize = false }: Props) {
   const { reportError, fail, info } = useNotify();
   const { t } = useTranslation();
   const { openReader } = useReader();
@@ -247,6 +285,8 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
     const mods = { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey };
     withOrder(mods.shift ? selRef.current.anchor : null, index, (order) => onSelection(clickSelect(selRef.current, order, index, mods)));
   };
+
+  const toggle = (index: number) => withOrder(null, index, (order) => onSelection(clickSelect(selRef.current, order, index, { shift: false, ctrl: true })));
 
   const onKeyDown = (e: KeyboardEvent) => {
     const mods = { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey };
@@ -301,8 +341,15 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
       onSelection(toggleActive(selRef.current, list.ids()));
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      // 3.2: Enter reads (a PDF) or opens the file; Shift+Enter opens the card; Ctrl+Enter opens the file in the other program.
       const id = selRef.current.active;
-      if (id) void (mods.ctrl ? openFile(id) : onOpenDetail(id));
+      if (!id) return;
+      const at = indexOfId(list.ids(), id);
+      const row = at >= 0 ? list.rowAt(at) : undefined;
+      if (mods.ctrl) void openFile(id);
+      else if (mods.shift) onOpenDetail(id);
+      else if (row && canRead(row.path, row.missing)) openReader(id);
+      else void openFile(id);
     } else if ((e.key === 'r' || e.key === 'R') && !mods.ctrl && !e.altKey) {
       // R: read the active document in the app (PDFs only).
       e.preventDefault();
@@ -373,11 +420,13 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
             active={row ? selection.active === row.docId : false}
             searching={searching}
             onClick={(e) => click(i, e)}
-            onDoubleClick={() => row && void openFile(row.docId)}
+            onDoubleClick={() => row && (canRead(row.path, row.missing) ? openReader(row.docId) : void openFile(row.docId))}
             onOpenFile={() => row && void openFile(row.docId)}
             onReveal={() => row && void reveal(row.docId)}
             onRead={(page, panel) => row && openReader(row.docId, page, panel ? { panel } : undefined)}
             onDetail={() => row && onOpenDetail(row.docId)}
+            onToggle={() => toggle(i)}
+            showSize={showSize}
           />
         );
       }}

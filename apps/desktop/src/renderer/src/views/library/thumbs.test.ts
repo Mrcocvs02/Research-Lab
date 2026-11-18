@@ -11,6 +11,7 @@ import { resetThumbs } from '../../lib/thumbs';
 import { AppProvider } from '../../state/app-context';
 import { makeDocs, memoryLibrary } from '../../testing/memoryLibrary';
 import { callsTo, emitEvent, memoryBackend, setHandlers } from '../../testing/mockRl';
+import { pickView } from '../../testing/libraryKit';
 import { LibraryView } from './LibraryView';
 
 vi.mock('../../lib/rl', async () => (await import('../../testing/mockRl')).rlModule);
@@ -62,7 +63,7 @@ describe('grid thumbnails', () => {
     docs[1]!.path = 'alpha/notes.docx';
     setup(docs);
     await screen.findAllByTestId('search-result');
-    fireEvent.click(screen.getByTestId('view-grid'));
+    pickView('grid');
     await waitFor(() => expect(imgs()).toHaveLength(3), { timeout: 4000 });
     for (const img of imgs()) {
       expect(img.getAttribute('src')).toMatch(/^rl-thumb:\/\/thumb\/d\d{15}\?v=aaaaaaaa$/);
@@ -81,7 +82,7 @@ describe('grid thumbnails', () => {
     const lib = setup(makeDocs(2));
     lib.state.thumbs.set('d000000000000000', 'rl-thumb://thumb/d000000000000000?v=aaaaaaaa');
     await screen.findAllByTestId('search-result');
-    fireEvent.click(screen.getByTestId('view-grid'));
+    pickView('grid');
     await waitFor(() => expect(imgs().map((i) => i.getAttribute('src'))).toContain('rl-thumb://thumb/d000000000000000?v=aaaaaaaa'));
     await waitFor(() => expect(imgs()).toHaveLength(2));
     expect(drawer.draw).toHaveBeenCalledTimes(1); // only the other one
@@ -92,9 +93,9 @@ describe('grid thumbnails', () => {
     await screen.findAllByTestId('search-result');
     let release!: () => void;
     drawer.draw.mockImplementationOnce(() => new Promise((r) => (release = () => r(new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66, 80, 0, 0, 0, 0])))));
-    fireEvent.click(screen.getByTestId('view-grid'));
+    pickView('grid');
     await waitFor(() => expect(drawer.draw).toHaveBeenCalledTimes(1), { timeout: 4000 });
-    fireEvent.click(screen.getByTestId('view-list'));
+    pickView('list');
     await act(async () => release());
     await new Promise((r) => setTimeout(r, 200));
     expect(drawer.draw).toHaveBeenCalledTimes(1);
@@ -104,7 +105,7 @@ describe('grid thumbnails', () => {
   it('a library event on the documents asks again for the urls on screen', async () => {
     setup(makeDocs(2));
     await screen.findAllByTestId('search-result');
-    fireEvent.click(screen.getByTestId('view-grid'));
+    pickView('grid');
     await waitFor(() => expect(imgs()).toHaveLength(2), { timeout: 4000 });
     const before = callsTo('thumbs:list').length;
     await act(async () => emitEvent('library:changed', { kind: 'documents' }));
@@ -116,7 +117,7 @@ describe('grid thumbnails', () => {
     const lib = setup(makeDocs(1));
     lib.state.thumbs.set('d000000000000000', 'rl-thumb://thumb/d000000000000000?v=aaaaaaaa');
     await screen.findAllByTestId('search-result');
-    fireEvent.click(screen.getByTestId('view-grid'));
+    pickView('grid');
     const img = await waitFor(() => {
       const i = imgs()[0];
       expect(i).toBeTruthy();

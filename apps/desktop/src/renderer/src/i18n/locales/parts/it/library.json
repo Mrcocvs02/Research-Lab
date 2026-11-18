@@ -1,0 +1,48 @@
+{
+  "library": {
+    "addPdf": "Aggiungi PDF",
+    "viewSummary": "Vista: {{view}} · {{sort}}",
+    "viewPanel": "Vista e ordinamento",
+    "more": "Altro",
+    "rowMore": "Altre azioni",
+    "detailToggle": "Mostra o nascondi la scheda",
+    "detailEmpty": "Seleziona un documento per vederne la scheda.",
+    "navOpen": "Cartelle e tag",
+    "manageTags": "Gestisci tag",
+    "facet": {
+      "studyStates": "Stato",
+      "types": "Tipo",
+      "years": "Anno",
+      "venues": "Rivista",
+      "authors": "Autori",
+      "tags": "Tag"
+    },
+    "facetEmpty": "Nessun valore in questi risultati.",
+    "clear": "Pulisci",
+    "missing": "Mostra i file mancanti",
+    "selTag": "Tag",
+    "selProject": "Progetto",
+    "selClaude": "Claude",
+    "selectionActions": "Azioni sui documenti selezionati",
+    "askClaude": "Chiedi a Claude…",
+    "openDefault": "Apri con il programma predefinito",
+    "openManyMax": "Si aprono al massimo {{count}} documenti alla volta.",
+    "open": "Apri",
+    "emptyTitle": "Nessun documento, per ora",
+    "noResultsTitle": "Nessun risultato",
+    "scanReport": {
+      "title": "Rapporto dell'ultima scansione",
+      "when": "Terminata il {{when}}",
+      "none": "Nessuna scansione terminata, per ora.",
+      "failed": "Non leggibili",
+      "first": "Era la prima scansione: i file trovati sono la tua libreria, non novità da guardare.",
+      "added": "Nuovi",
+      "changed": "Cambiati",
+      "moved": "Spostati",
+      "missing": "Mancanti",
+      "failedHint": "Il testo non si legge: si cercano per nome.",
+      "more": "e altri {{count}}",
+      "truncated": "L'elenco è parziale: i conteggi sono completi."
+    }
+  }
+}

@@ -55,6 +55,11 @@
     "types": "Tipi",
     "venues": "Riviste",
     "addType": "Nuovo tipo",
-    "addVenue": "Nuova rivista"
+    "addVenue": "Nuova rivista",
+    "pageTitle": "Tag",
+    "sectionName": "Nome e colore",
+    "sectionAliases": "Nomi alternativi",
+    "sectionRelations": "Relazioni",
+    "sectionMerge": "Unisci e ritira"
   }
 }

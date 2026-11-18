@@ -7,15 +7,15 @@
     "tasks": {
       "addDocs": {
         "title": "Aggiungere documenti",
-        "body": "Trascina nella finestra file PDF o una cartella, oppure usa Aggiungi PDF in Da rivedere (Alt+2). L'app legge titoli e metadati, li archivia nella libreria e ti mostra ciò che ha trovato da confermare. I tuoi originali non vengono mai modificati."
+        "body": "Trascina nella finestra file PDF o una cartella, oppure usa Aggiungi PDF nella Libreria o in Da rivedere (Alt+2). L'app legge titoli e metadati, li archivia nella libreria e ti mostra ciò che ha trovato da confermare. Il chip Attività, in alto a destra, segue la scansione: Vedi il rapporto elenca file nuovi, cambiati, spostati e mancanti. I tuoi originali non vengono mai modificati."
       },
       "tags": {
         "title": "Organizzare con tag e progetti",
-        "body": "Seleziona dei documenti nella Libreria e assegna loro i tag della tua tassonomia, oppure aggiungili a un progetto. Ogni modifica si può annullare con Annulla, in alto a destra. La casella di ricerca trova testo, titoli e autori; la ricerca avanzata può anche interrogare Claude."
+        "body": "Nella Libreria seleziona dei documenti (con la casella a sinistra di ogni riga): la barra al posto dei filtri offre Tag, Progetto e Claude. I tag si gestiscono da Gestisci tag, nel menu ⋯ della Libreria. Ogni modifica si può annullare con Annulla, in alto, o con Ctrl+Z; Ripeti è Ctrl+Y, nella Cronologia e nella tavolozza dei comandi. La casella di ricerca in alto trova testo, titoli e autori (? mostra la sintassi); il pulsante con la scintilla cerca con Claude."
       },
       "read": {
         "title": "Leggere e annotare",
-        "body": "Fai doppio clic su un documento per aprirlo nel lettore. Seleziona il testo per evidenziarlo, sottolinearlo e aggiungere una nota. Note, evidenziazioni e citazioni sono salvate nella cartella della libreria e viaggiano con essa. Gli strumenti del lettore usano tasti singoli. Al primo avvio dopo l'aggiornamento Research Lab ricontrolla in background le evidenziazioni salvate storte, senza aprire i documenti; quelle che non riesce a posizionare restano nel gruppo Da controllare del lettore."
+        "body": "Fai doppio clic su un documento (o premi Invio) per aprirlo nel lettore; Maiusc+Invio ne apre la scheda. Seleziona il testo per evidenziarlo, sottolinearlo e aggiungere una nota. Note, evidenziazioni e citazioni sono salvate nella cartella della libreria e viaggiano con essa. Per ora le evidenziazioni restano solo nell'app: la scrittura dentro i PDF non è ancora attiva. Gli strumenti del lettore usano tasti singoli. Al primo avvio dopo l'aggiornamento Research Lab ricontrolla in background le evidenziazioni salvate storte, senza aprire i documenti; quelle che non riesce a posizionare restano nel gruppo Da controllare del lettore."
       },
       "chat": {
         "title": "Chiedere a Claude",
@@ -35,19 +35,14 @@
       }
     },
     "welcome": {
-      "title": "Benvenuto in Research Lab",
-      "body": "La tua libreria è pronta. La guida spiega in poche righe i compiti principali.",
-      "tips": "Suggerimenti",
-      "hide": "Nascondi",
-      "hideTip": "Nascondi questo suggerimento per sempre",
-      "open": "Apri la guida",
-      "gotIt": "Ho capito",
-      "saveFailed": "Non è stato possibile salvare questa scelta."
-    },
-    "tips": {
-      "palette": "Premi {{palette}} per la tavolozza dei comandi: vai ovunque, fai il backup, chiedi a Claude.",
-      "search": "Premi {{search}} per andare alla casella di ricerca.",
-      "backup": "Imposta un backup nelle impostazioni, così le tue note non si perdono mai."
+      "title": "Per iniziare",
+      "saveFailed": "Non è stato possibile salvare questa scelta.",
+      "items": {
+        "read": "Apri un PDF e prova Evidenzia",
+        "claude": "Chiedi qualcosa a Claude",
+        "backup": "Imposta un backup"
+      },
+      "close": "Chiudi"
     }
   }
 }

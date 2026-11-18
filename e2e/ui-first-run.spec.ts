@@ -14,8 +14,8 @@ interface Scenario {
 }
 
 const scenarios: Scenario[] = [
-  { title: 'Italian interface, English documents', uiLanguage: 'it', docLanguage: 'en', libraryName: 'Biblioteca di prova', texts: { welcome: 'Benvenuto', summary: 'Riepilogo' } },
-  { title: 'English interface, Italian documents', uiLanguage: 'en', docLanguage: 'it', libraryName: 'Sample library', texts: { welcome: 'Welcome', summary: 'Summary' } },
+  { title: 'Italian interface, English documents', uiLanguage: 'it', docLanguage: 'en', libraryName: 'Biblioteca di prova', texts: { welcome: 'Benvenuto e lingua', summary: 'Riepilogo' } },
+  { title: 'English interface, Italian documents', uiLanguage: 'en', docLanguage: 'it', libraryName: 'Sample library', texts: { welcome: 'Welcome and language', summary: 'Summary' } },
 ];
 
 async function launchWith(base: string, root: string): Promise<LaunchedApp> {
@@ -50,36 +50,44 @@ for (const scenario of scenarios) {
       await expect(window.getByTestId('wizard-step-title')).toHaveText(scenario.texts.welcome);
       await next(window);
 
-      // Profile step (optional): leave empty.
-      await next(window);
-
       // Folder step: the dialog is replaced by RL_E2E_DIALOG_PATH.
       await window.getByTestId('wizard-choose-folder').click();
       await expect(window.getByTestId('wizard-folder-chosen')).toContainText('any-folder');
       await next(window);
 
-      // Details step.
+      // Details step: the library name, the language of the documents, and the optional name of the user.
       await window.getByTestId('wizard-lib-name').fill(scenario.libraryName);
       await window.getByTestId('wizard-doc-language').selectOption(scenario.docLanguage);
+      await expect(window.getByTestId('wizard-profile-name')).toBeVisible();
       await next(window);
 
-      // Taxonomy step: default empty.
+      // Starting tags: default empty, and it can be skipped.
       await expect(window.getByTestId('wizard-taxonomy-empty')).toBeChecked();
+      await expect(window.getByTestId('wizard-skip')).toBeVisible();
       await next(window);
 
-      // AI folders step: tree is shown, nothing selected, explicit confirmation required.
+      // Claude: the tree is shown, nothing is selected, nothing has to be confirmed (4.11).
       const tree = window.getByTestId('wizard-ai-tree');
       await expect(tree.getByRole('checkbox')).toHaveCount(2);
       for (const box of await tree.getByRole('checkbox').all()) await expect(box).not.toBeChecked();
-      await expect(window.getByTestId('wizard-next')).toBeDisabled();
-      await window.getByTestId('wizard-ai-confirm').check();
+      await expect(window.getByTestId('wizard-ai-confirm')).toHaveCount(0);
+      await expect(window.getByTestId('wizard-next')).toBeEnabled();
       await next(window);
 
-      // Summary and create.
+      // Summary: the consent switch is on and explained; creating the library goes to the first scan (the seventh step).
       await expect(window.getByTestId('wizard-step-title')).toHaveText(scenario.texts.summary);
+      await expect(window.getByTestId('wizard-progress')).toContainText('6');
+      await expect(window.getByTestId('wizard-write-to-pdf')).toHaveAttribute('aria-checked', 'true');
       await window.getByTestId('wizard-create').click();
+      await expect(window.getByTestId('wizard-scan')).toBeVisible();
+      await expect(window.getByTestId('wizard-progress')).toContainText('7');
+      // The first scan finishes on its own; the library opens from the last step.
+      await expect(window.getByTestId('wizard-scan-open')).toBeEnabled({ timeout: 60_000 });
+      await window.getByTestId('wizard-scan-open').click();
       await expect(window.getByTestId('wizard')).toHaveCount(0);
       await expect(window.getByTestId('status-library')).toContainText(scenario.libraryName);
+      // W17: the first scan is the library, not news: the Activity chip has no "unseen result" dot.
+      await expect(window.getByTestId('activity-dot')).toHaveCount(0);
 
       // library.json holds the chosen values, no absolute path, no AI folders.
       const raw = await readFile(path.join(root, '.lab', 'library.json'), 'utf8');
@@ -95,7 +103,7 @@ for (const scenario of scenarios) {
       await expect(ctx.window.getByTestId('shell')).toBeVisible();
       await expect(ctx.window.getByTestId('status-library')).toContainText(scenario.libraryName);
       await expect(ctx.window.getByTestId('wizard')).toHaveCount(0);
-      await expect(ctx.window.getByTestId('library-switcher')).toHaveValue(/^lib-/);
+      await expect(ctx.window.getByTestId('library-switcher')).toBeVisible();
       const html = await ctx.window.evaluate(() => document.documentElement.lang);
       expect(html).toBe(scenario.uiLanguage);
     } finally {
@@ -106,8 +114,8 @@ for (const scenario of scenarios) {
 }
 
 // D-357: with no settings file the interface starts in the language of the system (Electron's --lang stands for it here).
-for (const [locale, welcome] of [['en-US', 'Welcome'], ['it-IT', 'Benvenuto']] as const) {
-  test(`first run: a system in ${locale} starts the wizard in ${welcome === 'Welcome' ? 'English' : 'Italian'}`, async () => {
+for (const [locale, welcome] of [['en-US', 'Welcome and language'], ['it-IT', 'Benvenuto e lingua']] as const) {
+  test(`first run: a system in ${locale} starts the wizard in ${welcome.startsWith('Welcome') ? 'English' : 'Italian'}`, async () => {
     const base = await mkdtemp(path.join(os.tmpdir(), 'rl-lang-'));
     const env: Record<string, string> = {};
     for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;

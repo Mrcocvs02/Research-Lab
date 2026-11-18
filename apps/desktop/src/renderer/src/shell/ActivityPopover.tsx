@@ -16,6 +16,8 @@ interface Props {
   scan: ScanStatus | null;
   startScan(): void;
   cancelScan(): void;
+  /** Opens the report of the last scan (4.9): the chip hosts the dialog, so that the popover can close. */
+  onReport(): void;
 }
 
 /**
@@ -23,7 +25,7 @@ interface Props {
  * the outcome of the last scan with "Scan now". Every source is a provider that already follows its events; nothing is polled.
  * Other jobs appear through `publishActivity`.
  */
-export function ActivityPopover({ anchor, onClose, scan, startScan, cancelScan }: Props) {
+export function ActivityPopover({ anchor, onClose, scan, startScan, cancelScan, onReport }: Props) {
   const { t, i18n } = useTranslation();
   const jobs = useJobs();
   const cit = useCitationJob();
@@ -105,6 +107,11 @@ export function ActivityPopover({ anchor, onClose, scan, startScan, cancelScan }
           {when ? <b>{t('activity.lastScan', { when })}</b> : <b>{t('activity.noScan')}</b>}
           {s && <span className="act-row__detail">{t('activity.scanSummary', { added: s.added, changed: s.changed, missing: s.missing })}</span>}
           <div className="act-foot__actions">
+            {s && (
+              <Button size="sm" variant="ghost" onClick={onReport} data-testid="activity-scan-report">
+                {t('activity.seeReport')}
+              </Button>
+            )}
             <Button size="sm" variant="primary" disabled={scanning || !scan} disabledReason={scanning ? t('activity.scanRunning') : t('activity.needsLibrary')} onClick={startScan} data-testid="activity-scan-now">
               {t('scan.start')}
             </Button>

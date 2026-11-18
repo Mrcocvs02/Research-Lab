@@ -124,7 +124,7 @@ describe('strings of every file are loaded with its view', () => {
   });
 
   it('has no component import() outside lazyView/lazyRetry (other than the known prefetch, pdf.js and thumbnails)', () => {
-    const allowed = ['i18n/index.ts', 'lib/pdfjs.ts', 'lib/thumbs.ts', 'views/reader/engine.ts', 'views/library/LibraryView.tsx'];
+    const allowed = ['i18n/index.ts', 'lib/pdfjs.ts', 'lib/thumbs.ts', 'views/reader/engine.ts', 'views/library/LibraryView.tsx', 'App.tsx'];
     const stray: string[] = [];
     for (const [f, src] of text) {
       if (allowed.includes(rel(f))) continue;

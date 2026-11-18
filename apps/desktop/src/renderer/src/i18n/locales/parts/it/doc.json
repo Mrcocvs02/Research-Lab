@@ -15,7 +15,10 @@
     }
   },
   "docs": {
-    "readHint": "Apri nel lettore (scorciatoia: R nell’elenco)"
+    "readHint": "Apri nel lettore (scorciatoia: R nell’elenco)",
+    "openDefault": "Apri con il programma predefinito",
+    "open": "Apri",
+    "moreActions": "Altre azioni"
   },
   "tags": {
     "changed_one": "Tag aggiornati su {{count}} documento.",
@@ -54,10 +57,18 @@
     "size": "Dimensione",
     "added": "Aggiunto",
     "notes": "Note sul file",
-    "notesHint": "Le tue note in Markdown, tenute separate dal file. Le note di pagina sono nel lettore."
+    "notesHint": "Le tue note in Markdown, tenute separate dal file. Le note di pagina sono nel lettore.",
+    "dataTitle": "Dati del documento",
+    "editData": "Modifica i dati",
+    "doneEditing": "Fine",
+    "stateLabel": "Stato",
+    "askClaude": "Chiedi a Claude",
+    "aiNone": "Nessun contenuto AI.",
+    "propose": "Proponi con Claude…",
+    "similarTitle": "Simili nel contenuto"
   },
   "jobs": {
-    "proposeOne": "Proponi con l’AI…"
+    "proposeOne": "Proponi con Claude…"
   },
   "citations": {
     "title": "Citazioni",

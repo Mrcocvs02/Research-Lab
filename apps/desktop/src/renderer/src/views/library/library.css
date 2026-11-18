@@ -1,11 +1,5 @@
-/* Library view: search, results, facets */
-.library-page {
-  max-width: 1100px;
-}
-.search-bar input[type='search'] {
-  width: 100%;
-  font-size: 16px;
-}
+
+
 .library-tools {
   display: flex;
   gap: var(--space-3);
@@ -15,12 +9,7 @@
 .library-tools .spacer {
   flex: 1;
 }
-.library-body {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: var(--space-5);
-  align-items: start;
-}
+
 .facets .facets-head {
   display: flex;
   justify-content: space-between;
@@ -102,57 +91,22 @@
   color: var(--text-muted);
   font-size: 13px;
 }
-@media (max-width: 760px) {
-  .library-body {
-    grid-template-columns: 1fr;
-  }
-}
 
-.main:has(.library-page) {
-  overflow: hidden;
-}
-.view.library-page {
-  max-width: none;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-4) var(--space-5);
-  min-height: 0;
-}
-.library-head {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-4);
-}
-.library-head h1 {
-  margin: 0;
-}
-.library-head .search-bar {
-  flex: 1;
-  min-width: 0;
-}
-.library-head .search-bar label {
-  position: absolute;
-  left: -9999px;
-}
-.search-row {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-}
-.search-row button {
-  white-space: nowrap;
-}
-.library-head .search-bar .hint {
-  margin: 2px 0 0;
-}
+
+
+
+
+
+
+
+
+
+
 .library-tools {
   flex-wrap: wrap;
   margin: var(--space-2) 0;
 }
-.library-tools select {
-  width: auto;
-}
+
 button.toggle.on {
   background: var(--accent-soft);
   border-color: var(--accent);
@@ -180,31 +134,10 @@ button.toggle.on {
 .radio-chip:has(input:focus-visible) {
   outline: 2px solid var(--focus);
 }
-.library-grid {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
-  gap: var(--space-4);
-}
-.library-grid.with-detail {
-  grid-template-columns: 250px minmax(0, 1fr) 380px;
-}
-.library-nav,
-.detail-pane {
-  overflow-y: auto;
-  min-height: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--space-3);
-}
-.results-pane {
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
+
+
+
+
 .tabs {
   display: flex;
   gap: 2px;
@@ -379,30 +312,12 @@ button.toggle.on {
   color: var(--text-muted);
   font-size: 12px;
 }
-.tag-filter,
-.active-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-  margin-bottom: var(--space-2);
-}
+
 .tag-filter .tag-picker input {
   padding: 3px 8px;
 }
-.tag-filter-label {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.filter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 4px 1px 10px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  font-size: 12px;
-}
+
+
 .facets .year-range {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -415,62 +330,18 @@ button.toggle.on {
   font-size: 12px;
 }
 
-/* list and grid */
-.results-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 34px;
-}
-.results-bar .results-summary {
-  margin: 0;
-}
-.selection-bar {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  padding: 2px 8px;
-  background: var(--accent-soft);
-  border-radius: var(--radius);
-}
-.vl {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
+
+
+
+
 .vl-item {
   padding: 2px;
 }
-.doc {
-  position: relative;
-  height: 100%;
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid transparent;
-  border-radius: 6px;
-  user-select: none;
-  cursor: default;
-  overflow: hidden;
-}
-.doc:hover {
-  background: var(--surface-2);
-}
-.doc.is-selected {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-}
-.doc.active {
-  outline: 2px solid var(--focus);
-  outline-offset: -2px;
-}
-.vl:not(:focus-within) .doc.active {
-  outline: none;
-}
+
+
+
+
+
 .doc.missing {
   opacity: 0.7;
 }
@@ -478,10 +349,7 @@ button.toggle.on {
   background: var(--surface-2);
   opacity: 0.4;
 }
-.doc-main {
-  flex: 1;
-  min-width: 0;
-}
+
 .doc .result-title {
   margin: 0;
   font-size: 14px;
@@ -504,25 +372,14 @@ button.toggle.on {
 .doc .result-snippet {
   margin: 2px 0;
 }
-.doc-side {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
+
 .doc-size {
   font-size: 0.8em;
   color: var(--text-muted, inherit);
   font-variant-numeric: tabular-nums;
 }
-.doc-actions {
-  display: none;
-  gap: 2px;
-}
-.doc:hover .doc-actions,
-.doc.active .doc-actions {
-  display: inline-flex;
-}
+
+
 .doc-card {
   flex-direction: column;
   align-items: stretch;
@@ -603,23 +460,9 @@ button.toggle.on {
 .type-notebook {
   color: var(--warning);
 }
-.study {
-  padding: 0 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 650;
-  white-space: nowrap;
-  background: var(--surface-2);
-  color: var(--text-muted);
-}
-.study-reading {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-.study-read {
-  background: var(--ok-soft);
-  color: var(--ok);
-}
+
+
+
 .badge-warn {
   background: var(--warn-soft);
   color: var(--warn);
@@ -629,13 +472,7 @@ button.toggle.on {
   font-weight: 500;
 }
 
-/* document card */
-.panel-head {
-  display: flex;
-  gap: var(--space-3);
-  align-items: flex-start;
-  margin-bottom: var(--space-3);
-}
+
 .panel-title {
   flex: 1;
   min-width: 0;
@@ -644,20 +481,9 @@ button.toggle.on {
   margin: 0;
   overflow-wrap: anywhere;
 }
-.panel-actions {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  margin-bottom: var(--space-3);
-}
-.panel-section {
-  margin-bottom: var(--space-4);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
-}
-.panel-section h3 {
-  margin-bottom: var(--space-2);
-}
+
+
+
 .detail-pane .two-col {
   grid-template-columns: 1fr 1fr;
 }
@@ -746,15 +572,7 @@ button.toggle.on {
   grid-template-columns: minmax(260px, 380px) minmax(0, 1fr);
   gap: var(--space-4);
 }
-.taxonomy-tree-pane,
-.taxonomy-editor-pane {
-  overflow-y: auto;
-  min-height: 0;
-  padding: var(--space-3);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
+
 .tax-toolbar,
 .node-actions {
   display: flex;
@@ -762,19 +580,8 @@ button.toggle.on {
   flex-wrap: wrap;
   margin-bottom: var(--space-3);
 }
-.swatches {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-.swatch-button {
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border-radius: 50%;
-  background: var(--swatch);
-}
+
+
 .swatch-button.is-selected {
   outline: 2px solid var(--text);
   outline-offset: 2px;
@@ -793,45 +600,14 @@ button.toggle.on {
   margin-top: var(--space-4);
 }
 
-/* The detail pane needs room: in a narrow window it replaces the folder/tag pane instead of squeezing the list. */
-.view.library-page {
-  container-type: inline-size;
-}
-@container (max-width: 1100px) {
-  .library-grid.with-detail {
-    grid-template-columns: minmax(0, 1fr) 340px;
-  }
-  .library-grid.with-detail .library-nav {
-    display: none;
-  }
-}
-@container (max-width: 700px) {
-  .library-grid {
-    grid-template-columns: 200px minmax(0, 1fr);
-  }
-  .taxonomy-manager {
-    grid-template-columns: 1fr;
-    overflow-y: auto;
-  }
-  .library-head {
-    flex-wrap: wrap;
-  }
-}
-.results-bar {
-  flex-wrap: wrap;
-}
-.selection-bar {
-  flex-wrap: wrap;
-  min-width: 0;
-}
-.results-pane {
-  overflow: hidden;
-}
 
-.library-tools .check {
-  margin-bottom: 0;
-  align-items: center;
-}
+
+
+
+
+
+
+
 
 .badge-hit {
   cursor: pointer;
@@ -841,3 +617,592 @@ button.page-chip {
   font: inherit;
 }
 
+
+/* ---- Library view (D3): header, one row of filters, list, card ---- */
+.main:has(.library-page) {
+  overflow: hidden;
+}
+.view.library-page {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  max-width: none;
+  padding: 0 var(--space-6) var(--space-4);
+}
+.library-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+}
+.library-head h1 {
+  margin: 0;
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
+  font-weight: 600;
+}
+.library-head__count {
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.library-head__acts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.library-head__nav {
+  display: none;
+}
+.lib-pop-body {
+  padding: 12px;
+}
+.lib-view-pop {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lib-view-pop__sort {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+.tag-filter-pop {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* the row of filters */
+.facet-bar,
+.selection-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  margin-bottom: 8px;
+}
+.facet-bar__chips {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.facet-bar__chips > *,
+.facet-chip {
+  flex: none;
+}
+.facet-chip {
+  display: inline-flex;
+}
+.facet-bar .active-filters {
+  display: contents;
+}
+.facet-bar__missing {
+  flex: none;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.selection-bar {
+  gap: 8px;
+  padding: 0 8px 0 12px;
+  overflow: hidden;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+}
+.selection-bar > * {
+  flex: none;
+}
+.selection-bar__count {
+  margin-right: 4px;
+  color: var(--accent-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.selection-bar__ai {
+  color: var(--ai);
+}
+
+/* panes */
+.library-grid {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 16px;
+}
+.library-nav {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.results-pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.detail-pane {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.detail-empty {
+  margin: 0;
+}
+.library-empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+}
+/* The card sits beside the list when there is room for the list (420 px) as well; otherwise it is a drawer over it. */
+@container (min-width: 1052px) {
+  .library-grid.with-detail {
+    grid-template-columns: 240px minmax(0, 1fr) 360px;
+  }
+}
+@container (max-width: 1051px) {
+  .detail-pane {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+    width: min(360px, 100%);
+    box-shadow: var(--e-3);
+  }
+}
+/* Folders and tags become a drawer opened from the header when the view is narrower than 900 px. */
+@container (max-width: 860px) {
+  .library-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .library-head__nav {
+    display: inline-flex;
+  }
+  .library-nav {
+    display: none;
+  }
+  .library-grid.nav-open .library-nav {
+    display: block;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 7;
+    width: 280px;
+    padding: 12px;
+    border-radius: var(--r-md);
+    background: var(--surface);
+    box-shadow: var(--e-3);
+  }
+}
+
+/* list and grid */
+.vl {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  outline: none;
+}
+.doc {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 0 12px;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  cursor: default;
+  user-select: none;
+}
+.doc:hover {
+  background: var(--surface-2);
+}
+.doc.is-selected,
+.doc.active {
+  background: var(--accent-soft);
+}
+.doc.active {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.vl:focus-visible .doc.active {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.doc-cb {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--on-accent);
+  cursor: pointer;
+}
+.doc-cb.is-on {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.doc-main {
+  flex: 1;
+  min-width: 0;
+}
+.doc-side {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+}
+.doc-card .doc-cb {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+}
+.doc-actions {
+  display: none;
+  align-items: center;
+  gap: 6px;
+}
+.doc:hover .doc-actions,
+.doc.active .doc-actions {
+  display: inline-flex;
+}
+.doc-card .doc-side {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.study {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.study::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+.study-reading::before {
+  background: var(--accent);
+}
+.study-read::before {
+  background: var(--ok);
+}
+/* Rows with a snippet or pages (a search) have no room for the study text: the dot says it, the text is in the title. */
+@container (max-width: 620px) {
+  .doc-side .study {
+    font-size: 0;
+    gap: 0;
+  }
+}
+
+/* the card of a document (4.14) */
+.doc-card-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-head__caption {
+  color: var(--text-muted);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.card-title {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--fs-heading);
+  font-weight: 600;
+  line-height: var(--lh-heading);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.card-byline {
+  margin: -6px 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-actions__ai {
+  color: var(--ai);
+}
+.card-state,
+.card-underlined {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.card-underlined {
+  gap: 8px;
+  font-size: var(--fs-small);
+}
+.card-state__label {
+  flex: none;
+  width: 48px;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+.card-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card-ai-none {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--ai);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--ai-soft);
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+.card-section {
+  border-top: 1px solid var(--border);
+}
+.card-section__head {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+}
+.card-section__toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.card-section__chev {
+  flex: none;
+  transition: transform var(--dur) var(--ease);
+}
+.card-section[data-open='true'] .card-section__chev {
+  transform: rotate(90deg);
+}
+.card-section__title {
+  flex: none;
+  font-weight: 600;
+}
+.card-section__hint {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-section__action {
+  flex: none;
+  margin-left: 8px;
+  font-size: var(--fs-small);
+}
+.card-section__body {
+  padding: 4px 0 12px;
+}
+.card-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.panel-section {
+  margin-bottom: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.panel-section h3 {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: var(--fs-caption);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* the tag manager: "Library > Tags", the tree on the left, the node editor in sections on the right (4.13) */
+.taxonomy-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.taxonomy-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+}
+.taxonomy-crumbs h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-title);
+  font-weight: 600;
+  line-height: var(--lh-title);
+}
+.taxonomy-tree-pane,
+.taxonomy-editor-pane {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 4px 0 0;
+}
+.taxonomy-editor-pane {
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--border);
+}
+.node-fold {
+  border-top: 1px solid var(--border);
+}
+.node-fold > summary {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.node-fold__body {
+  padding: 4px 0 12px;
+}
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 20px);
+  gap: 8px;
+  align-items: center;
+}
+.swatches > .link,
+.swatches > input[type='color'] {
+  grid-column: span 3;
+}
+.swatch-button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--swatch);
+}
+.swatch-button.is-selected {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+@container (max-width: 700px) {
+  .taxonomy-manager {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+}
+
+/* the scan report dialog */
+.scan-report {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(440px, 80vw);
+}
+.scan-report__when {
+  margin: 0;
+  color: var(--text-muted);
+}
+.scan-report__list,
+.scan-report__docs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.scan-report__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+  text-align: left;
+}
+.scan-report__count {
+  font-variant-numeric: tabular-nums;
+}
+.scan-report__docs {
+  padding: 4px 4px 8px 16px;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+
+/* the second line of a row: authors, year and type, then the tags on the same line (60 px rows) */
+.doc-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.doc-sub .result-meta {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.doc-sub .doc-tags {
+  flex: none;
+  flex-wrap: nowrap;
+}
+.doc-card .doc-sub {
+  flex-wrap: wrap;
+}

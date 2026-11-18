@@ -11,6 +11,7 @@
     "noScan": "Nessuna scansione in questa sessione",
     "scanSummary": "+{{added}} nuovi · {{changed}} cambiati · {{missing}} mancanti",
     "scanRunning": "Una scansione è già in corso",
-    "needsLibrary": "Apri prima una libreria"
+    "needsLibrary": "Apri prima una libreria",
+    "seeReport": "Vedi il rapporto"
   }
 }

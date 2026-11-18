@@ -74,9 +74,10 @@ test('references in library and missing, explained read-next, published preprint
     const [idA, idB, idC] = [await idFor(a.title!), await idFor(b.title!), await idFor(c.title!)];
 
     // 1. A sample paper: references in the library and missing.
+    await window.getByTestId('view-menu').click();
     await window.getByTestId('search-sort').selectOption('title');
     await clickRow(window, a.title!);
-    await window.getByTestId('selection-details').click();
+    if (!(await window.getByTestId('detail-pane').isVisible())) await window.getByTestId('detail-toggle').click();
     await expect(window.getByTestId('doc-panel')).toBeVisible();
     await window.getByTestId('citations-toggle').click();
     const panel = window.getByTestId('citations-panel');

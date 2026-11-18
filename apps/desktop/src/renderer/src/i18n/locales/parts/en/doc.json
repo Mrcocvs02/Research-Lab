@@ -15,7 +15,10 @@
     }
   },
   "docs": {
-    "readHint": "Open in the reader (shortcut: R on the list)"
+    "readHint": "Open in the reader (shortcut: R on the list)",
+    "openDefault": "Open with the default program",
+    "open": "Open",
+    "moreActions": "More actions"
   },
   "tags": {
     "changed_one": "Tags updated on {{count}} document.",
@@ -54,10 +57,18 @@
     "size": "Size",
     "added": "Added",
     "notes": "Notes on the file",
-    "notesHint": "Your own notes in Markdown, kept apart from the file. Page notes are in the reader."
+    "notesHint": "Your own notes in Markdown, kept apart from the file. Page notes are in the reader.",
+    "dataTitle": "Document details",
+    "editData": "Edit details",
+    "doneEditing": "Done",
+    "stateLabel": "Status",
+    "askClaude": "Ask Claude",
+    "aiNone": "No AI content.",
+    "propose": "Propose with Claude…",
+    "similarTitle": "Similar in content"
   },
   "jobs": {
-    "proposeOne": "Propose with AI…"
+    "proposeOne": "Propose with Claude…"
   },
   "citations": {
     "title": "Citations",

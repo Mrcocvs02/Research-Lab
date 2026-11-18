@@ -1,6 +1,8 @@
 import { useEffect, useId, useMemo, useState, type CSSProperties, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TaxonomyNodeView } from '@rl/core';
+import { Button } from '../../components/Button';
+import { IconPlus } from '../../components/icons';
 import { Tree } from '../../components/Tree';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
@@ -41,6 +43,16 @@ function CommitText({ label, value, onCommit, testId, multiline }: { label: stri
         />
       )}
     </div>
+  );
+}
+
+/** A section of the node editor: a native disclosure, the first one open, the others closed (4.13). */
+function Fold({ id, title, open, children }: { id: string; title: string; open?: boolean; children: React.ReactNode }) {
+  return (
+    <details className="node-fold" open={open} data-testid={`node-fold-${id}`}>
+      <summary>{title}</summary>
+      <div className="node-fold__body">{children}</div>
+    </details>
   );
 }
 
@@ -98,6 +110,7 @@ function NodeEditor({ node, onGone, onSelect }: { node: TaxonomyNodeView; onGone
         {t('tax.counts', { direct: node.counts.direct, implied: node.counts.implied, subtree: node.counts.subtree })}
       </p>
 
+      <Fold id="name" title={t('tax.sectionName')} open>
       <CommitText label={t('tax.label')} value={node.label} onCommit={(v) => v.trim() && void apply([{ op: 'rename', id: node.id, label: v.trim() }])} testId="node-label" />
 
       <div className="field">
@@ -132,9 +145,14 @@ function NodeEditor({ node, onGone, onSelect }: { node: TaxonomyNodeView; onGone
         </div>
       </div>
 
+      </Fold>
+
+      <Fold id="aliases" title={t('tax.sectionAliases')}>
       <CommitText label={t('tax.aliases')} value={node.aliases.join('\n')} multiline onCommit={(v) => void apply([{ op: 'setAliases', id: node.id, aliases: splitLines(v) }])} testId="node-aliases" />
       <p className="hint">{t('tax.aliasesHint')}</p>
+      </Fold>
 
+      <Fold id="relations" title={t('tax.sectionRelations')}>
       <div className="field" data-testid="node-parents">
         <span className="label">{t('tax.parents')}</span>
         <div className="tag-list">
@@ -181,15 +199,6 @@ function NodeEditor({ node, onGone, onSelect }: { node: TaxonomyNodeView; onGone
         <button type="button" onClick={() => setCreating(true)} data-testid="add-child">
           {t('tax.addChild')}
         </button>
-        {node.status === 'deprecated' ? (
-          <button type="button" onClick={() => void apply([{ op: 'restore', id: node.id }])} data-testid="restore-node">
-            {t('tax.restore')}
-          </button>
-        ) : (
-          <button type="button" onClick={() => void apply([{ op: 'deprecate', id: node.id }])} data-testid="deprecate-node">
-            {t('tax.deprecate')}
-          </button>
-        )}
       </div>
       {creating && (
         <NewNodeForm
@@ -200,6 +209,20 @@ function NodeEditor({ node, onGone, onSelect }: { node: TaxonomyNodeView; onGone
           }}
         />
       )}
+      </Fold>
+
+      <Fold id="merge" title={t('tax.sectionMerge')}>
+      <div className="node-actions">
+        {node.status === 'deprecated' ? (
+          <button type="button" onClick={() => void apply([{ op: 'restore', id: node.id }])} data-testid="restore-node">
+            {t('tax.restore')}
+          </button>
+        ) : (
+          <button type="button" onClick={() => void apply([{ op: 'deprecate', id: node.id }])} data-testid="deprecate-node">
+            {t('tax.deprecate')}
+          </button>
+        )}
+      </div>
 
       <div className="field" data-testid="node-merge">
         <span className="label">{t('tax.merge')}</span>
@@ -258,6 +281,7 @@ function NodeEditor({ node, onGone, onSelect }: { node: TaxonomyNodeView; onGone
           </div>
         )}
       </div>
+      </Fold>
     </div>
   );
 }
@@ -408,16 +432,23 @@ export function TaxonomyManager({ onBack }: { onBack(): void }) {
 
   if (error && !loaded) return <ErrorNote>{errorMessage(error, t)}</ErrorNote>;
   return (
-    <div className="taxonomy-manager" data-testid="taxonomy-manager">
-      <div className="taxonomy-tree-pane">
-        <div className="tax-toolbar">
-          <button type="button" onClick={onBack} data-testid="taxonomy-back">
-            {t('tax.back')}
+    <div className="taxonomy-page" data-testid="taxonomy-manager">
+      <header className="library-head">
+        <nav className="taxonomy-crumbs" aria-label={t('shell.crumbs')}>
+          <button type="button" className="crumbs__link" onClick={onBack} data-testid="taxonomy-back">
+            {t('sections.library')}
           </button>
-          <button type="button" className="primary" onClick={() => setCreating(true)} data-testid="new-top-level">
+          <span aria-hidden="true">›</span>
+          <h1>{t('tax.pageTitle')}</h1>
+        </nav>
+        <div className="library-head__acts">
+          <Button variant="primary" icon={<IconPlus size={16} />} onClick={() => setCreating(true)} data-testid="new-top-level">
             {t('tax.newTopLevelButton')}
-          </button>
+          </Button>
         </div>
+      </header>
+      <div className="taxonomy-manager">
+      <div className="taxonomy-tree-pane">
         {creating && (
           <NewNodeForm
             parent={null}
@@ -474,6 +505,7 @@ export function TaxonomyManager({ onBack }: { onBack(): void }) {
         ) : (
           <p className="hint">{t('tax.selectHint')}</p>
         )}
+      </div>
       </div>
     </div>
   );

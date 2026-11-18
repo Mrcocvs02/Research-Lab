@@ -145,8 +145,7 @@ export async function createLibraryViaWizard(window: Page, options: WizardOption
   const next = () => window.getByTestId('wizard-next').click();
   await expect(window.getByTestId('wizard')).toBeVisible();
   await window.getByTestId('wizard-ui-language').selectOption('en');
-  await next(); // language
-  await next(); // profile (optional)
+  await next(); // welcome and language
   await window.getByTestId('wizard-choose-folder').click();
   await expect(window.getByTestId('wizard-folder-chosen')).toBeVisible();
   await next();
@@ -157,11 +156,11 @@ export async function createLibraryViaWizard(window: Page, options: WizardOption
     await window.getByTestId('wizard-import-legacy').uncheck();
     await next();
   }
-  await next(); // taxonomy (empty)
-  const confirm = window.getByTestId('wizard-ai-confirm');
-  if ((await confirm.count()) > 0) await confirm.check();
-  await next();
+  await next(); // starting tags (empty)
+  await next(); // Claude: no folder enabled, nothing to confirm
   await window.getByTestId('wizard-create').click();
+  // The seventh step is the first scan: it goes on in the background, the app is usable at once.
+  await window.locator('[data-testid="wizard-scan-background"], [data-testid="wizard-scan-open"]:enabled').first().click();
   await expect(window.getByTestId('wizard')).toHaveCount(0, { timeout: 30_000 });
 }
 

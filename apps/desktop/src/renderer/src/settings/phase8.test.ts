@@ -537,13 +537,13 @@ describe('guide', () => {
 });
 
 describe('welcome card', () => {
-  it('opens the guide, hides a tip for good and is dismissed for good', async () => {
-    const { state } = setup(createElement(WelcomeCard));
+  it('lists three first steps, ticks the ones already done, and is closed for good with one button', async () => {
+    const { state } = setup(createElement(WelcomeCard), {}, { guide: { welcomeSeen: false, dismissedTips: ['read'] } });
     await screen.findByTestId('welcome-card');
-    expect(screen.getAllByRole('listitem')).toHaveLength(3);
-    fireEvent.click(screen.getAllByTestId('welcome-tip-hide')[0]!);
-    await waitFor(() => expect(callsTo('settings:set')).toContainEqual({ guide: { dismissedTips: ['palette'] } }));
-    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
+    const items = screen.getAllByRole('listitem');
+    expect(items).toHaveLength(3);
+    expect(items.map((i) => i.getAttribute('data-done'))).toEqual(['true', 'false', 'false']);
+    expect(screen.queryByTestId('welcome-tip-hide')).toBeNull();
     fireEvent.click(screen.getByTestId('welcome-dismiss'));
     await waitFor(() => expect(callsTo('settings:set')).toContainEqual({ guide: { welcomeSeen: true } }));
     expect(state.settings.guide.welcomeSeen).toBe(true);

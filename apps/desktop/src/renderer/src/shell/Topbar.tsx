@@ -1,7 +1,6 @@
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../components/IconButton';
-import { Kbd } from '../components/Kbd';
 import { useAiUi } from '../lib/aiUi';
 import { useEffectiveShortcuts } from '../lib/keymap';
 import { useNav, type NavLocation, type NavView } from '../lib/nav';
@@ -9,6 +8,7 @@ import { ActivityChip } from './ActivityChip';
 import { HistoryButtons } from './HistoryButtons';
 import type { useScanStatus } from '../views/library/useScanStatus';
 import { Icon } from './shellIcons';
+import { TopSearch } from './TopSearch';
 
 export interface Crumb {
   label: string;
@@ -31,10 +31,9 @@ export function crumbsOf(loc: NavLocation, title: string | null, label: (key: st
 export function Topbar({ scan }: { scan: ReturnType<typeof useScanStatus> }) {
   const { t } = useTranslation();
   const nav = useNav();
-  const { setPaletteOpen, goTo } = useAiUi();
+  const { setPaletteOpen } = useAiUi();
   const keys = useEffectiveShortcuts();
   const crumbs = crumbsOf(nav.loc, nav.title, (k) => t(k));
-  const search = keys['search.focus'];
   const cmd = keys['palette.open'];
   return (
     <header className="topbar" data-testid="topbar">
@@ -64,11 +63,7 @@ export function Topbar({ scan }: { scan: ReturnType<typeof useScanStatus> }) {
           </Fragment>
         ))}
       </nav>
-      <button type="button" className="search-launch" onClick={() => goTo('library', { focus: 'search' })} data-testid="topbar-search" aria-keyshortcuts={search ?? undefined}>
-        <Icon name="search" size={16} />
-        <span className="search-launch__text">{t('shell.searchLibrary')}</span>
-        {search && <Kbd>{search}</Kbd>}
-      </button>
+      <TopSearch />
       <HistoryButtons />
       <button type="button" className="top-cmd" aria-label={t('chat.palette')} title={cmd ? `${t('chat.palette')} (${cmd})` : t('chat.palette')} onClick={() => setPaletteOpen(true)} data-testid="palette-open">
         <Icon name="command" />

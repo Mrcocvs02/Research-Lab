@@ -1,20 +1,27 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Lazy, lazyView } from '../../components/Lazy';
 import { useTranslation } from 'react-i18next';
+import { Button } from '../../components/Button';
+import { EmptyState } from '../../components/EmptyState';
+import { IconLibrary } from '../../components/icons-shell';
+import { IconPlus } from '../../components/icons';
+import { Tabs, tabIds } from '../../components/Tabs';
 import { ErrorNote } from '../../components/ui';
 import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
 import { useChangeVersion } from '../../lib/events';
-import { HistoryControls } from '../../lib/history';
-import { useCitationJob } from '../../lib/citationJobs';
-import { useNotify } from '../../lib/notify';
+import { useInbox } from '../../lib/inbox';
+import { setSearchText, useSearchText } from '../../lib/librarySearch';
 import { useLocalChoice } from '../../lib/useLocalString';
+import { useLocalFlag } from '../../lib/useLocalFlag';
+import { useNotify } from '../../lib/notify';
 import { useApp } from '../../state/app-context';
 import { DocViews, type ViewMode } from './DocViews';
-import { hasAnyCondition, initialBrowse, planQuery, SORTS, setTagFilter, withMissing, type BrowseState } from './docQuery';
-import { Facets } from './Facets';
-import { ActiveFilters, TagFilterBar } from './FilterBar';
+import { hasAnyCondition, initialBrowse, planQuery, setTagFilter, withMissing, type BrowseState } from './docQuery';
+import { FacetBar } from './FacetBar';
+import { LibraryHeader } from './LibraryHeader';
 import { FolderPane, TagTreePane } from './NavPanes';
+import { SelectionBar } from './SelectionBar';
 import { emptySelection, type SelectionState } from './selection';
 import { useDocumentList, type DocRow } from './useDocumentList';
 import { useScanStatus } from './useScanStatus';
@@ -26,15 +33,15 @@ const DocumentCard = lazyView(() => import('./DocPanel').then((m) => ({ default:
 const BulkTagEditor = lazyView(() => import('./DocPanel').then((m) => ({ default: m.BulkTagEditor })), ['doc', 'doc-projects-reader', 'doc-reader', 'doc-review']);
 const TaxonomyManager = lazyView(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })), ['taxonomy']);
 const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);
-const AdvancedSearchDialog = lazyView(() => import('../ai/AdvancedSearchDialog').then((m) => ({ default: m.AdvancedSearchDialog })), ['advSearch']);
 const AddToProject = lazyView(() => import('./AddToProject').then((m) => ({ default: m.AddToProject })), ['addToProject']);
 
-type PaneTab = 'folders' | 'tags' | 'filters';
-const TABS: PaneTab[] = ['folders', 'tags', 'filters'];
+type PaneTab = 'folders' | 'tags';
+const TABS: PaneTab[] = ['folders', 'tags'];
 
 /**
- * The Library section (phase 2): folder tree, tag and facet filters, the documents as list or grid, the
- * document card and bulk tag editor on the right, and the taxonomy manager. The phase 1 search is the text box.
+ * The Library section: folder and tag pane, the one row of filters (or the selection bar), the documents as list or grid,
+ * the document card on the right, and the taxonomy manager. The search box is in the top bar (D-441): its text comes from
+ * `lib/librarySearch`.
  */
 export function LibraryView() {
   return (
@@ -48,24 +55,25 @@ function LibraryInner() {
   const { t } = useTranslation();
   const app = useApp();
   const { info } = useNotify();
-  const inputId = useId();
-  const helpId = useId();
-  const sortId = useId();
-  const missingId = useId();
-  const { status, start, cancel, rebuild } = useScanStatus();
+  const inbox = useInbox();
+  const { status, start, cancel } = useScanStatus();
   const docsVersion = useChangeVersion('documents');
-  const citationJob = useCitationJob();
+  const text = useSearchText();
 
-  const [browse, setBrowse] = useState<BrowseState>(initialBrowse);
+  const [state, setState] = useState<BrowseState>(initialBrowse);
+  const browse = useMemo<BrowseState>(() => ({ ...state, text }), [state, text]);
   const [view, setView] = useLocalChoice<ViewMode>('rl.libraryView', ['list', 'grid'], 'list');
   const [tab, setTab] = useLocalChoice<PaneTab>('rl.libraryTab', TABS, 'folders');
   const [selection, setSelection] = useState<SelectionState>(emptySelection);
-  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useLocalFlag('rl.detailOpen', false);
+  const [navOpen, setNavOpen] = useState(false);
   const [mode, setMode] = useState<'browse' | 'taxonomy'>('browse');
   const [addOpen, setAddOpen] = useState(false);
   const [jobOpen, setJobOpen] = useState(false);
-  const [advOpen, setAdvOpen] = useState(false);
-  const set = (patch: Partial<BrowseState>) => setBrowse((b) => ({ ...b, ...patch }));
+  const set = (patch: Partial<Omit<BrowseState, 'text'>>) => setState((b) => ({ ...b, ...patch }));
+
+  // The text of the search box is the view's own while it lives: it goes away with the view.
+  useEffect(() => () => setSearchText(''), []);
 
   // Scan on opening the view when nothing ran in this session (a new library, for instance).
   const startedFor = useRef<string | null>(null);
@@ -89,7 +97,6 @@ function LibraryInner() {
   const list = useDocumentList(plan, Boolean(app.activeLibraryId), refreshKey);
   const running = status?.state === 'running';
   const searching = (list.forText ?? '').trim() !== '';
-  const shownSort = browse.sort === 'relevance' && browse.text.trim() === '' ? 'title' : browse.sort;
 
   // A different query is a different list: the selection and the card do not follow it.
   useEffect(() => {
@@ -113,7 +120,7 @@ function LibraryInner() {
 
   const selectedIds = useMemo(() => [...selection.ids], [selection]);
   // The chat panel uses the selection as context; it is withdrawn when the library view goes away.
-  const { publishSelection, openExport } = useAiUi();
+  const { publishSelection } = useAiUi();
   useEffect(() => {
     publishSelection(selectedIds);
   }, [selectedIds, publishSelection]);
@@ -121,188 +128,157 @@ function LibraryInner() {
   const loadAll = list.loadAll;
   const needRows = useCallback(() => void loadAll().catch(() => {}), [loadAll]);
   const single = selection.ids.size === 1 ? selectedIds[0]! : null;
-  const showPanel = detailOpen && selection.ids.size > 0;
+  const many = selection.ids.size > 1;
   const anything = hasAnyCondition(browse);
 
-  const setIncludeSub = (v: boolean) => setBrowse((b) => ({ ...b, includeSub: v, folder: v && b.folder === '' ? null : b.folder }));
+  const setIncludeSub = (v: boolean) => setState((b) => ({ ...b, includeSub: v, folder: v && b.folder === '' ? null : b.folder }));
   // "Show missing documents" is a view option, not a filter: clearing the filters leaves it as it is.
-  const clearAll = () => setBrowse((b) => ({ ...initialBrowse(), includeSub: b.includeSub, filters: withMissing({}, b.filters.includeMissing === true) }));
-  const openDetail = useCallback((docId: string) => {
-    setSelection((s) => (s.ids.has(docId) ? s : { ids: new Set([docId]), anchor: s.active, active: s.active }));
-    setDetailOpen(true);
-  }, []);
+  const clearAll = () => {
+    setSearchText('');
+    setState((b) => ({ ...initialBrowse(), includeSub: b.includeSub, sort: b.sort, filters: withMissing({}, b.filters.includeMissing === true) }));
+  };
+  const openDetail = useCallback(
+    (docId: string) => {
+      setSelection((s) => (s.ids.has(docId) ? s : { ids: new Set([docId]), anchor: s.active, active: s.active }));
+      setDetailOpen(true);
+    },
+    [setDetailOpen],
+  );
   const onDeleteKey = useCallback(() => {
     // Nothing is deleted from the keyboard: the key opens the place where tags can be removed, after a confirmation.
     setDetailOpen(true);
     info(t('docs.deleteHint'));
-  }, [info, t]);
+  }, [info, t, setDetailOpen]);
 
+  const ids = tabIds('library-nav', tab);
   return (
     <div className="view library-page" data-testid="section-library">
-      <header className="library-head">
-        <h1>{t('sections.library')}</h1>
-        <div className="search-bar" role="search">
-          <label htmlFor={inputId}>{t('search.label')}</label>
-          <div className="search-row">
-            <input
-              id={inputId}
-              type="search"
-              value={browse.text}
-              maxLength={500}
-              placeholder={t('search.placeholder')}
-              aria-describedby={helpId}
-              onChange={(e) => set({ text: e.target.value })}
-              data-testid="search-input"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <button type="button" onClick={() => setAdvOpen(true)} title={t('advSearch.buttonHint')} data-testid="adv-search">
-              {t('advSearch.button')}
-            </button>
-          </div>
-          <p className="hint" id={helpId}>
-            {t('search.help')}
-          </p>
-        </div>
-        <HistoryControls />
-      </header>
-
-      <div className="library-tools">
-        <div className="radio-row" role="group" aria-label={t('docs.view')}>
-          {(['list', 'grid'] as ViewMode[]).map((v) => (
-            <button key={v} type="button" className={view === v ? 'toggle on' : 'toggle'} aria-pressed={view === v} onClick={() => setView(v)} data-testid={`view-${v}`}>
-              {t(`docs.view_${v}`)}
-            </button>
-          ))}
-        </div>
-        <label htmlFor={sortId}>{t('search.sort')}</label>
-        <select id={sortId} value={shownSort} onChange={(e) => set({ sort: e.target.value as BrowseState['sort'] })} data-testid="search-sort">
-          {SORTS.filter((s) => s !== 'relevance' || browse.text.trim() !== '').map((s) => (
-            <option key={s} value={s}>
-              {t(`search.sorts.${s}`)}
-            </option>
-          ))}
-        </select>
-        <div className="check">
-          <input
-            id={missingId}
-            type="checkbox"
-            checked={browse.filters.includeMissing === true}
-            onChange={(e) => set({ filters: withMissing(browse.filters, e.target.checked) })}
-            data-testid="show-missing"
-          />
-          <label htmlFor={missingId}>{t('search.showMissing')}</label>
-        </div>
-        <span className="spacer" />
-        <button type="button" onClick={() => setMode(mode === 'taxonomy' ? 'browse' : 'taxonomy')} aria-pressed={mode === 'taxonomy'} data-testid="open-taxonomy">
-          {t('tax.title')}
-        </button>
-        {running ? (
-          <button type="button" onClick={() => void cancel()} data-testid="scan-cancel">
-            {t('scan.cancel')}
-          </button>
-        ) : (
-          <>
-            <button type="button" onClick={() => void start().catch(() => {})} data-testid="scan-start">
-              {t('scan.start')}
-            </button>
-            <button type="button" className="link" onClick={() => void rebuild().catch(() => {})} data-testid="index-rebuild">
-              {t('scan.rebuild')}
-            </button>
-          </>
-        )}
-      </div>
+      {mode !== 'taxonomy' && (
+      <LibraryHeader
+        count={list.total}
+        view={view}
+        onView={setView}
+        sort={browse.sort}
+        hasText={browse.text.trim() !== ''}
+        onSort={(sort) => set({ sort })}
+        scanning={running}
+        onScan={() => void start().catch(() => {})}
+        onCancelScan={() => void cancel()}
+        onManageTags={() => setMode('taxonomy')}
+        detailOpen={detailOpen}
+        onDetail={setDetailOpen}
+        navOpen={navOpen}
+        onNav={setNavOpen}
+      />
+      )}
 
       {mode === 'taxonomy' ? (
         <Lazy>
           <TaxonomyManager onBack={() => setMode('browse')} />
         </Lazy>
       ) : (
-        <div className={showPanel ? 'library-grid with-detail' : 'library-grid'}>
-          <aside className="library-nav" aria-label={t('docs.navigation')}>
-            <div className="tabs" role="tablist" aria-label={t('docs.navigation')}>
-              {TABS.map((id) => (
-                <button key={id} type="button" role="tab" id={`tab-${id}`} aria-selected={tab === id} aria-controls={`tabpanel-${id}`} className={tab === id ? 'tab on' : 'tab'} onClick={() => setTab(id)} data-testid={`tab-${id}`}>
-                  {t(`docs.tabs.${id}`)}
-                </button>
-              ))}
-            </div>
-            <div role="tabpanel" id={`tabpanel-${tab}`} aria-labelledby={`tab-${tab}`}>
-              {tab === 'folders' && <FolderPane folder={browse.folder} includeSub={browse.includeSub} onSelect={(path) => set({ folder: path })} onIncludeSub={setIncludeSub} reloadKey={refreshKey} />}
-              {tab === 'tags' && (
-                <TagTreePane
-                  include={browse.tags.include}
-                  exclude={browse.tags.exclude}
-                  onInclude={(id) => set({ tags: setTagFilter(browse.tags, id, browse.tags.include.includes(id) ? null : 'include') })}
-                  onExclude={(id) => set({ tags: setTagFilter(browse.tags, id, browse.tags.exclude.includes(id) ? null : 'exclude') })}
-                  onManage={() => setMode('taxonomy')}
+        <>
+          {many ? (
+            <SelectionBar
+              ids={selectedIds}
+              rows={selectedRows}
+              onProject={() => setAddOpen(true)}
+              onPropose={() => setJobOpen(true)}
+              onClear={() => setSelection(emptySelection())}
+              tagEditor={(close) => <BulkTagEditor docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onClose={close} />}
+            />
+          ) : (
+            <FacetBar facets={list.facets} browse={browse} anything={anything} onFilters={(filters) => set({ filters })} onTags={(tags) => set({ tags })} onFolder={(folder) => set({ folder })} onClearAll={clearAll} />
+          )}
+          <div className={`library-grid${detailOpen ? ' with-detail' : ''}${navOpen ? ' nav-open' : ''}`}>
+            <aside className="library-nav" aria-label={t('docs.navigation')}>
+              <Tabs
+                label={t('docs.navigation')}
+                idBase="library-nav"
+                value={tab}
+                onChange={(id) => setTab(id as PaneTab)}
+                tabs={TABS.map((id) => ({ id, label: t(`docs.tabs.${id}`) }))}
+              />
+              <div role="tabpanel" id={ids.panelId} aria-labelledby={ids.tabId}>
+                {tab === 'folders' && (
+                  <FolderPane
+                    folder={browse.folder}
+                    includeSub={browse.includeSub}
+                    onSelect={(path) => {
+                      set({ folder: path });
+                      setNavOpen(false);
+                    }}
+                    onIncludeSub={setIncludeSub}
+                    reloadKey={refreshKey}
+                  />
+                )}
+                {tab === 'tags' && (
+                  <TagTreePane
+                    include={browse.tags.include}
+                    exclude={browse.tags.exclude}
+                    onInclude={(id) => set({ tags: setTagFilter(browse.tags, id, browse.tags.include.includes(id) ? null : 'include') })}
+                    onExclude={(id) => set({ tags: setTagFilter(browse.tags, id, browse.tags.exclude.includes(id) ? null : 'exclude') })}
+                    onManage={() => setMode('taxonomy')}
+                  />
+                )}
+              </div>
+            </aside>
+
+            <section className="results-pane" aria-live="polite" aria-busy={list.loading} data-testid="results-pane" data-query={list.forText ?? ''}>
+              {list.error ? <ErrorNote testId="search-error">{errorMessage(list.error, t)}</ErrorNote> : null}
+              {list.total > 0 && (
+                <DocViews
+                  list={list}
+                  view={view}
+                  searching={searching}
+                  selection={selection}
+                  onSelection={setSelection}
+                  onOpenDetail={openDetail}
+                  onDeleteKey={onDeleteKey}
+                  ariaLabel={t('docs.listLabel')}
+                  showSize={browse.sort === 'size-desc' || browse.sort === 'size-asc'}
                 />
               )}
-              {tab === 'filters' && <Facets facets={list.facets} filters={browse.filters} onChange={(filters) => set({ filters })} />}
-            </div>
-          </aside>
-
-          <section className="results-pane" aria-live="polite" aria-busy={list.loading} data-testid="results-pane" data-query={list.forText ?? ''}>
-            <TagFilterBar tags={browse.tags} onChange={(tags) => set({ tags })} />
-            <ActiveFilters
-              filters={browse.filters}
-              folder={browse.folder}
-              includeSub={browse.includeSub}
-              onFilters={(filters) => set({ filters })}
-              onFolder={(folder) => set({ folder })}
-              onClearAll={clearAll}
-              anything={anything}
-            />
-            {list.error ? <ErrorNote testId="search-error">{errorMessage(list.error, t)}</ErrorNote> : null}
-            <div className="results-bar">
-              <p className="results-summary" data-testid="search-summary">
-                {t('search.results', { count: list.total })}
-              </p>
-              {selection.ids.size > 0 && (
-                <div className="selection-bar" data-testid="selection-bar">
-                  <span data-testid="selection-count">{t('docs.selected', { count: selection.ids.size })}</span>
-                  <button type="button" onClick={() => setDetailOpen(true)} data-testid="selection-details">
-                    {single ? t('docs.details') : t('bulk.editTags')}
-                  </button>
-                  <button type="button" onClick={() => setAddOpen(true)} data-testid="add-to-project-button">
-                    {t('projects.addToProject')}
-                  </button>
-                  <button type="button" onClick={() => setJobOpen(true)} data-testid="bulk-ai-propose">
-                    {t('jobs.propose')}
-                  </button>
-                  <button type="button" onClick={() => void citationJob.start(selectedIds)} disabled={citationJob.busy} title={citationJob.busy ? t('citations.alreadyRunning') : t('citations.bulkHint')} data-testid="bulk-citations">
-                    {t('citations.bulk')}
-                  </button>
-                  <button type="button" onClick={() => openExport({ docIds: selectedIds })} data-testid="bulk-export">
-                    {t('secondBrain.button')}
-                  </button>
-                  <button type="button" className="link" onClick={() => setSelection(emptySelection())} data-testid="selection-clear">
-                    {t('docs.clearSelection')}
-                  </button>
+              {list.total === 0 && !list.loading && list.forText !== undefined && (
+                <div className="library-empty" data-testid="search-empty">
+                  {anything ? (
+                    <EmptyState icon={<IconLibrary size={24} />} title={t('library.noResultsTitle')} action={<Button onClick={clearAll}>{t('library.clear')}</Button>}>
+                      {t('search.none')}
+                    </EmptyState>
+                  ) : (
+                    <EmptyState
+                      icon={<IconLibrary size={24} />}
+                      title={t('library.emptyTitle')}
+                      action={
+                        <Button variant="primary" icon={<IconPlus size={16} />} onClick={() => void inbox.choose()}>
+                          {t('library.addPdf')}
+                        </Button>
+                      }
+                    >
+                      {t('search.emptyLibrary')}
+                    </EmptyState>
+                  )}
                 </div>
               )}
-            </div>
-            {list.total > 0 && <DocViews list={list} view={view} searching={searching} selection={selection} onSelection={setSelection} onOpenDetail={openDetail} onDeleteKey={onDeleteKey} ariaLabel={t('docs.listLabel')} />}
-            {list.total === 0 && !list.loading && list.forText !== undefined && (
-              <p className="empty" data-testid="search-empty">
-                {anything ? t('search.none') : t('search.emptyLibrary')}
-              </p>
-            )}
-          </section>
+            </section>
 
-          {showPanel && (
-            <aside className="detail-pane" aria-label={t('docs.details')} data-testid="detail-pane" onKeyDown={(e) => e.key === 'Escape' && setDetailOpen(false)}>
-              <Lazy>
-                {single ? <DocumentCard key={single} docId={single} onClose={() => setDetailOpen(false)} /> : <BulkTagEditor docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onClose={() => setDetailOpen(false)} />}
-              </Lazy>
-            </aside>
-          )}
-        </div>
-      )}
-      {advOpen && (
-        <Lazy>
-          <AdvancedSearchDialog initialText={browse.text} onClose={() => setAdvOpen(false)} />
-        </Lazy>
+            {detailOpen && (
+              <aside className="detail-pane" aria-label={t('docs.details')} data-testid="detail-pane" onKeyDown={(e) => e.key === 'Escape' && setDetailOpen(false)}>
+                <Lazy>
+                  {single ? (
+                    <DocumentCard key={single} docId={single} onClose={() => setDetailOpen(false)} />
+                  ) : many ? (
+                    <BulkTagEditor docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onClose={() => setDetailOpen(false)} />
+                  ) : (
+                    <p className="hint detail-empty" data-testid="detail-empty">
+                      {t('library.detailEmpty')}
+                    </p>
+                  )}
+                </Lazy>
+              </aside>
+            )}
+          </div>
+        </>
       )}
       {jobOpen && (
         <Lazy>

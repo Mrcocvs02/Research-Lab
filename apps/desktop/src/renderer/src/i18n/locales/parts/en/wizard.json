@@ -15,29 +15,26 @@
     "creating": "Creating…",
     "cancel": "Cancel",
     "steps": {
-      "language": "Welcome",
-      "profile": "About you",
-      "folder": "Library folder",
-      "details": "Library details",
+      "language": "Welcome and language",
+      "folder": "Folder",
+      "details": "Details",
       "legacy": "Existing index found",
-      "taxonomy": "Starting taxonomy",
-      "aiFolders": "Folders enabled for Claude",
-      "summary": "Summary"
+      "taxonomy": "Starting tags",
+      "aiFolders": "Claude",
+      "summary": "Summary",
+      "scan": "First scan"
     },
     "language": {
       "intro": "Welcome to Research Lab. Choose the language of the interface. You can change it later in the settings.",
       "label": "Interface language"
-    },
-    "profile": {
-      "intro": "These details help the app recognise your own papers and query citation services. Everything here is optional.",
-      "optional": "You can leave all fields empty and fill them in later from the settings."
     },
     "folder": {
       "intro": "Choose the folder that holds your documents. It can be any folder, including one that a cloud service already synchronises.",
       "choose": "Choose folder…",
       "change": "Choose another folder…",
       "dialogTitle": "Choose the library folder",
-      "safe": "Your documents are never modified, moved or deleted. The app only writes inside its own data folder."
+      "safe": "Your documents are never modified, moved or deleted. The app only writes inside its own data folder.",
+      "advanced": "Advanced options"
     },
     "legacy": {
       "intro": "An index created by the previous tool was found in this folder. You can import it once.",
@@ -74,15 +71,12 @@
       "claudeNote": "Available after connecting Claude."
     },
     "ai": {
-      "intro": "Documents are sent to Claude only from the folders you enable here. By default no folder is enabled.",
-      "why": "Why: some material may be confidential. Sending is enabled folder by folder, and every send shows a preview first and is recorded in a log. Check the data terms of your Claude plan before enabling folders with non-public material.",
+      "intro": "Claude reads documents only from the folders you enable here. Until you enable a folder, nothing is sent.",
+      "why": "Some material may be confidential: every send shows a preview first and is recorded in a list. Before enabling folders with non-public material, check your Claude plan's terms on the use of data.",
       "treeLabel": "Folders in the library",
       "noneSelected": "No folder enabled: nothing will be sent to Claude.",
       "selected_one": "{{count}} folder enabled, including its sub-folders.",
-      "selected_other": "{{count}} folders enabled, including their sub-folders.",
-      "confirmNone": "I understand that nothing will be sent to Claude for now",
-      "confirmSome_one": "I confirm that documents in the {{count}} selected folder may be sent to Claude",
-      "confirmSome_other": "I confirm that documents in the {{count}} selected folders may be sent to Claude"
+      "selected_other": "{{count}} folders enabled, including their sub-folders."
     },
     "summary": {
       "intro": "Check the details and create the library.",
@@ -92,7 +86,33 @@
       "taxonomy": "Starting taxonomy",
       "taxonomyImport": "From the imported index",
       "ai": "Folders enabled for Claude",
-      "aiNone": "None"
+      "aiNone": "None",
+      "writeToPdf": "Save highlights inside the PDFs too",
+      "writeToPdfHint": "You will see them in Chrome and other readers; the PDF text does not change. In this version they stay in the app only: the consent applies for when writing is on. Change it in Settings › Library.",
+      "willWrite": "Highlights will be saved inside the PDFs too.",
+      "appOnly": "Highlights stay in the app only."
+    },
+    "skip": "Skip",
+    "details": {
+      "yourName": "Your name",
+      "yourNameHint": "Optional. It helps to recognise your own work; the rest of the profile is in Settings."
+    },
+    "scan": {
+      "intro": "Reading the library folder.",
+      "files_one": "{{count}} file",
+      "files_other": "{{count}} files",
+      "phase_walking": "File list",
+      "phase_hashing": "Fingerprints",
+      "phase_extracting": "Text extraction",
+      "phase_indexing": "Index",
+      "result_one": "Found {{count}} document.",
+      "result_other": "Found {{count}} documents.",
+      "resultFailed_one": "Found {{count}} document · {{failed}} unreadable (searched by name).",
+      "resultFailed_other": "Found {{count}} documents · {{failed}} unreadable (searched by name).",
+      "background": "You can close this: the scan goes on and you can follow it at the top.",
+      "continue": "Continue in the background",
+      "open": "Open the library",
+      "wait": "The scan has not finished yet"
     }
   }
 }

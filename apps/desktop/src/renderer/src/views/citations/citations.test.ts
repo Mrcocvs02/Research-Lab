@@ -16,6 +16,7 @@ import { fakeLink, fakeView, memoryCitations } from '../../testing/memoryCitatio
 import { makeDocs, memoryLibrary } from '../../testing/memoryLibrary';
 import { callsTo, emitEvent, memoryBackend, setHandlers } from '../../testing/mockRl';
 import { LibraryView } from '../library/LibraryView';
+import { chooseMenuItem, openDetail } from '../../testing/libraryKit';
 import { CitationsPanel } from './CitationsPanel';
 
 vi.mock('../../lib/rl', async () => (await import('../../testing/mockRl')).rlModule);
@@ -211,15 +212,24 @@ describe('bulk citation refresh', () => {
     const c = await mount(createElement('div', null, createElement(LibraryView), createElement(Starter, { ids: ['d1'] })), lib.handlers);
     await screen.findAllByTestId('search-result');
     fireEvent.click(screen.getAllByTestId('search-result')[0]!);
-    fireEvent.click(await screen.findByTestId('bulk-citations'));
+    fireEvent.click(screen.getAllByTestId('search-result')[1]!, { ctrlKey: true });
+    fireEvent.click(await screen.findByTestId('selection-more'));
+    chooseMenuItem(/Refresh citations/);
     await waitFor(() => expect(c.state.manyStarted).toHaveLength(1));
     act(() => c.progress({ state: 'running', total: 1, done: 0 }));
-    await waitFor(() => expect(screen.getByTestId('bulk-citations')).toHaveProperty('disabled', true));
+    const refreshItem = () => {
+      fireEvent.click(screen.getByTestId('selection-more'));
+      const item = screen.getByRole('menuitem', { name: /Refresh citations/, hidden: true });
+      const off = item.getAttribute('aria-disabled') === 'true';
+      fireEvent.keyDown(item, { key: 'Escape' });
+      return off;
+    };
+    await waitFor(() => expect(refreshItem()).toBe(true));
     fireEvent.click(screen.getByTestId('go'));
     await waitFor(() => expect(screen.getByTestId('toasts').textContent).toContain('already running'));
     expect(c.state.manyStarted).toHaveLength(1);
     act(() => c.progress({ state: 'done', total: 1, done: 1 }));
-    await waitFor(() => expect(screen.getByTestId('bulk-citations')).toHaveProperty('disabled', false));
+    await waitFor(() => expect(refreshItem()).toBe(false));
   });
 
   it('is offered from the library selection and starts the job for the selected documents', async () => {
@@ -229,7 +239,8 @@ describe('bulk citation refresh', () => {
     const rows = screen.getAllByTestId('search-result');
     fireEvent.click(rows[0]!);
     fireEvent.click(rows[1]!, { ctrlKey: true });
-    fireEvent.click(await screen.findByTestId('bulk-citations'));
+    fireEvent.click(await screen.findByTestId('selection-more'));
+    chooseMenuItem(/Refresh citations/);
     await waitFor(() => expect(c.state.manyStarted).toHaveLength(1));
     expect(c.state.manyStarted[0]).toHaveLength(2);
     expect(callsTo('citations:refresh')).toEqual([]);
@@ -275,7 +286,7 @@ describe('document detail', () => {
     const c = await mount(createElement(LibraryView), lib.handlers);
     await screen.findAllByTestId('search-result');
     fireEvent.click(screen.getAllByTestId('search-result')[0]!);
-    fireEvent.click(await screen.findByTestId('selection-details'));
+    openDetail();
     const toggle = await screen.findByTestId('citations-toggle');
     expect(callsTo('citations:get')).toEqual([]);
     expect(screen.queryByTestId('citations-panel')).toBeNull();

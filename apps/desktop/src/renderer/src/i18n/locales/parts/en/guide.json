@@ -7,15 +7,15 @@
     "tasks": {
       "addDocs": {
         "title": "Add documents",
-        "body": "Drop PDF files or a folder into the window, or use Add PDF in To review (Alt+2). The app reads titles and metadata, files them in your library and shows what it found for you to confirm. Your originals are never changed."
+        "body": "Drop PDF files or a folder into the window, or use Add PDF in the Library or in To review (Alt+2). The app reads titles and metadata, files them in your library and shows what it found for you to confirm. The Activity chip, at the top right, follows the scan: See the report lists new, changed, moved and missing files. Your originals are never changed."
       },
       "tags": {
         "title": "Organize with tags and projects",
-        "body": "Select documents in the Library and give them tags from your taxonomy, or add them to a project. You can undo any change with Undo, in the top bar. The search box finds text, titles and authors; the advanced search can also ask Claude."
+        "body": "In the Library select documents (with the box at the left of each row): the bar that replaces the filters offers Tags, Project and Claude. Tags are managed from Manage tags, in the Library ⋯ menu. You can undo any change with Undo, in the top bar, or Ctrl+Z; Redo is Ctrl+Y, in the History and in the command palette. The search box at the top finds text, titles and authors (? shows the syntax); the sparkle button searches with Claude."
       },
       "read": {
         "title": "Read and annotate",
-        "body": "Double-click a document to open it in the reader. Select text to highlight or underline it and to add a note. Notes, highlights and citations are saved in your library folder and travel with it. Reader tools use single keys. At the first start after the update Research Lab re-checks highlights that were saved misplaced, in the background and without opening the documents; those it cannot place stay in the reader's To check group."
+        "body": "Double-click a document (or press Enter) to open it in the reader; Shift+Enter opens its card. Select text to highlight or underline it and to add a note. Notes, highlights and citations are saved in your library folder and travel with it. For now highlights stay in the app only: writing into the PDFs is not on yet. Reader tools use single keys. At the first start after the update Research Lab re-checks highlights that were saved misplaced, in the background and without opening the documents; those it cannot place stay in the reader's To check group."
       },
       "chat": {
         "title": "Ask Claude",
@@ -35,19 +35,14 @@
       }
     },
     "welcome": {
-      "title": "Welcome to Research Lab",
-      "body": "Your library is ready. The guide explains the main tasks in a few lines.",
-      "tips": "Tips",
-      "hide": "Hide",
-      "hideTip": "Hide this tip for good",
-      "open": "Open the guide",
-      "gotIt": "Got it",
-      "saveFailed": "Could not save this choice."
-    },
-    "tips": {
-      "palette": "Press {{palette}} for the command palette: go anywhere, back up, ask Claude.",
-      "search": "Press {{search}} to jump to the search box.",
-      "backup": "Set up a backup in the settings so your notes are never lost."
+      "title": "Getting started",
+      "saveFailed": "Could not save this choice.",
+      "items": {
+        "read": "Open a PDF and try Highlight",
+        "claude": "Ask Claude something",
+        "backup": "Set up a backup"
+      },
+      "close": "Close"
     }
   }
 }

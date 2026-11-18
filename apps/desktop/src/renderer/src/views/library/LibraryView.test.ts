@@ -10,9 +10,10 @@ import { HistoryProvider } from '../../lib/history';
 import { NotifyProvider } from '../../lib/notify';
 import { AppProvider } from '../../state/app-context';
 import { ExportProbe } from '../../testing/exportProbe';
+import { chooseMenuItem, openDetail, openFacet, openTaxonomy, pickSort, pickView, resetSearch, topBarParts } from '../../testing/libraryKit';
 import { makeDocs, memoryLibrary, type FakeNode } from '../../testing/memoryLibrary';
 import { callsTo, emitEvent, memoryBackend, setHandlers } from '../../testing/mockRl';
-import { Facets, toggleFilter } from './Facets';
+import { toggleFilter } from './Facets';
 import { LibraryView } from './LibraryView';
 
 vi.mock('../../lib/rl', async () => (await import('../../testing/mockRl')).rlModule);
@@ -26,7 +27,7 @@ function setup(init: Parameters<typeof memoryLibrary>[0] = {}, override: Record<
   const { handlers } = memoryBackend({ profiles: [profile] });
   setHandlers({ ...handlers, ...lib.handlers, ...override });
   render(
-    createElement(AppProvider, null, createElement(LibraryEventsProvider, null, createElement(NotifyProvider, null, createElement(HistoryProvider, null, createElement(AiUiProvider, null, createElement(LibraryView), createElement(ExportProbe)))))),
+    createElement(AppProvider, null, createElement(LibraryEventsProvider, null, createElement(NotifyProvider, null, createElement(HistoryProvider, null, createElement(AiUiProvider, null, createElement(LibraryView), topBarParts(), createElement(ExportProbe)))))),
   );
   return lib;
 }
@@ -47,14 +48,16 @@ beforeEach(async () => {
     // no storage
   }
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  resetSearch();
+});
 
 describe('facets helper', () => {
   it('toggles a value and a single year', () => {
     expect(toggleFilter({}, 'authors', 'A')).toEqual({ authors: ['A'] });
     expect(toggleFilter({ authors: ['A'] }, 'authors', 'A')).toEqual({});
     expect(toggleFilter({}, 'years', '2020')).toEqual({ yearFrom: 2020, yearTo: 2020 });
-    expect(typeof Facets).toBe('function');
   });
 });
 
@@ -76,9 +79,9 @@ describe('LibraryView: list, grid, search', () => {
   it('switches to the grid and back, and sorts', async () => {
     setup();
     await ready();
-    fireEvent.click(screen.getByTestId('view-grid'));
+    pickView('grid');
     await waitFor(() => expect(rows()[0]?.dataset.view).toBe('grid'));
-    fireEvent.click(screen.getByTestId('view-list'));
+    pickView('list');
     await waitFor(() => expect(rows()[0]?.dataset.view).toBe('list'));
     fireEvent.change(screen.getByTestId('search-sort'), { target: { value: 'year-desc' } });
     await waitFor(() => expect(callsTo('documents:list').some((p) => p.sort === 'year-desc')).toBe(true));
@@ -103,7 +106,7 @@ describe('LibraryView: list, grid, search', () => {
     expect(rows().length).toBeLessThan(60);
     expect(callsTo('documents:list').filter((p) => (p.limit ?? 0) <= 100).length).toBeLessThanOrEqual(2);
     const list = screen.getByTestId('search-results');
-    list.scrollTop = 76 * 4000;
+    list.scrollTop = 60 * 4000;
     fireEvent.scroll(list);
     await waitFor(() => expect(titles().some((t) => t?.includes('Paper 40'))).toBe(true));
     expect(rows().length).toBeLessThan(60);
@@ -118,6 +121,7 @@ describe('LibraryView: list, grid, search', () => {
       fireEvent.change(screen.getByTestId(testId), { target: { value: text } });
       fireEvent.keyDown(screen.getByTestId(testId), { key: 'Enter' });
     };
+    openFacet('tags');
     pick('filter-include-input', 'ML');
     pick('filter-include-input', 'stat');
     fireEvent.click(screen.getByTestId('tag-mode-any'));
@@ -145,11 +149,13 @@ describe('LibraryView: list, grid, search', () => {
     setup({ docs });
     await ready();
     const sizes = () => rows().map((r) => r.querySelector('[data-testid="doc-size"]')?.textContent);
-    expect(sizes()).toEqual(['500 B', '3 MB', '20 KB', '1.5 KB']);
-    type('search-sort', 'size-desc');
+    // The size is shown when the list is sorted by it, not otherwise (4.2: a quiet row).
+    expect(sizes()).toEqual([undefined, undefined, undefined, undefined]);
+    pickSort('size-desc');
     await waitFor(() => expect(titles()).toEqual(['Paper 0001', 'Paper 0002', 'Paper 0003', 'Paper 0000']));
+    expect(sizes()).toEqual(['3 MB', '20 KB', '1.5 KB', '500 B']);
     expect(callsTo('documents:list').at(-1)?.sort).toBe('size-desc');
-    type('search-sort', 'size-asc');
+    pickSort('size-asc');
     await waitFor(() => expect(titles()).toEqual(['Paper 0000', 'Paper 0003', 'Paper 0002', 'Paper 0001']));
   });
 
@@ -189,7 +195,8 @@ describe('LibraryView: selection', () => {
     await ready();
     const count = () => screen.queryByTestId('selection-count')?.textContent ?? '';
     fireEvent.click(rowOf('Paper 0001'));
-    expect(count()).toBe('1 selected');
+    expect(count()).toBe(''); // the bar of the selection is for several documents; one is the active row
+    expect(rowOf('Paper 0001').getAttribute('aria-selected')).toBe('true');
     fireEvent.click(rowOf('Paper 0003'), { ctrlKey: true });
     expect(count()).toBe('2 selected');
     fireEvent.click(rowOf('Paper 0005'), { shiftKey: true });
@@ -257,7 +264,7 @@ describe('LibraryView: tags', () => {
     await ready();
     fireEvent.click(rowOf('Paper 0000'));
     fireEvent.click(rowOf('Paper 0001'), { ctrlKey: true });
-    fireEvent.click(screen.getByTestId('selection-details'));
+    openDetail();
     return screen.findByTestId('bulk-panel');
   }
 
@@ -311,6 +318,7 @@ describe('LibraryView: tags', () => {
       fireEvent.change(screen.getByTestId(testId), { target: { value: text } });
       fireEvent.keyDown(screen.getByTestId(testId), { key: 'Enter' });
     };
+    openFacet('tags');
     await pick('filter-include-input', 'ML');
     await waitFor(() => expect(rows()).toHaveLength(2));
     expect(callsTo('documents:list').at(-1)?.filters?.tags).toEqual(['ml']);
@@ -334,7 +342,7 @@ describe('LibraryView: tags', () => {
     const lib = setup({ docs });
     await ready();
     fireEvent.click(rowOf('Paper 0000'));
-    fireEvent.click(screen.getByTestId('selection-details'));
+    openDetail();
     const panel = await screen.findByTestId('doc-panel');
     fireEvent.click(await within(await within(panel).findByTestId('doc-tag-list')).findByRole('button', { name: /Remove tag Machine learning/ }));
     await waitFor(() => expect(lib.state.docs[0]!.tags).toEqual([]));
@@ -354,7 +362,7 @@ describe('LibraryView: document card', () => {
   async function open() {
     await ready();
     fireEvent.click(rowOf('Paper 0000'));
-    fireEvent.keyDown(screen.getByTestId('search-results'), { key: 'Enter' });
+    fireEvent.keyDown(screen.getByTestId('search-results'), { key: 'Enter', shiftKey: true });
     return screen.findByTestId('doc-panel');
   }
 
@@ -368,7 +376,9 @@ describe('LibraryView: document card', () => {
     expect(ai.querySelector('textarea, input')).toBeNull();
     expect(within(ai).getByTestId('ai-keywords').textContent).toContain('alpha');
     expect(panel.querySelector('[data-testid="doc-metadata"] [data-testid="ai-area"]')).toBeNull();
-    // extracted values are marked, user values are not
+    // the data are read-only until 'Edit details'; extracted values are marked, user values are not
+    expect(within(panel).queryByTestId('field-title')).toBeNull();
+    fireEvent.click(within(panel).getByTestId('detail-edit-data'));
     expect(within(panel).getAllByTestId('extracted-mark')).toHaveLength(1);
 
     const title = within(panel).getByTestId('field-title');
@@ -396,9 +406,11 @@ describe('LibraryView: document card', () => {
       },
     });
     const panel = await open();
-    fireEvent.click(within(panel).getByTestId('reveal-file'));
+    fireEvent.click(within(panel).getByTestId('doc-more'));
+    chooseMenuItem(/Show in folder/);
     await waitFor(() => expect(callsTo('documents:reveal')).toHaveLength(1));
-    fireEvent.click(within(panel).getByTestId('open-file'));
+    fireEvent.click(within(panel).getByTestId('doc-more'));
+    chooseMenuItem(/Open with the default program/);
     await waitFor(() => expect(screen.getByTestId('toasts').textContent).toContain('Show in folder'));
   });
 
@@ -409,6 +421,7 @@ describe('LibraryView: document card', () => {
       },
     });
     const panel = await open();
+    fireEvent.click(within(panel).getByTestId('detail-edit-data'));
     const title = within(panel).getByTestId('field-title');
     fireEvent.change(title, { target: { value: 'x' } });
     fireEvent.blur(title);
@@ -423,7 +436,7 @@ describe('LibraryView: undo, redo and history', () => {
     const lib = setup();
     await ready();
     fireEvent.click(rowOf('Paper 0000'));
-    fireEvent.click(screen.getByTestId('selection-details'));
+    openDetail();
     const input = await screen.findByTestId('tag-input');
     fireEvent.change(input, { target: { value: 'stats' } });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -461,7 +474,7 @@ describe('LibraryView: undo, redo and history', () => {
 describe('LibraryView: taxonomy manager', () => {
   const open = async () => {
     await ready();
-    fireEvent.click(screen.getByTestId('open-taxonomy'));
+    openTaxonomy();
     return screen.findByTestId('taxonomy-manager');
   };
   const treeItem = (id: string) => screen.getByTestId('tax-tree').querySelector<HTMLElement>(`[data-key="${id}"]`)!;
@@ -607,7 +620,7 @@ describe('LibraryView: phase 2 review fixes', () => {
     fireEvent.click(rowOf('Paper 0000'));
     fireEvent.keyDown(screen.getByTestId('search-results'), { key: 'a', ctrlKey: true });
     await waitFor(() => expect(countText()).toBe('250 selected'));
-    fireEvent.click(screen.getByTestId('selection-details'));
+    openDetail();
     await addTag('bulk-tag-input', 'stats');
     await waitFor(() => expect(callsTo('documents:tag')).toHaveLength(1));
     expect(callsTo('documents:tag')[0].docIds).toHaveLength(250);
@@ -645,7 +658,7 @@ describe('LibraryView: phase 2 review fixes', () => {
     emitEvent('library:changed', { kind: 'documents' });
     await waitFor(() => expect(titles().at(-1)).toBe('Zzz last'));
     const list = screen.getByTestId('search-results');
-    fireEvent.keyDown(list, { key: 'Enter' });
+    fireEvent.keyDown(list, { key: 'Enter', shiftKey: true });
     await waitFor(() => expect(screen.getByTestId('panel-title').textContent).toBe('Paper 0002'));
     fireEvent.keyDown(list, { key: 'ArrowDown' });
     await waitFor(() => expect(rowOf('Paper 0003').getAttribute('aria-selected')).toBe('true'));
@@ -660,7 +673,7 @@ describe('LibraryView: phase 2 review fixes', () => {
     await ready();
     fireEvent.click(rowOf('Paper 0000'));
     fireEvent.click(rowOf('Paper 0001'), { ctrlKey: true });
-    fireEvent.click(screen.getByTestId('selection-details'));
+    openDetail();
     const items = await screen.findAllByTestId('bulk-tag');
     const byTag = (id: string) => items.find((i) => i.dataset.tag === id)!;
     expect(within(byTag('ml')).getByTestId('bulk-remove')).toBeTruthy();
@@ -674,7 +687,7 @@ describe('LibraryView: phase 2 review fixes', () => {
     const lib = setup();
     await ready();
     fireEvent.click(rowOf('Paper 0000'));
-    fireEvent.click(screen.getByTestId('selection-details'));
+    openDetail();
     await addTag('tag-input', 'stats');
     await waitFor(() => expect(lib.state.docs[0]!.tags).toEqual(['stats']));
     await waitFor(() => expect((screen.getByTestId('undo-button') as HTMLButtonElement).disabled).toBe(false));
@@ -692,7 +705,7 @@ describe('LibraryView: phase 2 review fixes', () => {
 
   it('applies taxonomy operations one after the other: a blur and a click right after it do not conflict', async () => {
     const lib = setup({ nodes: [node('methods', 'Methods')] });
-    fireEvent.click(await screen.findByTestId('open-taxonomy'));
+    openTaxonomy();
     fireEvent.click(await screen.findByText('Methods'));
     const aliases = await screen.findByTestId('node-aliases');
     fireEvent.change(aliases, { target: { value: 'meth' } });
@@ -741,7 +754,7 @@ describe('LibraryView: bulk actions and their limits (D-178)', () => {
     let lib!: ReturnType<typeof setup>;
     lib = setup({ docs: makeDocs(250) }, { 'documents:tag': async (p) => (await gate, lib.handlers['documents:tag']!(p)) });
     await selectAll('250 selected');
-    fireEvent.click(screen.getByTestId('selection-details'));
+    openDetail();
     await addTag('stats');
     expect((await screen.findByTestId('bulk-busy')).textContent).toContain('250');
     expect((screen.getByTestId('bulk-tag-input') as HTMLInputElement).disabled).toBe(true);
@@ -756,7 +769,7 @@ describe('LibraryView: bulk actions and their limits (D-178)', () => {
   it('refuses a tag change on more documents than one change can hold, with the reason and without sending it', async () => {
     setup({ docs: makeDocs(250) }, { 'documents:ids': () => ({ total: 250, ids: fakeIds(50_001) }) });
     await selectAll('50001 selected');
-    fireEvent.click(screen.getByTestId('selection-details'));
+    openDetail();
     await addTag('stats');
     await waitFor(() => expect(toastTexts().some((x) => x.includes('One change can cover at most 50000 documents; 50001 are selected.'))).toBe(true));
     expect(callsTo('documents:tag')).toHaveLength(0);
@@ -824,7 +837,8 @@ describe('LibraryView: propose with AI', () => {
     await ready();
     fireEvent.click(rowOf('Paper 0000'));
     fireEvent.click(rowOf('Paper 0002'), { ctrlKey: true });
-    fireEvent.click(screen.getByTestId('bulk-ai-propose'));
+    fireEvent.click(screen.getByTestId('bulk-claude'));
+    chooseMenuItem(/Propose with Claude/);
     expect(await screen.findByTestId('job-dialog')).toBeTruthy();
     await waitFor(() => expect(screen.getByTestId('job-to-send').textContent).toBe('2 documents will be sent'));
     expect(callsTo('jobs:estimate')[0].docIds).toHaveLength(2);
@@ -839,7 +853,8 @@ describe('LibraryView: second-brain export', () => {
     expect(screen.getByTestId('export-probe').textContent).toBe('closed');
     fireEvent.click(rowOf('Paper 0000'));
     fireEvent.click(rowOf('Paper 0002'), { ctrlKey: true });
-    fireEvent.click(screen.getByTestId('bulk-export'));
+    fireEvent.click(screen.getByTestId('selection-more'));
+    chooseMenuItem(/second brain/i);
     const init = JSON.parse(screen.getByTestId('export-probe').textContent!);
     expect([...init.docIds].sort()).toEqual([docs[0]!.docId, docs[2]!.docId].sort());
   });

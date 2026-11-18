@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
-import { SEARCH_LIMITS, SEARCH_MARK_OPEN } from '@rl/core';
+import { SEARCH_LIMITS, SEARCH_MARK_OPEN, contentHashOf } from '@rl/core';
 import type {
   DocumentListQuery,
   DocumentSummary,
@@ -368,7 +368,7 @@ export class SqliteSearchIndex implements SearchIndex {
         ins.run(id * PAGE_ROWID_BASE + p.page, stripControl(p.text));
         pages++;
       }
-      db.prepare('UPDATE docs SET text_hash = ?, page_count = ? WHERE id = ?').run(doc.textHash ?? r.hash, pages, id);
+      db.prepare('UPDATE docs SET text_hash = ?, page_count = ? WHERE id = ?').run(doc.textHash ?? contentHashOf(r), pages, id);
     }
   }
 

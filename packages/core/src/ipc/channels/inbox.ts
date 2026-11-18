@@ -55,6 +55,11 @@ export const inboxItemSchema = z.object({
     .object({ kind: z.enum(['same-file', 'same-work', 'version']), docId: documentIdSchema, title: z.string().nullable(), path: relativePathSchema })
     .nullable(),
   /**
+   * A copy made by a sync conflict of a PDF we annotated (§8.3.6): its first bytes are `pdfWrite.base` of `docId`.
+   * The app never deletes it; the user compares, keeps it as a separate document or ignores it.
+   */
+  conflictOf: z.object({ docId: documentIdSchema, title: z.string().nullable() }).optional(),
+  /**
    * What the app proposes: file name and folder (kind `dropped`; '' is the root of the library), tags of the
    * taxonomy and, from the AI only, new nodes. `tagsFrom`: 'similar' (tags of the most similar documents of the
    * library, no AI), 'ai' (`inbox:proposeTags`), 'none'.

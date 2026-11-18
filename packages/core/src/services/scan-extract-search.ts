@@ -117,6 +117,11 @@ export interface ExtractOptions {
   /** Content hash when the caller already knows it: allows a cache hit without reading the file. */
   hash?: string;
   /**
+   * The file carries annotations we appended: its text is the text of this (base) content, so the cache entry is also
+   * stored under it and the result reports it as `hash` (no mismatch). Never set for a file that may have changed.
+   */
+  contentHash?: string;
+  /**
    * Progress signal for a watchdog (PDF only): `(0, total)` when the document is open, then `(page, total)` after each
    * page. A supervisor that gets no signal for N seconds can kill the thread running the extraction.
    */

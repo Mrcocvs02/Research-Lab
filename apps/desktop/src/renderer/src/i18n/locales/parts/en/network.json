@@ -43,8 +43,8 @@
       "layout": "Laying out the map"
     },
     "tab": {
-      "map": "Map",
-      "network": "Network",
+      "map": "Overview",
+      "network": "Links",
       "explore": "Explore",
       "surprising": "Unexpected pairs"
     },
@@ -101,12 +101,16 @@
         "contains": "contains"
       },
       "empty": "Choose a document, folder or tag to start the network.",
-      "help": "Double-click a node (or use Expand, or press Enter) to add its neighbours; drag nodes to move them; wheel to zoom; ] and [ choose the next or previous node.",
+      "help": "Double-click a node to bring its neighbourhood into focus and expand it (or use Expand, or press Enter twice); drag nodes to move them (they stay where you drop them, P releases); wheel to zoom; arrows go to the nearest node, ] and [ to the next or previous one; Shift+click a second node for the shortest path.",
       "label": "Network of documents, folders and tags",
       "noKinds": "None of the chosen kinds applies to this node.",
       "alreadyExpanded": "This node is already expanded.",
-      "capped": "The network is limited to {{limit}} nodes.",
-      "nothingNew": "No new neighbours."
+      "capped": "+{{count}} not shown (limit {{limit}} nodes)",
+      "nothingNew": "No new neighbours.",
+      "onlyThese": "Show only these",
+      "announce": "{{name}}, {{kind}}, {{links}} links",
+      "surprise": "Close in content, far in topics. Words in common: {{terms}}.",
+      "emptyTitle": "Choose a document to start from"
     },
     "explore": {
       "documents": "Documents",
@@ -153,6 +157,122 @@
       "surprisingTitle": "Close but do not look it",
       "surprisingHint": "Similar in content, yet with no shared tag, citation or folder.",
       "noSurprising": "No unexpected pairs found."
+    },
+    "roleMap": "map",
+    "announce": {
+      "doc": "{{title}}, {{topic}}"
+    },
+    "card": {
+      "topic": "Topic: {{topic}}"
+    },
+    "minimap": "Show the minimap",
+    "minimapLabel": "Minimap: drag the rectangle to move the view",
+    "unpinAll": "Release all pinned nodes",
+    "more": "More options",
+    "play": {
+      "shuffle": "Shuffle",
+      "surprise": "Surprise me"
+    },
+    "search": {
+      "go": "Go to…",
+      "goDoc": "Go to a document…",
+      "goEntity": "Go to {{kind}}…"
+    },
+    "noMapTitle": "Build the map of your documents",
+    "mapFiltered": "{{from}} → {{to}} documents",
+    "fewDocs": "The map needs at least 3 documents to show anything useful. Add PDFs to the library and build it again.",
+    "mode": {
+      "label": "Network of:",
+      "doc": "Documents",
+      "tag": "Tags",
+      "topic": "Topics",
+      "author": "Authors",
+      "hint": "M changes mode"
+    },
+    "ent": {
+      "groupOf": "Group of {{name}}",
+      "you": "You",
+      "noPath": "These two nodes are not connected.",
+      "dotsMore_one": "{{shown}} of {{total}} document shown.",
+      "dotsMore_other": "{{shown}} of {{total}} documents shown.",
+      "lastLevel": "This topic cannot be split any further.",
+      "noSurprise": "No surprising pair found here.",
+      "years": "Years",
+      "yearFrom": "First year",
+      "yearTo": "Last year",
+      "minDocs": "At least N documents",
+      "minWeight": "Links",
+      "level": "Level",
+      "tagAny": "Any tag",
+      "cap": "{{shown}} of {{total}} {{kind}}",
+      "count_one": "{{count}} {{kind}}",
+      "count_other": "{{count}} {{kind}}",
+      "documents_one": "{{count}} document",
+      "documents_other": "{{count}} documents",
+      "up": "Back to the level",
+      "label": "Network of {{kind}}: drag to move, wheel to zoom, arrows go to the nearest node, Enter selects, M changes mode, L opens Explore.",
+      "forms_one": "{{count}} form",
+      "forms_other": "{{count}} forms",
+      "namesake_one": "Possible namesake: {{count}} form of the name",
+      "namesake_other": "Possible namesake: {{count}} forms of the name",
+      "groupLine": {
+        "tag": "Branch: {{name}}",
+        "topic": "Part of: {{name}}",
+        "author": "Group of {{name}}"
+      },
+      "links": {
+        "tag": "Often with",
+        "topic": "Close to",
+        "author": "Co-authors"
+      },
+      "announce": {
+        "tag": "Tag {{name}}, {{count}} documents, {{links}} links",
+        "topic": "Topic {{name}}, {{count}} documents, {{links}} links",
+        "author": "Author {{name}}, {{count}} documents, {{links}} co-authors"
+      },
+      "surprise": {
+        "tag": "{{a}} and {{b}} appear together in {{n}} documents.",
+        "topic": "{{a}} and {{b}} are far apart on the Overview but share {{n}} tagged documents.",
+        "author": "{{a}} and {{b}} might know each other: {{n}} co-authors in common, never a paper together."
+      },
+      "kind": {
+        "tag": "tags",
+        "topic": "topics",
+        "author": "authors"
+      },
+      "empty": {
+        "build": {
+          "title": "Build the map of your documents",
+          "text": "Topics come from the model of the map. Building reads the documents already in the library; nothing is sent online.",
+          "action": "Build the map"
+        },
+        "tags": {
+          "title": "There are no tags yet",
+          "text": "Tag some documents and the network of tags appears here.",
+          "action": "Manage tags"
+        },
+        "review": {
+          "title": "The documents have no authors",
+          "text": "Complete the data in Review, or update the citations, and the authors appear here.",
+          "action": "Complete the data"
+        },
+        "few": {
+          "title": "Widen the filters",
+          "text": "Fewer than 3 nodes pass the filters.",
+          "action": "Clear the filters"
+        }
+      },
+      "detail": "Selected entity",
+      "also": "also: {{names}}",
+      "openLibrary": "Open in the Library",
+      "split": "Separate these forms",
+      "mergeWith": "Merge with…",
+      "merge": "Merge",
+      "docs": "Documents",
+      "related": {
+        "author": "Related authors",
+        "topic": "Related topics"
+      }
     }
   }
 }

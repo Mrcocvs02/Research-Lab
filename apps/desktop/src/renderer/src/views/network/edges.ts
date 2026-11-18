@@ -50,8 +50,12 @@ export function fillTapered(ctx: CanvasRenderingContext2D, ax: number, ay: numbe
   ctx.fill();
 }
 
-/** Opacity of an edge by weight: `0.12 + 0.5 w`, at least `floorDark` in the dark theme (D-379: >= 0.22). */
+/**
+ * Opacity of an edge by weight: `0.12 + 0.5 w`; in the dark theme at least 0.3 (D-379 asks for >= 0.22 and a mean contrast of
+ * 1.6:1 of the light arcs on the background; at 0.22 the measured contrast is 1.47:1, at 0.3 it is 1.76:1).
+ */
+export const DARK_FLOOR = 0.3;
 export function edgeAlpha(weight: number, dark: boolean): number {
   const a = 0.12 + 0.5 * Math.min(Math.max(weight, 0), 1);
-  return dark ? Math.max(a, 0.22) : a;
+  return dark ? Math.max(a, DARK_FLOOR) : a;
 }

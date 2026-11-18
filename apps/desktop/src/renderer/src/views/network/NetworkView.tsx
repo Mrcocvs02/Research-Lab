@@ -3,16 +3,22 @@ import { GRAPH_LIMITS } from '@rl/core';
 import { useTranslation } from 'react-i18next';
 import { ErrorNote, ProgressBar } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
+import { useNav } from '../../lib/nav';
 import { canRead, useReader } from '../../lib/reader';
 import { rl } from '../../lib/rl';
 import { useDocTitle } from '../chat/useLabels';
 import { safeText } from '../library/safeText';
+import { EntityDetail } from './EntityDetail';
+import type { EmptyKind } from './EntityNet';
+import type { EntityNetwork, EntityNode, NetMode } from './entityTypes';
 import { Explore } from './Explore';
-import { GraphNet, type NetStart } from './GraphNet';
+import type { NetStart } from './GraphNet';
+import { LinksPanel } from './LinksPanel';
 import { MapPanel } from './MapPanel';
 import { SimilarPanel, SurprisingList } from './SimilarPanel';
 import { useGraphModel, type Phase } from './useGraphModel';
 import { useScopeOptions } from './useScopes';
+import './palette.css';
 import './network.css';
 
 const TABS = ['map', 'network', 'explore', 'surprising'] as const;
@@ -70,11 +76,37 @@ export function NetworkView() {
   const scopes = useScopeOptions();
   const [tab, setTab] = useState<Tab>('map');
   const [visited, setVisited] = useState<Set<Tab>>(() => new Set(['map']));
-  const [doc, setDoc] = useState<string | null>(null);
+  const [doc, setDocState] = useState<string | null>(null);
+  const [entity, setEntity] = useState<{ node: EntityNode; mode: Exclude<NetMode, 'doc'> } | null>(null);
+  const [entityData, setEntityData] = useState<EntityNetwork | null>(null);
+  const [dimRequest, setDimRequest] = useState<{ dim: 'topic' | 'author'; nonce: number } | undefined>(undefined);
+  const nav = useNav();
+  const { openReader } = useReader();
   const [start, setStart] = useState<NetStart | null>(null);
   const [seedText, setSeedText] = useState('');
   const docTitle = useDocTitle(doc);
   const { status, building } = model;
+
+  /** A document and an entity are never both in the side panel. */
+  const setDoc = (id: string | null) => {
+    setDocState(id);
+    if (id) setEntity(null);
+  };
+  const mapReady = status !== null && (status.state === 'ready' || status.state === 'stale');
+  const readDoc = (id: string) => {
+    rl.invoke('documents:get', { docId: id }).then(
+      (d) => canRead(d.path, false) && openReader(id),
+      () => undefined,
+    );
+  };
+  const exploreDim = (dim: 'topic' | 'author') => {
+    setDimRequest((cur) => ({ dim, nonce: (cur?.nonce ?? 0) + 1 }));
+    show('explore');
+  };
+  const onEmpty = (kind: EmptyKind) => {
+    if (kind === 'build') void model.build(seed);
+    else nav.navigate({ view: kind === 'review' ? 'review' : 'library' });
+  };
 
   const show = (next: Tab) => {
     setTab(next);
@@ -154,18 +186,35 @@ export function NetworkView() {
                   </button>
                 </div>
               ) : status ? (
-                <MapPanel status={status} mapVersion={model.mapVersion} scopes={scopes} selected={doc} onSelect={setDoc} onMapChanged={model.bumpMap} />
+                <MapPanel status={status} mapVersion={model.mapVersion} scopes={scopes} selected={doc} onSelect={setDoc} onMapChanged={model.bumpMap} onRead={readDoc} onExplore={() => exploreDim('topic')} onBuild={() => void model.build(seed)} />
               ) : null}
             </div>
           )}
           {visited.has('network') && (
             <div role="tabpanel" id="net-panel-network" aria-labelledby="net-tab-network" hidden={tab !== 'network'} className="net-panel">
-              <GraphNet start={start} scopes={scopes} selectedDoc={doc} selectedDocLabel={docTitle} onSelectDoc={setDoc} onStart={startNet} />
+              <LinksPanel
+                start={start}
+                scopes={scopes}
+                selectedDoc={doc}
+                selectedDocLabel={docTitle}
+                selectedEntityId={entity?.node.id ?? null}
+                onSelectDoc={setDoc}
+                onSelectEntity={(node, mode) => {
+                  setEntity(node ? { node, mode: mode as Exclude<NetMode, 'doc'> } : null);
+                  if (node) setDocState(null);
+                }}
+                onData={setEntityData}
+                onStart={startNet}
+                onExplore={exploreDim}
+                onEmpty={onEmpty}
+                mapVersion={model.mapVersion}
+                mapReady={mapReady}
+              />
             </div>
           )}
           {visited.has('explore') && (
             <div role="tabpanel" id="net-panel-explore" aria-labelledby="net-tab-explore" hidden={tab !== 'explore'} className="net-panel">
-              <Explore selectedDoc={doc} onOpenDoc={setDoc} />
+              <Explore selectedDoc={doc} onOpenDoc={setDoc} dimRequest={dimRequest} />
             </div>
           )}
           {visited.has('surprising') && (
@@ -174,6 +223,7 @@ export function NetworkView() {
             </div>
           )}
         </div>
+        {entity && <EntityDetail key={entity.node.id} mode={entity.mode} entity={entity.node} peers={entityData?.nodes ?? []} yearRange={entityData?.yearRange} onClose={() => setEntity(null)} onOpenDoc={setDoc} />}
         {doc && <DocDetail key={doc} docId={doc} onClose={() => setDoc(null)} onNetwork={() => startNet({ kind: 'doc', id: doc, label: docTitle ?? doc.slice(0, 8) })} tagLabel={scopes.tagLabel} onOpenDoc={setDoc} />}
       </div>
     </div>

@@ -1,12 +1,12 @@
-import { mkdir, mkdtemp, rm, unlink, utimes, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, unlink, utimes, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AppError, createMemoryLogger, defaultLibraryConfig, documentRecordSchema, type ScanStatus } from '@rl/core';
+import { AppError, createMemoryLogger, defaultLibraryConfig, documentRecordSchema, scanReportSchema, type ScanStatus } from '@rl/core';
 import { createLibraryStore, createScanner, createTextExtractor } from '@rl/data';
 import { createSearchIndex } from '@rl/search';
-import { LibraryRuntime, localPaths } from './library-runtime.js';
+import { LibraryRuntime, localPaths, scanReportFile } from './library-runtime.js';
 import { RuntimeManager } from './runtime-manager.js';
 import { createWorkerService } from './worker-service.js';
 import { createWorkerClient, serveWorker } from './worker-transport.js';
@@ -278,6 +278,41 @@ describe('LibraryRuntime (real scanner, extractor and index; worker service in-p
       // The removed file stays known (flagged missing) and searchable by its record, never deleted.
       const two = (await store.documents.list()).find((d) => d.path === 'two.md');
       expect(two?.missing).toBe(true);
+    } finally {
+      await rt.close();
+    }
+  });
+
+  it('keeps the report of the last finished scan: first scan flag, ids per outcome, untouched by a targeted scan that found nothing', async () => {
+    await put('one.md', 'First document about volcanoes.\n');
+    await put('two.md', 'Second document about tides.\n');
+    const { rt, store } = await open();
+    const read = async () => scanReportSchema.parse(JSON.parse(await readFile(scanReportFile(local, 'lib-test'), 'utf8')));
+    try {
+      rt.startScan();
+      await rt.whenIdle();
+      const first = await read();
+      expect(first).toMatchObject({ firstScan: true, truncated: false, summary: { added: 2 }, changed: [], moved: [], missing: [], failed: [] });
+      expect(first.added).toHaveLength(2);
+      expect(first.finishedAt).not.toBeNull();
+
+      await put('three.md', 'Third document about aurora.\n');
+      await put('one.md', 'First document about glaciers now.\n');
+      await utimes(path.join(root, 'one.md'), new Date(), new Date(Date.now() + 5000));
+      await unlink(path.join(root, 'two.md'));
+      rt.startScan();
+      await rt.whenIdle();
+      const second = await read();
+      const byPath = async (ids: string[]) => (await Promise.all(ids.map((id) => store.documents.get(id as never)))).map((d) => d?.path);
+      expect(second.firstScan).toBe(false);
+      expect(await byPath(second.added)).toEqual(['three.md']);
+      expect(await byPath(second.changed)).toEqual(['one.md']);
+      expect(await byPath(second.missing)).toEqual(['two.md']);
+
+      // A targeted scan (the watcher) that changes nothing leaves the report the user has not seen yet.
+      rt.startScan({ paths: ['three.md'] });
+      await rt.whenIdle();
+      expect((await read()).finishedAt).toBe(second.finishedAt);
     } finally {
       await rt.close();
     }

@@ -49,7 +49,7 @@ In corso: G4a (annotazioni nel PDF: scrittura sincrona, consenso, `LibraryAnnota
 
 Passi, in ordine:
 1. Ramo `g4a`: se il lavoro è completo e il worktree pulito, revisione e merge su `main` (solo typecheck, build, check:budget, check:generality; `PDF_WRITE_ENABLED` resta `false`). Se è incompleto, riprendere il subagent con SendMessage, oppure rifare G4a da `docs/design/ARCHITETTURA-UI.md` §14, ondata 4.
-2. Ondata 4: poi M4 (Mappa, giocosa, reti per tag, temi e autori) ∥ G4c (PDF cifrati con password vuota) ∥ N4 (reti di entità in `main`).
+2. Ondata 4: M4 (Mappa, giocosa, reti per tag, temi e autori) in parallelo con G4a; poi G4c (PDF cifrati con password vuota) ∥ N4 (reti di entità in `main`), come in ARCHITETTURA-UI §14.
 3. Ondata 5: I5 (chat, export, viste secondarie) ∥ H5 (progetti e Scopri), poi J5. Il responsabile della guida i18n dell'ondata 5 applica le frasi in sospeso dai rapporti di F4 ed E3 (D-444, D-446): strumenti prima del lettore, Spazio, colori 1-5, barra laterale che si riduce durante la lettura, conferma della gomma oltre 3 annotazioni, "Solo nell'app" in Studio; schede "Nuovi file" e "Proposte di Claude" di Da rivedere, chip Modello e Ragionamento, Ignora/Conferma, "Segna tutti come visti", copie di conflitto, ✓/✗ per campo, "Accettate finora".
 4. T1 pipeline di analisi (D-446).
 5. Ondate 7-10: funzioni nuove X1..X8 (§14.1).

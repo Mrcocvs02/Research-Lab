@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promise
 import os from 'node:os';
 import path from 'node:path';
 import { launchApp, type LaunchedApp } from './helpers/launch';
-import { ipcData } from './helpers/phase1';
+import { createLibraryViaWizard, ipcData } from './helpers/phase1';
 import { waitClaudeReady } from './helpers/settings';
 
 /**
@@ -94,7 +94,13 @@ test('without the auth commands the card gets no identity and the login opens th
 });
 
 test('the Account card in the settings: state, mode, change account then check, sign out (simulated Claude Code)', async () => {
-  const w = ctx!.window;
+  // The settings need a library (without one the first-run wizard covers the window): a new launch with a small synthetic one.
+  await ctx!.close();
+  ctx = await launchApp({ library: 'papers', dialogPath: true, offline: true, env: { RL_E2E: '1', RL_E2E_CLAUDE_SIM: sim, RL_AI_PROVIDER: 'mock' } });
+  const w = ctx.window;
+  await createLibraryViaWizard(w, { name: 'Account library' });
+  await ipcData(w, 'settings:set', { uiLanguage: 'en' });
+  await w.reload();
   await waitClaudeReady(w);
   const card = w.getByTestId('ai-account');
   await expect(w.getByTestId('ai-account-state')).toHaveText('Connected with the Claude Code login');

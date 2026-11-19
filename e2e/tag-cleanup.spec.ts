@@ -53,11 +53,11 @@ test('guided tag cleanup: sure proposals ticked, six steps, undo all restores th
     await make('concetti beta', [2]); // plural (sure)
     await make('Gamma delta epsilon (GDE)', [4]);
     await make('GDE', [5]); // acronym in the name (sure)
-    // Undoing a merge is refused when a later change touched a document that carries the surviving tag, so each step works on its own papers.
-    await make('colour x', [8, 9]);
-    await make('color x', [8, 9, 10]); // regional spelling (probable)
-    for (const l of ['twin a', 'twin b', 'twin c', 'twin d']) await make(l, [6, 7]); // twins on the same papers
-    await make('Journal of Tests', [11]); // a venue used as a tag (metadata)
+    // The steps deliberately overlap on the same papers: "Undo all" unwinds them later step first (D-504).
+    await make('colour x', [0, 8, 9]);
+    await make('color x', [3, 8, 9, 10]); // regional spelling (probable)
+    for (const l of ['twin a', 'twin b', 'twin c', 'twin d']) await make(l, [0, 6, 7]); // twins on the same papers
+    await make('Journal of Tests', [1, 11]); // a venue used as a tag (metadata)
     const initial = await snapshot(window, docIds);
     const before = JSON.parse(initial).tax.length as number;
 

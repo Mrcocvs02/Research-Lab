@@ -96,3 +96,9 @@ export function applyAi(ps: Proposal[], state: State, labels: Map<string, string
     return p;
   });
 }
+
+/** How many applied steps stand after `step` in the run (D-504): a single-step undo is refused while there are any. */
+export function laterApplied(applied: ReadonlyArray<{ step: number }>, step: number): number {
+  const at = applied.findIndex((x) => x.step === step);
+  return at < 0 ? 0 : applied.length - at - 1;
+}

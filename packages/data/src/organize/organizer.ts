@@ -469,8 +469,8 @@ export class Organizer {
   historyView(limit?: number): Promise<{ items: HistoryItem[]; canUndo: boolean; canRedo: boolean }> {
     return this.history.view(limit);
   }
-  undo(changeId?: string): Promise<HistoryResult> {
-    return this.run(() => this.history.undo(changeId));
+  undo(changeId?: string, settled?: ReadonlySet<string>): Promise<HistoryResult> {
+    return this.run(() => this.history.undo(changeId, settled));
   }
   redo(changeId?: string): Promise<HistoryResult> {
     return this.run(() => this.history.redo(changeId));

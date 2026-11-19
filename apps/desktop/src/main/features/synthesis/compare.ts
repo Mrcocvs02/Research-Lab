@@ -2,7 +2,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { aiVisible, approxTokens, folderOf } from '@rl/ai';
-import { COMPARE_BLOCK, COMPARE_PAPER_CHARS, COMPARE_TOKENS, COMPARE_VERSION, cleanCompare, compareAnswerSchema, comparePrompt, compareSystem } from '@rl/ai/analysis';
+import { COMPARE_BLOCK, COMPARE_PAPER_CHARS, COMPARE_TOKENS, COMPARE_VERSION, cleanCompare, compareAnswerSchema, comparePrompt, compareSystem } from '@rl/ai/synthesis';
 import { AppError, COMPARE_LIMITS, documentIdSchema, itemIdSchema, type CompareCell, type CompareColumn, type CompareRow, type CompareTable, type DocumentId, type DocumentRecord, type LiteratureKey } from '@rl/core';
 import { atomicWriteJson, atomicWriteFile } from '@rl/core/node';
 import { callStructured } from '../../analysis/call.js';

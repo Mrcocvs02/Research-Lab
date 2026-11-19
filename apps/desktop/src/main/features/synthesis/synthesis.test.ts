@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { COMPARE_BLOCK, comparePrompt, compareSystem, COMPARE_VERSION } from '@rl/ai/analysis';
+import { COMPARE_BLOCK, comparePrompt, compareSystem, COMPARE_VERSION } from '@rl/ai/synthesis';
 import type { CompareColumn, CompareTable, DocumentRecord } from '@rl/core';
 import { cellOfSection, noteCells, rowLabel, splitCells } from './cells.js';
 import { groupData, groupId, overviewMarkdown } from './groups.js';

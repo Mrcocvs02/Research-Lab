@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { aiVisible, approxTokens, folderOf } from '@rl/ai';
-import { cleanGroups, GROUPS_TOKENS, GROUPS_VERSION, groupsAnswerSchema, groupsPrompt, groupsSystem } from '@rl/ai/analysis';
+import { cleanGroups, GROUPS_TOKENS, GROUPS_VERSION, groupsAnswerSchema, groupsPrompt, groupsSystem } from '@rl/ai/synthesis';
 import { AppError, documentIdSchema, GROUPS_LIMITS, groupsOverviewSchema, type DocumentId, type DocumentRecord, type GroupsOverview } from '@rl/core';
 import { atomicWriteFile } from '@rl/core/node';
 import { callStructured } from '../../analysis/call.js';

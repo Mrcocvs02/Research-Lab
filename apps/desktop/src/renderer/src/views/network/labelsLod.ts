@@ -44,3 +44,44 @@ export function pickLabels(cands: readonly LabelCandidate[], width: number, heig
 
 /** True when two label boxes (centre, width, fixed height) overlap: used by the tests. */
 export const overlaps = (a: LabelCandidate, b: LabelCandidate): boolean => Math.abs(a.x - b.x) < (a.w + b.w) / 2 && Math.abs(a.y - b.y) < CELL_H;
+
+export interface TopicLabelItem {
+  id: number;
+  /** Screen box of the core of the topic. */
+  box: { x0: number; y0: number; x1: number; y1: number };
+  /** Width of the text. */
+  w: number;
+  /** The bigger a topic, the earlier it is placed (and the later it is hidden). */
+  size: number;
+}
+
+export const TOPIC_LABEL_H = 18;
+
+/**
+ * Labels of the topics (§4.22): each one is tried above the core, then below, on the right, on the left; the first place that
+ * touches no label already placed (and stays in the view) wins. A topic with no free place is not labelled until the next zoom.
+ * The biggest topics are placed first, so the smallest is the one hidden. Returns the centre of every label placed, by id.
+ */
+export function placeTopicLabels(items: readonly TopicLabelItem[], width: number, height: number): Map<number, { x: number; y: number }> {
+  const placed: Array<{ x: number; y: number; w: number }> = [];
+  const out = new Map<number, { x: number; y: number }>();
+  const hit = (x: number, y: number, w: number) => placed.some((p) => Math.abs(p.x - x) < (p.w + w) / 2 && Math.abs(p.y - y) < TOPIC_LABEL_H);
+  const inside = (x: number, y: number, w: number) => x - w / 2 >= 0 && x + w / 2 <= width && y - TOPIC_LABEL_H / 2 >= 0 && y + TOPIC_LABEL_H / 2 <= height;
+  for (const it of [...items].sort((a, b) => b.size - a.size || a.id - b.id)) {
+    const b = it.box;
+    const cx = (b.x0 + b.x1) / 2;
+    const cy = (b.y0 + b.y1) / 2;
+    if (b.x1 < 0 || b.x0 > width || b.y1 < 0 || b.y0 > height) continue;
+    const tries: Array<[number, number]> = [
+      [cx, b.y0 - TOPIC_LABEL_H / 2 - 4],
+      [cx, b.y1 + TOPIC_LABEL_H / 2 + 4],
+      [b.x1 + it.w / 2 + 6, cy],
+      [b.x0 - it.w / 2 - 6, cy],
+    ];
+    const spot = tries.find(([x, y]) => inside(x, y, it.w) && !hit(x, y, it.w));
+    if (!spot) continue;
+    placed.push({ x: spot[0], y: spot[1], w: it.w });
+    out.set(it.id, { x: spot[0], y: spot[1] });
+  }
+  return out;
+}

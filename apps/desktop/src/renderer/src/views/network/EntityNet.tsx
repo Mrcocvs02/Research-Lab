@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../components/EmptyState';
+import { Segmented } from '../../components/Segmented';
+import { useNotify } from '../../lib/notify';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { useChangeVersion } from '../../lib/events';
@@ -24,6 +26,7 @@ import { convexHull, centroidOf, hullShape, type Pt } from './hulls';
 import { pickLabels, shortLabel, type LabelCandidate } from './labelsLod';
 import { firstNode, mapAction, nearestInDirection } from './mapKeyboard';
 import { MiniMap } from './MiniMap';
+import { ChipPop, ChromeCtx, copyCanvasImage, HeadMore, MapIllustration, Pill, RowPortal, useHint } from './NetChrome';
 import { NodeSearch } from './NodeSearch';
 import { bfsPath, pickSurprise, rng, type Surprise } from './playful';
 import type { ScopeOptions } from './useScopes';
@@ -43,6 +46,8 @@ interface Props {
   onSelectDoc(docId: string): void;
   /** `L`: open Explore on the same dimension. */
   onExplore(): void;
+  active: boolean;
+  modeChip: ReactNode;
   onEmpty(kind: EmptyKind): void;
   /** The network that is shown (its nodes feed "Merge with…" and the year range of the card). */
   onData?(d: EntityNetwork | null): void;
@@ -60,7 +65,7 @@ const MAX_DOT = 80;
  * into sub-topics, the "Tu" ring on your own author node, hover card, path, Mescola and Sorprendimi. Data from
  * `fetchEntityNetwork`. Frames only while the simulation or the camera moves.
  */
-export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onExplore, onEmpty, onData, mapVersion, mapReady }: Props) {
+export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect, onSelectDoc, onExplore, onEmpty, onData, mapVersion, mapReady }: Props) {
   const { t } = useTranslation();
   const app = useApp();
   const lib = app.activeLibraryId ?? '';
@@ -103,6 +108,12 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
   const refs = useRef({ selKey, cursor, pathKeys, focusKey, surprise });
   refs.current = { selKey, cursor, pathKeys, focusKey, surprise };
   const searchRef = useRef<HTMLInputElement>(null);
+  const chrome = useContext(ChromeCtx);
+  const { info: notify } = useNotify();
+  const [hint] = useHint(active);
+  /** The user moved "At least N documents" himself: it is not lowered for him. */
+  const touched = useRef(false);
+  const lowered = useRef(false);
   const wrap = useRef<HTMLDivElement>(null);
   const prevMode = useRef<EntityMode | null>(null);
   const selfKeys = useMemo(() => new Set([app.settings?.user.name ?? '', ...(app.settings?.user.authorVariants ?? [])].filter((s) => s.trim() !== '').map(authorKey)), [app.settings?.user.name, app.settings?.user.authorVariants]);
@@ -637,8 +648,12 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
   };
 
   const reset = () => {
+    touched.current = true;
     setMinDocs(1);
     setMinWeight(0);
+    setLevel(0);
+    setThemes(false);
+    setSizeBy('docs');
     setYears(null);
     setTagScope('');
   };
@@ -755,14 +770,42 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
     [net],
   );
 
+  const [lowNote, setLowNote] = useState<string | null>(null);
+  // Defaults that leave fewer than 3 nodes: "At least N documents" goes down to 1, once, and the pill says so.
+  useEffect(() => {
+    if (!data || loading || touched.current || lowered.current || minDocs !== 2 || count >= MIN_NODES) return;
+    lowered.current = true;
+    setMinDocs(1);
+    setLowNote(t('network.ent.lowered', { kind: t(`network.ent.kind.${mode}`) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, count, loading]);
   const emptyKind: EmptyKind | null = loading || error ? null : mode === 'topic' && !mapReady ? 'build' : mode === 'tag' && scopes.tags.length === 0 ? 'tags' : mode === 'author' && data && data.total === 0 && (data.documents ?? 0) > 0 && minDocs <= 1 ? 'review' : null;
   const few = !loading && !error && emptyKind === null && data !== null && count < MIN_NODES;
   const kindName = t(`network.ent.kind.${mode}`);
   const rangeYears = data?.yearRange;
+  const filterCount = (years ? 1 : 0) + (minDocs !== 2 ? 1 : 0) + (minWeight > 0 ? 1 : 0) + (level > 0 ? 1 : 0) + (tagScope !== '' ? 1 : 0) + (sizeBy !== 'docs' ? 1 : 0) + (themes ? 1 : 0);
+
+  let pill: ReactNode = null;
+  if (surprise) {
+    pill = (
+      <Pill testId="ent-surprise-note" onClose={() => setSurprise(null)}>
+        {sentence}
+      </Pill>
+    );
+  } else if (note ?? lowNote) {
+    pill = (
+      <Pill testId="ent-note" onClose={() => (setNote(null), setLowNote(null))}>
+        {note ?? lowNote}
+      </Pill>
+    );
+  } else if (hint && count > 0) {
+    pill = <Pill testId="ent-hint">{t('network.hint')}</Pill>;
+  }
 
   return (
     <div className="net-tab ent-tab" data-testid="entity-panel" data-mode={mode}>
-      <div className="net-toolbar ent-filters">
+      <RowPortal active={active}>
+        {modeChip}
         <NodeSearch
           ref={searchRef}
           testId="ent-search"
@@ -783,47 +826,72 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
             pick(n);
           }}
         />
-        {rangeYears && rangeYears[1] > rangeYears[0] && (
-          <span className="net-field ent-years" data-testid="ent-years">
-            <span>{t('network.ent.years')}</span>
-            <input type="range" aria-label={t('network.ent.yearFrom')} min={rangeYears[0]} max={rangeYears[1]} value={years?.[0] ?? rangeYears[0]} onChange={(e) => setYears([Math.min(Number(e.target.value), years?.[1] ?? rangeYears[1]), years?.[1] ?? rangeYears[1]])} data-testid="ent-year-from" />
-            <input type="range" aria-label={t('network.ent.yearTo')} min={rangeYears[0]} max={rangeYears[1]} value={years?.[1] ?? rangeYears[1]} onChange={(e) => setYears([years?.[0] ?? rangeYears[0], Math.max(Number(e.target.value), years?.[0] ?? rangeYears[0])])} data-testid="ent-year-to" />
-            <span className="hint">
-              {years?.[0] ?? rangeYears[0]}–{years?.[1] ?? rangeYears[1]}
-            </span>
-          </span>
-        )}
-        <label className="net-field">
-          <span>{t('network.ent.minDocs')}</span>
-          <input type="range" min={1} max={10} value={minDocs} onChange={(e) => setMinDocs(Number(e.target.value))} data-testid="ent-min-docs" />
-          <span className="hint">{minDocs}</span>
-        </label>
-        <label className="net-field">
-          <span>{t('network.ent.minWeight')}</span>
-          <input type="range" min={0} max={0.9} step={0.05} value={minWeight} onChange={(e) => setMinWeight(Number(e.target.value))} data-testid="ent-min-weight" />
-        </label>
-        {mode === 'topic' && depth > 1 && (
-          <label className="net-field">
-            <span>{t('network.ent.level')}</span>
-            <input type="range" min={1} max={depth} value={level + 1} onChange={(e) => setLevel(Number(e.target.value) - 1)} data-testid="ent-level" />
-            <span className="hint">
-              {level + 1}/{depth}
-            </span>
-          </label>
-        )}
-        {mode !== 'tag' && scopes.tags.length > 0 && (
-          <label className="net-field">
-            <span className="visually-hidden">{t('network.scope.tag')}</span>
-            <select value={tagScope} onChange={(e) => setTagScope(e.target.value)} data-testid="ent-tag-scope">
-              <option value="">{t('network.ent.tagAny')}</option>
-              {scopes.tags.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {safeText(x.label)}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        <ChipPop label={t('network.filters')} testId="ent-filters" count={filterCount} width={360}>
+          <div className="net-pop-body">
+            {rangeYears && rangeYears[1] > rangeYears[0] && (
+              <div className="net-field net-pop-row ent-years" data-testid="ent-years">
+                <span>{t('network.ent.years')}</span>
+                <input type="range" aria-label={t('network.ent.yearFrom')} min={rangeYears[0]} max={rangeYears[1]} value={years?.[0] ?? rangeYears[0]} onChange={(e) => setYears([Math.min(Number(e.target.value), years?.[1] ?? rangeYears[1]), years?.[1] ?? rangeYears[1]])} data-testid="ent-year-from" />
+                <input type="range" aria-label={t('network.ent.yearTo')} min={rangeYears[0]} max={rangeYears[1]} value={years?.[1] ?? rangeYears[1]} onChange={(e) => setYears([years?.[0] ?? rangeYears[0], Math.max(Number(e.target.value), years?.[0] ?? rangeYears[0])])} data-testid="ent-year-to" />
+                <span className="hint">
+                  {years?.[0] ?? rangeYears[0]}–{years?.[1] ?? rangeYears[1]}
+                </span>
+              </div>
+            )}
+            <label className="net-field net-pop-row">
+              <span>{t('network.ent.minDocs')}</span>
+              <input
+                type="range"
+                min={1}
+                max={10}
+                value={minDocs}
+                onChange={(e) => {
+                  touched.current = true;
+                  setMinDocs(Number(e.target.value));
+                }}
+                data-testid="ent-min-docs"
+              />
+              <span className="hint">{minDocs}</span>
+            </label>
+            <label className="net-field net-pop-row">
+              <span>{t('network.ent.minWeight')}</span>
+              <input type="range" min={0} max={0.9} step={0.05} value={minWeight} onChange={(e) => setMinWeight(Number(e.target.value))} data-testid="ent-min-weight" />
+            </label>
+            {mode === 'topic' && depth > 1 && (
+              <label className="net-field net-pop-row">
+                <span>{t('network.ent.level')}</span>
+                <input type="range" min={1} max={depth} value={level + 1} onChange={(e) => setLevel(Number(e.target.value) - 1)} data-testid="ent-level" />
+                <span className="hint">
+                  {level + 1}/{depth}
+                </span>
+              </label>
+            )}
+            {mode !== 'tag' && scopes.tags.length > 0 && (
+              <label className="net-field net-pop-row">
+                <span>{t('network.scope.tag')}</span>
+                <select value={tagScope} onChange={(e) => setTagScope(e.target.value)} data-testid="ent-tag-scope">
+                  <option value="">{t('network.ent.tagAny')}</option>
+                  {scopes.tags.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {safeText(x.label)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="net-pop-sec">{t('network.look')}</div>
+            <div className="net-field net-pop-row" data-testid="ent-size-by">
+              <span>{t('network.ent.sizeBy')}</span>
+              <Segmented<SizeBy> size="sm" label={t('network.ent.sizeBy')} value={sizeBy} onChange={setSizeBy} options={SIZE_BY.map((s) => ({ value: s, label: t(`network.ent.sizeBy_${s}`), testId: `ent-size-${s}` }))} />
+            </div>
+            {mode === 'author' && (
+              <label className="check-inline">
+                <input type="checkbox" checked={themes} onChange={(e) => setThemes(e.target.checked)} data-testid="ent-themes-toggle" />
+                {t('network.ent.sharedThemes')}
+              </label>
+            )}
+          </div>
+        </ChipPop>
         <span className="map-actions">
           <button type="button" className="icon-button" title={t('network.play.shuffle')} aria-label={t('network.play.shuffle')} onClick={reflow} disabled={count === 0} data-testid="ent-shuffle">
             ✧
@@ -834,85 +902,43 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
           <button type="button" className="icon-button" title={t('network.fit')} aria-label={t('network.fit')} onClick={() => view.fit(true)} disabled={count === 0} data-testid="ent-fit">
             ⤢
           </button>
-          <details className="map-more">
-            <summary aria-label={t('network.more')} title={t('network.more')} data-testid="ent-more">
-              ⋯
-            </summary>
-            <div className="map-more-body">
-              <label className="check-inline">
-                <input type="checkbox" checked={mini} onChange={(e) => setMini(e.target.checked)} data-testid="ent-minimap-toggle" />
-                {t('network.minimap')}
-              </label>
-              <label className="net-field">
-                <span>{t('network.ent.sizeBy')}</span>
-                <select value={sizeBy} onChange={(e) => setSizeBy(e.target.value as SizeBy)} data-testid="ent-size-by">
-                  {SIZE_BY.map((s) => (
-                    <option key={s} value={s}>
-                      {t(`network.ent.sizeBy_${s}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {mode === 'author' && (
-                <label className="check-inline">
-                  <input type="checkbox" checked={themes} onChange={(e) => setThemes(e.target.checked)} data-testid="ent-themes-toggle" />
-                  {t('network.ent.sharedThemes')}
-                </label>
-              )}
-              <button
-                type="button"
-                className="link"
-                onClick={() => {
+        </span>
+      </RowPortal>
+      <HeadMore
+        active={active}
+        testId="ent-more"
+        groups={[
+          {
+            id: 'view',
+            items: [
+              {
+                id: 'unpin',
+                label: t('network.unpinAll'),
+                testId: 'ent-unpin-all',
+                onSelect: () => {
                   for (const n of net.nodes.values()) n.fixed = false;
                   view.requestDraw();
-                }}
-                data-testid="ent-unpin-all"
-              >
-                {t('network.unpinAll')}
-              </button>
-            </div>
-          </details>
-        </span>
-      </div>
+                },
+              },
+              { id: 'minimap', label: t('network.minimap'), icon: <span>{mini ? '☑' : '☐'}</span>, testId: 'ent-minimap-toggle', onSelect: () => setMini(!mini) },
+              { id: 'image', label: t('network.copyImage'), testId: 'ent-image', onSelect: () => void copyCanvasImage(view.canvas.current).then((ok) => notify(ok ? t('network.imageCopied') : t('network.imageFailed'))) },
+            ],
+          },
+          chrome.model,
+        ]}
+      />
       {error ? <ErrorNote testId="ent-error">{errorMessage(error, t)}</ErrorNote> : null}
-      {data && count > 0 && (
-        <p className="hint ent-subtitle" role="status" data-testid="ent-count" data-count={count} data-total={data.total} data-truncated={data.truncated ? 'true' : 'false'} data-drilled={drilled}>
-          {data.truncated ? t('network.ent.cap', { shown: count, total: data.total.toLocaleString(), kind: kindName }) : t('network.ent.count', { count, kind: kindName })}
-          {data.documents !== undefined ? ` · ${t('network.ent.documents', { count: data.documents })}` : ''}
-          {drilled > 0 && (
-            <>
-              {' · '}
-              <button type="button" className="link" onClick={ascend} data-testid="ent-up">
-                {t('network.ent.up')}
-              </button>
-            </>
-          )}
-        </p>
-      )}
-      {note && (
-        <p className="hint" role="status" data-testid="ent-note">
-          {note}
-        </p>
-      )}
-      {surprise && (
-        <p className="surprise-note" role="status" data-testid="ent-surprise-note">
-          {sentence}{' '}
-          <button type="button" className="link" onClick={() => setSurprise(null)}>
-            {t('common.close')}
-          </button>
-        </p>
-      )}
       {emptyKind && (
-        <EmptyState icon={<span>◌</span>} title={t(`network.ent.empty.${emptyKind}.title`)} action={<button type="button" className="primary" onClick={() => onEmpty(emptyKind)} data-testid={`ent-empty-${emptyKind}`}>{t(`network.ent.empty.${emptyKind}.action`)}</button>}>
+        <EmptyState icon={<MapIllustration />} title={t(`network.ent.empty.${emptyKind}.title`)} action={<button type="button" className="primary" onClick={() => onEmpty(emptyKind)} data-testid={`ent-empty-${emptyKind}`}>{t(`network.ent.empty.${emptyKind}.action`)}</button>}>
           {t(`network.ent.empty.${emptyKind}.text`)}
         </EmptyState>
       )}
       {few && (
-        <EmptyState icon={<span>◌</span>} title={t('network.ent.empty.few.title')} action={<button type="button" onClick={reset} data-testid="ent-clear-filters">{t('network.ent.empty.few.action')}</button>}>
-          {t('network.ent.empty.few.text')}
+        <EmptyState icon={<MapIllustration />} title={t('network.ent.empty.few.title', { kind: kindName })} action={<button type="button" onClick={reset} data-testid="ent-clear-filters">{t('network.ent.empty.few.action')}</button>}>
+          {t('network.ent.empty.few.text', { min: minDocs, count })}
         </EmptyState>
       )}
-      <div ref={wrap} className="map-wrap net-wrap" hidden={emptyKind !== null}>
+      <div ref={wrap} className="map-wrap net-wrap" hidden={emptyKind !== null || few}>
         <canvas
           ref={view.canvas}
           className="map-canvas"
@@ -932,6 +958,20 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
         <span className="visually-hidden" aria-live="polite" data-testid="ent-focus">
           {announce}
         </span>
+        {pill}
+        {data && count > 0 && (
+          <div className="net-legend-box">
+            <span className="hint" role="status" data-testid="ent-count" data-count={count} data-total={data.total} data-truncated={data.truncated ? 'true' : 'false'} data-drilled={drilled}>
+              {data.truncated ? t('network.ent.cap', { shown: count, total: data.total.toLocaleString(), kind: kindName }) : t('network.ent.count', { count, kind: kindName })}
+              {data.documents !== undefined ? ` · ${t('network.ent.documents', { count: data.documents })}` : ''}
+            </span>
+            {drilled > 0 && (
+              <button type="button" className="link" onClick={ascend} data-testid="ent-up">
+                {t('network.ent.up')}
+              </button>
+            )}
+          </div>
+        )}
         {hovered?.entity && hover && (
           <HoverCard x={hover.x} y={hover.y} width={view.size.current.w} height={view.size.current.h} testId="net-tooltip">
             <strong className="hc-title">

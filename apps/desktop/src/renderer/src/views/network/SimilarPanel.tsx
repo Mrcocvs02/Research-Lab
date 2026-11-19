@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
+import { EmptyState } from '../../components/EmptyState';
 import { ErrorNote } from '../../components/ui';
+import { MapIllustration } from './NetChrome';
 import { errorMessage } from '../../lib/errors';
 import { rl } from '../../lib/rl';
 import { useDocTitle } from '../chat/useLabels';
@@ -10,11 +12,12 @@ import { safeText } from '../library/safeText';
 type Similar = ResponseOf<Channels, 'graph:similar'>['items'][number];
 type Pair = ResponseOf<Channels, 'graph:surprising'>['pairs'][number];
 
-export function DocLink({ docId, onOpen }: { docId: string; onOpen(docId: string): void }) {
+export function DocLink({ docId, onOpen, className = 'link sim-title' }: { docId: string; onOpen(docId: string): void; className?: string }) {
+  const { t } = useTranslation();
   const title = useDocTitle(docId);
   return (
-    <button type="button" className="link sim-title" onClick={() => onOpen(docId)} data-testid="sim-open" data-doc-id={docId}>
-      {safeText(title ?? docId.slice(0, 8))}
+    <button type="button" className={className} onClick={() => onOpen(docId)} data-testid="sim-open" data-doc-id={docId}>
+      {safeText(title ?? t('network.untitled'))}
     </button>
   );
 }
@@ -110,8 +113,8 @@ export function SimilarPanel({ docId, tagLabel = (id) => id, onOpen }: { docId: 
   );
 }
 
-/** The strongest "close but do not look it" pairs of the whole library. */
-export function SurprisingList({ onOpen }: { onOpen(docId: string): void }) {
+/** The strongest "close but do not look it" pairs of the whole library: two levels per row (titles and score, then the shared words). */
+export function SurprisingList({ active, onOpen, onShow, onBack }: { active: boolean; onOpen(docId: string): void; onShow(a: string, b: string, terms: string[]): void; onBack(): void }) {
   const { t } = useTranslation();
   const [pairs, setPairs] = useState<Pair[] | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -126,20 +129,28 @@ export function SurprisingList({ onOpen }: { onOpen(docId: string): void }) {
     };
   }, []);
   return (
-    <div className="net-tab surprising-tab" data-testid="surprising-panel">
-      <p className="hint">{t('network.similar.surprisingHint')}</p>
+    <div className="net-tab surprising-tab" data-testid="surprising-panel" data-active={active ? 'true' : 'false'}>
       {error ? <ErrorNote testId="surprising-error">{errorMessage(error, t)}</ErrorNote> : null}
       {!pairs && !error && <p className="hint">{t('common.loading')}</p>}
-      {pairs && pairs.length === 0 && <p className="hint" data-testid="surprising-empty">{t('network.similar.noSurprising')}</p>}
+      {pairs && pairs.length === 0 && (
+        <EmptyState icon={<MapIllustration />} title={t('network.similar.noSurprisingTitle')} action={<button type="button" onClick={onBack} data-testid="surprising-back">{t('network.similar.backToMap')}</button>}>
+          <span data-testid="surprising-empty">{t('network.similar.noSurprising')}</span>
+        </EmptyState>
+      )}
       {pairs && pairs.length > 0 && (
         <ol className="sim-list pair-list" data-testid="surprising-all">
           {pairs.map((p) => (
-            <li key={`${p.a}${p.b}`} className="sim-row" data-testid="surprising-pair">
-              <DocLink docId={p.a} onOpen={onOpen} />
-              <span aria-hidden="true">↔</span>
-              <DocLink docId={p.b} onOpen={onOpen} />
-              <span className="badge">{Math.round(p.score * 100)}%</span>
-              <Terms pair={p} />
+            <li key={`${p.a}${p.b}`} className="pair-row" data-testid="surprising-pair">
+              <div className="pair-main">
+                <DocLink docId={p.a} onOpen={onOpen} className="pair-link" />
+                <span aria-hidden="true" className="pair-arrow">↔</span>
+                <DocLink docId={p.b} onOpen={onOpen} className="pair-link" />
+                <span className="pair-score">{Math.round(p.score * 100)} %</span>
+                <button type="button" className="link pair-show" onClick={() => onShow(p.a, p.b, p.terms)} data-testid="surprising-show">
+                  {t('network.similar.showOnMap')}
+                </button>
+              </div>
+              {p.terms.length > 0 && <div className="hint pair-terms">{t('network.similar.commonWords', { terms: p.terms.slice(0, 5).map(safeText).join(', ') })}</div>}
             </li>
           ))}
         </ol>

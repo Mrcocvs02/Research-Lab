@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { coreHull, coreRadius, restingFill, separateClusters } from './hulls';
+import { placeTopicLabels, TOPIC_LABEL_H } from './labelsLod';
+import { nodeRadius } from './mapModel';
 import { bridgePath } from './BridgePath';
 import { bridgeGeo, bridgeView } from './bridgeLayer';
 import { takeMapBridge, setMapBridge } from './bridgeIntent';
@@ -74,5 +77,59 @@ describe('bridge on the map', () => {
     setMapBridge(path);
     expect(takeMapBridge()).toBe(path);
     expect(takeMapBridge()).toBeNull();
+  });
+});
+
+describe('Panorama hulls (§4.22)', () => {
+  /** Three tangled groups: the points of each lie around the same place. */
+  const tangled = () => {
+    const xs = new Float32Array(90);
+    const ys = new Float32Array(90);
+    const order = Array.from({ length: 90 }, (_, i) => i);
+    for (let i = 0; i < 90; i++) {
+      const g = Math.floor(i / 30);
+      xs[i] = g * 10 + Math.cos(i * 1.7) * 40;
+      ys[i] = g * 6 + Math.sin(i * 2.3) * 40;
+    }
+    return { xs, ys, order, starts: [0, 30, 60, 90] };
+  };
+
+  it('leaves no two cores overlapping after the separation', () => {
+    const { xs, ys, order, starts } = tangled();
+    separateClusters(xs, ys, order, starts, 3, 24);
+    const c = [0, 1, 2].map((s) => coreRadius(xs, ys, order, starts[s]!, starts[s + 1]!));
+    for (let a = 0; a < 3; a++) for (let b = a + 1; b < 3; b++) expect(Math.hypot(c[a]!.cx - c[b]!.cx, c[a]!.cy - c[b]!.cy)).toBeGreaterThanOrEqual(c[a]!.r + c[b]!.r);
+  });
+
+  it('fills at rest only disjoint groups, at most 8, and the resting set is pairwise disjoint', () => {
+    const circles = [
+      { cx: 0, cy: 0, r: 10 },
+      { cx: 15, cy: 0, r: 10 },
+      { cx: 100, cy: 0, r: 10 },
+    ];
+    expect(restingFill(circles, [5, 9, 3])).toEqual([false, false, true]);
+    const many = Array.from({ length: 12 }, (_, i) => ({ cx: i * 100, cy: 0, r: 10 }));
+    expect(restingFill(many, many.map((_, i) => 100 - i)).filter(Boolean).length).toBe(8);
+  });
+
+  it('keeps the core hull inside the 80% closest points', () => {
+    const xs = [0, 1, 0, 1, 0.5, 100];
+    const ys = [0, 0, 1, 1, 0.5, 100];
+    const hull = coreHull(xs, ys, [0, 1, 2, 3, 4, 5], 0, 6);
+    expect(Math.max(...hull.map((p) => p[0]))).toBeLessThan(2);
+  });
+
+  it('places the topic labels without collisions and hides the smallest', () => {
+    const items = Array.from({ length: 12 }, (_, i) => ({ id: i, box: { x0: 40 + i * 60, y0: 100, x1: 80 + i * 60, y1: 140 }, w: 90, size: 100 - i }));
+    const spots = placeTopicLabels(items, 800, 300);
+    const at = [...spots.entries()];
+    for (let a = 0; a < at.length; a++) for (let b = a + 1; b < at.length; b++) expect(Math.abs(at[a]![1].x - at[b]![1].x) < 90 && Math.abs(at[a]![1].y - at[b]![1].y) < TOPIC_LABEL_H).toBe(false);
+    expect(spots.has(0)).toBe(true);
+  });
+
+  it('draws nodes with a radius of 3 to 6 px', () => {
+    expect(nodeRadius(0, 10)).toBe(3);
+    expect(nodeRadius(10, 10)).toBe(6);
+    expect(nodeRadius(5, 10)).toBeGreaterThan(3);
   });
 });

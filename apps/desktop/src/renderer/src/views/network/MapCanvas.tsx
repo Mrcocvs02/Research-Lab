@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isDarkTheme } from '../../lib/theme';
 import { reducedMotion } from './camera';
-import { withAlpha, haloSprite, readTheme, type MapTheme } from './colors';
-import { boundsOf, PointGrid, toScreenX, toScreenY, toWorldX, toWorldY } from './geometry';
+import { withAlpha, haloSprite, mix, readTheme, type MapTheme } from './colors';
+import { boundsOf, fitView, PointGrid, toScreenX, toScreenY, toWorldX, toWorldY } from './geometry';
 import { Menu } from '../../components/Menu';
 import type { BridgePath } from './BridgePath';
 import { bridgeGeo, bridgeView, drawBridge } from './bridgeLayer';
 import { DocCard, HoverCard, useRestingHover } from './HoverCard';
-import { centroidOf, hullShape, inPolygon, type Pt } from './hulls';
-import { pickLabels, shortLabel, type LabelCandidate } from './labelsLod';
+import { hullShape, inPolygon, type Pt } from './hulls';
+import { pickLabels, placeTopicLabels, shortLabel, type LabelCandidate, type TopicLabelItem } from './labelsLod';
 import { firstNode, mapAction, nearestInDirection } from './mapKeyboard';
-import { clusterHulls, clusterText, pointsInView, stepPoint, type PreparedMap } from './mapModel';
+import { clusterHulls, clusterText, nodeRadius, pointsInView, restingHulls, stepPoint, type PreparedMap } from './mapModel';
+import { peekTitle, wantTitles } from './titles';
 import { MiniMap } from './MiniMap';
 import { useCanvasView } from './useCanvasView';
 import { safeText } from '../library/safeText';
@@ -28,6 +29,10 @@ export interface MapHandle {
   clearSurprise(): void;
   /** Flies to a document and pulses it (the search field). */
   flyToDoc(docId: string): void;
+  /** The canvas (for "copy as image"). */
+  canvas(): HTMLCanvasElement | null;
+  /** Lights a group (legend hover or focus) or none (null). */
+  light(id: string | null): void;
 }
 
 interface Props {
@@ -53,9 +58,11 @@ interface Props {
   bridge?: BridgePath | null;
   /** "Find a bridge" between two documents of the map (opens Discover). */
   onBridge?(a: string, b: string): void;
+  /** Pill, legend: drawn over the canvas (never beside or above it). */
+  overlay?: ReactNode;
 }
 
-const MAX_LABELS = 400;
+const shortLabel28 = (s: string): string => (s.length > 28 ? `${s.slice(0, 27)}…` : s);
 const OPEN_MAX = 600;
 
 /** The note while the second document of a bridge is being chosen. */
@@ -90,7 +97,7 @@ function Announce({ docId, topic }: { docId: string; topic: string }) {
  * to the nearest point that way, `]` and `[` walk through the points in view, Enter selects, Shift+Enter reads, `L` opens Explore.
  * React renders only when the hovered or focused point changes, never per frame; nothing runs at rest.
  */
-export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, aiBadge, label, fitKey, handle, tints, allow, minimap, bridge = null, onBridge }: Props) {
+export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, aiBadge, label, fitKey, handle, tints, allow, minimap, bridge = null, onBridge, overlay }: Props) {
   const { t } = useTranslation();
   const [hover, setHover, holdHover] = useRestingHover<{ idx: number; x: number; y: number }>(150, 250);
   const [menuFor, setMenuFor] = useState<number | null>(null);
@@ -123,6 +130,16 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
   const lastLabel = useRef<string>('');
   const theme = useRef<MapTheme | null>(null);
   const hulls = useMemo(() => clusterHulls(map, level), [map, level]);
+  /** Which hulls are filled at rest (§4.22) and the cluster of every point. */
+  const rest = useMemo(() => restingHulls(map, level), [map, level]);
+  const clusterOf = useMemo(() => {
+    const g = map.groups[level];
+    const of = new Int32Array(map.n);
+    if (g) for (let s = 0; s + 1 < g.starts.length; s++) for (let j = g.starts[s]!; j < g.starts[s + 1]!; j++) of[g.order[j]!] = s;
+    return of;
+  }, [map, level]);
+  /** The cluster lit by the pointer or by the legend / keyboard (-1: none): its hull is full, the rest at 35%. */
+  const lit = useRef(-1);
   const tintRef = useRef(tints);
   tintRef.current = tints;
   const allowRef = useRef(allow);
@@ -149,8 +166,14 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
       const g = map.groups[level];
       const clusters = map.levels[level] ?? [];
       const small = map.n < 30;
-      const size = small ? 14 : Math.min(5, Math.max(2, 1.2 + Math.sqrt(v.k / Math.max(map.n, 1)) * 40));
-      const half = size / 2;
+      // Circles below 5000 points (radius 3-6 px by the size of the topic), squares of 2-5 px above.
+      const round = map.n <= 5000;
+      const cmax = clusters[0]?.size ?? 1;
+      const grow = small ? 1.5 : 1;
+      const sq = Math.min(5, Math.max(2, 1.2 + Math.sqrt(v.k / Math.max(map.n, 1)) * 40));
+      const size = round ? 6 * grow : sq;
+      const half = round ? 4.5 * grow : sq / 2;
+      const litS = lit.current;
       let animating = false;
       // Entry animation.
       if (appear.current.t < 1) {
@@ -166,9 +189,8 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
         animating = true;
       }
       // Hulls and their labels first: behind the points.
-      const labels: LabelCandidate[] = [];
+      const topicItems: TopicLabelItem[] = [];
       const texts: Array<{ text: string; ai: boolean; c: number }> = [];
-      const dpx = (c: number) => ({ x: toScreenX(v, clusters[c]!.centroid.x, w), y: toScreenY(v, clusters[c]!.centroid.y, h) });
       ctx.font = '600 13px system-ui, sans-serif';
       ctx.textBaseline = 'middle';
       clusters.forEach((c, s) => {
@@ -180,7 +202,9 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
         const minY = Math.min(...screen.map((p) => p[1]));
         const maxY = Math.max(...screen.map((p) => p[1]));
         const tint = th.tints[tintRef.current.tint[s] ?? 0] ?? th.muted;
-        if (maxX > -40 && minX < w + 40 && maxY > -40 && minY < h + 40) {
+        const isLit = s === litS;
+        // At rest only the isolated big groups are filled (5%, no outline); the lit one is full (12%, outline 1.5 px at 40%).
+        if ((isLit || rest.fill[s]) && maxX > -40 && minX < w + 40 && maxY > -40 && minY < h + 40) {
           const shape = hullShape(screen, 16);
           if (shape.length > 2) {
             ctx.beginPath();
@@ -188,23 +212,22 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
             for (let i = 1; i < shape.length; i++) ctx.lineTo(shape[i]![0], shape[i]![1]);
             ctx.closePath();
             ctx.globalAlpha = ease;
-            ctx.fillStyle = withAlpha(tint, dark ? 0.12 : 0.07);
+            ctx.fillStyle = withAlpha(tint, isLit ? 0.12 : dark ? 0.08 : 0.05);
             ctx.fill();
-            ctx.strokeStyle = withAlpha(tint, dark ? 0.35 : 0.25);
-            ctx.lineWidth = 1;
-            ctx.setLineDash(tintRef.current.dashed[s] ? [5, 4] : []);
-            ctx.stroke();
-            ctx.setLineDash([]);
+            if (isLit) {
+              ctx.strokeStyle = withAlpha(tint, 0.4);
+              ctx.lineWidth = 1.5;
+              ctx.stroke();
+            }
             ctx.globalAlpha = 1;
           }
         }
         const text = clusterText(c);
         const label = shortLabel(text.text);
         if (label === '') return;
-        const ctr = centroidOf(screen);
         const tw = ctx.measureText(label).width + (text.ai ? ctx.measureText(aiBadge).width + 16 : 0) + 10;
         texts.push({ text: label, ai: text.ai, c: s });
-        labels.push({ id: texts.length - 1, x: ctr[0], y: ctr[1], w: tw, size: c.size });
+        topicItems.push({ id: texts.length - 1, box: { x0: minX, y0: minY, x1: maxX, y1: maxY }, w: tw, size: c.size });
       });
       // Points: one path per colour, culled to the viewport.
       const groups = g ? clusters.length + 1 : 1;
@@ -217,9 +240,11 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
         if (from === to) continue;
         const color = g && s < clusters.length ? (th.tints[tintRef.current.tint[s] ?? 0] ?? th.muted) : th.muted;
         const c0 = g && s < clusters.length ? clusters[s]!.centroid : null;
+        const rad = (round ? (c0 ? nodeRadius(clusters[s]!.size, cmax) : 3) : sq / 2) * grow;
+        const dim = litS >= 0 && s !== litS ? 0.35 : 1;
         for (const pass of al ? [true, false] : [true]) {
           ctx.fillStyle = color;
-          ctx.globalAlpha = pass ? Math.max(ease, 0.001) : 0.08 + 0.92 * (1 - f.t);
+          ctx.globalAlpha = (pass ? Math.max(ease, 0.001) : 0.08 + 0.92 * (1 - f.t)) * dim;
           ctx.beginPath();
           for (let j = from; j < to; j++) {
             const i = g ? g.order[j]! : j;
@@ -234,11 +259,19 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
             const sx = (x - v.cx) * v.k + w / 2;
             const sy = (y - v.cy) * v.k + h / 2;
             if (sx < -size || sy < -size || sx > w + size || sy > h + size) continue;
-            const hs = pass ? half : half * (0.5 + 0.5 * (1 - f.t));
-            ctx.rect(sx - hs, sy - hs, hs * 2, hs * 2);
+            const hs = pass ? rad : rad * (0.5 + 0.5 * (1 - f.t));
+            if (round) {
+              ctx.moveTo(sx + hs, sy);
+              ctx.arc(sx, sy, hs, 0, Math.PI * 2);
+            } else ctx.rect(sx - hs, sy - hs, hs * 2, hs * 2);
             count++;
           }
           ctx.fill();
+          if (round) {
+            ctx.strokeStyle = th.bg;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
         }
       }
       ctx.globalAlpha = 1;
@@ -261,6 +294,41 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
         ctx.fill();
       }
       if (ctx.canvas.dataset['drawn'] !== String(count)) ctx.canvas.dataset['drawn'] = String(count);
+      // Titles of the documents on a deep zoom (>= 2.5 times the fitted view): at most 30, the ones nearest the centre.
+      const deep = !op && map.n > 0 && v.k / fitView(map.bounds, w, h).k >= 2.5;
+      if (deep) {
+        const near: Array<{ i: number; d: number }> = [];
+        for (let i = 0; i < map.n; i++) {
+          const x = toScreenX(v, map.xs[i]!, w);
+          const y = toScreenY(v, map.ys[i]!, h);
+          if (x < 0 || y < 0 || x > w || y > h) continue;
+          near.push({ i, d: (x - w / 2) ** 2 + (y - h / 2) ** 2 });
+        }
+        near.sort((a, b) => a.d - b.d);
+        const pick = near.slice(0, 30);
+        wantTitles(pick.map((p) => map.ids[p.i]!), () => view.requestDraw());
+        ctx.font = '12px system-ui, sans-serif';
+        const cands: LabelCandidate[] = [];
+        const names: string[] = [];
+        pick.forEach((p, k) => {
+          const title = peekTitle(map.ids[p.i]!);
+          if (!title) return;
+          const text = shortLabel28(title);
+          names.push(text);
+          cands.push({ id: names.length - 1, x: toScreenX(v, map.xs[p.i]!, w), y: toScreenY(v, map.ys[p.i]!, h) + size + 8, w: ctx.measureText(text).width + 6, size: 30 - k });
+        });
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (const i of pickLabels(cands, w, h, 30)) {
+          const l = cands[i]!;
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = th.bg;
+          ctx.strokeText(names[l.id]!, l.x, l.y);
+          ctx.fillStyle = th.text;
+          ctx.fillText(names[l.id]!, l.x, l.y);
+        }
+        ctx.textAlign = 'left';
+      }
       // Hover halo (additive in the dark theme), selected and cursor rings.
       const at = (i: number): [number, number] => {
         const d = op?.dx.get(i);
@@ -325,33 +393,37 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
         }
       }
       if (geoRef.current) drawBridge(ctx, th, geoRef.current, (p) => [toScreenX(v, p[0], w), toScreenY(v, p[1], h)], shortLabel);
-      // Labels of the topics: the biggest first, none over another.
+      // Labels of the topics, in their own colour above the core: none over another (above, below, right, left; the smallest is hidden).
       ctx.font = '600 13px system-ui, sans-serif';
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       let shown = 0;
       labelBoxes.current = [];
-      for (const i of pickLabels(labels, w, h, MAX_LABELS)) {
-        const l = labels[i]!;
-        const tx = texts[l.id]!;
+      const spots = placeTopicLabels(topicItems, w, h);
+      for (const [id, at] of spots) {
+        const tx = texts[id]!;
+        const tint = th.tints[tintRef.current.tint[tx.c] ?? 0] ?? th.text;
+        const ink = mix(tint, th.text, dark ? 0.15 : 0.4);
+        const tw = topicItems.find((it) => it.id === id)!.w;
         shown++;
-        labelBoxes.current.push({ s: tx.c, x: l.x, y: l.y, w: l.w });
+        labelBoxes.current.push({ s: tx.c, x: at.x, y: at.y, w: tw });
         ctx.lineWidth = 3;
         ctx.strokeStyle = th.bg;
         if (tx.ai) {
           const bw = ctx.measureText(aiBadge).width;
           ctx.textAlign = 'left';
-          const left = l.x - l.w / 2 + 5;
-          ctx.strokeText(aiBadge, left, l.y);
+          const left = at.x - tw / 2 + 5;
+          ctx.strokeText(aiBadge, left, at.y);
           ctx.fillStyle = (getComputedStyle(ctx.canvas).getPropertyValue('--ai').trim() || '#7a3fd0') as string;
-          ctx.fillText(aiBadge, left, l.y);
-          ctx.strokeText(tx.text, left + bw + 6, l.y);
-          ctx.fillStyle = th.text;
-          ctx.fillText(tx.text, left + bw + 6, l.y);
+          ctx.fillText(aiBadge, left, at.y);
+          ctx.strokeText(tx.text, left + bw + 6, at.y);
+          ctx.fillStyle = ink;
+          ctx.fillText(tx.text, left + bw + 6, at.y);
           ctx.textAlign = 'center';
         } else {
-          ctx.strokeText(tx.text, l.x, l.y);
-          ctx.fillStyle = th.text;
-          ctx.fillText(tx.text, l.x, l.y);
+          ctx.strokeText(tx.text, at.x, at.y);
+          ctx.fillStyle = ink;
+          ctx.fillText(tx.text, at.x, at.y);
         }
       }
       ctx.textAlign = 'left';
@@ -378,6 +450,15 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
     onHover(idx, sx, sy) {
       if (view.canvas.current) view.canvas.current.style.cursor = idx !== null && idx <= -2 ? 'grab' : '';
       const i = idx !== null && idx >= 0 ? idx : -1;
+      // The group under the pointer (a point, its label or its hull) is lit; the legend or the keyboard may hold one lit (focusLit).
+      if (idx !== null) focusLit.current = false;
+      if (!focusLit.current) {
+        const c = i >= 0 ? clusterOf[i]! : idx !== null && idx <= -2 ? -2 - idx : idx === null ? -1 : clusterAt(sx, sy);
+        if (c !== lit.current) {
+          lit.current = c;
+          view.requestDraw();
+        }
+      }
       if (i === hoverIdx.current) return;
       hoverIdx.current = i;
       setHover(i < 0 ? null : { idx: i, x: sx, y: sy });
@@ -460,6 +541,8 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
   });
 
   const lastPointer = useRef({ x: 0, y: 0 });
+  /** True while the legend or the keyboard holds a group lit: the pointer does not change it until it leaves the canvas or Esc. */
+  const focusLit = useRef(false);
 
   /** The cluster whose hull contains the screen point (the smallest wins), or -1. */
   function clusterAt(px: number, py: number, v = view.view.current, w = view.size.current.w, h = view.size.current.h): number {
@@ -517,14 +600,7 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
 
   /** The cluster index (at the current level) a point belongs to; the last (no topic) when it has none. */
   function clusterIndexOf(i: number): number {
-    const g = map.groups[level];
-    if (!g) return 0;
-    const cl = map.levels[level] ?? [];
-    for (let s = 0; s <= cl.length; s++) {
-      // Binary search is not needed: the hover is one point.
-      for (let j = g.starts[s]!; j < g.starts[s + 1]!; j++) if (g.order[j] === i) return s;
-    }
-    return 0;
+    return map.groups[level] ? (clusterOf[i] ?? 0) : 0;
   }
 
   /** "Find a bridge" from a document: with another one selected the pair is known, else the next click picks the second. */
@@ -559,6 +635,8 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
     const setCursor = (next: number) => {
       cursor.current = next;
       hoverIdx.current = next;
+      lit.current = clusterOf[next]!;
+      focusLit.current = true;
       setHover(null);
       setFocused(next);
       view.requestDraw();
@@ -607,6 +685,8 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
         document.querySelector<HTMLInputElement>('[data-testid="map-search"]')?.focus();
         break;
       case 'escape':
+        lit.current = -1;
+        focusLit.current = false;
         cursor.current = -1;
         setFocused(null);
         setSecond(null);
@@ -629,6 +709,8 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
       focusCluster(id) {
         const c = map.clusterById.get(id);
         if (!c) return;
+        lit.current = (map.levels[level] ?? []).indexOf(c);
+        focusLit.current = lit.current >= 0;
         const v = view.view.current;
         view.flyTo(c.centroid.x, c.centroid.y, Math.max(v.k, v.k * 1.5));
       },
@@ -651,6 +733,13 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
       },
       clearSurprise() {
         surprise.current = null;
+        view.requestDraw();
+      },
+      canvas: () => view.canvas.current,
+      light(id) {
+        const c = id === null ? undefined : map.clusterById.get(id);
+        lit.current = c ? (map.levels[level] ?? []).indexOf(c) : -1;
+        focusLit.current = lit.current >= 0;
         view.requestDraw();
       },
       flyToDoc(docId) {
@@ -747,7 +836,8 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
         groups={[{ id: 'doc', items: [{ id: 'bridge', testId: 'map-card-bridge', label: t('network.bridge.find'), onSelect: () => menuFor !== null && startBridge(menuFor) }] }]}
       />
       {second !== null && <BridgePick docId={map.ids[second]!} onCancel={() => setSecond(null)} />}
-      {minimap && map.n > 0 && <MiniMap bounds={map.bounds} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={`${level}:${map.n}:${tints.tint.join(',')}`} />}
+      {overlay}
+      {minimap && map.n >= 30 && <MiniMap bounds={map.bounds} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={`${level}:${map.n}:${tints.tint.join(',')}`} />}
     </div>
   );
 }

@@ -3,7 +3,6 @@
     "level": "Livello {{level}}",
     "colorBy": "Colora per",
     "fit": "Mostra tutto",
-    "mapInfo": "{{count}} documenti · seme {{seed}}",
     "noMap": "La mappa non è ancora disponibile.",
     "noPoints": "Nessun documento in questo ambito.",
     "mapLabel": "Mappa dei documenti: trascina per spostare, rotella o più e meno per ingrandire, clicca un punto per sceglierlo, oppure premi ] e [ per scorrere i punti in vista e Invio per sceglierlo.",
@@ -54,7 +53,8 @@
       "folder": "Cartella",
       "project": "Progetto",
       "tag": "Tag",
-      "pick": "Scegli…"
+      "pick": "Scegli…",
+      "active": "Ambito attivo"
     },
     "labels": {
       "open": "Etichetta i cluster con Claude",
@@ -110,7 +110,14 @@
       "onlyThese": "Mostra solo questi",
       "announce": "{{name}}, {{kind}}, {{links}} legami",
       "surprise": "Vicini nel contenuto, lontani negli argomenti. Parole in comune: {{terms}}.",
-      "emptyTitle": "Scegli un documento da cui partire"
+      "emptyTitle": "Scegli un documento da cui partire",
+      "notExpanded": "Il nodo non è espanso.",
+      "removeFromNet": "Rimuovi dalla rete",
+      "showInNet": "Mostra nella rete",
+      "resetNet": "Azzera la rete",
+      "startFrom": "Parti da",
+      "eachExpansion": "A ogni espansione",
+      "fromDocNamed": "Documento scelto: {{title}}"
     },
     "explore": {
       "documents": "Documenti",
@@ -134,7 +141,21 @@
       },
       "count": "Documenti",
       "zoomIn": "Ingrandisci",
-      "relatedLabel": "Mostra correlati:"
+      "relatedLabel": "Mostra correlati:",
+      "emptyTitle": {
+        "topic": "Nessun tema",
+        "author": "Nessun autore",
+        "venue": "Nessuna rivista"
+      },
+      "emptyText": {
+        "topic": "I temi vengono dai tag: aggiungine ad alcuni documenti.",
+        "author": "I documenti non hanno autori nei dati.",
+        "venue": "Nessuna rivista nei dati dei documenti."
+      },
+      "createTags": "Crea i primi tag",
+      "byAuthors": "Esplora per autori",
+      "leaf": "Questo livello non ha altri nodi.",
+      "showRelated": "Mostra {{dim}}"
     },
     "dim": {
       "topic": "Temi",
@@ -156,7 +177,11 @@
       "none": "Nessun paper simile trovato.",
       "surprisingTitle": "Vicini ma non sembra",
       "surprisingHint": "Simili nel contenuto, ma senza tag, citazioni o cartella in comune.",
-      "noSurprising": "Nessuna coppia inattesa trovata."
+      "noSurprising": "Servono documenti con testo per trovarne.",
+      "noSurprisingTitle": "Nessun vicino inatteso",
+      "backToMap": "Torna al Panorama",
+      "showOnMap": "Mostra nella mappa",
+      "commonWords": "Parole in comune: {{terms}}"
     },
     "roleMap": "mappa",
     "announce": {
@@ -181,14 +206,18 @@
     },
     "noMapTitle": "Costruisci la mappa dei tuoi documenti",
     "mapFiltered": "{{from}} → {{to}} documenti",
-    "fewDocs": "Servono almeno 3 documenti perché la mappa dica qualcosa. Aggiungi PDF alla libreria e costruiscila di nuovo.",
+    "fewDocs": "La mappa ha senso da 3 documenti in su: aggiungi PDF alla libreria e costruiscila di nuovo.",
     "mode": {
       "label": "Rete di:",
       "doc": "Documenti",
       "tag": "Tag",
       "topic": "Argomenti",
       "author": "Autori",
-      "hint": "M cambia modo"
+      "hint": "M cambia modo",
+      "docSentence": "Documenti legati da somiglianza, citazioni e tag.",
+      "tagSentence": "Tag che compaiono insieme negli stessi documenti.",
+      "topicSentence": "Gli argomenti del Panorama e quanto sono vicini.",
+      "authorSentence": "Autori che hanno firmato insieme."
     },
     "ent": {
       "groupOf": "Gruppo di {{name}}",
@@ -258,8 +287,8 @@
           "action": "Completa i dati"
         },
         "few": {
-          "title": "Allarga i filtri",
-          "text": "Meno di 3 nodi passano i filtri.",
+          "title": "Nessun risultato con questi filtri",
+          "text": "Con almeno {{min}} documenti ce ne sono {{count}}.",
           "action": "Togli i filtri"
         }
       },
@@ -280,17 +309,56 @@
       "sizeBy_equal": "Tutti uguali",
       "sharedThemes": "Mostra temi in comune",
       "cutHint": "oltre il limite",
-      "cutShown": "Mostrato senza i suoi collegamenti: è oltre gli {{limit}} nodi che la rete può contenere."
+      "cutShown": "Mostrato senza i suoi collegamenti: è oltre gli {{limit}} nodi che la rete può contenere.",
+      "lowered": "Mostro anche {{kind}} con 1 documento."
     },
     "bridge": {
       "find": "Trova un ponte…",
       "pickSecond": "Fai clic sul secondo documento per un ponte con «{{title}}»",
-      "note": "Ponte: {{a}} ⇢ lavoro ⇢ {{b}}"
+      "note": "Ponte: {{a}} ⇢ lavoro ⇢ {{b}}",
+      "findWith": "Trova un ponte con…",
+      "pickSecondShort": "Fai clic sul secondo documento per il ponte"
     },
     "timeline": {
       "byYear": "Disponi per anno",
       "label": "Per anno · Esc per uscire",
       "noYear": "Senza anno"
+    },
+    "untitled": "Documento senza titolo",
+    "hint": "Trascina, rotella per lo zoom, doppio clic per aprire",
+    "filters": "Filtri",
+    "look": "Aspetto",
+    "start": "Partenza",
+    "copyImage": "Copia come immagine",
+    "imageCopied": "Immagine copiata negli appunti.",
+    "imageFailed": "Non è stato possibile copiare l'immagine.",
+    "updateMap": "Aggiorna la mappa",
+    "rebuildMap": "Ricostruisci la mappa",
+    "rebuildBusy": "Una costruzione è già in corso.",
+    "fewTitle": "Servono almeno 3 documenti",
+    "addPdf": "+ Aggiungi PDF",
+    "noPointsTitle": "Nessun documento in questo ambito",
+    "clearScope": "Togli l'ambito",
+    "noModel": {
+      "title": "La mappa dei tuoi documenti",
+      "text": "È ancora da costruire: ci vuole poco tempo, dipende dal numero di documenti, e nulla va online."
+    },
+    "options": {
+      "open": "Opzioni del modello…",
+      "title": "Opzioni del modello",
+      "seedHelp": "Lo stesso seme dà la stessa disposizione. Lascia vuoto per sceglierlo in automatico."
+    },
+    "head": {
+      "none": "Mappa non costruita",
+      "stale_one": "{{count}} documento nuovo",
+      "stale_other": "{{count}} documenti nuovi",
+      "removed_one": "{{count}} documento rimosso",
+      "removed_other": "{{count}} documenti rimossi",
+      "documents_one": "{{count}} documento",
+      "documents_other": "{{count}} documenti",
+      "topics_one": "{{count}} argomento",
+      "topics_other": "{{count}} argomenti",
+      "updated": "aggiornata il {{date}}"
     }
   }
 }

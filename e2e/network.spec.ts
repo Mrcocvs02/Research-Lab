@@ -25,6 +25,25 @@ interface MapData {
 
 const assignment = (m: MapData) => JSON.stringify(m.points.map((p) => [p.docId, p.clusters]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
 
+/** Opens a chip or the `⋯` of the Map (their content is in a popover, §4.22). */
+async function openPop(window: import('@playwright/test').Page, testId: string): Promise<void> {
+  await window.getByTestId(testId).click();
+}
+
+/** Model options from the `⋯`: the seed and the rebuild. */
+async function rebuildWithSeed(window: import('@playwright/test').Page, seed: string): Promise<void> {
+  await openPop(window, 'map-more');
+  await window.getByTestId('map-options').click();
+  await window.getByTestId('graph-seed').fill(seed);
+  await window.getByTestId('graph-build-options').click();
+}
+
+/** The mode of the Links tab, from the "Network of" chip. */
+async function pickMode(window: import('@playwright/test').Page, mode: string): Promise<void> {
+  await openPop(window, 'net-mode');
+  await window.getByTestId(`net-mode-${mode}`).click();
+}
+
 /** Sets a range input the way a user does (React listens to the input event). */
 async function setRange(locator: Locator, value: number): Promise<void> {
   await locator.evaluate((el, v) => {
@@ -48,8 +67,7 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     // 1. Empty state, build with progress.
     await window.getByTestId('nav-map').click();
     await expect(window.getByTestId('graph-empty')).toBeVisible();
-    await window.getByTestId('graph-seed').fill('42');
-    await window.getByTestId('graph-build-empty').click();
+    await rebuildWithSeed(window, '42');
     const phases = new Set<string>();
     await expect
       .poll(
@@ -85,8 +103,7 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     // 3. Same seed, same clusters after a rebuild.
     const first = await ipcData<MapData>(window, 'graph:map', {});
     expect(first.seed).toBe(42);
-    await window.getByTestId('graph-seed').fill('42');
-    await window.getByTestId('graph-build').click();
+    await rebuildWithSeed(window, '42');
     await expect(window.getByTestId('graph-progress')).toBeVisible({ timeout: 30_000 }).catch(() => undefined);
     await expect(window.getByTestId('graph-status')).toHaveAttribute('data-state', 'ready', { timeout: 600_000 });
     await expect(window.getByTestId('graph-progress')).toHaveCount(0);
@@ -96,6 +113,7 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
 
     // 4. Expandable network with ~500 nodes: smooth while panning.
     await window.getByTestId('net-tab-network').click();
+    await openPop(window, 'net-start');
     await window.getByTestId('net-limit').selectOption('300');
     await window.getByTestId('net-start-folder').selectOption('');
     const net = window.getByTestId('net-canvas');
@@ -194,6 +212,7 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
       await window.mouse.up();
       await window.waitForTimeout(1500);
     });
+    await openPop(window, 'net-more');
     await window.getByTestId('net-reset').click();
     await expect(window.getByTestId('net-count')).toHaveAttribute('data-count', '0');
 
@@ -292,14 +311,16 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
 
     // 9. M4: the four modes of the Links tab, with the entity card, the Library filter and the keyboard.
     await window.getByTestId('net-tab-network').click();
-    await expect(window.getByTestId('net-mode-doc')).toHaveAttribute('aria-checked', 'true');
+    await expect(window.getByTestId('links-panel')).toHaveAttribute('data-mode', 'doc');
     for (const mode of ['tag', 'topic', 'author'] as const) {
-      await window.getByTestId(`net-mode-${mode}`).click();
+      await pickMode(window, mode);
       await expect(window.getByTestId('entity-panel')).toHaveAttribute('data-mode', mode);
       await expect(window.getByTestId('ent-canvas')).toHaveAttribute('data-loading', 'false', { timeout: 60_000 });
     }
     // Authors: at least 1 document per author, then the card of Test Author A.
+    await openPop(window, 'ent-filters');
     await setRange(window.getByTestId('ent-min-docs'), 1);
+    await window.keyboard.press('Escape');
     const entities = window.getByTestId('ent-canvas');
     await expect.poll(async () => Number(await entities.getAttribute('data-nodes')), { timeout: 60_000 }).toBeGreaterThan(0);
     await window.getByTestId('ent-fit').click();
@@ -327,15 +348,15 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     await window.getByTestId('nav-map').click();
     await window.getByTestId('net-tab-network').click();
     // M goes to the next mode (authors -> documents), and the mode of the library is remembered.
-    await expect(window.getByTestId('net-mode-author')).toHaveAttribute('aria-checked', 'true');
+    await expect(window.getByTestId('links-panel')).toHaveAttribute('data-mode', 'author');
     await window.getByTestId('ent-canvas').focus();
     await window.keyboard.press('m');
-    await expect(window.getByTestId('net-mode-doc')).toHaveAttribute('aria-checked', 'true');
+    await expect(window.getByTestId('links-panel')).toHaveAttribute('data-mode', 'doc');
     await window.keyboard.press('m');
-    await expect(window.getByTestId('net-mode-tag')).toHaveAttribute('aria-checked', 'true');
+    await expect(window.getByTestId('links-panel')).toHaveAttribute('data-mode', 'tag');
     // Reduced motion: no flight, the layout is settled before it is drawn.
     await window.emulateMedia({ reducedMotion: 'reduce' });
-    await window.getByTestId('net-mode-topic').click();
+    await pickMode(window, 'topic');
     await expect(window.getByTestId('ent-canvas')).toHaveAttribute('data-loading', 'false', { timeout: 60_000 });
     await window.getByTestId('ent-fit').click();
     const settled = Number((await window.getByTestId('ent-canvas').getAttribute('data-frames')) ?? 0);

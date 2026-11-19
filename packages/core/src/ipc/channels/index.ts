@@ -13,6 +13,7 @@ import { citationsChannels, citationsEvents, recommendChannels } from './citatio
 import { commandsChannels } from './commands.js';
 import { dialogChannels } from './dialog.js';
 import { discoverChannels } from './discover.js';
+import { doclinksChannels } from './doclinks.js';
 import { documentsChannels } from './documents.js';
 import { exploreChannels, graphChannels, graphEvents } from './graph.js';
 import { exportChannels, exportEvents } from './export.js';
@@ -43,6 +44,7 @@ import { settingsChannels } from './settings.js';
 
 export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels, citationsChannels, recommendChannels, watchChannels, graphChannels, exploreChannels, exportChannels, mcpChannels, backupChannels, maintenanceChannels, bibChannels, readerToolsChannels, resourcesChannels, importIdChannels, resumeChannels, literatureChannels,
   discoverChannels,
+  doclinksChannels,
   refsChannels,
   guidesChannels,
   compareChannels,

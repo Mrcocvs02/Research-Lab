@@ -65,6 +65,8 @@
     "selGroupsNeeds": "Seleziona al massimo {{max}} documenti",
     "selTimeline": "Linea del tempo",
     "selSideBySide": "Leggi affiancati",
-    "selSideReason": "Seleziona 2 documenti"
+    "selSideReason": "Seleziona 2 documenti",
+    "selLinks": "Trova collegamenti…",
+    "docLinksFind": "Trova collegamenti…"
   }
 }

@@ -10,7 +10,7 @@ export { ENTITY_LIMIT, TOP_EDGES_PER_NODE, CONSORTIUM, buildEntityNetwork, commu
 export type { EntityDoc, EntityEdge, EntityInput, EntityNetwork, EntityNode, EntityRequest } from './entity-network.js';
 export type { AuthorAliases, ExploreDimension, ExploreDoc, ExploreIndex, ExploreKind, ExploreNode, ExploreTaxonomy, PathStep } from './explore.js';
 export { MAX_CITATION_KEYS, citationKey, citationSignals } from './citation-keys.js';
-export { GRAPH_K, STORE_K, TEXT_REASON_MIN, WEIGHTS, analyze, combine, makeAnalysis, reasonsOf, similarTo } from './analysis.js';
+export { GRAPH_K, STORE_K, TEXT_REASON_MIN, WEIGHTS, analyze, combine, makeAnalysis, pairSignals, reasonsOf, similarTo } from './analysis.js';
 export type { Analysis, Neighbor, Reason } from './analysis.js';
 export { buildModel, decodeModel, encodeNeighbors, modelVector, modelVocabulary, neighborsOf, MODEL_FORMAT, MODEL_VERSION } from './model.js';
 export type { BuildOptions, GraphModel, ModelCluster } from './model.js';

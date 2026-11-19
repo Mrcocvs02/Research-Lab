@@ -35,6 +35,8 @@ import './library.css';
 const CitationsPanel = lazyView(() => import('./docpanel/CitationsSection').then((m) => ({ default: m.CitationsSection })), ['citations']);
 const SimilarPanel = lazyView(() => import('../network/SimilarPanel').then((m) => ({ default: m.SimilarPanel })), ['network']);
 const DocResources = lazyView(() => import('../resources/DocResources'), ['resources']);
+const DocLinks = lazyView(() => import('./docpanel/DocLinks').then((m) => ({ default: m.DocLinks })), ['links']);
+const LinkFinderDialog = lazyView(() => import('../links/LinkFinderDialog').then((m) => ({ default: m.LinkFinderDialog })), ['links']);
 const GroupsDialog = lazyView(() => import('../groups/GroupsDialog').then((m) => ({ default: m.GroupsDialog })), ['groups']);
 const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);
 
@@ -346,6 +348,8 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
   const { openReader } = useReader();
   const [jobOpen, setJobOpen] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(false);
+  const [linksOpen, setLinksOpen] = useState(false);
+  const [linksVersion, setLinksVersion] = useState(0);
   const [editing, setEditing] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreAnchor = useRef<HTMLSpanElement>(null);
@@ -422,6 +426,7 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
         { ...groupsItem(t, [docId], () => setGroupsOpen(true)), id: 'groups', testId: 'doc-groups', icon: <IconClaude size={16} /> },
       ],
     },
+    { id: 'links', items: [{ id: 'links', label: t('library.docLinksFind'), testId: 'doc-links-find', onSelect: () => setLinksOpen(true) }] },
   ];
   const ai = doc.ai;
   const noAi = !ai.summary && !ai.description && !ai.keywords && !ai.synonyms && !ai.suggestedTags && !ai.suggestedNewTags && !ai.suggestedType && !ai.relations;
@@ -602,6 +607,10 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
         </Lazy>
       </CardSection>
 
+      <Lazy>
+        <DocLinks docId={docId} version={linksVersion} />
+      </Lazy>
+
       <CardSection id="similar" title={t('doc.similarTitle')} testId="doc-similar" toggleTestId="similar-toggle">
         <Lazy>
           <SimilarPanel docId={docId} tagLabel={(id) => model.byId.get(resolveId(model, id))?.label ?? id} onOpen={openReader} />
@@ -624,6 +633,17 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
         />
       </CardSection>
 
+      {linksOpen && (
+        <Lazy>
+          <LinkFinderDialog
+            docIds={[docId]}
+            onClose={() => {
+              setLinksOpen(false);
+              setLinksVersion((v) => v + 1);
+            }}
+          />
+        </Lazy>
+      )}
       {groupsOpen && (
         <Lazy>
           <GroupsDialog docIds={[docId]} onClose={() => setGroupsOpen(false)} />

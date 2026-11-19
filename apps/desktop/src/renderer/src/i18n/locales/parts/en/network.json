@@ -84,7 +84,8 @@
         "tags": "tags",
         "folder": "folder",
         "children": "sub-folders",
-        "documents": "documents"
+        "documents": "documents",
+        "links": "links"
       },
       "expand": "Expand",
       "collapse": "Collapse",
@@ -377,6 +378,29 @@
       "areaByTopic": "Colour by topic",
       "manageTags": "Manage tags",
       "areaIsolate": "Isolate the area {{name}}"
+    },
+    "edge": {
+      "title": "Link between documents",
+      "kind": {
+        "similar": "Similar",
+        "cites": "Citation",
+        "tagged": "Tag",
+        "contains": "Contains",
+        "linked": "Link"
+      },
+      "weight": "Weight {{value}}",
+      "remove": "Remove",
+      "findLinks": "Find links…",
+      "reason": {
+        "terms": "words: {{terms}}",
+        "to": "cites it",
+        "from": "is cited by it",
+        "both": "cite each other",
+        "shared": "{{count}} references in common",
+        "tags": "tags: {{tags}}",
+        "authors": "authors: {{authors}}",
+        "none": "added by hand"
+      }
     }
   }
 }

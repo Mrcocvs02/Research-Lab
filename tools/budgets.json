@@ -24,7 +24,9 @@
       "ManuscriptView": 16,
       "ManuscriptMatrix": 16,
       "AssignDialog": 16,
-      "AssignSuggestDialog": 16
+      "AssignSuggestDialog": 16,
+      "LinkFinderDialog": 16,
+      "DocLinks": 16
     }
   },
   "main": {

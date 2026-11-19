@@ -84,7 +84,8 @@
         "tags": "tag",
         "folder": "cartella",
         "children": "sottocartelle",
-        "documents": "documenti"
+        "documents": "documenti",
+        "links": "collegamenti"
       },
       "expand": "Espandi",
       "collapse": "Comprimi",
@@ -377,6 +378,29 @@
       "areaByTopic": "Colora per argomento",
       "manageTags": "Gestisci tag",
       "areaIsolate": "Isola l'area {{name}}"
+    },
+    "edge": {
+      "title": "Collegamento tra documenti",
+      "kind": {
+        "similar": "Simile",
+        "cites": "Citazione",
+        "tagged": "Tag",
+        "contains": "Contiene",
+        "linked": "Collegamento"
+      },
+      "weight": "Peso {{value}}",
+      "remove": "Rimuovi",
+      "findLinks": "Trova collegamenti…",
+      "reason": {
+        "terms": "termini: {{terms}}",
+        "to": "cita l'altro",
+        "from": "è citato dall'altro",
+        "both": "si citano a vicenda",
+        "shared": "{{count}} riferimenti in comune",
+        "tags": "tag: {{tags}}",
+        "authors": "autori: {{authors}}",
+        "none": "aggiunto a mano"
+      }
     }
   }
 }

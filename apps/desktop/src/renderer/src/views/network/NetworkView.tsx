@@ -6,6 +6,7 @@ import { Lazy, lazyView } from '../../components/Lazy';
 import { Menu, type MenuGroup } from '../../components/Menu';
 import { ErrorNote, ProgressBar } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
+import { takeMapStart } from '../../lib/mapStartIntent';
 import { useNav } from '../../lib/nav';
 import { canRead, useReader } from '../../lib/reader';
 import { rl } from '../../lib/rl';
@@ -37,6 +38,7 @@ export interface NetCtl {
   collapse(): void;
   remove(): void;
   bridge(): void;
+  links(): void;
 }
 
 function DocDetail({ docId, onClose, onNetwork, tagLabel, onOpenDoc, ctl }: { docId: string; onClose(): void; onNetwork(): void; tagLabel(id: string): string; onOpenDoc(docId: string): void; ctl: NetCtl | null }) {
@@ -91,6 +93,7 @@ function DocDetail({ docId, onClose, onNetwork, tagLabel, onOpenDoc, ctl }: { do
                     ctl.expanded ? { id: 'collapse', label: t('network.net.collapse'), testId: 'net-collapse', onSelect: ctl.collapse } : { id: 'collapse', label: t('network.net.collapse'), testId: 'net-collapse', onSelect: ctl.collapse, disabled: true, disabledReason: t('network.net.notExpanded') },
                     { id: 'remove', label: t('network.net.removeFromNet'), testId: 'net-remove', onSelect: ctl.remove },
                     { id: 'bridge', label: t('network.bridge.findWith'), testId: 'net-bridge', onSelect: ctl.bridge },
+                    { id: 'links', label: t('network.edge.findLinks'), testId: 'net-links-find', onSelect: ctl.links },
                   ],
                 },
               ]}
@@ -165,6 +168,12 @@ export function NetworkView() {
     setStart((cur) => ({ ...s, nonce: (cur?.nonce ?? 0) + 1 }));
     show('network');
   };
+  // "Show on the Map" from the link finder of the Library: start the network from that document.
+  useEffect(() => {
+    const m = takeMapStart();
+    if (m) startNet({ kind: 'doc', id: m.docId, label: m.label });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const phase = building?.phase ?? null;
 
   const when = (iso: string): string => {

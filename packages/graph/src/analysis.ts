@@ -77,6 +77,19 @@ export async function analyze(docs: readonly GraphDoc[], ctx?: RunContext): Prom
   return makeAnalysis(docs, vocab, vectors);
 }
 
+/**
+ * Citation closeness of two documents from their reference keys (`r:` cited works, `c:` citing works): bibliographic
+ * coupling and co-citation as the share of keys in common, never below 0.8 for a direct link. `ignore` drops keys that
+ * too many documents share.
+ */
+export function pairSignals(a: ReadonlySet<string>, b: ReadonlySet<string>, isDirect: boolean, ignore?: (key: string) => boolean): { cit: number; citShared: number; direct: boolean } {
+  let citShared = 0;
+  const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+  for (const k of small) if (big.has(k) && !ignore?.(k)) citShared++;
+  const coupling = citShared === 0 ? 0 : citShared / Math.sqrt(a.size * b.size);
+  return { cit: isDirect ? Math.max(0.8, coupling) : coupling, citShared, direct: isDirect };
+}
+
 export function makeAnalysis(docs: readonly GraphDoc[], vocab: Vocabulary, vectors: SparseVec[]): Analysis {
   const n = docs.length;
   const post: Postings = buildPostings(vectors, vocab.terms.length);
@@ -100,22 +113,14 @@ export function makeAnalysis(docs: readonly GraphDoc[], vocab: Vocabulary, vecto
   });
 
   const pair = (i: number, j: number): Omit<Neighbor, 'j' | 'score' | 'text'> => {
-    const a = refSets[i] as Set<string>;
-    const b = refSets[j] as Set<string>;
-    let citShared = 0;
-    const [small, big] = a.size <= b.size ? [a, b] : [b, a];
-    for (const k of small) if (big.has(k)) citShared++;
-    const isDirect = (direct[i] as Set<number>).has(j);
-    const coupling = citShared === 0 ? 0 : citShared / Math.sqrt(a.size * b.size);
+    const c = pairSignals(refSets[i] as Set<string>, refSets[j] as Set<string>, (direct[i] as Set<number>).has(j));
     const ta = tagSets[i] as Set<string>;
     const tb = tagSets[j] as Set<string>;
     let tagShared = 0;
     for (const t of ta) if (tb.has(t)) tagShared++;
     const union = ta.size + tb.size - tagShared;
     return {
-      cit: isDirect ? Math.max(0.8, coupling) : coupling,
-      citShared,
-      direct: isDirect,
+      ...c,
       tag: union === 0 ? 0 : tagShared / union,
       tagShared,
       sameFolder: (docs[i] as GraphDoc).folder === (docs[j] as GraphDoc).folder,

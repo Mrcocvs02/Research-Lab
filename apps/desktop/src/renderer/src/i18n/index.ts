@@ -34,6 +34,7 @@ export type StringPart =
   | 'export'
   | 'jobs'
   | 'library'
+  | 'links'
   | 'literature'
   | 'mcp'
   | 'network'

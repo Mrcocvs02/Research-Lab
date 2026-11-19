@@ -65,6 +65,8 @@
     "selGroupsNeeds": "Select at most {{max}} documents",
     "selTimeline": "Timeline",
     "selSideBySide": "Read side by side",
-    "selSideReason": "Select 2 documents"
+    "selSideReason": "Select 2 documents",
+    "selLinks": "Find links…",
+    "docLinksFind": "Find links…"
   }
 }

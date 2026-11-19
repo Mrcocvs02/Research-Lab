@@ -889,3 +889,17 @@
   background: color-mix(in srgb, var(--surface) 85%, transparent);
   border: 1px solid var(--border);
 }
+
+.net-edge-card {
+  position: absolute;
+  z-index: 5;
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--surface, var(--bg));
+  border: 1px solid var(--border, currentColor);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
+}

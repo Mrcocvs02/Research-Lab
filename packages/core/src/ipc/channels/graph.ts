@@ -102,14 +102,14 @@ export const graphChannels = defineChannels('graph', {
   neighbors: {
     request: z.object({
       node: z.object({ kind: z.enum(['doc', 'folder', 'tag']), id: z.string().max(1024) }),
-      kinds: z.array(z.enum(['similar', 'citations', 'tags', 'folder', 'children', 'documents'])).min(1).max(6),
+      kinds: z.array(z.enum(['similar', 'citations', 'tags', 'folder', 'children', 'documents', 'links'])).min(1).max(7),
       limit: z.number().int().min(1).max(GRAPH_LIMITS.neighbors).default(50),
     }),
     response: z.object({
       nodes: z.array(z.object({ kind: z.enum(['doc', 'folder', 'tag']), id: z.string().max(1024), label: z.string(), count: z.number().int().nonnegative().optional(), ...A })),
       areas,
       /** `from` / `to` are node KEYS `<kind>:<id>` (a folder and a tag may share the same id). */
-      edges: z.array(z.object({ from: z.string().max(1100), to: z.string().max(1100), kind: z.enum(['similar', 'cites', 'tagged', 'contains']), weight: z.number().min(0).max(1) })),
+      edges: z.array(z.object({ from: z.string().max(1100), to: z.string().max(1100), kind: z.enum(['similar', 'cites', 'tagged', 'contains', 'linked']), weight: z.number().min(0).max(1), id: z.string().max(40).optional(), reasons: z.record(z.string(), z.unknown()).optional() })),
     }),
   },
   /**

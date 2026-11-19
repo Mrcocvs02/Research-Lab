@@ -13,16 +13,17 @@ import { useNav } from '../../lib/nav';
 import { useNotify } from '../../lib/notify';
 import { useReader } from '../../lib/reader';
 import { rl } from '../../lib/rl';
-import { bridgeItem } from './selection/actions/bridge';
 import { compareItem } from './selection/actions/compare';
 import { extendItem } from './selection/actions/extend';
 import { groupsItem } from './selection/actions/groups';
+import { linksItem } from './selection/actions/links';
 import { timelineItem } from './selection/actions/timeline';
 import type { DocRow } from './useDocumentList';
 
 // The comparison table and the group overview load their own chunk (and strings) the first time they are asked for.
 const CompareView = lazyView(() => import('../compare/CompareView').then((m) => ({ default: m.CompareView })), ['compare']);
 const GroupsDialog = lazyView(() => import('../groups/GroupsDialog').then((m) => ({ default: m.GroupsDialog })), ['groups']);
+const LinkFinderDialog = lazyView(() => import('../links/LinkFinderDialog').then((m) => ({ default: m.LinkFinderDialog })), ['links']);
 
 /** Several default-program windows at once are too many: the menu entry waits for a smaller selection. */
 export const OPEN_MANY_MAX = 5;
@@ -57,6 +58,7 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
   const [moreOpen, setMoreOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(false);
+  const [linksOpen, setLinksOpen] = useState(false);
 
   const claude: MenuGroups = [
     {
@@ -96,7 +98,7 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
       ],
     },
     { id: 'read', items: [side, timelineItem(t, ids, () => navigate({ view: 'map' }))] },
-    { id: 'discover', items: [extendItem(t, ids, () => navigate({ view: 'discover' })), bridgeItem(t, ids, () => navigate({ view: 'discover' }))] },
+    { id: 'discover', items: [extendItem(t, ids, () => navigate({ view: 'discover' })), linksItem(t, () => setLinksOpen(true))] },
   ];
 
   return (
@@ -141,6 +143,11 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
       {groupsOpen && (
         <Lazy>
           <GroupsDialog docIds={ids} onClose={() => setGroupsOpen(false)} />
+        </Lazy>
+      )}
+      {linksOpen && (
+        <Lazy>
+          <LinkFinderDialog docIds={ids} onClose={() => setLinksOpen(false)} />
         </Lazy>
       )}
       <Button size="sm" variant="ghost" onClick={onClear} data-testid="selection-clear">

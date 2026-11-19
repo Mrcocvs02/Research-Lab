@@ -34,19 +34,21 @@ test('new search menu, extend and bridge from the selection, an honest answer (f
     for (const k of ['question', 'extend', 'bridge']) await expect(window.getByTestId(`new-search-${k}`)).toBeVisible();
     await window.keyboard.press('Escape');
 
-    // The bridge needs exactly two documents.
+    // The bridge (in the link finder dialog) needs exactly two documents.
     await window.getByTestId('nav-library').click();
     await pickSort(window, 'title');
     // The selection bar (and its menu) exists from two documents on (section 4.2, B3): with every document selected the bridge is off, with a reason.
     await clickRow(window, papers[0]!.title!);
     await window.getByTestId('search-results').press('Control+a');
     await window.getByTestId('selection-more').click();
-    await expect(window.getByTestId('selection-bridge')).toHaveAttribute('aria-disabled', 'true');
+    await window.getByTestId('selection-links').click();
+    await expect(window.getByTestId('lf-bridge')).toBeDisabled();
     await window.keyboard.press('Escape');
     await clickRow(window, papers[0]!.title!);
     await clickRow(window, papers[1]!.title!, ['Control']);
     await window.getByTestId('selection-more').click();
-    await window.getByTestId('selection-bridge').click();
+    await window.getByTestId('selection-links').click();
+    await window.getByTestId('lf-bridge').click();
 
     // Discover opens on the Searches tab and answers, without downloading anything.
     await expect(window.getByTestId('discover-searches')).toBeVisible({ timeout: 30_000 });

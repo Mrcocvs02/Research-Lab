@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppError, effectiveShortcuts, type BackupInfo, type LibraryProfile } from '@rl/core';
+import { AppError, SHORTCUT_IDS, effectiveShortcuts, type BackupInfo, type LibraryProfile } from '@rl/core';
 import i18n from '../i18n';
 import { KeymapProvider } from '../lib/keymap';
 import { AppProvider } from '../state/app-context';
@@ -524,7 +524,8 @@ describe('guide', () => {
       expect(keys).toContain('Ctrl+P');
       expect(keys).not.toContain('Ctrl+K');
     });
-    expect(screen.getAllByTestId('shortcut-list-key').length).toBe(30);
+    // One row per command with a key (derived from the commands, so a new command does not break the count).
+    expect(screen.getAllByTestId('shortcut-list-key').length).toBe(SHORTCUT_IDS.filter((id) => effectiveShortcuts([{ id: 'palette.open', accelerator: 'Ctrl+P' }])[id]).length);
   });
 
   it('shows only the shortcut list for the shortcuts dialog, in Italian too', async () => {

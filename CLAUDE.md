@@ -15,14 +15,14 @@ App desktop (Electron + React + TypeScript, monorepo npm) che organizza librerie
   - **Sonnet** (subagent) per logica, interfacce, revisioni e sicurezza. Nel dubbio, Sonnet.
   - **Haiku** (subagent) per il lavoro meccanico: worktree e junction di `node_modules`, controlli di budget e generalità, traduzioni it ↔ en, aggiornamento di STATUS, HISTORY, HANDOFF e DECISIONS da un elenco di fatti dato dall'agente principale.
   - **Coppia Opus** (architetto e revisore avversario visivo) solo per le decisioni di design dell'interfaccia; poi Sonnet implementa. Al massimo 2 round di design; i testid si fissano nel piano di design.
-- Ogni incarico è autosufficiente (obiettivo, contesto, file di proprietà, criteri, vincoli, rapporto breve). I subagent non fanno mai push.
+- Ogni incarico è autosufficiente (obiettivo, contesto, file di proprietà, criteri, vincoli, rapporto di massimo 150 parole). Il brief rimanda solo a `CLAUDE.md` e alla sezione di design del task. I subagent non fanno mai push.
 - Al massimo 2 subagent insieme, su file disgiunti. Se si raggiunge il limite d'uso di Claude, si riprende lo stesso subagent con SendMessage dopo il ripristino, senza avviarne uno nuovo.
 - Worktree in `C:\dev\rl-wt\<ramo>`, su un ramo dedicato. In ogni worktree `node_modules` è una junction verso quello del repository principale (`New-Item -ItemType Junction`); non cancellarla mai. Poiché `node_modules/@rl/*` punta ai pacchetti del repository principale, un task che cambia `packages/*` verifica typecheck e build con alias temporanei, che rimuove prima di consegnare.
-- Merge su `main` da parte dell'agente principale, con solo `npm run typecheck`, `npm run build`, `npm run check:budget`, `npm run check:generality`.
+- Merge su `main` da parte dell'agente principale, con solo `npm run typecheck`, `npm run build`, `npm run check:budget`, `npm run check:generality`. In caso di conflitto di merge in elenchi di canali o di handler si tengono entrambi i lati.
 - Regola dei test (D-443): durante le ondate si eseguono solo quei quattro comandi. I task scrivono i loro test ma non li eseguono. Revisioni, correzioni e tutti i test si fanno una volta sola alla fine dell'implementazione; i test pesanti uno alla volta. Prima controllare la RAM libera; dopo gli e2e chiudere gli `electron.exe` rimasti da `C:\dev\research-lab\node_modules\electron`.
-- Budget: alzare un tetto richiede una voce in `docs/DECISIONS.md`. Prevale la funzionalità sulla leggerezza, ma avvio (JS iniziale) e memoria a riposo non devono crescere: il codice nuovo si carica in modo pigro.
+- Budget: alzare un tetto richiede una voce in `docs/DECISIONS.md`, e i tetti si alzano una volta per le ondate rimanenti, non a ogni merge. Tetti attuali (KiB): JS iniziale del renderer 396 e entry del main 1110 (mai alzati); JS totale del renderer 2110; totale del renderer 2230; lazy del main 340 (D-464). Ogni nuovo chunk del renderer ha un tetto di 16 KiB in `renderer.chunkCapsKB` (D-465). Il codice nuovo del main va in chunk pigri (≤ 30 KiB ciascuno). Prevale la funzionalità sulla leggerezza, ma avvio (JS iniziale) e memoria a riposo non devono crescere.
 - Nessuna domanda bloccante quando si lavora senza supervisione (per esempio di notte): decidere, registrare in `docs/DECISIONS.md`, proseguire.
-- Aggiornare `docs/STATUS.md`, `docs/HISTORY.md` e `docs/HANDOFF.md` a ogni fine onda e prima di fermarsi.
+- Aggiornare `docs/STATUS.md`, `docs/HISTORY.md` e `docs/HANDOFF.md` una sola volta per onda (non a ogni merge), alla fine dell'onda e prima di fermarsi.
 - A fine di ogni fase: reviewer indipendente e security (potere di blocco), correzioni, suite completa, tag `phase-N`.
 
 ## Commit
@@ -45,8 +45,8 @@ Configurata in `.claude/settings.local.json` (non versionato) della cartella di 
 
 ## Compact instructions
 Quando compatti il contesto conserva, in quest'ordine:
-- fase e onda correnti (onda 4 in corso), ultimo commit su `main` e tag di fase già creati (`phase-0`..`phase-3`, `phase-6`, `phase-7`; `phase-4`, `phase-5`, `phase-8` senza tag);
-- subagent in corso e rami non ancora uniti: oggi `g4a` (worktree `C:\dev\rl-wt\g4a`, nessun commit, modifiche non committate da riprendere o rifare);
+- fase e onda correnti (onda 9 in corso: X5 e X6; onde 4, 5, 7 e 8 unite), ultimo commit su `main` (`2cce6b4`) e tag di fase già creati (`phase-0`..`phase-3`, `phase-6`, `phase-7`; `phase-4`, `phase-5`, `phase-8` senza tag);
+- subagent in corso e rami non ancora uniti: `x5` (worktree `C:\dev\rl-wt\x5`) e `x6` (worktree `C:\dev\rl-wt\x6`), onda 9;
 - difetti aperti dalle revisioni e lavoro non verificato (test rimandati alla verifica finale, D-443);
 - preferenze dell'utente: subagent Sonnet per logica, interfacce, revisioni e sicurezza; Haiku per il lavoro meccanico (worktree, controlli, docs di stato, traduzioni); coppia Opus solo per il design; al massimo 2 subagent insieme; test solo alla fine, quelli pesanti uno alla volta; niente coautore Claude nei commit, identità locale, push a ogni passo; nessuna domanda bloccante; app leggera ma senza togliere funzioni utili;
 - decisioni prese nella sessione ma non ancora scritte in `docs/DECISIONS.md`.

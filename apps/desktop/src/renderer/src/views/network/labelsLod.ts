@@ -85,3 +85,76 @@ export function placeTopicLabels(items: readonly TopicLabelItem[], width: number
   }
   return out;
 }
+
+/** A box on the screen: top-left corner and size. */
+export interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+export interface PaperLabel extends Box {
+  /** Index in the caller's list. */
+  id: number;
+  /** Hovered, selected, neighbour of the selection, end of a path: placed first. */
+  forced?: boolean;
+  /** Priority among the others: the bigger, the earlier (centrality). */
+  rank: number;
+}
+
+/** Width of a paper's cell on the screen from which every paper is labelled (D-498); below it only the forced and the central ones. */
+export const ALL_LABELS_CELL_PX = 110;
+/** Labels of the free layout ("Nessuno") in view at once. */
+export const FREE_LABEL_CAP = 40;
+
+const apart = (a: Box, b: Box): boolean => a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y;
+
+/**
+ * Titles of the papers (section 19.2.4): forced ones first, then by rank; a label is placed only when it overlaps no label already
+ * placed and none of the `fixed` boxes (the names of the blocks, which are placed before everything). Labels off the view are dropped.
+ * Never two boxes overlap. Returns the ids placed.
+ */
+export function planPaperLabels(cands: readonly PaperLabel[], fixed: readonly Box[], width: number, height: number, max = Infinity): number[] {
+  const placed: Box[] = [...fixed];
+  const out: number[] = [];
+  const order = cands.filter((c) => c.x + c.w >= 0 && c.x <= width && c.y + c.h >= 0 && c.y <= height).sort((a, b) => (b.forced ? 1 : 0) - (a.forced ? 1 : 0) || b.rank - a.rank || a.id - b.id);
+  for (const c of order) {
+    if (out.length >= max) break;
+    if (!placed.every((p) => apart(p, c))) continue;
+    placed.push(c);
+    out.push(c.id);
+  }
+  return out;
+}
+
+/** The title cut at a word to `max` characters, with an ellipsis (a word longer than the room is cut). */
+export function cutTitle(title: string, max: number): string {
+  const s = title.replace(/\s+/g, ' ').trim();
+  const room = Math.max(4, max);
+  if (s.length <= room) return s;
+  const head = s.slice(0, room - 1);
+  const at = head.lastIndexOf(' ');
+  return `${(at >= room * 0.5 ? head.slice(0, at) : head).replace(/[\s,;:.\-–]+$/, '')}…`;
+}
+
+/** "Surname year" of the second line of a label (the surname of the first author; either part may be missing). */
+export function byline(authors: readonly string[], year: number | null): string {
+  const first = (authors[0] ?? '').trim();
+  const surname = first.includes(',') ? first.split(',')[0]!.trim() : (first.split(/\s+/).pop() ?? '');
+  return [surname, year ?? ''].filter((p) => p !== '').join(' ');
+}
+
+/** The central papers: the top 10 % by evidence degree (at least one per block, only with some evidence), as indices into `degree`. */
+export function centralPapers(degree: ArrayLike<number>, blockOf: ArrayLike<number>): Set<number> {
+  const n = degree.length;
+  const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => degree[b]! - degree[a]! || a - b);
+  const out = new Set<number>(order.slice(0, Math.max(1, Math.ceil(n * 0.1))).filter((i) => degree[i]! > 0));
+  const seen = new Set<number>([...out].map((i) => blockOf[i]!));
+  for (const i of order) {
+    if (!seen.has(blockOf[i]!)) {
+      seen.add(blockOf[i]!);
+      out.add(i);
+    }
+  }
+  return out;
+}

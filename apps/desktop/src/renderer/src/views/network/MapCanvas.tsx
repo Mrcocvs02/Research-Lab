@@ -1,19 +1,22 @@
+import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isDarkTheme } from '../../lib/theme';
 import { reducedMotion } from './camera';
 import { withAlpha, haloSprite, mix, readTheme, type MapTheme } from './colors';
-import { boundsOf, fitView, PointGrid, toScreenX, toScreenY, toWorldX, toWorldY } from './geometry';
+import { boundsOf, fitView, PointGrid, toScreenX, toScreenY, toWorldX, toWorldY, type View } from './geometry';
 import { Menu } from '../../components/Menu';
 import type { BridgePath } from './BridgePath';
 import { bridgeGeo, bridgeView, drawBridge } from './bridgeLayer';
 import { DocCard, HoverCard, useRestingHover } from './HoverCard';
 import { coreRadius } from './hulls';
 import { areaSummary, shareIn, withUserTints, type AreaDef } from './areaColors';
-import { pickLabels, placeTopicLabels, shortLabel, type LabelCandidate, type TopicLabelItem } from './labelsLod';
+import { FREE_LABEL_CAP, placeTopicLabels, shortLabel, type TopicLabelItem } from './labelsLod';
 import { firstNode, mapAction, nearestInDirection } from './mapKeyboard';
 import { clusterText, nodeRadius, paintPoints, pointsInView, stepPoint, type PointPaint, type PreparedMap } from './mapModel';
-import { peekTitle, wantTitles } from './titles';
+import { blockView, DOT_X, DOT_Y, dotX, dotY, drawBlocks, hitBlocks, paintLabels, type BlockView } from './blocksDraw';
+import { adjacency, bundleEdges, selectEdges, type EdgeMode, type EvEdge } from './edges';
+import { centralPapers } from './labelsLod';
 import { MiniMap } from './MiniMap';
 import { useCanvasView } from './useCanvasView';
 import { safeText } from '../library/safeText';
@@ -71,9 +74,18 @@ interface Props {
   onTopicExport?(id: string, text: string): void;
   /** Pill, legend: drawn over the canvas (never beside or above it). */
   overlay?: ReactNode;
+  /** The blocks of the chosen family (section 19.2.2); null or absent: the free layout of the map. */
+  blocks?: BlocksProp | null;
+  /** Evidence between papers, already filtered by the chips; which of it is drawn follows `edgeMode`. */
+  evidence?: readonly EvEdge[];
+  edgeMode?: EdgeMode;
+  /** Where the minimap goes (the side column), shown only beyond 150 papers. */
+  minimapSlot?: HTMLElement | null;
+}
+export interface BlocksProp {
+  view: BlockView;
 }
 
-const shortLabel28 = (s: string): string => (s.length > 28 ? `${s.slice(0, 27)}…` : s);
 const OPEN_MAX = 600;
 
 /** The note while the second document of a bridge is being chosen. */
@@ -108,7 +120,7 @@ function Announce({ docId, topic }: { docId: string; topic: string }) {
  * to the nearest point that way, `]` and `[` walk through the points in view, Enter selects, Shift+Enter reads, `L` opens Explore.
  * React renders only when the hovered or focused point changes, never per frame; nothing runs at rest.
  */
-export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, aiBadge, label, fitKey, handle, tints, areas = null, allow, minimap, bridge = null, onBridge, onFindLinks, onTopicExport, overlay }: Props) {
+function FreeCanvas({ map, level, selected, onSelect, onRead, onExplore, aiBadge, label, fitKey, handle, tints, areas = null, allow, minimap, bridge = null, onBridge, onFindLinks, onTopicExport, overlay, evidence, minimapSlot }: Props) {
   const { t } = useTranslation();
   const [hover, setHover, holdHover] = useRestingHover<{ idx: number; x: number; y: number }>(150, 250);
   const [menuFor, setMenuFor] = useState<number | null>(null);
@@ -142,6 +154,8 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
   const selIdx = selected !== null ? (map.indexOf.get(selected) ?? -1) : -1;
   const selRef = useRef(selIdx);
   selRef.current = selIdx;
+  const freeAdj = useRef<Map<string, EvEdge[]>>(new Map());
+  freeAdj.current = useMemo(() => adjacency(evidence ?? []), [evidence]);
   const lastLabel = useRef<string>('');
   const theme = useRef<MapTheme | null>(null);
   /** Core circle of every topic (centre and 80th percentile radius): where its label goes. Nothing is outlined (D-482). */
@@ -330,40 +344,21 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
         }
       }
       if (ctx.canvas.dataset['drawn'] !== String(count)) ctx.canvas.dataset['drawn'] = String(count);
-      // Titles of the documents on a deep zoom (>= 2.5 times the fitted view): at most 30, the ones nearest the centre.
-      const deep = !op && map.n > 0 && v.k / fitView(map.bounds, w, h).k >= 2.5;
-      if (deep) {
-        const near: Array<{ i: number; d: number }> = [];
+      // Titles of the papers (section 19.2.4): the hovered, the selected, the neighbours of the selection and the central ones (by evidence), at most 40, none over another.
+      if (!op && map.n > 0 && (map.n <= 3000 || v.k / fitView(map.bounds, w, h).k >= 2.5)) {
+        const adj = freeAdj.current;
+        const deg = (i: number): number => adj.get(map.ids[i]!)?.length ?? 0;
+        const vis: number[] = [];
         for (let i = 0; i < map.n; i++) {
           const x = toScreenX(v, map.xs[i]!, w);
           const y = toScreenY(v, map.ys[i]!, h);
-          if (x < 0 || y < 0 || x > w || y > h) continue;
-          near.push({ i, d: (x - w / 2) ** 2 + (y - h / 2) ** 2 });
+          if (x >= 0 && y >= 0 && x <= w && y <= h) vis.push(i);
         }
-        near.sort((a, b) => a.d - b.d);
-        const pick = near.slice(0, 30);
-        wantTitles(pick.map((p) => map.ids[p.i]!), () => view.requestDraw());
-        ctx.font = '12px system-ui, sans-serif';
-        const cands: LabelCandidate[] = [];
-        const names: string[] = [];
-        pick.forEach((p, k) => {
-          const title = peekTitle(map.ids[p.i]!);
-          if (!title) return;
-          const text = shortLabel28(title);
-          names.push(text);
-          cands.push({ id: names.length - 1, x: toScreenX(v, map.xs[p.i]!, w), y: toScreenY(v, map.ys[p.i]!, h) + size + 8, w: ctx.measureText(text).width + 6, size: 30 - k });
-        });
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        for (const i of pickLabels(cands, w, h, 30)) {
-          const l = cands[i]!;
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = th.bg;
-          ctx.strokeText(names[l.id]!, l.x, l.y);
-          ctx.fillStyle = th.text;
-          ctx.fillText(names[l.id]!, l.x, l.y);
-        }
-        ctx.textAlign = 'left';
+        const force = new Set<number>([hoverIdx.current, selRef.current].filter((i) => i >= 0));
+        if (selRef.current >= 0) for (const e of (adj.get(map.ids[selRef.current]!) ?? []).slice(0, 5)) force.add(map.indexOf.get(e.a === map.ids[selRef.current] ? e.b : e.a) ?? -1);
+        const pick = new Set<number>([...vis.sort((a, b) => deg(b) - deg(a) || a - b).slice(0, FREE_LABEL_CAP * 2), ...[...force].filter((i) => i >= 0)]);
+        const items = [...pick].map((i) => ({ id: map.ids[i]!, x: toScreenX(v, map.xs[i]!, w), y: toScreenY(v, map.ys[i]!, h), forced: force.has(i), rank: deg(i) }));
+        paintLabels(ctx, items, [], w, h, 150, th, () => view.requestDraw(), FREE_LABEL_CAP);
       }
       // Hover halo (additive in the dark theme), selected and cursor rings.
       const at = (i: number): [number, number] => {
@@ -913,8 +908,386 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
       })()}
       {second !== null && <BridgePick docId={map.ids[second]!} onCancel={() => setSecond(null)} />}
       {overlay}
-      {minimap && map.n >= 30 && <MiniMap bounds={map.bounds} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={`${level}:${map.n}:${tints.tint.join(',')}:${areas ? 'a' : 't'}`} />}
+      {minimapSlot && minimap && map.n > 150 && createPortal(<MiniMap bounds={map.bounds} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={`${level}:${map.n}:${tints.tint.join(',')}:${areas ? 'a' : 't'}`} />, minimapSlot)}
     </div>
   );
 }
 
+
+/** The papers in view, in the order of the blocks. */
+function papersInView(bv: BlockView, v: View, w: number, h: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < bv.ids.length; i++) {
+    const x = toScreenX(v, bv.x[i]! + DOT_X, w);
+    const y = toScreenY(v, bv.y[i]! + DOT_Y, h);
+    if (x >= 0 && y >= 0 && x <= w && y <= h) out.push(i);
+  }
+  return out;
+}
+
+/**
+ * The Map in blocks (D-498): one block per value of the family, each paper in its cell with its title, evidence edges only for the selected or
+ * hovered paper (or the strongest, bundled between blocks). The same camera, card and keyboard as the free layout; nothing runs at rest.
+ */
+function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, onSelect, onRead, onExplore, label, fitKey, handle, allow, minimap, minimapSlot, onBridge, onFindLinks }: Props & { blocks: BlocksProp }) {
+  const { t } = useTranslation();
+  const bv = blocks.view;
+  const [hover, setHover, holdHover] = useRestingHover<{ idx: number; x: number; y: number }>(150, 250);
+  const [menuFor, setMenuFor] = useState<number | null>(null);
+  const [second, setSecond] = useState<number | null>(null);
+  const secondRef = useRef<number | null>(null);
+  secondRef.current = second;
+  const moreBtn = useRef<HTMLButtonElement>(null);
+  const [focused, setFocused] = useState<number | null>(null);
+  const hoverIdx = useRef(-1);
+  const cursor = useRef(-1);
+  const lit = useRef(-1);
+  const theme = useRef<MapTheme | null>(null);
+  const surprise = useRef<{ a: number; b: number } | null>(null);
+  const pulse = useRef<{ idx: number; at: number } | null>(null);
+  const flyRef = useRef<{ from: Map<string, [number, number]>; t: number; at: number } | null>(null);
+  const lastBv = useRef(bv);
+  const selIdx = selected !== null ? (bv.index.get(selected) ?? -1) : -1;
+  const selRef = useRef(selIdx);
+  selRef.current = selIdx;
+  const allowRef = useRef(allow);
+  allowRef.current = allow;
+  const adj = useMemo(() => adjacency(evidence), [evidence]);
+  const central = useMemo(() => centralPapers(Float64Array.from(bv.ids, (id) => adj.get(id)?.length ?? 0), bv.block), [bv, adj]);
+  const strong = useMemo(() => {
+    const edges = edgeMode === 'strong' ? selectEdges('strong', adj, []) : [];
+    return bundleEdges(edges, (id) => (bv.index.has(id) ? bv.block[bv.index.get(id)!]! : -1));
+  }, [edgeMode, adj, bv]);
+  const neighbors = useMemo(() => {
+    const out = new Set<number>();
+    if (selected !== null) for (const e of (adj.get(selected) ?? []).slice(0, 5)) out.add(bv.index.get(e.a === selected ? e.b : e.a) ?? -1);
+    out.delete(-1);
+    return out;
+  }, [selected, adj, bv]);
+  const stateRef = useRef({ adj, central, strong, neighbors, edgeMode, bv, selected });
+  stateRef.current = { adj, central, strong, neighbors, edgeMode, bv, selected };
+  const focusLit = useRef(false);
+
+  const view = useCanvasView<number>({
+    draw(ctx, w, h, v) {
+      const dark = isDarkTheme();
+      if (theme.current?.dark !== dark) theme.current = readTheme(ctx.canvas, dark);
+      const th = theme.current!;
+      const st = stateRef.current;
+      let animating = false;
+      const fl = flyRef.current;
+      if (fl) {
+        if (fl.at === 0) fl.at = performance.now();
+        fl.t = Math.min(1, (performance.now() - fl.at) / 300);
+        animating = fl.t < 1;
+        if (!animating) flyRef.current = null;
+      }
+      const hoverId = hoverIdx.current >= 0 ? st.bv.ids[hoverIdx.current]! : null;
+      const shown = st.edgeMode === 'strong' ? st.strong : { single: selectEdges(st.edgeMode, st.adj, [st.selected, hoverId]), bundles: [] };
+      const out = drawBlocks({ ctx, w, h, v, bv: st.bv, th, hover: hoverIdx.current, sel: selRef.current, cursor: cursor.current, lit: lit.current, edges: shown.single, bundles: shown.bundles, forced: st.neighbors, central: st.central, allow: allowRef.current, fly: flyRef.current, redraw: () => view.requestDraw() });
+      const sig = `${out.labels.length}`;
+      if (ctx.canvas.dataset['labels'] !== sig) ctx.canvas.dataset['labels'] = sig;
+      ctx.canvas.dataset['drawn'] = String(st.bv.ids.length);
+      const pl = pulse.current;
+      if (pl) {
+        const age = (performance.now() - pl.at) / 1000;
+        if (age < 1.2) {
+          animating = true;
+          ctx.strokeStyle = th.accent;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(toScreenX(v, dotX(st.bv, pl.idx), w), toScreenY(v, dotY(st.bv, pl.idx), h), 8 + Math.abs(Math.sin(age * Math.PI * 2)) * 8, 0, Math.PI * 2);
+          ctx.stroke();
+        } else pulse.current = null;
+      }
+      const sr = surprise.current;
+      if (sr) {
+        const ax = toScreenX(v, dotX(st.bv, sr.a), w);
+        const ay = toScreenY(v, dotY(st.bv, sr.a), h);
+        const bx = toScreenX(v, dotX(st.bv, sr.b), w);
+        const by = toScreenY(v, dotY(st.bv, sr.b), h);
+        ctx.setLineDash([8, 6]);
+        ctx.strokeStyle = th.accent;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.quadraticCurveTo((ax + bx) / 2 + (by - ay) * 0.2, (ay + by) / 2 - (bx - ax) * 0.2, bx, by);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (animating) view.requestDraw();
+    },
+    hit: (sx, sy, v, w, h) => hitBlocks(bv, toWorldX(v, sx, w), toWorldY(v, sy, h)),
+    onHover(idx, sx, sy) {
+      if (view.canvas.current) view.canvas.current.style.cursor = idx !== null && idx <= -2 ? 'pointer' : '';
+      if (idx !== null) focusLit.current = false;
+      if (!focusLit.current) {
+        const b = idx !== null && idx <= -2 ? -2 - idx : -1;
+        if (b !== lit.current) {
+          lit.current = b;
+          view.requestDraw();
+        }
+      }
+      const i = idx !== null && idx >= 0 ? idx : -1;
+      if (i === hoverIdx.current) return;
+      hoverIdx.current = i;
+      setHover(i < 0 ? null : { idx: i, x: sx, y: sy });
+      view.requestDraw();
+    },
+    onClick(idx) {
+      if (idx !== null && idx <= -2) {
+        const b = -2 - idx;
+        lit.current = lit.current === b && focusLit.current ? -1 : b;
+        focusLit.current = lit.current >= 0;
+        view.requestDraw();
+        return;
+      }
+      const s2 = secondRef.current;
+      if (s2 !== null) {
+        setSecond(null);
+        if (idx !== null && idx >= 0 && idx !== s2) onBridge?.(bv.ids[s2]!, bv.ids[idx]!);
+        return;
+      }
+      if (idx === null || idx < 0) {
+        lit.current = -1;
+        focusLit.current = false;
+      }
+      onSelect(idx !== null && idx >= 0 ? bv.ids[idx]! : null);
+    },
+    onDoubleClick(idx) {
+      if (idx === null || idx > -2) return false;
+      flyToBlock(-2 - idx);
+      return true;
+    },
+    bounds: () => (bv.ids.length > 0 ? bv.bounds : null),
+    maxFit: () => 2.2,
+  });
+
+  function flyToBlock(b: number): void {
+    const box = bv.blocks[b];
+    if (!box) return;
+    const { w, h } = view.size.current;
+    const target = blockView(box, w || 800, h || 600);
+    view.flyTo(target.cx, target.cy, target.k);
+  }
+
+  // Another family or another shape of the canvas: the papers fly from the old cells to the new, then the view fits again.
+  const first = useRef(true);
+  useEffect(() => {
+    const old = lastBv.current;
+    if (old !== bv && !reducedMotion() && old.ids.length > 0) {
+      const from = new Map<string, [number, number]>();
+      old.ids.forEach((id, i) => from.set(id, [old.x[i]!, old.y[i]!]));
+      flyRef.current = { from, t: 0, at: 0 };
+    }
+    lastBv.current = bv;
+    hoverIdx.current = -1;
+    cursor.current = -1;
+    lit.current = -1;
+    focusLit.current = false;
+    setHover(null);
+    setFocused(null);
+    if (first.current) first.current = false;
+    else view.fit(true);
+    view.requestDraw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bv]);
+  const firstFit = useRef(true);
+  useEffect(() => {
+    if (firstFit.current) firstFit.current = false;
+    else view.fit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitKey]);
+  useEffect(() => {
+    view.requestDraw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allow, selIdx, evidence, edgeMode]);
+
+  function startBridge(i: number): void {
+    const a = bv.ids[i]!;
+    if (selected !== null && selected !== a) onBridge?.(a, selected);
+    else setSecond(i);
+  }
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLCanvasElement>) => {
+    const v = view.view.current;
+    const { w, h } = view.size.current;
+    const setCursor = (next: number) => {
+      cursor.current = next;
+      hoverIdx.current = next;
+      lit.current = bv.block[next]!;
+      focusLit.current = true;
+      setHover(null);
+      setFocused(next);
+      view.requestDraw();
+    };
+    const list = papersInView(bv, v, w, h);
+    if (e.key === ']' || e.key === '[') {
+      const next = stepPoint(list, cursor.current >= 0 ? cursor.current : selRef.current, e.key === ']');
+      if (next < 0) return;
+      setCursor(next);
+      return e.preventDefault();
+    }
+    if ((e.key === 'b' || e.key === 'B') && !e.ctrlKey && !e.metaKey && cursor.current >= 0 && onBridge) {
+      startBridge(cursor.current);
+      return e.preventDefault();
+    }
+    const a = mapAction(e);
+    if (!a) return view.handlers.onKeyDown(e);
+    switch (a.type) {
+      case 'move': {
+        const from = cursor.current >= 0 ? cursor.current : selRef.current;
+        const sx = new Float64Array(bv.ids.length);
+        const sy = new Float64Array(bv.ids.length);
+        for (const i of list) {
+          sx[i] = toScreenX(v, dotX(bv, i), w);
+          sy[i] = toScreenY(v, dotY(bv, i), h);
+        }
+        const next = from < 0 || !list.includes(from) ? firstNode(sx, sy, list) : nearestInDirection(sx, sy, from, a.dir, list);
+        if (next < 0) return;
+        setCursor(next);
+        break;
+      }
+      case 'open':
+        if (cursor.current < 0) return;
+        onSelect(bv.ids[cursor.current]!);
+        break;
+      case 'read':
+        if (cursor.current >= 0) onRead?.(bv.ids[cursor.current]!);
+        break;
+      case 'zoom':
+        view.zoom(a.factor);
+        break;
+      case 'fit':
+        view.fit(true);
+        break;
+      case 'search':
+        document.querySelector<HTMLInputElement>('[data-testid="map-search"]')?.focus();
+        break;
+      case 'escape':
+        lit.current = -1;
+        focusLit.current = false;
+        cursor.current = -1;
+        setFocused(null);
+        setSecond(null);
+        surprise.current = null;
+        view.requestDraw();
+        return view.handlers.onKeyDown(e);
+      case 'explore':
+        return onExplore?.();
+      default:
+        return;
+    }
+    e.preventDefault();
+  };
+
+  useImperativeHandle(
+    handle,
+    () => ({
+      fit: () => view.fit(true),
+      focusCluster(id) {
+        const b = bv.blocks.findIndex((x) => x.id === id);
+        if (b < 0) return;
+        lit.current = b;
+        focusLit.current = true;
+        flyToBlock(b);
+      },
+      shuffle() {
+        view.requestDraw();
+      },
+      surprise(a, b) {
+        const ia = bv.index.get(a);
+        const ib = bv.index.get(b);
+        if (ia === undefined || ib === undefined) return;
+        surprise.current = { a: ia, b: ib };
+        const { w, h } = view.size.current;
+        const bx = Math.abs(dotX(bv, ia) - dotX(bv, ib));
+        const by = Math.abs(dotY(bv, ia) - dotY(bv, ib));
+        view.flyTo((dotX(bv, ia) + dotX(bv, ib)) / 2, (dotY(bv, ia) + dotY(bv, ib)) / 2, Math.min(Math.min(w, h) / Math.max(bx * 1.5, by * 1.5, 1e-9), 2.5));
+        pulse.current = { idx: ia, at: performance.now() };
+        view.requestDraw();
+      },
+      clearSurprise() {
+        surprise.current = null;
+        view.requestDraw();
+      },
+      canvas: () => view.canvas.current,
+      light(id) {
+        lit.current = id === null ? -1 : bv.blocks.findIndex((x) => x.id === id);
+        focusLit.current = lit.current >= 0;
+        view.requestDraw();
+      },
+      lightArea() {},
+      isolateArea() {},
+      flyToDoc(docId) {
+        const i = bv.index.get(docId);
+        if (i === undefined) return;
+        view.flyTo(dotX(bv, i), dotY(bv, i), Math.max(view.view.current.k, 1.2));
+        pulse.current = { idx: i, at: performance.now() };
+        view.requestDraw();
+      },
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bv, view],
+  );
+
+  const paintMini = useCallback(
+    (ctx: CanvasRenderingContext2D, to: (x: number, y: number) => [number, number]) => {
+      const th = theme.current;
+      for (const b of bv.blocks) {
+        const [x0, y0] = to(b.x, b.y);
+        const [x1, y1] = to(b.x + b.w, b.y + b.h);
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = th?.areas[b.tint] ?? '#888';
+        ctx.fillRect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+      }
+      ctx.globalAlpha = 1;
+    },
+    [bv],
+  );
+
+  const hoverBlock = hover ? (bv.blocks[bv.block[hover.idx]!]?.label ?? '') : '';
+  return (
+    <div className="map-wrap" data-testid="map-blocks" data-blocks={bv.blocks.length}>
+      <canvas
+        ref={view.canvas}
+        className="map-canvas"
+        tabIndex={0}
+        role="application"
+        aria-roledescription={t('network.roleMap')}
+        aria-label={label}
+        data-testid="map-canvas"
+        data-points={bv.ids.length}
+        {...view.handlers}
+        onKeyDown={onKeyDown}
+      />
+      {focused !== null && <Announce docId={bv.ids[focused]!} topic={bv.blocks[bv.block[focused]!]?.label ?? ''} />}
+      {hover && (
+        <HoverCard x={hover.x} y={hover.y} width={view.size.current.w} height={view.size.current.h} testId="map-tooltip" live={onBridge ? { label: t('network.card.actions'), onEnter: () => holdHover(true), onLeave: () => menuFor === null && holdHover(false) } : undefined}>
+          <DocCard docId={bv.ids[hover.idx]!} topic={hoverBlock} />
+          {onBridge && (
+            <button ref={moreBtn} type="button" className="icon-button hc-more" aria-haspopup="menu" aria-label={t('network.more')} title={t('network.more')} onClick={() => setMenuFor(hover.idx)} data-testid="map-card-more">
+              <span aria-hidden="true">⋯</span>
+            </button>
+          )}
+        </HoverCard>
+      )}
+      <Menu
+        anchor={moreBtn}
+        open={menuFor !== null}
+        label={t('network.card.actions')}
+        onClose={() => {
+          setMenuFor(null);
+          holdHover(false);
+        }}
+        groups={[{ id: 'doc', items: [{ id: 'bridge', testId: 'map-card-bridge', label: t('network.bridge.find'), onSelect: () => menuFor !== null && startBridge(menuFor) }, ...(onFindLinks ? [{ id: 'links', testId: 'map-card-links', label: t('network.edge.findLinks'), onSelect: () => menuFor !== null && onFindLinks(bv.ids[menuFor]!) }] : [])] }]}
+      />
+      {second !== null && <BridgePick docId={bv.ids[second]!} onCancel={() => setSecond(null)} />}
+      {minimapSlot && minimap && bv.ids.length > 150 && createPortal(<MiniMap bounds={bv.bounds} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={bv} />, minimapSlot)}
+    </div>
+  );
+}
+
+export function MapCanvas(props: Props) {
+  return props.blocks ? <BlocksCanvas {...props} blocks={props.blocks} /> : <FreeCanvas {...props} />;
+}

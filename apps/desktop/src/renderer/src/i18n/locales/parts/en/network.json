@@ -425,7 +425,32 @@
       "nameNone": "No names proposed.",
       "nameAccept": "Accept",
       "nameAcceptAll": "Accept all ({{count}})",
-      "named": "Names saved."
+      "named": "Names saved.",
+      "noneBlocks": "None (free layout)"
+    },
+    "blocks": {
+      "hint": "Click: the paper's links · Double-click: its neighbourhood · Alt+←: back · ✕",
+      "topicNote": "Topic does not group well yet ({{pct}} % of the papers in a clear value) · Showing automatic groups.",
+      "reason": "Only {{pct}} % of the papers have a clear value · Tidy the tags",
+      "loading": "Arranging the papers…",
+      "side": "Map legend and controls",
+      "sideHide": "Fold the column",
+      "sideShow": "Open the column",
+      "controls": "Controls",
+      "edges": "Edges",
+      "edgesSelected": "Selected",
+      "edgesStrong": "Strong",
+      "edgesNone": "None",
+      "evidence": "Evidence",
+      "evCites": "Citations",
+      "evLinks": "Links",
+      "evSimilar": "Similar",
+      "threshold": "Similarity threshold",
+      "tau": "Similarity from {{tau}} ({{pct}}th percentile of the library)",
+      "strict": "Strict",
+      "normal": "Normal",
+      "wide": "Wide",
+      "count": "{{count}} papers"
     }
   }
 }

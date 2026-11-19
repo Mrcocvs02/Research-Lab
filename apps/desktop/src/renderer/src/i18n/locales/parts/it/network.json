@@ -425,7 +425,32 @@
       "nameNone": "Nessun nome proposto.",
       "nameAccept": "Accetta",
       "nameAcceptAll": "Accetta tutti ({{count}})",
-      "named": "Nomi salvati."
+      "named": "Nomi salvati.",
+      "noneBlocks": "Nessuno (disposizione libera)"
+    },
+    "blocks": {
+      "hint": "Clic: i collegamenti del lavoro · Doppio clic: il suo vicinato · Alt+←: indietro · ✕",
+      "topicNote": "Topic non raggruppa ancora bene ({{pct}} % dei lavori in un valore chiaro) · Riordina i tag.",
+      "reason": "Solo il {{pct}} % dei lavori ha un valore chiaro · Riordina i tag",
+      "loading": "Dispongo i lavori…",
+      "side": "Legenda e controlli della mappa",
+      "sideHide": "Richiudi la colonna",
+      "sideShow": "Apri la colonna",
+      "controls": "Controlli",
+      "edges": "Archi",
+      "edgesSelected": "Del selezionato",
+      "edgesStrong": "Forti",
+      "edgesNone": "Nessuno",
+      "evidence": "Prove",
+      "evCites": "Citazioni",
+      "evLinks": "Collegamenti",
+      "evSimilar": "Somiglianza",
+      "threshold": "Soglia di somiglianza",
+      "tau": "Somiglianza da {{tau}} ({{pct}}° percentile della libreria)",
+      "strict": "Rigorosa",
+      "normal": "Normale",
+      "wide": "Ampia",
+      "count": "{{count}} lavori"
     }
   }
 }

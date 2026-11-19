@@ -70,3 +70,81 @@ export const edgeWidths = (weight: number, cites = false): { w0: number; w1: num
 };
 export const straightWidth = (weight: number): number => 0.6 + 1.4 * Math.min(Math.max(weight, 0), 1);
 export const STRAIGHT_ALPHA = 0.8;
+
+/** Evidence between two papers (D-499): `e` is 1 for a citation or a link of the user, the similarity weight otherwise. */
+export interface EvEdge {
+  a: string;
+  b: string;
+  e: number;
+  kinds: Array<'cites' | 'linked' | 'similar'>;
+  w?: number | undefined;
+}
+export type EdgeMode = 'selected' | 'strong' | 'none';
+export type EvFilter = Record<'cites' | 'linked' | 'similar', boolean>;
+/** Edges of the selected or hovered paper, and the degree allowed to each paper in the "strong" mode. */
+export const K_SELECTED = 5;
+export const K_STRONG = 2;
+
+/** The edges whose kinds are not all switched off (the chips of the evidence), with the kinds left. */
+export function filterKinds(edges: readonly EvEdge[], on: EvFilter): EvEdge[] {
+  const out: EvEdge[] = [];
+  for (const e of edges) {
+    const kinds = e.kinds.filter((k) => on[k]);
+    if (kinds.length > 0) out.push(kinds.length === e.kinds.length ? e : { ...e, kinds });
+  }
+  return out;
+}
+
+/** Edges of each paper, the strongest first (ties: the explicit ones, then by the other end's id). */
+export function adjacency(edges: readonly EvEdge[]): Map<string, EvEdge[]> {
+  const adj = new Map<string, EvEdge[]>();
+  for (const e of edges) for (const id of [e.a, e.b]) (adj.get(id) ?? adj.set(id, []).get(id)!).push(e);
+  const other = (e: EvEdge, id: string) => (e.a === id ? e.b : e.a);
+  for (const [id, list] of adj) list.sort((x, y) => y.e - x.e || (y.kinds.includes('similar') ? 0 : 1) - (x.kinds.includes('similar') ? 0 : 1) || (other(x, id) < other(y, id) ? -1 : 1));
+  return adj;
+}
+
+/**
+ * What to draw (section 19.2.3): `selected` the k = 5 strongest edges of the selected and of the hovered paper; `strong` an edge only when it is among
+ * the first k = 2 of both its ends (degree at most 2); `none` nothing.
+ */
+export function selectEdges(mode: EdgeMode, adj: ReadonlyMap<string, readonly EvEdge[]>, focus: ReadonlyArray<string | null>): EvEdge[] {
+  if (mode === 'none') return [];
+  if (mode === 'selected') {
+    const out = new Set<EvEdge>();
+    for (const id of focus) if (id) for (const e of (adj.get(id) ?? []).slice(0, K_SELECTED)) out.add(e);
+    return [...out];
+  }
+  const top = new Map<string, Set<EvEdge>>();
+  for (const [id, list] of adj) top.set(id, new Set(list.slice(0, K_STRONG)));
+  const out = new Set<EvEdge>();
+  for (const [id, set] of top) for (const e of set) if (top.get(e.a === id ? e.b : e.a)?.has(e)) out.add(e);
+  return [...out];
+}
+
+export interface Bundle {
+  /** Block indices, a < b. */
+  a: number;
+  b: number;
+  pairs: EvEdge[];
+}
+/** Pairs between two blocks become one bundle when there are at least two; the rest stay single edges. */
+export function bundleEdges(edges: readonly EvEdge[], blockOf: (id: string) => number): { single: EvEdge[]; bundles: Bundle[] } {
+  const groups = new Map<string, Bundle>();
+  const single: EvEdge[] = [];
+  for (const e of edges) {
+    const x = blockOf(e.a);
+    const y = blockOf(e.b);
+    if (x < 0 || y < 0 || x === y) {
+      single.push(e);
+      continue;
+    }
+    const key = x < y ? `${x}:${y}` : `${y}:${x}`;
+    (groups.get(key) ?? groups.set(key, { a: Math.min(x, y), b: Math.max(x, y), pairs: [] }).get(key)!).pairs.push(e);
+  }
+  const bundles: Bundle[] = [];
+  for (const g of groups.values()) (g.pairs.length >= 2 ? bundles.push(g) : single.push(...g.pairs));
+  return { single, bundles };
+}
+/** Thickness of a bundle (1 to 6 px) from its number of pairs. */
+export const bundleWidth = (pairs: number): number => Math.min(6, 1 + pairs * 0.5);

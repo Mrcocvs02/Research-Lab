@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, RequestOf } from '@rl/core';
 import { EmptyState } from '../../components/EmptyState';
@@ -18,8 +18,11 @@ import { RlError } from '../../lib/rl-error';
 import { safeText } from '../library/safeText';
 import { Segmented } from '../../components/Segmented';
 import { AreaLegend, useAreaColors } from './AreaLegend';
-import { GroupBy, GroupLabel } from './GroupBy';
-import { familyName, nameClusters, TOPIC_FAMILY, useFamilies, useFamily, useFamilyRev, withFamilyShares, type FamilyShares } from './grouping';
+import { clearShare, GroupBy } from './GroupBy';
+import { buildBlockView, type FamilyResponse } from './blocksDraw';
+import { filterKinds, type EdgeMode, type EvEdge, type EvFilter } from './edges';
+import { MapSide, MapStrip, useWide, type EvidenceControls, type SideBlock, type Strictness } from './MapSide';
+import { NONE_FAMILY, useFamilies, useFamily, useFamilyRev } from './grouping';
 import { areaFallback, assignAreaSlots, loadAreaMemo, saveAreaMemo } from './areaColors';
 import { adjacencyOf, assignTints, type TintMemo } from './colors';
 import { rng } from './playful';
@@ -61,11 +64,10 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const [value, setValue] = useState('');
   const [level, setLevel] = useState(0);
   const [rawMap, setMap] = useState<PreparedMap | null>(null);
-  // Group by (D-489): another family than the topic replaces the shares of the points (colours and legend) by its own.
+  // Group by (D-498): the papers sit in blocks, one per value of the family; "None" is the free layout of the map.
   const [family] = useFamily();
-  const grouped = family !== TOPIC_FAMILY;
-  const [famShares, setFamShares] = useState<(FamilyShares & { family: string }) | null>(null);
-  const map = useMemo(() => (rawMap && grouped && famShares?.family === family ? withFamilyShares(rawMap, famShares) : rawMap), [rawMap, grouped, famShares, family]);
+  const freeMode = family === NONE_FAMILY;
+  const map = rawMap;
   const [mapKey, setMapKey] = useState('');
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
@@ -115,26 +117,61 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const [byArea, setByArea] = useAreaColors();
   const families = useFamilies(scope, usable);
   const famRev = useFamilyRev();
+  const wide = useWide();
+  const [sideOpen, setSideOpen] = useLocalFlag('rl.map.sideOpen', true);
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const aspect = useAspect(stage, !!rawMap && rawMap.n >= 3);
+  const offer = families.find((f) => f.id === family);
+  const [autoFor, setAutoFor] = useState<string | null>(null);
+  const effective = freeMode ? null : offer?.eligible === false || autoFor === family ? 'auto' : family;
+  const [fam, setFam] = useState<FamilyResponse | null>(null);
   useEffect(() => {
-    if (!grouped || !rawMap) return;
+    if (!usable || !effective || aspect === null || !rawMap) return;
     let live = true;
-    rl.invoke('graph:family', { family, ...(scope ? { scope } : {}) }).then(
-      (r) => live && setFamShares({ family, areas: nameClusters(t, (r.areas ?? []) as FamilyShares['areas']), items: r.items as FamilyShares['items'] }),
-      () => live && setFamShares({ family, areas: [], items: [] }),
+    rl.invoke('graph:family', { family: effective, ...(scope ? { scope } : {}), aspect }).then(
+      (r) => {
+        if (!live) return;
+        if (r.eligible === false && effective !== 'auto') setAutoFor(effective);
+        else setFam(r);
+      },
+      () => live && setFam(null),
     );
     return () => {
       live = false;
     };
-  }, [grouped, family, rawMap, scope, t, famRev]);
+  }, [usable, effective, scope, aspect, !!rawMap, famRev, mapVersion, status.documents, status.pending, status.builtAt]);
+  const blocksView = useMemo(() => (fam?.blocks && !freeMode ? buildBlockView(fam.items, fam.blocks) : null), [fam, freeMode]);
+  const blocks = blocksView && blocksView.ids.length > 0 ? { view: blocksView } : null;
+  // Evidence between papers (D-499): the threshold of the library and at most 5 edges per paper; the chips and the mode choose what is drawn.
+  const [edgeMode, setEdgeMode] = useChoice<EdgeMode>('rl.map.edges', 'selected', ['selected', 'strong', 'none']);
+  const [strict, setStrict] = useChoice<Strictness>('rl.map.strict', 'normal', ['strict', 'normal', 'wide']);
+  const [kCites, setKCites] = useLocalFlag('rl.map.ev.cites', true);
+  const [kLinked, setKLinked] = useLocalFlag('rl.map.ev.links', true);
+  const [kSimilar, setKSimilar] = useLocalFlag('rl.map.ev.similar', true);
+  const [evidence, setEvidence] = useState<{ tau: number; edges: EvEdge[] } | null>(null);
+  useEffect(() => {
+    if (!usable) return;
+    let live = true;
+    rl.invoke('graph:evidence', { ...(scope ? { scope } : {}), strictness: strict }).then(
+      (r) => live && setEvidence(r),
+      () => live && setEvidence(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [usable, scope, strict, mapVersion, status.documents, status.pending, status.builtAt]);
+  const kinds = useMemo<EvFilter>(() => ({ cites: kCites, linked: kLinked, similar: kSimilar }), [kCites, kLinked, kSimilar]);
+  const edges = useMemo(() => filterKinds(evidence?.edges ?? [], kinds), [evidence, kinds]);
   // Colour by macro-area (D-483): with no area, one area, or colouring switched off, the topics colour the points.
   const fallback = useMemo(() => (map ? areaFallback(map.areas, map.withArea, map.n) : { use: 'topics' as const, reason: 'none' as const }), [map]);
   const areaSlots = useMemo(() => {
     if (!map || map.areas.length === 0) return null;
-    const r = assignAreaSlots(map.areas, grouped ? null : loadAreaMemo());
-    if (!grouped) saveAreaMemo(r.memo);
+    const r = assignAreaSlots(map.areas, loadAreaMemo());
+    saveAreaMemo(r.memo);
     return r.slots;
-  }, [map, grouped]);
-  const areaProp = useMemo(() => (map && (byArea || grouped) && fallback.use === 'areas' && areaSlots ? { defs: map.areas, slots: areaSlots } : null), [map, byArea, grouped, fallback, areaSlots]);
+  }, [map]);
+  const areaProp = useMemo(() => (map && byArea && fallback.use === 'areas' && areaSlots ? { defs: map.areas, slots: areaSlots } : null), [map, byArea, fallback, areaSlots]);
   const tl = useTimeline(map);
   const depth = map?.levels.length ?? 0;
   const lvl = Math.min(level, Math.max(depth - 1, 0));
@@ -182,6 +219,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const chrome = useContext(ChromeCtx);
   const { info } = useNotify();
   const [hint, dismissHint] = useHint(active && !!map && map.n >= 3);
+  const [topicNoteSeen, setTopicNoteSeen] = useLocalFlag('rl.map.topicNote', false);
   const [legendFor, setLegendFor] = useState<{ id: string; text: string } | null>(null);
   const legendAnchor = useRef<HTMLElement | null>(null);
   const topics = map?.levels[0]?.length ?? 0;
@@ -220,7 +258,16 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const shownCount = allow && map ? [...allow].filter((id) => map.indexOf.has(id)).length : 0;
   let pill: React.ReactNode = null;
   if (map && !tooFew) {
-    if (bridge) {
+    if (family === 'topic' && offer?.eligible === false && !topicNoteSeen) {
+      pill = (
+        <Pill testId="map-group-fallback" onClose={() => setTopicNoteSeen(true)}>
+          {t('network.blocks.topicNote', { pct: clearShare(offer) })}{' '}
+          <button type="button" className="link" onClick={() => nav.navigate({ view: 'settings' })}>
+            {t('network.area.manageTags')}
+          </button>
+        </Pill>
+      );
+    } else if (bridge) {
       pill = (
         <Pill testId="map-bridge-note" onClose={() => setBridge(null)}>
           {t('network.bridge.note', { a: safeText(bridge.nodes[0].title), b: safeText(bridge.nodes[2].title) })}
@@ -250,7 +297,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     } else if (map.omitted > 0) {
       pill = <Pill testId="map-omitted">{t('network.mapOmitted', { count: map.omitted, shown: map.n })}</Pill>;
     } else if (hint) {
-      pill = <Pill testId="map-hint">{t('network.hint')}</Pill>;
+      pill = <Pill testId="map-hint">{t('network.blocks.hint')}</Pill>;
     } else if (byArea && fallback.use === 'topics') {
       pill = (
         <Pill testId="map-color-note">
@@ -274,11 +321,10 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     }
   }
 
-  const groupName = familyName(t, families, family);
   const levels = map?.levels ?? [];
   const legend =
     map && !tooFew && areaProp ? (
-      <AreaLegend defs={areaProp.defs} slots={areaProp.slots} title={grouped ? t('network.group.grouped', { name: groupName }) : undefined} without={map.n - map.withArea} onLight={(a) => handle.current?.lightArea(a)} onIsolate={(a) => handle.current?.isolateArea(a)} />
+      <AreaLegend defs={areaProp.defs} slots={areaProp.slots} without={map.n - map.withArea} onLight={(a) => handle.current?.lightArea(a)} onIsolate={(a) => handle.current?.isolateArea(a)} />
     ) : map && !tooFew ? (
       <ul className="legend" data-testid="cluster-legend" aria-label={t('network.legend')}>
         {clusters.slice(0, 8).map((c, i) => {
@@ -313,10 +359,14 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
       </ul>
     ) : null;
 
+  const sideBlocks: SideBlock[] = !freeMode && blocks ? blocks.view.blocks.map((b) => ({ id: b.id, label: b.label, count: b.count, tint: b.tint })) : [];
+  const shown = !freeMode && blocks ? blocks.view.ids.length : (map?.n ?? 0);
+  const controls: EvidenceControls = { mode: edgeMode, setMode: setEdgeMode, kinds, setKind: (k, on) => (k === 'cites' ? setKCites(on) : k === 'linked' ? setKLinked(on) : setKSimilar(on)), strict, setStrict, tau: evidence?.tau ?? null };
   const noMapReason = t('network.noMapTitle');
   return (
     <div className="net-tab map-tab" data-testid="map-panel">
       <RowPortal active={active}>
+        <GroupBy families={families} scope={scope} withNone />
         <NodeSearch
           testId="map-search"
           label={t('network.search.go')}
@@ -382,7 +432,6 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
                 ]}
               />
             </div>
-            <GroupBy families={families} scope={scope} />
             <label className="net-field net-pop-row">
               <span>{t('network.colorBy')}</span>
               <select value={lvl} onChange={(e) => setLevel(Number(e.target.value))} disabled={depth === 0} data-testid="map-level">
@@ -466,40 +515,48 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
         </EmptyState>
       )}
       {map && !tooFew && (
-        <div className="map-body">
-          <MapCanvas
-            map={tl.map ?? map}
-            level={lvl}
-            selected={selected}
-            onSelect={(id) => {
-              dismissHint();
-              onSelect(id);
-            }}
-            onRead={onRead}
-            onExplore={onExplore}
-            tints={tints}
-            areas={areaProp}
-            allow={tl.only ?? allow}
-            minimap={mini}
-            bridge={bridge}
-            onFindLinks={setFindFor}
-            onTopicExport={(id, text) => openExport({ clusters: [{ id, label: text }], name: text })}
-            onBridge={(a, b) => {
-              setDiscoverIntent({ kind: 'bridge', docIds: [a, b] });
-              nav.navigate({ view: 'discover' });
-            }}
-            aiBadge={t('ai.badge')}
-            label={t('network.mapLabel')}
-            fitKey={mapKey}
-            handle={handle}
-            overlay={
-              <>
-                {pill}
-                {grouped && areaProp && <GroupLabel families={families} family={family} />}
-                {legend}
-              </>
-            }
-          />
+        <div className={wide ? 'map-body has-side' : 'map-body'}>
+          <div className="map-stage" ref={stage}>
+            {!wide && <MapStrip blocks={sideBlocks} legend={legend} controls={controls} count={shown} onLight={(id) => handle.current?.light(id)} onFly={(id) => handle.current?.focusCluster(id)} />}
+            {pill && <div className="map-notes">{pill}</div>}
+            {!freeMode && !blocks && !fam ? (
+              <div className="map-wrap map-loading" role="status" data-testid="map-blocks-loading">
+                {t('network.blocks.loading')}
+              </div>
+            ) : (
+              <MapCanvas
+                map={tl.map ?? map}
+                level={lvl}
+                selected={selected}
+                onSelect={(id) => {
+                  dismissHint();
+                  onSelect(id);
+                }}
+                onRead={onRead}
+                onExplore={onExplore}
+                tints={tints}
+                areas={areaProp}
+                allow={tl.only ?? allow}
+                minimap={mini}
+                minimapSlot={wide && sideOpen ? slot : null}
+                blocks={freeMode ? null : blocks}
+                evidence={edges}
+                edgeMode={edgeMode}
+                bridge={bridge}
+                onFindLinks={setFindFor}
+                onTopicExport={(id, text) => openExport({ clusters: [{ id, label: text }], name: text })}
+                onBridge={(a, b) => {
+                  setDiscoverIntent({ kind: 'bridge', docIds: [a, b] });
+                  nav.navigate({ view: 'discover' });
+                }}
+                aiBadge={t('ai.badge')}
+                label={t('network.mapLabel')}
+                fitKey={mapKey}
+                handle={handle}
+              />
+            )}
+          </div>
+          {wide && <MapSide open={sideOpen} onToggle={() => setSideOpen(!sideOpen)} minimapRef={setSlot} blocks={sideBlocks} legend={legend} controls={controls} count={shown} onLight={(id) => handle.current?.light(id)} onFly={(id) => handle.current?.focusCluster(id)} />}
         </div>
       )}
       <Menu
@@ -528,4 +585,59 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
       )}
     </div>
   );
+}
+
+/** A string choice kept in localStorage as a per-viewer convenience (an unknown stored value falls back to the default). */
+function useChoice<T extends string>(key: string, initial: T, allowed: readonly T[]): [T, (v: T) => void] {
+  const [value, setValue] = useState<T>(() => {
+    try {
+      const raw = window.localStorage.getItem(key) as T | null;
+      return raw && allowed.includes(raw) ? raw : initial;
+    } catch {
+      return initial;
+    }
+  });
+  const set = (v: T) => {
+    setValue(v);
+    try {
+      window.localStorage.setItem(key, v);
+    } catch {
+      /* storage unavailable: the choice lives until the next load */
+    }
+  };
+  return [value, set];
+}
+
+/** Width over height of the canvas column for the blocks: measured at once, then again 300 ms after the last resize when it changed by more than 15 %. */
+function useAspect(el: RefObject<HTMLElement | null>, on: boolean): number | null {
+  const [aspect, setAspect] = useState<number | null>(null);
+  useEffect(() => {
+    const node = el.current;
+    if (!node || !on) return;
+    let timer = 0;
+    let last = 0;
+    const read = () => {
+      const r = node.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return;
+      const q = r.width / r.height;
+      if (last === 0 || Math.abs(q - last) / last > 0.15) {
+        last = q;
+        setAspect(Math.round(q * 100) / 100);
+      }
+    };
+    const ro = new ResizeObserver(() => {
+      if (last === 0) read();
+      else {
+        clearTimeout(timer);
+        timer = window.setTimeout(read, 300);
+      }
+    });
+    ro.observe(node);
+    read();
+    return () => {
+      ro.disconnect();
+      clearTimeout(timer);
+    };
+  }, [el, on]);
+  return aspect;
 }

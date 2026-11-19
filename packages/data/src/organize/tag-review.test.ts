@@ -192,3 +192,19 @@ describe('acronyms on real-shaped vocabularies (D-505)', () => {
     expect(conventionName('3kt')).toBe('3kt');
   });
 });
+
+describe('author names used as tags, as real metadata writes them (D-509)', () => {
+  const authorRows = (labels: string[], authors: string[][]) => {
+    const nodes = labels.map((l) => node(l));
+    const docs = authors.map((a, i) => ({ id: `d${i}`, tags: nodes.map((n) => n.id), authors: a }));
+    return reviewTags({ nodes, docs }).proposals.filter((p) => p.kind === 'metadata' && p.meta?.field === 'author').map((p) => p.tags[0]);
+  };
+  it('"Surname I." authors and tags with several initials or a two-part surname', () => {
+    const found = authorRows(['doe_j', 'roe_l_w', 'van-dyke_q', 'wu_c'], [['Doe J.', 'Roe L. W.'], ['Van-Dyke Q.', 'Wu C.']]);
+    expect(found.sort()).toEqual(['doe-j', 'roe-l-w', 'van-dyke-q', 'wu-c'].sort());
+  });
+  it('"Given Surname" still reads the surname last, and a topic is never an author', () => {
+    expect(authorRows(['doe_j'], [['Jane Doe']])).toEqual(['doe-j']);
+    expect(authorRows(['deep_learning', 'x_ray'], [['Deep L.', 'Ray X.']])).toEqual(['x-ray']);
+  });
+});

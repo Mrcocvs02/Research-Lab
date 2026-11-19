@@ -510,7 +510,7 @@ export class PdfSync {
    * Puts the file back as it was before our first write (§8.3.8): the first `base.size` bytes (checked against `base.hash`), else the
    * safety copy (checked against its hash). Same path as a write: temporary, re-check, replacement. Then the document is app-only.
    */
-  async restoreOriginal(docId: string, mode: 'one' | 'all' = 'one'): Promise<{ restored: boolean; droppedExternal: number }> {
+  async restoreOriginal(docId: string, mode: 'one' | 'all' = 'one'): Promise<{ restored: boolean; droppedExternal: number; savedCopy?: string }> {
     const rt = await this.s.runtime.require();
     const id = docId as DocumentId;
     return this.enqueue(rt.libraryId, docId, async () => {
@@ -522,9 +522,22 @@ export class PdfSync {
       const st = await stat(abs);
       if (st.size !== rec.size) throw new AppError('CONFLICT', 'The file changed meanwhile', { reason: 'changed' });
       const before = await fingerprint(abs);
+      // The file must be the one the record knows (I2): a different file with the same size is never replaced.
+      if ((await sha256File(abs).catch(() => '')) !== rec.hash) throw new AppError('CONFLICT', 'The file changed meanwhile', { reason: 'changed' });
       let dropped = 0;
       const ins = await rt.pdf.pdfInspect({ path: abs, baseSize: w.base.size }).catch(() => null);
       if (ins?.ok && ins.externalAtBase !== null) dropped = Math.max(0, ins.external - ins.externalAtBase);
+      // The restore drops what other programs added (I1): the current state is saved first, or nothing is replaced.
+      let savedCopy: string | undefined;
+      if (dropped > 0 || !ins?.ok) {
+        const dir = this.backupDir(rt, w.backup?.location ?? (await this.config(rt)).annotations.backupLocation);
+        try {
+          savedCopy = await copyOriginal(abs, dir, docId, rec.hash, this.journal, rt.libraryId, '-prerestore');
+        } catch {
+          throw new AppError('IO_ERROR', 'The current state cannot be saved before the restore', { reason: 'no-original' });
+        }
+      }
+      const known = new Set([w.base.hash, ...w.own.map((o) => o.hash)]);
       const tmp = tempNameFor(abs);
       await this.journal.add({ tmp, docId, libraryId: rt.libraryId, at: nowIso() });
       try {
@@ -536,6 +549,8 @@ export class PdfSync {
         if (!ok) {
           // The truncation does not give the original (the file was rewritten): the safety copy does, if it is still there and intact.
           await unlink(tmp).catch(() => {});
+          // The copy replaces only a file whose hash we know (ours or the original): never a new edition of someone else.
+          if (!known.has(rec.hash)) throw new AppError('IO_ERROR', 'The original cannot be restored', { reason: 'no-original' });
           const b = w.backup;
           const dir = b ? this.backupDir(rt, b.location) : null;
           const src = b && dir ? await resolveInRoot(dir, b.file).catch(() => null) : null;
@@ -569,7 +584,7 @@ export class PdfSync {
       ld.pending = undefined;
       await this.saveLocal();
       this.s.emit('library:changed', { kind: 'documents', ids: [docId] });
-      return { restored: true, droppedExternal: dropped };
+      return { restored: true, droppedExternal: dropped, ...(savedCopy ? { savedCopy } : {}) };
     });
   }
 
@@ -696,7 +711,9 @@ export class PdfSync {
     return { jobId };
   }
 
-  async restoreAll(): Promise<{ jobId: string }> {
+  /** `confirmed` must be true: the main process refuses a mass restore the renderer did not ask the user to confirm (I1). */
+  async restoreAll(confirmed = false): Promise<{ jobId: string }> {
+    if (confirmed !== true) throw new AppError('PERMISSION_DENIED', 'The restore of the library needs the confirmation of the user', { reason: 'confirm' });
     const rt = await this.s.runtime.require();
     const { jobId, job } = this.startJob('restore');
     void (async () => {
@@ -750,6 +767,15 @@ export class PdfSync {
         const { backup: _b, ...w } = cur!.pdfWrite!;
         return { ...cur!, pdfWrite: w, updatedAt: nowIso() };
       });
+    }
+    // Copies without a record (the file changed and the record was reset, prerestore copies) are deleted too (M7).
+    for (const loc of ['data', 'local'] as const) {
+      const dir = this.backupDir(rt, loc);
+      for (const name of await readdir(dir).catch(() => [] as string[])) {
+        if (!/^[\w-]+-[0-9a-f]{8}(-prerestore)?\.pdf$/.test(name)) continue;
+        const file = await resolveInRoot(dir, name).catch(() => null);
+        if (file && (await unlink(file).then(() => true, () => false))) deleted++;
+      }
     }
     return { deleted };
   }

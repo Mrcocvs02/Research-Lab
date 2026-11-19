@@ -197,7 +197,7 @@
       "restoreAll": "Ripristina tutti gli originali…",
       "deleteCopies": "Elimina le copie di sicurezza…",
       "restoreTitle": "Ripristinare ogni PDF modificato?",
-      "restoreBody": "Ogni file torna, byte per byte, com'era prima che Research Lab ci scrivesse. Le evidenziazioni restano nell'app.",
+      "restoreBody": "Ogni file torna, byte per byte, com'era prima che Research Lab ci scrivesse. Le evidenziazioni restano nell'app. Se altri programmi hanno aggiunto annotazioni a un file, una copia del suo stato attuale resta nella cartella delle copie di sicurezza prima del ripristino.",
       "restoreConfirm": "Ripristina i file",
       "deleteTitle": "Eliminare le copie di sicurezza?",
       "deleteBody_one": "Si elimina 1 copia. Un ripristino poi riporterà il file ai suoi byte originali solo per troncamento.",

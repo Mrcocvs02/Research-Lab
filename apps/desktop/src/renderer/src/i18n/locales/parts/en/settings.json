@@ -197,7 +197,7 @@
       "restoreAll": "Restore all originals…",
       "deleteCopies": "Delete the safety copies…",
       "restoreTitle": "Restore every changed PDF?",
-      "restoreBody": "Each file goes back, byte for byte, to what it was before Research Lab wrote into it. Highlights stay in the app.",
+      "restoreBody": "Each file goes back, byte for byte, to what it was before Research Lab wrote into it. Highlights stay in the app. If other programs added annotations to a file, a copy of its current state is kept in the safety copies folder before it is restored.",
       "restoreConfirm": "Restore the files",
       "deleteTitle": "Delete the safety copies?",
       "deleteBody_one": "1 copy will be deleted. A restore will then only cut the file back to its original bytes.",

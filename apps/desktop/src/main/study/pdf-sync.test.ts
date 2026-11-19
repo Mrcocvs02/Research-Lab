@@ -461,7 +461,11 @@ describe('take them out, restore, copies (D-352, §8.3.8)', () => {
     await otherProgramAnnotates();
     expect((await ps.state(DOC, true)).droppedOnRestore).toBe(1);
     const r = await ps.restoreOriginal(DOC);
-    expect(r).toEqual({ restored: true, droppedExternal: 1 });
+    expect(r.restored).toBe(true);
+    expect(r.droppedExternal).toBe(1);
+    // I1: the state with the other program's annotation is kept before the restore
+    expect(r.savedCopy).toMatch(/-prerestore\.pdf$/);
+    expect((await readdir(path.join(w.data, 'pdf-originals'))).includes(r.savedCopy!)).toBe(true);
     expect((await bytes(w)).equals(w.original)).toBe(true);
     const rec = w.rec.get(DOC)!;
     expect(rec.hash).toBe(sha(w.original));
@@ -470,15 +474,32 @@ describe('take them out, restore, copies (D-352, §8.3.8)', () => {
     expect(await tmps(w)).toEqual([]);
   });
 
-  it('when the truncation is not the original (the file was rewritten) the safety copy is used, after its hash is checked', async () => {
+  it('I2: a file whose hash the record does not know (a new edition) is never replaced by the safety copy', async () => {
     const ps = new PdfSync(w.s, true);
     await ps.writeNow(DOC);
     const rewritten = docPdf({ pages: 5 }); // another program saved the whole file again
     await writeFile(w.file, rewritten);
     const st = await stat(w.file);
     w.rec.set(DOC, { ...w.rec.get(DOC)!, size: rewritten.length, hash: sha(rewritten), mtimeMs: st.mtimeMs });
-    expect((await ps.restoreOriginal(DOC)).restored).toBe(true);
-    expect((await bytes(w)).equals(w.original)).toBe(true);
+    await expect(ps.restoreOriginal(DOC)).rejects.toBeInstanceOf(AppError);
+    expect((await bytes(w)).equals(rewritten)).toBe(true);
+    expect(await tmps(w)).toEqual([]);
+  });
+
+  it('I2: a file that differs from the recorded hash (same size) is a conflict and stays', async () => {
+    const ps = new PdfSync(w.s, true);
+    await ps.writeNow(DOC);
+    const cur = await bytes(w);
+    const other = Buffer.from(cur);
+    other[other.length - 1] = other[other.length - 1] === 0x0a ? 0x20 : 0x0a;
+    await writeFile(w.file, other);
+    await expect(ps.restoreOriginal(DOC)).rejects.toMatchObject({ details: { reason: 'changed' } });
+    expect((await bytes(w)).equals(other)).toBe(true);
+  });
+
+  it('I1: restoreAll needs the confirmation that the main process checks', async () => {
+    const ps = new PdfSync(w.s, true);
+    await expect(ps.restoreAll()).rejects.toMatchObject({ code: 'PERMISSION_DENIED' });
   });
 
   it('with a damaged copy and a truncation that does not match, nothing is replaced', async () => {
@@ -487,7 +508,7 @@ describe('take them out, restore, copies (D-352, §8.3.8)', () => {
     const rewritten = docPdf({ pages: 5 });
     await writeFile(w.file, rewritten);
     const st = await stat(w.file);
-    w.rec.set(DOC, { ...w.rec.get(DOC)!, size: rewritten.length, hash: sha(rewritten), mtimeMs: st.mtimeMs });
+    w.rec.set(DOC, { ...w.rec.get(DOC)!, size: rewritten.length, hash: sha(rewritten), mtimeMs: st.mtimeMs, pdfWrite: { ...w.rec.get(DOC)!.pdfWrite!, own: [...w.rec.get(DOC)!.pdfWrite!.own, { hash: sha(rewritten), size: rewritten.length, at: new Date().toISOString() }] } });
     const copy = path.join(w.data, 'pdf-originals', w.rec.get(DOC)!.pdfWrite!.backup!.file);
     await writeFile(copy, 'damaged');
     await expect(ps.restoreOriginal(DOC)).rejects.toBeInstanceOf(AppError);
@@ -504,6 +525,11 @@ describe('take them out, restore, copies (D-352, §8.3.8)', () => {
     expect(await ps.deleteBackups()).toEqual({ deleted: 1 });
     expect((await ps.backups()).count).toBe(0);
     expect(w.rec.get(DOC)!.pdfWrite!.backup).toBeUndefined();
+    // M7: a copy without a record is deleted too
+    await writeFile(path.join(w.data, 'pdf-originals', 'doc-x-0123abcd.pdf'), 'orphan');
+    expect((await ps.backups()).count).toBe(1);
+    expect(await ps.deleteBackups()).toEqual({ deleted: 1 });
+    expect((await ps.backups()).count).toBe(0);
     expect((await ps.restoreOriginal(DOC)).restored).toBe(true);
     expect((await bytes(w)).equals(w.original)).toBe(true);
   });

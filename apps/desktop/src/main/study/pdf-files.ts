@@ -115,6 +115,7 @@ export async function writeTempWithAppend(abs: string, tmp: string, bytes: Buffe
   await copyFile(abs, tmp, constants.COPYFILE_EXCL);
   const fh = await open(tmp, 'r+');
   try {
+    await fh.truncate(at); // a file that grew since the analysis must not leave an old tail after the update
     await fh.write(bytes, 0, bytes.length, at);
     await fh.sync();
   } finally {
@@ -138,9 +139,9 @@ export async function writeTempTruncated(abs: string, tmp: string, n: number): P
  * The safety copy of the original (§8.3.3 step 4): atomic (temporary, flush, hash check, rename), confined to `dir`, and made once per
  * content (an existing copy with the same hash is kept). Returns the file name inside `dir`.
  */
-export async function copyOriginal(abs: string, dir: string, docId: string, hash: string, journal: Journal, libraryId: string): Promise<string> {
+export async function copyOriginal(abs: string, dir: string, docId: string, hash: string, journal: Journal, libraryId: string, suffix = ''): Promise<string> {
   await mkdir(dir, { recursive: true });
-  const name = `${docId}-${hash.slice(0, 8)}.pdf`;
+  const name = `${docId}-${hash.slice(0, 8)}${suffix}.pdf`;
   const dest = path.join(dir, name);
   if (!isInside(dir, dest)) throw new AppError('PATH_OUTSIDE_ROOT', 'The copy would leave its folder');
   if ((await stat(dest).catch(() => null))?.isFile() && (await sha256File(dest)) === hash) return name;

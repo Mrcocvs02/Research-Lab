@@ -130,7 +130,7 @@ export const annotationsChannels = defineChannels('annotations', {
   /** Writes the existing annotations of the whole library into the PDFs, one file at a time (Activity, cancellable). */
   migrate: { request: z.object({}), response: jobId },
   /** Restores every written PDF to its original bytes, one file at a time. */
-  restoreAll: { request: z.object({}), response: jobId },
+  restoreAll: { request: z.object({ confirmed: z.boolean().optional() }), response: jobId },
   jobCancel: { request: jobId, response: z.object({}) },
   /** Safety copies of the originals (Advanced): how many, how much space, where. */
   backups: { request: z.object({}), response: z.object({ count: z.number().int().nonnegative(), bytes: z.number().nonnegative(), location: z.enum(['data', 'local']) }) },

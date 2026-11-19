@@ -2,36 +2,25 @@
 
 > Passaggio di consegne: vedi `docs/HANDOFF.md`.
 
-- **Fase:** 8 completa nel codice (tag `phase-0`..`phase-3`, `phase-6`, `phase-7` pubblicati). Fasi 4 e 5 complete nel codice senza tag; le prove su dati reali sono tolte dalla to-do (D-475). `phase-8` e versione 1.0.0 (D-262) senza tag, dopo la prova di installazione.
-- **Onda:** ondate 1–12 unite in `main`, incluse le ondate 9, 10 e 12. La verifica finale è fatta (D-443). La funzione 49 (Z1) è rinviata dopo 1.0 e si discute con il feedback dell'utente (D-399, D-472, D-475). Implementazione secondo `docs/design/ARCHITETTURA-UI.md` §14 e §14.1.
-- **HEAD:** `main` a `6d2018e` (efix3, ultimo commit pubblicato). Il commit di documentazione di questo aggiornamento viene subito dopo.
-- **Fatto** (in `main` fino a `6d2018e`):
-  - Fasi 0–3 chiuse con tag; fasi 4 e 5 complete nel codice; fase 6 e 7 complete con tag; fase 8 completa nel codice. Dettagli in `docs/HISTORY.md`.
-  - Design: P0 approvato dall'utente (D-383); scelte delle funzioni nuove (D-389..D-409); critica del giro 4 chiusa (D-410..D-428): barra del lettore a 13 controlli, menu al massimo 7 voci in al massimo 3 gruppi, progetto al massimo 4 schede.
-  - Onda 0: H0 correzione dello stretch PDF e CSS di pdf.js prefissato; R0 riparazione headless nel worker, annulla che azzera la geometria (D-429, D-430); S1 spike di autenticazione della CLI di Claude (`docs/design/spike-auth.md`, D-431); S2 prototipo di scrittura PDF in `tools/spikes/pdf-annot` (D-432); contratti per le ondate successive (D-433).
-  - Onda 1: A1 token (accento Petrolio, confermato D-448), CSS diviso in parti, componenti; B1 account Claude, uso di tutte le librerie, rapporto di scansione, lingua al primo avvio (D-435).
-  - Onda 2: C2 pagina impostazioni con sotto-menu, ricerca, salvataggio automatico, scheda account Claude, Avanzate; A2 nuova shell, barra laterale, barra superiore, chip e popover Attività, badge, tavolozza (D-437, D-438).
-  - Audit visivo round 5 (`docs/design/AUDIT.md`, D-441); R2 correzioni dei risultati, Annulla fuori dalla barra superiore.
-  - Prova con dati reali (tesi dell'utente e 2 articoli Styliaris 2025, copie in una cartella temporanea fuori dal repository): bug corretti in `fix-real`; feedback registrato in D-446.
-  - Onda 3: F4 lettore basato su strumenti, barra unica a 13 controlli, barra laterale ridotta durante la lettura, Esc mostra un suggerimento (D-329); D3 libreria (ricerca in alto con `?` e `✦`, fascia dei filtri, barra di selezione, scheda, gestore dei tag, rapporto di scansione, procedura guidata a 7 passi, Libreria caricata in modo pigro); E3 hub "Da rivedere"; G4b identità del contenuto dei PDF (`pdfWrite`, `contentHashOf`, classificatore degli incrementi, copie di conflitto).
-  - Monitor dei token e tetto mensile modificabile, con estensione e nuovo tentativo dalla notifica (D-442, `tokcap`).
-  - Risposte dell'utente: D-436 (copia BibTeX/RIS sì, modello locale no), D-439 (PRISMA sì), D-440 (secondo account Windows escluso, consenso OpenAlex, regola del prompt strutturato per ogni compito di Claude), D-446 (tag su tutti i livelli, tagging prima dalla tassonomia con candidati e chiusura gerarchica, nota di letteratura v0.2 come fonte concentrata con modello più forte, citazioni per rilevanza, descrizione fino a 1200 caratteri; nuovo compito T1 "pipeline di analisi").
-  - **Onda 4, G4a unita** (`g4a`, merge `8a42f58`; D-449..D-451): scrittore incrementale lazy in `packages/data/src/pdf-annot/`, con consenso, copia di sicurezza, sostituzione verificata, ripristino e migrazione; `PDF_WRITE_ENABLED` resta `false`. Test scritti ma non eseguiti (D-443).
-  - **Onda 4, M4 unita** (`m4`, merge in `main`, poi `38415f0`; D-452..D-454): Mappa giocabile con camera a inerzia e volo, simulazione Barnes-Hut in `forceSim.ts`, contorni, etichette a livelli di dettaglio, minimappa, scheda al passaggio del mouse, reti di entità, Separa/Unisci per gli autori, tastiera e movimento ridotto. Lacune note in `Prossimo`, punto 3. Test scritti ma non eseguiti (D-443).
-  - **Onda 4, G4c unita** (`g4c`, merge `87a4848`; D-455): decifratura dei PDF con password utente vuota in `packages/data/src/pdf-annot/crypt.ts` (RC4, AES-CBC, R2-R6, chunk `crypt` caricato solo per i file cifrati); motivi di rifiuto `permission`, `encrypted/password`, `encrypted/handler`. `PDF_WRITE_ENABLED` resta `false`.
-  - **Onda 4, N4 unita** (`n4`, merge `a584868`; D-456, D-457): `graph:entityNetwork` e `graph:editAuthorAliases` in `@rl/core`; `buildEntityNetwork` in `packages/graph/src/entity-network.ts` con chunk pigri nel `main`; alias in `<dataDir>/graph/author-aliases.json`; filtro `topic` e `docIds` nella ricerca. Tetto del `main` a 1110 KiB (D-457).
-  - **Onda 5 unita** (H5 `a7e8d21`, I5 `ee36263`, J5 `44558e0`; D-459, D-460): progetti e Scopri (H5); chat, strumenti in italiano, guida, finestre (I5); copia annotata e importa annotazioni esterne (J5).
-  - **T1 unita** (`t1`, merge `0d63cdb`; D-446, D-461): pipeline di analisi con `jobs:taxonomy`, tag dai candidati con peso, chiusura gerarchica, nota di letteratura v0.2 in `literature/<id>.md`, citazioni per rilevanza.
-  - **Ondate 7 e 8 unite** (X1 `91c98d0`, X2 `8c6c3d7`, X4 `4f2359d`, SLIM merge `023981e`, X3 `c20886d`; D-462..D-469): import da Zotero e BibTeX con `.bib` gestito; strumenti di lettura (ritaglio, ✦ Spiega); risorse, import da DOI/arXiv/URL e Riprendi; backup e manutenzione pigri; note di letteratura, modelli, LaTeX e collegamenti.
-  - **Ondata 9 unita** (X5 `5865221`, X6 `aca5376`, mapfix `945fd4a`; D-470, D-471): lettura affiancata, schede di citazione e guida con evidenziazioni (X5); motore di scoperta con Estendi la bibliografia, ricerca profonda, Trova un ponte e tab Ricerche (X6); Mappa con gap chiusi, "Trova un ponte" e "Mostra sulla mappa" da Scopri (mapfix). Lacune in `Prossimo`, punto 3.
-  - **Ondata 10 unita** (X7 `9234728`, X8 prima di `154add3`; D-471): Schema di progetto, Resoconto, suggerimenti di citazione con consenso per progetto (X7); tabella di confronto salvata in `projects/<id>/tables/*.md`, panoramica dei gruppi di ricerca, contesto delle citazioni, cronologia (X8). Lacune in `Prossimo`, punto 3.
-  - **Ondata 12 unita** (w12 `dabc8b7`; D-471): esportazione RIS e CSL JSON in "Esporta…" con BibTeX, chiave citazione configurabile in Impostazioni › Libreria, diagramma PRISMA 2020 da ⋯ di progetto (SVG e Markdown).
-  - **Verifica finale** (D-443, fatta su `main`): fix di sicurezza, audit visivo, Mappa (`mapspec`, `mapimpl`) e correzioni dei test già in `main`; efix1, efix2, pdfw e efix3 uniti (`6d2018e`; D-473). Unitari: 2708 passati, 1 instabile (`export.test.ts` "cancelled or failed", passa da solo). E2e, uno alla volta: 40 su 42 verdi; `qa-budget` `firstContentMs` instabile (534, 604 contro 530), non alzato. Heavy: tutti verdi (6 file unitari, `qa-search-perf`, `security-hostile-scan`).
-- **In corso:** prova di installazione della fase 8 (installazione silenziosa in cartella temporanea, avvio, disinstallazione, controllo dei dati, con le impostazioni dell'account salvate e ripristinate prima).
-- **Bloccato:** nulla di bloccante. `PDF_WRITE_ENABLED` è acceso (D-473); nei test e2e di sviluppo resta spento salvo `RL_E2E_PDF_WRITE=1`. Le domande aperte all'utente non bloccano (`docs/HANDOFF.md`, sezione 7).
+- **Fase:** 8 completa, tag `phase-8` creato. Tag pubblicati: `phase-0`..`phase-3`, `phase-6`, `phase-7`, `phase-8`; `phase-4` e `phase-5` senza tag. Versione 1.0.0 (D-262) da fare.
+- **Onda:** ondate 1–13 unite in `main`. Ondata 13 (D-477..D-491): gap di X7, X8 e w12, funzione 49 (Z1), Mappa (K1, L1, K2), gruppi di ricerca, "Raggruppa per", famiglie di tag. Nessun lavoro in corso.
+- **HEAD:** `main` a `c2ce253` (ultimo commit pubblicato). Il commit di documentazione di questo aggiornamento viene subito dopo.
+- **Fatto** (in `main` fino a `c2ce253`):
+  - Fasi 0–8 complete nel codice; fasi 0–3, 6, 7 e 8 con tag. Dettagli in `docs/HISTORY.md`.
+  - Ondata 13: lacune di X7 (Cerca prove, PDF del resoconto, scelta del modello), X8 (istituzioni e menu dei gruppi) e w12 (motivo di esclusione) chiuse (D-477).
+  - Funzione 49 fatta (Z1a–Z1c): manoscritto ↔ fonti, con proposte di sezioni dall'AI (`docs/design/ARCHITETTURA-UI.md` §18, D-478..D-485).
+  - Mappa: molle pesate, archi per peso, contorni tolti, colori per macro-area (K1); trovatore di collegamenti locale con soglia, collegamenti rimovibili, avanzamento e annullamento (L1); lacune di M4 chiuse (K2).
+  - Gruppi di ricerca come tag `grp:` (D-488); "Raggruppa per" con famiglie, incluse Automatica (Louvain + TF-IDF) e "Dai un nome con Claude" (D-489).
+  - Verifica su una copia dei dati reali: macro-aree casuali da tassonomia piatta corrette (D-490).
+  - Famiglie di tag nella gestione dei tag, limite di 8 tag nella Mappa con "+N", legenda ripiegabile, colori dominanti più marcati, un solo nome per cluster (D-491).
+  - Budget non più vincolanti (D-487); test di bomba zip/stream rimossi (D-476); scrittura PDF attiva (D-473); eseguibile di Claude non incluso (D-474); prove su dati reali tolte dalla to-do (D-475).
+  - Test: unitari ed e2e verdi tranne `qa-budget` `firstContentMs` (instabile, noto); heavy verdi.
+- **In corso:** nulla.
+- **Bloccato:** nulla di bloccante. Le domande aperte all'utente non bloccano (`docs/HANDOFF.md`, sezione 7).
 - **Prossimo (in ordine):**
-  1. Fase 8: prova di installazione (in corso).
-  2. Tag `phase-8` e versione 1.0.0 (D-262).
-  3. Dopo 1.0: feedback dell'utente sui miglioramenti (D-475) e funzione 49 (Z1), da discutere insieme (D-399). Lacune note di M4, X7, X8 e w12 in `docs/HANDOFF.md`, sezione 5.
-- **Budget** (dopo w12, D-470): JS iniziale del renderer 359,9/396 KiB; JS totale ~2139/2170 KiB (totale del renderer ~2273,6/2310 KiB); entry del main ~1102,6/1110 KiB; lazy del main ~377,7/400 KiB; ogni nuovo chunk del renderer ha un tetto di 16 KiB (`renderer.chunkCapsKB`, D-465); preload sotto 8 KiB.
-- **Da ricordare:** test pesanti solo uno alla volta; con poca RAM libera la suite e2e si ferma da sola (mem-sample): far liberare memoria all'utente e rieseguire solo i test mancanti. Installer (fase 8): `pdfjs-dist` e `fflate` esterni al bundle del main (D-052), Fuses di Electron; l'eseguibile di Claude Code (~356 MB dell'Agent SDK) non è incluso nell'installer (D-474, conferma di D-203).
+  1. Installer finale (rifare `npm run dist` con la versione finale; senza eseguibile di Claude, D-474).
+  2. Versione 1.0.0 (D-262).
+  3. Tag `v1.0.0`.
+  - Dopo 1.0: piccole lacune note e feedback dell'utente (`docs/HANDOFF.md`, sezione 5; D-475).
+- **Budget:** tetti in `CLAUDE.md`, non più rigidi (D-487); ogni nuovo chunk del renderer ha un tetto di 16 KiB (`renderer.chunkCapsKB`, D-465).
+- **Da ricordare:** test pesanti solo uno alla volta; e2e in parallelo solo con cartelle `--output` separate; con poca RAM libera la suite e2e si ferma da sola (mem-sample). Installer: `pdfjs-dist` e `fflate` esterni al bundle del main (D-052), Fuses di Electron; eseguibile di Claude Code non incluso (D-474).

@@ -79,6 +79,12 @@ const GRAVITY = 0.02;
 const GROUP_PULL = 0.012;
 const MIN_GROUP = 3;
 const COLLIDE = 0.8;
+/** Grouping by a family (section 18.3.7): the spring multiplier of an edge inside a cluster and across clusters, and the weak pull of a node to its cluster centroid. */
+export const SAME_CLUSTER = 1.8;
+export const CROSS_CLUSTER = 0.45;
+const CLUSTER_PULL = 0.05;
+/** Temperature of a warm start (a change of family): from the positions on screen, never from random ones. */
+const REGROUP_ALPHA = 0.55;
 /** Weight of the edges that carry none (a tag or a folder holding a document). */
 const FLAT_WEIGHT = 0.3;
 const DAMP = 0.6;
@@ -93,6 +99,8 @@ interface Sim {
   list: NetNode[];
   ei: Int32Array;
   ej: Int32Array;
+  /** Clusters of each node (see `clustersOf`), only when grouping. */
+  cl: Array<Array<[number, number]>> | null;
   /** Rest length, stiffness and the share of the move that falls on `i` (0..2; `j` takes `2 - share`). */
   el: Float64Array;
   ek: Float64Array;
@@ -105,6 +113,23 @@ interface Sim {
   fy: Float64Array;
   tree: QuadTree;
 }
+
+/** The clusters a node belongs to as `[cluster, share 0..1]` pairs (its macro-area / family triples); a node without any is in the "none" block (cluster -1). */
+export function clustersOf(ar: ReadonlyArray<ReadonlyArray<number>> | undefined): Array<[number, number]> {
+  const kept = (ar ?? []).filter((t) => (t[2] ?? 0) > 0);
+  const total = kept.reduce((sum, t) => sum + t[2]!, 0);
+  return total > 0 ? kept.map((t): [number, number] => [t[0]!, t[2]! / total]) : [[-1, 1]];
+}
+
+/** How much two nodes share their clusters: the sum over clusters of the product of the shares (1 inside one cluster, 0 for disjoint ones). */
+export function clusterAffinity(a: ReadonlyArray<readonly [number, number]>, b: ReadonlyArray<readonly [number, number]>): number {
+  let s = 0;
+  for (const [ca, pa] of a) for (const [cb, pb] of b) if (ca === cb) s += pa * pb;
+  return s;
+}
+
+/** Spring multiplier of an edge by the affinity of its ends: stronger inside a cluster, weaker across (the edge itself and its drawn weight do not change). */
+export const clusterMultiplier = (affinity: number): number => CROSS_CLUSTER + (SAME_CLUSTER - CROSS_CLUSTER) * Math.min(Math.max(affinity, 0), 1);
 
 /** The weight of an edge as the springs see it. */
 export const springWeight = (e: { kind: EdgeKind; weight: number }): number => (e.kind === 'tagged' || e.kind === 'contains' ? FLAT_WEIGHT : Math.min(Math.max(e.weight, 0), 1));
@@ -126,6 +151,8 @@ export class Network {
   alpha = 0;
   /** Mean squared speed of the last step. */
   energy = 0;
+  /** Grouping by a family is on: the clusters of the nodes (their `ar` shares) shape the springs and pull the nodes to their centroids. */
+  grouping = false;
   private cache: Sim | null = null;
   private adj: { version: number; map: Map<string, string[]> } | null = null;
 
@@ -319,6 +346,7 @@ export class Network {
       deg[j]!++;
     }
     const m = ei.length;
+    const cl = this.grouping ? list.map((nd) => clustersOf(nd.ar)) : null;
     const rad = new Float64Array(n);
     let rmax = 0;
     for (let i = 0; i < n; i++) {
@@ -333,9 +361,10 @@ export class Network {
       const j = ej[k]!;
       el[k] = restLength(ew[k]!, rad[i]!, rad[j]!);
       ek[k] = (0.02 + 0.1 * ew[k]!) / Math.min(deg[i]!, deg[j]!);
+      if (cl) ek[k]! *= clusterMultiplier(clusterAffinity(cl[i]!, cl[j]!));
       es[k] = (2 * deg[j]!) / (deg[i]! + deg[j]!);
     }
-    c = { version: this.version, n, list, ei: Int32Array.from(ei), ej: Int32Array.from(ej), el, ek, es, rad, rmax, xs: new Float64Array(n), ys: new Float64Array(n), fx: new Float64Array(n), fy: new Float64Array(n), tree: c?.tree ?? new QuadTree() };
+    c = { version: this.version, n, list, cl, ei: Int32Array.from(ei), ej: Int32Array.from(ej), el, ek, es, rad, rmax, xs: new Float64Array(n), ys: new Float64Array(n), fx: new Float64Array(n), fy: new Float64Array(n), tree: c?.tree ?? new QuadTree() };
     this.cache = c;
     return c;
   }
@@ -392,6 +421,19 @@ export class Network {
       a[2]++;
       groups.set(g, a);
     }
+    // Grouping: the centroid of each cluster (shares as weights), for clusters of at least three nodes' worth.
+    const cent = new Map<number, [number, number, number]>();
+    if (c.cl) {
+      for (let i = 0; i < n; i++) {
+        for (const [k, p] of c.cl[i]!) {
+          const e = cent.get(k) ?? [0, 0, 0];
+          e[0] += xs[i]! * p;
+          e[1] += ys[i]! * p;
+          e[2] += p;
+          cent.set(k, e);
+        }
+      }
+    }
     let energy = 0;
     const a = this.alpha;
     for (let i = 0; i < n; i++) {
@@ -404,7 +446,15 @@ export class Network {
         gx = (cx - xs[i]!) * pull;
         gy = (cy - ys[i]!) * pull;
       }
-      const g = nd.group !== undefined ? groups.get(nd.group) : undefined;
+      if (c.cl) {
+        for (const [k, p] of c.cl[i]!) {
+          const e = cent.get(k)!;
+          if (e[2] < MIN_GROUP) continue;
+          gx += (e[0] / e[2] - xs[i]!) * CLUSTER_PULL * p;
+          gy += (e[1] / e[2] - ys[i]!) * CLUSTER_PULL * p;
+        }
+      }
+      const g = !c.cl && nd.group !== undefined ? groups.get(nd.group) : undefined;
       if (g && g[2] >= MIN_GROUP) {
         gx += (g[0] / g[2] - xs[i]!) * GROUP_PULL;
         gy += (g[1] / g[2] - ys[i]!) * GROUP_PULL;
@@ -480,6 +530,18 @@ export class Network {
   warm(alpha = 0.3): void {
     this.alpha = Math.max(this.alpha, alpha);
     for (const n of this.nodes.values()) n.mobility = Math.max(n.mobility, 0.35);
+  }
+
+  /**
+   * Grouping by a family (section 18.3.7): sets whether the clusters of the nodes (`ar`) shape the springs, and warm-starts from the
+   * positions on screen (never a random restart): nothing moves until the simulation runs; with reduced motion it settles at once.
+   */
+  regroup(on: boolean, reduced = false): void {
+    this.grouping = on;
+    this.version++;
+    for (const n of this.nodes.values()) n.mobility = Math.max(n.mobility, 0.6);
+    this.alpha = Math.max(this.alpha, REGROUP_ALPHA);
+    if (reduced) for (let i = 0; i < 400 && this.tick(); i++);
   }
 
   /** Replaces everything with an entity network (nodes already placed), capped at `MAX_NET_NODES`. Returns how many nodes were left out. */

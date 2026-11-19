@@ -126,6 +126,7 @@ export const CHANNEL_NAMES: readonly string[] = [
   'graph:labelClusters',
   'graph:map',
   'graph:neighbors',
+  'graph:family',
   'graph:previewLabels',
   'graph:similar',
   'graph:status',

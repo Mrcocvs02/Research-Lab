@@ -18,6 +18,8 @@ import { RlError } from '../../lib/rl-error';
 import { safeText } from '../library/safeText';
 import { Segmented } from '../../components/Segmented';
 import { AreaLegend, useAreaColors } from './AreaLegend';
+import { GroupBy, GroupLabel } from './GroupBy';
+import { familyName, nameClusters, TOPIC_FAMILY, useFamilies, useFamily, withFamilyShares, type FamilyShares } from './grouping';
 import { areaFallback, assignAreaSlots, loadAreaMemo, saveAreaMemo } from './areaColors';
 import { adjacencyOf, assignTints, type TintMemo } from './colors';
 import { rng } from './playful';
@@ -58,7 +60,12 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const [kind, setKind] = useState<ScopeKind>('all');
   const [value, setValue] = useState('');
   const [level, setLevel] = useState(0);
-  const [map, setMap] = useState<PreparedMap | null>(null);
+  const [rawMap, setMap] = useState<PreparedMap | null>(null);
+  // Group by (D-489): another family than the topic replaces the shares of the points (colours and legend) by its own.
+  const [family] = useFamily();
+  const grouped = family !== TOPIC_FAMILY;
+  const [famShares, setFamShares] = useState<(FamilyShares & { family: string }) | null>(null);
+  const map = useMemo(() => (rawMap && grouped && famShares?.family === family ? withFamilyShares(rawMap, famShares) : rawMap), [rawMap, grouped, famShares, family]);
   const [mapKey, setMapKey] = useState('');
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
@@ -106,15 +113,27 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   }, [usable, scope, mapVersion, status.documents, status.pending, status.builtAt]);
 
   const [byArea, setByArea] = useAreaColors();
+  const families = useFamilies(scope, usable);
+  useEffect(() => {
+    if (!grouped || !rawMap) return;
+    let live = true;
+    rl.invoke('graph:family', { family, ...(scope ? { scope } : {}) }).then(
+      (r) => live && setFamShares({ family, areas: nameClusters(t, (r.areas ?? []) as FamilyShares['areas']), items: r.items as FamilyShares['items'] }),
+      () => live && setFamShares({ family, areas: [], items: [] }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [grouped, family, rawMap, scope, t]);
   // Colour by macro-area (D-483): with no area, one area, or colouring switched off, the topics colour the points.
   const fallback = useMemo(() => (map ? areaFallback(map.areas, map.withArea, map.n) : { use: 'topics' as const, reason: 'none' as const }), [map]);
   const areaSlots = useMemo(() => {
     if (!map || map.areas.length === 0) return null;
-    const r = assignAreaSlots(map.areas, loadAreaMemo());
-    saveAreaMemo(r.memo);
+    const r = assignAreaSlots(map.areas, grouped ? null : loadAreaMemo());
+    if (!grouped) saveAreaMemo(r.memo);
     return r.slots;
-  }, [map]);
-  const areaProp = useMemo(() => (map && byArea && fallback.use === 'areas' && areaSlots ? { defs: map.areas, slots: areaSlots } : null), [map, byArea, fallback, areaSlots]);
+  }, [map, grouped]);
+  const areaProp = useMemo(() => (map && (byArea || grouped) && fallback.use === 'areas' && areaSlots ? { defs: map.areas, slots: areaSlots } : null), [map, byArea, grouped, fallback, areaSlots]);
   const tl = useTimeline(map);
   const depth = map?.levels.length ?? 0;
   const lvl = Math.min(level, Math.max(depth - 1, 0));
@@ -254,10 +273,11 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     }
   }
 
+  const groupName = familyName(t, families, family);
   const levels = map?.levels ?? [];
   const legend =
     map && !tooFew && areaProp ? (
-      <AreaLegend defs={areaProp.defs} slots={areaProp.slots} without={map.n - map.withArea} onLight={(a) => handle.current?.lightArea(a)} onIsolate={(a) => handle.current?.isolateArea(a)} />
+      <AreaLegend defs={areaProp.defs} slots={areaProp.slots} title={grouped ? t('network.group.grouped', { name: groupName }) : undefined} without={map.n - map.withArea} onLight={(a) => handle.current?.lightArea(a)} onIsolate={(a) => handle.current?.isolateArea(a)} />
     ) : map && !tooFew ? (
       <ul className="legend" data-testid="cluster-legend" aria-label={t('network.legend')}>
         {clusters.slice(0, 8).map((c, i) => {
@@ -361,6 +381,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
                 ]}
               />
             </div>
+            <GroupBy families={families} />
             <label className="net-field net-pop-row">
               <span>{t('network.colorBy')}</span>
               <select value={lvl} onChange={(e) => setLevel(Number(e.target.value))} disabled={depth === 0} data-testid="map-level">
@@ -473,6 +494,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
             overlay={
               <>
                 {pill}
+                {grouped && areaProp && <GroupLabel families={families} family={family} />}
                 {legend}
               </>
             }

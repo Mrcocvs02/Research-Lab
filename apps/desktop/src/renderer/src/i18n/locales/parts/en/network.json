@@ -405,6 +405,16 @@
         "authors": "authors: {{authors}}",
         "none": "added by hand"
       }
+    },
+    "group": {
+      "by": "Group by",
+      "topic": "Topic",
+      "group": "Group",
+      "method": "Method",
+      "auto": "Automatic",
+      "other": "other",
+      "none": "none",
+      "grouped": "Grouped by {{name}}"
     }
   }
 }

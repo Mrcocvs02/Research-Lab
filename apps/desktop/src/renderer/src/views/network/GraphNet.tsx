@@ -15,6 +15,8 @@ import { safeText } from '../library/safeText';
 import { reasonLine, weightBar, type LinkReasons } from '../links/reasons';
 import { reducedMotion } from './camera';
 import { AreaLegend, AreaNote, useAreaColors } from './AreaLegend';
+import { GroupBy, GroupLabel } from './GroupBy';
+import { applyShares, familyName, nameClusters, TOPIC_FAMILY, useFamilies, useFamily, type FamilyShares } from './grouping';
 import { areaNoteNeeded, areaSummary, withUserTints, assignAreaSlots, colorCache, loadAreaMemo, mainArea, saveAreaMemo, shareIn, type AreaDef } from './areaColors';
 import { Segmented } from '../../components/Segmented';
 import { assignKeyTints, mix, readTheme, type MapTheme } from './colors';
@@ -118,6 +120,11 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
   const hoverKey = useRef<string | null>(null);
   /** Macro-areas (D-483): the areas of the library and their tint slots, learnt from the answers of `graph:neighbors`. */
   const [byArea, setByArea] = useAreaColors();
+  // Group by (D-489): the family of the chosen tag kind (or communities) colours the nodes and shapes the springs.
+  const [family] = useFamily();
+  const families = useFamilies(undefined, active);
+  const familyRef = useRef(family);
+  familyRef.current = family;
   const [areaState, setAreaState] = useState<{ defs: AreaDef[]; slots: number[] } | null>(null);
   const areaRef = useRef<{ on: boolean; defs: AreaDef[]; slots: number[]; names: Map<string, string> }>({ on: false, defs: [], slots: [], names: new Map() });
   const areaPaint = useRef<{ dark: boolean; slots: unknown; fn: ReturnType<typeof colorCache> } | null>(null);
@@ -152,7 +159,7 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
     const tp = topics.current;
     const docs = [...net.nodes.values()].filter((n) => n.kind === 'doc');
     // No area, or one, or no document with one: the topics colour the nodes.
-    ar.on = byAreaRef.current && ar.defs.length >= 2 && docs.some((n) => n.ar !== undefined && n.ar.length > 0);
+    ar.on = (byAreaRef.current || familyRef.current !== TOPIC_FAMILY) && ar.defs.length >= 2 && docs.some((n) => n.ar !== undefined && n.ar.length > 0);
     ar.names = new Map();
     for (const n of docs) {
       if (ar.on) {
@@ -518,6 +525,37 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
     }
   }
 
+  /** Asks the main process for the shares of the family on the document nodes and installs them (and the grouped physics when it is not the topic). */
+  async function applyFamily(warm: boolean): Promise<void> {
+    const f = familyRef.current;
+    const docs = [...net.nodes.values()].filter((n) => n.kind === 'doc');
+    try {
+      const r = await rl.invoke('graph:family', { family: f, docIds: docs.map((n) => n.id).slice(0, MAX_NET_NODES) });
+      if (f !== familyRef.current) return;
+      const defs = nameClusters(t, (r.areas ?? []) as FamilyShares['areas']);
+      applyShares(net.nodes.values(), r.items as FamilyShares['items']);
+      const slots = assignAreaSlots(defs, f === TOPIC_FAMILY ? loadAreaMemo() : null);
+      areaRef.current.defs = defs;
+      areaRef.current.slots = slots.slots;
+      setAreaState({ defs, slots: slots.slots });
+      tagTopics();
+      // Warm start from the positions on screen (never a random restart); with reduced motion it settles at once.
+      if (warm) net.regroup(f !== TOPIC_FAMILY, reducedMotion());
+      else net.grouping = f !== TOPIC_FAMILY;
+      view.requestDraw();
+      if (warm) view.fit(true);
+    } catch (e) {
+      setError(e);
+    }
+  }
+  const lastFamily = useRef(family);
+  useEffect(() => {
+    if (lastFamily.current === family) return;
+    lastFamily.current = family;
+    if (net.size > 0) void applyFamily(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [family]);
+
   async function expand(n: NetNode): Promise<void> {
     const valid = kindsRef.current.filter((k) => VALID[n.kind].includes(k));
     if (valid.length === 0) {
@@ -540,14 +578,15 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
       if (!live) return;
       for (const e of r.edges) if (e.kind === 'linked' && e.id) linkMeta.current.set(`${e.from}|${e.to}`, { id: e.id, reasons: (e.reasons ?? {}) as LinkReasons });
       const res = net.expand(live, r.nodes, r.edges);
-      if (r.areas && r.areas.length > 0 && areaRef.current.defs !== r.areas) {
+      if (familyRef.current === TOPIC_FAMILY && r.areas && r.areas.length > 0 && areaRef.current.defs !== r.areas) {
         const slots = assignAreaSlots(r.areas, loadAreaMemo());
         saveAreaMemo(slots.memo);
         areaRef.current.defs = r.areas;
         areaRef.current.slots = slots.slots;
         setAreaState({ defs: r.areas, slots: slots.slots });
       }
-      tagTopics();
+      if (familyRef.current !== TOPIC_FAMILY) await applyFamily(false);
+      else tagTopics();
       if (res.capped) setNote({ text: t('network.net.capped', { count: res.omitted, limit: MAX_NET_NODES }), only: live });
       else if (res.added === 0) setNote({ text: t('network.net.nothingNew') });
       syncCount();
@@ -944,6 +983,7 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
                   ]}
                 />
               </div>
+              <GroupBy families={families} />
             </div>
           )}
         </ChipPop>
@@ -1042,6 +1082,7 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         {pill}
         {areaState && areaRef.current.on && (
           <AreaLegend
+            title={family !== TOPIC_FAMILY ? t('network.group.grouped', { name: familyName(t, families, family) }) : undefined}
             defs={areaState.defs}
             slots={areaState.slots}
             without={[...net.nodes.values()].filter((n) => n.kind === 'doc' && !(n.ar && n.ar.length > 0)).length}
@@ -1056,6 +1097,7 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
           />
         )}
         <div className="net-legend-box">
+          {family !== TOPIC_FAMILY && count > 0 && <GroupLabel families={families} family={family} />}
           <span className="hint" data-testid="net-count" data-count={count} aria-live="polite">
             {t('network.net.count', { count })}
           </span>

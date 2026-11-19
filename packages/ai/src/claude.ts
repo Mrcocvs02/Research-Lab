@@ -63,7 +63,10 @@ export function findClaudeExecutable(o: ExecutableLookup = {}): { path: string |
   const exists = o.exists ?? ((p: string) => existsSync(p));
   const exe = platform === 'win32' ? 'claude.exe' : 'claude';
   const pathMod = platform === 'win32' ? path.win32 : path.posix;
-  if (o.configured && exists(o.configured)) return { path: o.configured, source: 'settings' };
+  // The configured path must be absolute and name the program itself: a relative one would resolve against the working
+  // directory, and any other executable would be launched with the account's environment.
+  const base = o.configured ? pathMod.basename(o.configured).toLowerCase() : '';
+  if (o.configured && pathMod.isAbsolute(o.configured) && (base === 'claude' || base === 'claude.exe') && exists(o.configured)) return { path: o.configured, source: 'settings' };
   const pathVar = env.PATH ?? env.Path ?? '';
   for (const dir of pathVar.split(platform === 'win32' ? ';' : ':')) {
     // A relative entry would resolve against the app's working directory: never an executable that receives the key.

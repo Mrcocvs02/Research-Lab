@@ -132,6 +132,7 @@ export function NetworkView() {
   const [mapInfo, setMapInfo] = useState<{ topics: number } | null>(null);
   const [ctl, setCtl] = useState<NetCtl | null>(null);
   const [panorama, setPanorama] = useState<{ a: string; b: string; terms: string[]; nonce: number } | null>(null);
+  const [lightNode, setLightNode] = useState<{ ids: string[]; nonce: number } | null>(null);
   const docTitle = useDocTitle(doc);
   const { status, building } = model;
   // Path between two papers (section 19.2.5): started from the panel ("Path to...") or by Shift+click; the second paper chosen ends it.
@@ -358,7 +359,7 @@ export function NetworkView() {
             <div className="net-panels">
               {visited.has('map') && (
                 <div role="tabpanel" id="net-panel-map" aria-labelledby="net-tab-map" hidden={tab !== 'map'} className="net-panel">
-                  {status ? <MapPanel active={tab === 'map'} status={status} mapVersion={model.mapVersion} scopes={scopes} selected={doc} onSelect={setDoc} onMapChanged={model.bumpMap} onRead={readDoc} onExplore={() => exploreDim('topic')} onBuild={() => void model.build()} onInfo={setMapInfo} highlight={panorama} /> : null}
+                  {status ? <MapPanel active={tab === 'map'} status={status} mapVersion={model.mapVersion} scopes={scopes} selected={doc} onSelect={setDoc} onMapChanged={model.bumpMap} onRead={readDoc} onExplore={() => exploreDim('topic')} onVicinity={(id) => centerOn(id, t('network.untitled'))} light={lightNode} onBuild={() => void model.build()} onInfo={setMapInfo} highlight={panorama} /> : null}
                 </div>
               )}
               {visited.has('network') && (
@@ -407,8 +408,9 @@ export function NetworkView() {
                     onEmpty={onEmpty}
                     mapVersion={model.mapVersion}
                     mapReady={mapReady}
-                    onShowInMap={(famId) => {
+                    onShowInMap={(famId, ids) => {
                       setFamily(famId);
+                      setLightNode((cur) => ({ ids, nonce: (cur?.nonce ?? 0) + 1 }));
                       show('map');
                     }}
                   />

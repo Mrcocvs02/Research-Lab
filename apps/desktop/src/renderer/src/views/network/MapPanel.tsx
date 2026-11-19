@@ -50,6 +50,10 @@ interface Props {
   onMapChanged(): void;
   onRead?(docId: string): void;
   onExplore?(): void;
+  /** Double click or Enter on a paper: its neighbourhood. */
+  onVicinity?(docId: string): void;
+  /** "Show on the Map" from the Vocabulary: the block of the node (the ids of the node and of its ancestors, the deepest first) is lit and framed. */
+  light?: { ids: string[]; nonce: number } | null;
   onBuild?(): void;
   onInfo?(i: { topics: number } | null): void;
   /** "Show on the map" from the unexpected neighbours: the same highlight as the surprise. */
@@ -57,7 +61,7 @@ interface Props {
 }
 
 /** The map tab: scope, level, the canvas, the legend of clusters and the labels by Claude. */
-export function MapPanel({ active, status, mapVersion, scopes, selected, onSelect, onMapChanged, onRead, onExplore, onBuild, onInfo, highlight }: Props) {
+export function MapPanel({ active, status, mapVersion, scopes, selected, onSelect, onMapChanged, onRead, onExplore, onVicinity, onBuild, onInfo, highlight, light }: Props) {
   const { t } = useTranslation();
   const { openExport } = useAiUi();
   const [kind, setKind] = useState<ScopeKind>('all');
@@ -238,6 +242,17 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     }, 80);
     return () => clearTimeout(run);
   }, [highlight, map]);
+
+  const lastLight = useRef(0);
+  useEffect(() => {
+    if (!light || light.nonce === lastLight.current || !blocksView) return;
+    const id = light.ids.find((x) => blocksView.blocks.some((b) => b.id === x));
+    const run = setTimeout(() => {
+      lastLight.current = light.nonce;
+      if (id !== undefined) handle.current?.focusCluster(id);
+    }, 120);
+    return () => clearTimeout(run);
+  }, [light, blocksView]);
 
   const yearsActive = !!years && !!yearBounds && (years[0] > yearBounds[0] || years[1] < yearBounds[1]);
   const filterCount = (kind !== 'all' ? 1 : 0) + (yearsActive ? 1 : 0);
@@ -534,6 +549,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
                 }}
                 onRead={onRead}
                 onExplore={onExplore}
+                onVicinity={onVicinity}
                 tints={tints}
                 areas={areaProp}
                 allow={tl.only ?? allow}

@@ -250,28 +250,18 @@
       "namesake_one": "Possibile omonimia: {{count}} forma del nome",
       "namesake_other": "Possibile omonimia: {{count}} forme del nome",
       "groupLine": {
-        "tag": "Ramo: {{name}}",
-        "topic": "Parte di: {{name}}",
         "author": "Gruppo di {{name}}"
       },
       "links": {
-        "tag": "Spesso con",
-        "topic": "Vicino a",
         "author": "Coautori"
       },
       "announce": {
-        "tag": "Tag {{name}}, {{count}} documenti, {{links}} legami",
-        "topic": "Argomento {{name}}, {{count}} documenti, {{links}} legami",
         "author": "Autore {{name}}, {{count}} documenti, {{links}} coautori"
       },
       "surprise": {
-        "tag": "{{a}} e {{b}} compaiono insieme in {{n}} documenti.",
-        "topic": "{{a}} e {{b}} sono lontani nel Panorama ma condividono {{n}} documenti con gli stessi tag.",
         "author": "{{a}} e {{b}} potrebbero conoscersi: {{n}} coautori in comune, mai un articolo insieme."
       },
       "kind": {
-        "tag": "tag",
-        "topic": "argomenti",
         "author": "autori"
       },
       "empty": {

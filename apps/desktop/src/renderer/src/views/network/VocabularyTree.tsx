@@ -9,7 +9,7 @@ import { rl } from '../../lib/rl';
 import { safeText } from '../library/safeText';
 import { familyLabel, TOPIC_FAMILY, useFamilies } from './grouping';
 import { MapIllustration } from './NetChrome';
-import { buildVocabTree, layoutVocab, type VocabSource } from './vocabTree';
+import { buildVocabTree, layoutVocab, type VNode, type VocabSource } from './vocabTree';
 
 const ROW = 22;
 const COL = 210;
@@ -24,12 +24,13 @@ interface Link {
   lift: number;
   shared: number;
 }
+const hasNode = (n: VNode, id: string): boolean => n.id === id || n.children.some((c) => hasNode(c, id));
 const cut = (s: string): string => (s.length > MAX_LABEL ? `${s.slice(0, MAX_LABEL - 1)}…` : s);
 const radius = (n: number, max: number): number => 3 + 5 * Math.sqrt(n / Math.max(max, 1));
 
 interface Props {
   /** "Show on the Map": the Map grouped by this family. */
-  onShowInMap(family: string): void;
+  onShowInMap(family: string, nodeIds: string[]): void;
 }
 
 /**
@@ -119,7 +120,7 @@ export function VocabularyTree({ onShowInMap }: Props) {
         {sel && (
           <span className="vocab-actions" data-testid="vocab-actions">
             <strong>{safeText(sel.node.label)}</strong>
-            <button type="button" onClick={() => onShowInMap(family)} data-testid="vocab-show-map">
+            <button type="button" onClick={() => onShowInMap(family, [sel.node.id, ...tree.filter((r) => r.id !== sel.node.id && hasNode(r, sel.node.id)).map((r) => r.id)])} data-testid="vocab-show-map">
               {t('vicinity.vocab.showMap')}
             </button>
             <button type="button" onClick={() => showInLibrary(sel.node.id)} data-testid="vocab-show-library">

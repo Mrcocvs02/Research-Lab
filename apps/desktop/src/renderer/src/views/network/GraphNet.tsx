@@ -23,7 +23,7 @@ import { useDocTitle } from '../chat/useLabels';
 import { assignKeyTints, mix, readTheme, type MapTheme } from './colors';
 import { controlPoint, edgeAlpha, edgeWidths, fillTapered, MAX_CURVED, STRAIGHT_ALPHA, straightWidth } from './edges';
 import { MAX_NET_NODES, Network, type EdgeKind, type NetNode, type NodeKind, type RawEdge, type RawNode } from './forceSim';
-import { capEdges, EVIDENCE_KINDS, RING1, RING1_MAX, RING2_PER_NODE, strongestNew, VICINITY_MAX_NODES } from './vicinityModel';
+import { aboveTau, capEdges, EVIDENCE_KINDS, RING1, RING1_MAX, RING2_PER_NODE, strongestNew, VICINITY_MAX_NODES } from './vicinityModel';
 import { boundsOf, toScreenX, toScreenY, type Bounds } from './geometry';
 import { clusterText } from './mapModel';
 import { DocCard, HoverCard, useRestingHover } from './HoverCard';
@@ -509,8 +509,8 @@ export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selec
   }
 
   /** Adds the `take` strongest new papers of an answer to ring `ring` around `from`; the edges stay at most 4 per paper (all of the centre's). Returns how many came in. */
-  function absorb(from: NetNode, r: Awaited<ReturnType<typeof neighborsOf>>, take: number, ring: number): number {
-    const edges = r.edges.filter((e) => (EVIDENCE_KINDS as readonly string[]).includes(e.kind)) as RawEdge[];
+  function absorb(from: NetNode, r: Awaited<ReturnType<typeof neighborsOf>>, take: number, ring: number, tau = 0): number {
+    const edges = aboveTau(r.edges.filter((e) => (EVIDENCE_KINDS as readonly string[]).includes(e.kind)) as RawEdge[], tau);
     const pick = strongestNew(r.nodes as RawNode[], edges, from.key, new Set(net.nodes.keys()), take);
     if (pick.nodes.length === 0) return 0;
     const res = net.expand(from, pick.nodes, pick.edges);
@@ -545,9 +545,9 @@ export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selec
         else if (net.size >= VICINITY_MAX_NODES) setNote({ text: t('vicinity.capped', { count: VICINITY_MAX_NODES }) });
       } else {
         const have = [...net.nodes.values()].filter((n) => n.ring === 1).length;
-        const r = await neighborsOf(c, step === 'first' ? RING1 : RING1_MAX);
+        const [r, ev] = await Promise.all([neighborsOf(c, step === 'first' ? RING1 : RING1_MAX), rl.invoke('graph:evidence', { strictness: 'normal' }).catch(() => null)]);
         const take = step === 'first' ? RING1 : Math.min(RING1, RING1_MAX - have);
-        const added = absorb(c, r, take, 1);
+        const added = absorb(c, r, take, 1, ev?.tau ?? 0);
         setShown((s) => ({ ...s, ring1: have + added, more: have + added < RING1_MAX && added >= take }));
         if (step === 'first' && added === 0) setNote({ text: t('vicinity.none') });
       }

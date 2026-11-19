@@ -359,15 +359,11 @@ describe('entity networks', () => {
     expect(nodeRadius(0, 4)).toBe(4);
   });
 
-  it('picks a surprising pair for each mode and says the numbers', () => {
+  it('picks a surprising pair of authors and says the numbers', () => {
     const node = (id: string, count: number, group = '', colorKey = ''): EntityNode => ({ id, label: id, count, years: [], colorKey, group });
-    const tags = pickSurprise('tag', [node('a', 10, 'g1'), node('b', 10, 'g2'), node('c', 10, 'g1')], [{ a: 'a', b: 'b', w: 0.7, n: 7 }, { a: 'a', b: 'c', w: 0.9, n: 9 }], () => undefined, () => 0);
-    expect(tags).toMatchObject({ a: 'a', b: 'b', n: 7, kind: 'tag' });
-    const topics = pickSurprise('topic', [node('a', 5), node('b', 5), node('c', 5)], [{ a: 'a', b: 'b', w: 0.5, n: 3 }, { a: 'a', b: 'c', w: 0.5, n: 2 }], (id) => ({ x: id === 'c' ? 10 : 100, y: 0 }), () => 0);
-    expect(topics?.b).toBe('c');
-    const authors = pickSurprise('author', [node('a', 3, '', 't'), node('b', 3, '', 't'), node('m', 3, '', 'u')], [{ a: 'a', b: 'm', w: 1, n: 1 }, { a: 'b', b: 'm', w: 1, n: 1 }], () => undefined, () => 0);
+    const authors = pickSurprise([node('a', 3, '', 't'), node('b', 3, '', 't'), node('m', 3, '', 'u')], [{ a: 'a', b: 'm', w: 1, n: 1 }, { a: 'b', b: 'm', w: 1, n: 1 }], () => 0);
     expect(authors).toMatchObject({ a: 'a', b: 'b', n: 1, kind: 'author' });
-    expect(pickSurprise('tag', [], [], () => undefined, () => 0)).toBeNull();
+    expect(pickSurprise([], [], () => 0)).toBeNull();
   });
 });
 

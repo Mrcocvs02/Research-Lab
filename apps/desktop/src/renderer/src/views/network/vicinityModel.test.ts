@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Network, REST, RING_STEP, radialPull, type RawEdge, type RawNode } from './forceSim';
-import { capEdges, chainOf, strongestNew } from './vicinityModel';
+import { aboveTau, capEdges, chainOf, strongestNew } from './vicinityModel';
 
 const doc = (id: string): RawNode => ({ kind: 'doc', id, label: id });
 const edge = (from: string, to: string, weight: number): RawEdge => ({ from: `doc:${from}`, to: `doc:${to}`, kind: 'similar', weight });
@@ -74,5 +74,12 @@ describe('capEdges', () => {
 describe('chainOf', () => {
   it('walks the steps from the first paper', () => {
     expect(chainOf('a', [{ a: 'a', b: 'b' }, { a: 'c', b: 'b' }, { a: 'c', b: 'd' }])).toEqual(['a', 'b', 'c', 'd']);
+  });
+});
+
+describe('aboveTau', () => {
+  it('drops similarity under the threshold and keeps citations and links', () => {
+    const edges: RawEdge[] = [edge('a', 'b', 0.4), edge('a', 'c', 0.1), { ...edge('a', 'd', 0.05), kind: 'cites' }];
+    expect(aboveTau(edges, 0.2).map((e) => e.to)).toEqual(['doc:b', 'doc:d']);
   });
 });

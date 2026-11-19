@@ -2,8 +2,8 @@
  * The shape of `graph:entityNetwork` (D-387, D-454, §4.21.3), computed by the main process (`packages/graph/src/entity-network.ts`).
  * The contract itself is in `@rl/core`; these are the view's own types, so nothing here imports it.
  */
-/** The contract still serves the three; the view shows the authors only (section 19.2.1): tags and topics are the vocabulary tree of Explore (section 19.2.7). */
-export type EntityMode = 'tag' | 'topic' | 'author';
+/** The view shows the authors only (section 19.2.1): tags and topics are the vocabulary tree of Explore (section 19.2.7). */
+export type EntityMode = 'author';
 
 export interface EntityNode {
   /** Same ids as Explore (`author:<key>`, a taxonomy node id, a cluster id): `explore:related` works from them. */
@@ -33,8 +33,6 @@ export interface EntityEdge {
   w: number;
   /** Raw count behind the strength (documents in common). */
   n: number;
-  /** Tag "implies" edges of the taxonomy: dashed and light. */
-  implies?: boolean;
 }
 
 export interface EntityNetwork {

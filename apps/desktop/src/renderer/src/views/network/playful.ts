@@ -51,8 +51,8 @@ export interface Surprise {
   extra?: number;
 }
 
-/** Positions are those of the Panorama layout (or the settled network), used to tell "far" from "near". */
-export function pickSurprise(mode: EntityMode, nodes: readonly EntityNode[], edges: readonly EntityEdge[], pos: (id: string) => { x: number; y: number } | undefined, rand: () => number): Surprise | null {
+/** Same topic, never wrote together, many co-authors in common: "they might know each other". */
+export function pickSurprise(nodes: readonly EntityNode[], edges: readonly EntityEdge[], rand: () => number): Surprise | null {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const adj = new Map<string, Set<string>>();
   for (const e of edges) {
@@ -60,34 +60,14 @@ export function pickSurprise(mode: EntityMode, nodes: readonly EntityNode[], edg
     (adj.get(e.b) ?? adj.set(e.b, new Set()).get(e.b)!).add(e.a);
   }
   const scored: Array<{ s: number; v: Surprise }> = [];
-  if (mode === 'tag') {
-    // Co-occurrence far above the expected one, in different branches.
-    const docs = Math.max(2, ...nodes.map((n) => n.count)) * 2;
-    for (const e of edges) {
-      const a = byId.get(e.a);
-      const b = byId.get(e.b);
-      if (!a || !b || e.implies || a.group === b.group || e.n < 2) continue;
-      scored.push({ s: (e.n * docs) / (a.count * b.count), v: { a: a.id, b: b.id, kind: mode, n: e.n } });
-    }
-  } else if (mode === 'topic') {
-    // Far apart in the Panorama but with a strong link.
-    for (const e of edges) {
-      const p = pos(e.a);
-      const q = pos(e.b);
-      if (!p || !q || e.n < 1) continue;
-      scored.push({ s: e.w * Math.hypot(p.x - q.x, p.y - q.y), v: { a: e.a, b: e.b, kind: mode, n: e.n } });
-    }
-  } else {
-    // Same topic, never wrote together, many co-authors in common: "they might know each other".
-    const linked = new Set(edges.map((e) => `${e.a}|${e.b}`));
-    for (const [id, nb] of adj) {
-      for (const other of nodes) {
-        if (other.id <= id || linked.has(`${id}|${other.id}`) || linked.has(`${other.id}|${id}`)) continue;
-        const a = byId.get(id);
-        if (!a || a.colorKey !== other.colorKey) continue;
-        const common = [...(adj.get(other.id) ?? [])].filter((x) => nb.has(x)).length;
-        if (common >= 1) scored.push({ s: common, v: { a: id, b: other.id, kind: mode, n: common } });
-      }
+  const linked = new Set(edges.map((e) => `${e.a}|${e.b}`));
+  for (const [id, nb] of adj) {
+    for (const other of nodes) {
+      if (other.id <= id || linked.has(`${id}|${other.id}`) || linked.has(`${other.id}|${id}`)) continue;
+      const a = byId.get(id);
+      if (!a || a.colorKey !== other.colorKey) continue;
+      const common = [...(adj.get(other.id) ?? [])].filter((x) => nb.has(x)).length;
+      if (common >= 1) scored.push({ s: common, v: { a: id, b: other.id, kind: 'author', n: common } });
     }
   }
   if (scored.length === 0) return null;

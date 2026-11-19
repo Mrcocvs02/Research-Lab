@@ -3,7 +3,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { aiVisible, approxTokens, folderOf } from '@rl/ai';
 import { cleanGroups, GROUPS_TOKENS, GROUPS_VERSION, groupsAnswerSchema, groupsPrompt, groupsSystem } from '@rl/ai/synthesis';
-import { AppError, documentIdSchema, GROUPS_LIMITS, groupsOverviewSchema, type DocumentId, type DocumentRecord, type GroupsOverview } from '@rl/core';
+import { AppError, dedupeGroups, documentIdSchema, GROUPS_LIMITS, groupsOverviewSchema, type DocumentId, type DocumentRecord, type GroupsOverview } from '@rl/core';
 import { atomicWriteFile } from '@rl/core/node';
 import { asObj, encodePath, pathDoi } from '@rl/citations';
 import { callStructured } from '../../analysis/call.js';
@@ -14,6 +14,7 @@ import type { MainServices } from '../../ipc/handlers/services.js';
 import { costDecision } from '../ai/batch.js';
 import { online } from '../../citations/context.js';
 import { cheapModel } from '../ai/pick.js';
+import { settle } from '../../ipc/handlers/organize-handlers.js';
 
 /**
  * The research-group overview on request (feature 12, §17.4.19, D-393): a Markdown note in `notes/groups/<id>.md` with the authors,
@@ -65,23 +66,64 @@ export function institutionCounts(works: readonly unknown[]): Array<{ name: stri
   return [...count.values()].sort((a, b) => b.docs - a.docs || a.name.localeCompare(b.name)).slice(0, 15);
 }
 
+const doiKey = (d: string): string => (pathDoi(d) ?? d).toLowerCase();
+
+/** The institutions of each OpenAlex work, by DOI: the research groups of that paper (D-488), most frequent among its authorships first. */
+export function groupsByDoi(works: readonly unknown[]): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const w of works) {
+    const raw = asObj(w)['doi'];
+    if (typeof raw !== 'string' || raw === '') continue;
+    const count = new Map<string, number>();
+    const authorships = asObj(w)['authorships'];
+    for (const a of Array.isArray(authorships) ? authorships : []) {
+      const insts = asObj(a)['institutions'];
+      for (const i of Array.isArray(insts) ? insts : []) {
+        const n = asObj(i)['display_name'];
+        if (typeof n === 'string' && n.trim() !== '') count.set(n.trim().slice(0, 200), (count.get(n.trim().slice(0, 200)) ?? 0) + 1);
+      }
+    }
+    out.set(doiKey(raw), dedupeGroups([...count].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0])).map(([n]) => n)));
+  }
+  return out;
+}
+
+/**
+ * Writes the groups of the papers whose OpenAlex work was read (D-488): a paper found with no institution gets an empty list, a paper not
+ * found (offline, unknown work) keeps what it had. Returns the ids that changed (their group tags changed with them).
+ */
+export async function syncGroups(rt: { store: { documents: { update(id: DocumentId, fn: (cur: DocumentRecord | null) => DocumentRecord): Promise<DocumentRecord> } } }, docs: readonly DocumentRecord[], byDoi: ReadonlyMap<string, string[]>): Promise<string[]> {
+  const changed: string[] = [];
+  for (const d of docs) {
+    const next = d.doi ? byDoi.get(doiKey(d.doi)) : undefined;
+    if (!next || JSON.stringify(next) === JSON.stringify(d.groups ?? [])) continue;
+    await rt.store.documents.update(d.id as DocumentId, (cur) => {
+      if (!cur) throw new AppError('NOT_FOUND', 'Unknown document');
+      return { ...cur, groups: next };
+    });
+    changed.push(d.id);
+  }
+  return changed;
+}
+
 const INSTITUTION_DOCS = 60;
 const BATCH = 25;
 /** Institutions of the group from OpenAlex, by the DOI of the papers; any failure (offline, unknown work) gives an empty list, never an error. */
-async function fetchInstitutions(s: MainServices, docs: readonly DocumentRecord[]): Promise<Array<{ name: string; docs: number }>> {
+async function fetchInstitutions(s: MainServices, docs: readonly DocumentRecord[]): Promise<{ institutions: Array<{ name: string; docs: number }>; byDoi: Map<string, string[]> }> {
+  const none = { institutions: [], byDoi: new Map<string, string[]>() };
   const dois = [...new Set(docs.map((d) => (d.doi ? pathDoi(d.doi) : null)).filter((x): x is string => !!x))].slice(0, INSTITUTION_DOCS);
-  if (dois.length === 0) return [];
+  if (dois.length === 0) return none;
   try {
     const { net } = await online(s);
     const works: unknown[] = [];
     for (let i = 0; i < dois.length; i += BATCH) {
       const filter = encodeURIComponent(`doi:${dois.slice(i, i + BATCH).map((d) => `https://doi.org/${encodePath(d)}`).join('|')}`);
-      const r = asObj(await net.json(`https://api.openalex.org/works?filter=${filter}&per-page=${BATCH}&select=id,authorships`, undefined, 4 * 1024 * 1024));
+      const r = asObj(await net.json(`https://api.openalex.org/works?filter=${filter}&per-page=${BATCH}&select=id,doi,authorships`, undefined, 4 * 1024 * 1024));
       if (Array.isArray(r['results'])) works.push(...r['results']);
     }
-    return institutionCounts(works);
+    return { institutions: institutionCounts(works), byDoi: groupsByDoi(works) };
   } catch {
-    return [];
+    return none;
   }
 }
 
@@ -228,7 +270,11 @@ export async function runGroups(s: MainServices, req: { token: string; docIds: s
     }
   }
   const at = new Date().toISOString();
-  const data = { ...groupData(p.docs, p.tagLabel), institutions: await fetchInstitutions(s, p.docs) };
+  const found = await fetchInstitutions(s, p.docs);
+  const data = { ...groupData(p.docs, p.tagLabel), institutions: found.institutions };
+  // The groups of the papers are the research-group tags (D-488): kept in sync here, with the index refreshed for the ones that changed.
+  const changedIds = await syncGroups(rt, p.docs, found.byDoi).catch((): string[] => []);
+  if (changedIds.length > 0) await settle(s, rt, { reindex: changedIds }, [{ kind: 'documents', ids: changedIds.length <= 500 ? changedIds : undefined }]);
   const synthesis = written && (written.overview !== '' || written.themes.length > 0) ? 'written' : 'not-written';
   const body = overviewMarkdown({ docs: p.docs, data, written: synthesis === 'written' ? written : null, keyDoc: p.keyDoc, at, lang: cfg.language });
   const id = groupId(req.docIds);

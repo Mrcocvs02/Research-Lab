@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { COMPARE_BLOCK, comparePrompt, compareSystem, COMPARE_VERSION } from '@rl/ai/synthesis';
 import type { CompareColumn, CompareTable, DocumentRecord } from '@rl/core';
 import { cellOfSection, noteCells, rowLabel, splitCells } from './cells.js';
-import { groupData, groupId, institutionCounts, overviewMarkdown } from './groups.js';
+import { groupData, groupId, groupsByDoi, institutionCounts, overviewMarkdown, syncGroups } from './groups.js';
 import { listTables, parseTable, readTable, removeTable, tableCsv, tableMarkdown, writeTable } from './table-store.js';
 
 const ID = '0123456789abcdef';
@@ -147,5 +147,25 @@ describe('group overview', () => {
     expect(md).toContain('## Institutions (OpenAlex)');
     expect(md).toContain('- Univ A (2)');
     expect(overviewMarkdown({ docs, data: groupData(docs, (x) => x), written: null, keyDoc: new Map(), at: '2026-11-19T10:00:00.000Z', lang: 'en' })).not.toContain('Institutions');
+  });
+});
+
+describe('research groups of a paper as tags (D-488)', () => {
+  const work = (doi: string, ...insts: string[][]) => ({ doi: `https://doi.org/${doi}`, authorships: insts.map((i) => ({ institutions: i.map((display_name) => ({ display_name })) })) });
+  it('takes the institutions of each work by DOI, most frequent first, without repeats', () => {
+    const m = groupsByDoi([work('10.1000/A', ['Univ A', 'Lab B'], ['Univ A']), work('10.1000/b', []), { authorships: [] }, null]);
+    expect(m.get('10.1000/a')).toEqual(['Univ A', 'Lab B']);
+    expect(m.get('10.1000/b')).toEqual([]);
+    expect(m.size).toBe(2);
+  });
+  it('writes only the groups that changed and keeps the papers not found', async () => {
+    const store = new Map<string, DocumentRecord>();
+    const docs = [{ ...rec('d1', []), doi: '10.1000/a', groups: ['Old'] }, { ...rec('d2', []), doi: '10.1000/zz' }, { ...rec('d3', []), doi: '10.1000/b', groups: [] }, { ...rec('d4', []), doi: '10.1000/c', groups: ['Same'] }] as DocumentRecord[];
+    for (const d of docs) store.set(d.id, d);
+    const rt = { store: { documents: { update: async (id: string, fn: (c: DocumentRecord | null) => DocumentRecord) => (store.set(id, fn(store.get(id) ?? null)), store.get(id)!) } } };
+    const byDoi = new Map([['10.1000/a', ['Univ A']], ['10.1000/b', []], ['10.1000/c', ['Same']]]);
+    expect(await syncGroups(rt as never, docs, byDoi)).toEqual(['d1']);
+    expect(store.get('d1')?.groups).toEqual(['Univ A']);
+    expect(store.get('d2')?.groups).toBeUndefined();
   });
 });

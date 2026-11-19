@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { AppError, contentHashOf, type DocumentRecord } from '@rl/core';
+import { AppError, contentHashOf, visibleGroupTags, type DocumentRecord } from '@rl/core';
 import { readCachedText } from '@rl/data';
 import { GRAPH_K, analyze, citationKey, modelVector, neighborsOf, resolveAuthor, type AuthorAliases, type SparseVec } from '@rl/graph';
 import { readAuthorAliases } from '../../graph/author-aliases.js';
@@ -52,7 +52,7 @@ async function resolveTargets(s: MainServices, view: LibraryView, sourceId: stri
 /** Weight of each tag: the accepted score (D-447), else 1 for a tag set by hand. */
 function tagWeights(rec: DocumentRecord): Map<string, number> {
   const scores = new Map((rec.ai.suggestedTagScores?.value ?? []).map((t) => [t.id, t.weight]));
-  return new Map(rec.tags.map((id) => [id, scores.get(id) ?? 1]));
+  return new Map([...rec.tags, ...visibleGroupTags(rec)].map((id) => [id, scores.get(id) ?? 1]));
 }
 
 function authorsOf(rec: DocumentRecord, aliases: AuthorAliases): Map<string, string> {

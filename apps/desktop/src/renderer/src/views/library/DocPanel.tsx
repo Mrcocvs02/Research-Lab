@@ -9,7 +9,7 @@ import { KeyValue } from '../../components/KeyValue';
 import { Menu, type MenuGroups } from '../../components/Menu';
 import { Segmented } from '../../components/Segmented';
 import { useAiUi } from '../../lib/aiUi';
-import { SEARCH_LIMITS, type Channels, type DocumentPatch, type ResponseOf, type StudyState } from '@rl/core';
+import { groupTagLabel, visibleGroupTags, SEARCH_LIMITS, type Channels, type DocumentPatch, type ResponseOf, type StudyState } from '@rl/core';
 
 type DocumentView = ResponseOf<Channels, 'documents:get'>;
 import { useChangeVersion, useLibraryEvents } from '../../lib/events';
@@ -262,7 +262,7 @@ export function AiArea({ doc }: { doc: DocumentView }) {
           <ul className="ai-chips">
             {ai.suggestedTags.value.map((id) => (
               <li key={id} className="ai-chip">
-                {safeText(model.byId.get(resolveId(model, id))?.label ?? id)}
+                {safeText(model.byId.get(resolveId(model, id))?.label ?? groupTagLabel(id))}
               </li>
             ))}
           </ul>,
@@ -506,6 +506,19 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
           onCreate={(label) => createAndAdd([docId], label)}
           testId="tag-input"
         />
+        {(doc.groups?.length ?? 0) > 0 && (
+          <div className="tag-list" data-testid="doc-group-tags">
+            <span className="card-state__label">{t('doc.groupTags')}</span>
+            {visibleGroupTags(doc).map((id) => (
+              <TagChip key={id} id={id} label={groupTagLabel(id)} removeLabel={t('doc.hideGroup', { name: groupTagLabel(id) })} onRemove={() => save({ groupsHidden: [...(doc.groupsHidden ?? []), groupTagLabel(id)] })} />
+            ))}
+            {(doc.groupsHidden?.length ?? 0) > 0 && (
+              <button type="button" className="link" data-testid="doc-group-show" onClick={() => save({ groupsHidden: [] })}>
+                {t('doc.showGroups', { count: doc.groupsHidden?.length ?? 0 })}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {noAi ? (
@@ -613,7 +626,7 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
 
       <CardSection id="similar" title={t('doc.similarTitle')} testId="doc-similar" toggleTestId="similar-toggle">
         <Lazy>
-          <SimilarPanel docId={docId} tagLabel={(id) => model.byId.get(resolveId(model, id))?.label ?? id} onOpen={openReader} />
+          <SimilarPanel docId={docId} tagLabel={(id) => model.byId.get(resolveId(model, id))?.label ?? groupTagLabel(id)} onOpen={openReader} />
         </Lazy>
       </CardSection>
 
@@ -719,7 +732,7 @@ export function BulkTagEditor({ docIds, rows, onNeedRows, onClose }: { docIds: s
             const node = model.byId.get(resolveId(model, id));
             return (
               <li key={id} data-testid="bulk-tag" data-tag={id} data-implied={implied ? 1 : 0}>
-                <TagChip label={node?.label ?? id} color={node?.color} id={id} />
+                <TagChip label={node?.label ?? groupTagLabel(id)} color={node?.color} id={id} />
                 <span className="facet-count">{t('bulk.onCount', { count: n, total: docIds.length })}</span>
                 {implied ? (
                   <span className="badge" title={t('bulk.impliedHint')} data-testid="bulk-implied">

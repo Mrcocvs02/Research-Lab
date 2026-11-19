@@ -54,6 +54,8 @@ export const documentPatchSchema = z
     arxivId: nullableText(L.identifier),
     /** The user's short description of the file. */
     userDescription: z.string().max(L.userDescription),
+    /** Group tags (D-488) the user hides on this document (the whole list). */
+    groupsHidden: z.array(z.string().trim().min(1).max(L.author)).max(50),
     studyState: studyStateSchema,
     /** Manual "underlined" flag. */
     underlined: z.boolean(),

@@ -36,7 +36,7 @@ export function toGraphDoc(rec: DocumentRecord, tax: TaxonomyLookup, src: GraphT
     abstract: ai || src.abstract || '',
     keywords: [...(usable(rec.ai.keywords) ?? []), ...(usable(rec.ai.synonyms) ?? [])],
     text: src.text ?? '',
-    tags: tax.expandTags(rec.tags),
+    tags: tax.tagsOfRecord(rec),
     refs: src.citations?.refs ?? [],
     cites: src.citations?.cites ?? [],
   };

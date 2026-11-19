@@ -184,6 +184,10 @@ export const documentRecordSchema = z.object({
 
   /** User-owned tags: taxonomy node ids. */
   tags: z.array(itemIdSchema).max(L.tags).default([]),
+  /** Research groups (institutions) of the paper, derived from OpenAlex (D-488): they become tags `grp:<name>`, apart from `tags`. */
+  groups: z.array(z.string().trim().min(1).max(L.author)).max(20).optional(),
+  /** Groups of `groups` the user hid: a hidden group is no tag, and a refresh of `groups` does not bring it back. */
+  groupsHidden: z.array(z.string().trim().min(1).max(L.author)).max(50).optional(),
   study: studySchema.prefault({}),
 
   ai: documentAiSchema.prefault({}),

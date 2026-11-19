@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byline, centralPapers, cutTitle, planPaperLabels, type Box } from './labelsLod';
+import { byline, centralPapers, cutTitle, placeTopicLabels, planPaperLabels, TOPIC_LABEL_H, type Box } from './labelsLod';
 
 const apart = (a: Box, b: Box): boolean => a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y;
 
@@ -38,5 +38,18 @@ describe('labels of the papers', () => {
     expect(c.has(0)).toBe(true);
     expect([...c].some((i) => block[i] === 1)).toBe(true);
     expect(c.size).toBeLessThanOrEqual(4);
+  });
+});
+
+describe('names of the topics in the free layout (W19)', () => {
+  it('a name never lands on a title already drawn', () => {
+    const item = { id: 1, box: { x0: 200, y0: 200, x1: 300, y1: 260 }, w: 90, size: 5 };
+    const free = placeTopicLabels([item], 600, 400);
+    expect(free.get(1)).toEqual({ x: 250, y: 200 - TOPIC_LABEL_H / 2 - 4 }); // above the core
+    const title: Box = { x: 190, y: 170, w: 120, h: 30 };
+    const moved = placeTopicLabels([item], 600, 400, [title]);
+    const at = moved.get(1)!;
+    expect(at).not.toEqual(free.get(1));
+    expect(apart(title, { x: at.x - 45, y: at.y - TOPIC_LABEL_H / 2, w: 90, h: TOPIC_LABEL_H })).toBe(true);
   });
 });

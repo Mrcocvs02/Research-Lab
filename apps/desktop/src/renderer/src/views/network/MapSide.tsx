@@ -123,6 +123,8 @@ interface FrameProps {
   count: number;
   onLight(id: string | null): void;
   onFly(id: string): void;
+  /** More controls for the popover of the strip (the naming of Automatic below 1440 px). */
+  extra?: ReactNode;
 }
 
 /**
@@ -169,6 +171,7 @@ export function MapStrip(p: FrameProps) {
       )}
       <ChipPop label={t('network.blocks.controls')} testId="map-strip-controls" width={320}>
         <div className="net-pop-body">
+          {p.extra}
           <Controls c={p.controls} count={p.count} />
         </div>
       </ChipPop>

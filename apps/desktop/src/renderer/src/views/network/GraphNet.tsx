@@ -178,8 +178,10 @@ export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selec
       ys.push(n.y);
     }
     const b = boundsOf(xs, ys, xs.length);
-    const pad = 40;
-    return { minX: b.minX - pad, minY: b.minY - pad, maxX: b.maxX + pad, maxY: b.maxY + pad };
+    // Room for the labels, which are wider than the nodes (they were cut at the edge of the canvas, D-508).
+    const padX = 110;
+    const padY = 48;
+    return { minX: b.minX - padX, minY: b.minY - padY, maxX: b.maxX + padX, maxY: b.maxY + padY };
   }
 
   const view = useCanvasView<NetNode>({
@@ -915,6 +917,32 @@ export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selec
           <span data-testid="net-empty">{t('network.net.empty')}</span>
         </EmptyState>
       )}
+      {/* Legend and node count in a strip above the canvas, like the Map: nothing sits over the nodes (D-508). */}
+      <div className="net-bl" hidden={count === 0} data-testid="net-strip">
+      {areaState && areaRef.current.on && (
+        <AreaLegend
+          title={family !== TOPIC_FAMILY ? t('network.group.grouped', { name: familyName(t, families, family) }) : undefined}
+          defs={areaState.defs}
+          slots={areaState.slots}
+          without={[...net.nodes.values()].filter((n) => n.kind === 'doc' && !(n.ar && n.ar.length > 0)).length}
+          onLight={(a) => {
+            litAreaRef.current = a;
+            view.requestDraw();
+          }}
+          onIsolate={(a) => {
+            isoAreaRef.current = a;
+            view.requestDraw();
+          }}
+        />
+      )}
+      <div className="net-legend-box">
+        {/* The legend already says "Grouped by X" in its title: not twice (D-505). */}
+        {family !== TOPIC_FAMILY && count > 0 && !(areaState && areaRef.current.on) && <GroupLabel families={families} family={family} />}
+        <span className="hint" data-testid="net-count" data-count={count} aria-live="polite">
+          {t('network.net.count', { count })}
+        </span>
+      </div>
+      </div>
       <div className="map-wrap net-wrap" hidden={count === 0}>
         <canvas
           ref={view.canvas}
@@ -934,32 +962,6 @@ export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selec
           {announce}
         </span>
         {pill}
-        {/* Legend and node count stack in one column, so they never overlap (audit on real data, D-490). */}
-        <div className="net-bl">
-        {areaState && areaRef.current.on && (
-          <AreaLegend
-            title={family !== TOPIC_FAMILY ? t('network.group.grouped', { name: familyName(t, families, family) }) : undefined}
-            defs={areaState.defs}
-            slots={areaState.slots}
-            without={[...net.nodes.values()].filter((n) => n.kind === 'doc' && !(n.ar && n.ar.length > 0)).length}
-            onLight={(a) => {
-              litAreaRef.current = a;
-              view.requestDraw();
-            }}
-            onIsolate={(a) => {
-              isoAreaRef.current = a;
-              view.requestDraw();
-            }}
-          />
-        )}
-        <div className="net-legend-box">
-          {/* The legend already says "Grouped by X" in its title: not twice (D-505). */}
-          {family !== TOPIC_FAMILY && count > 0 && !(areaState && areaRef.current.on) && <GroupLabel families={families} family={family} />}
-          <span className="hint" data-testid="net-count" data-count={count} aria-live="polite">
-            {t('network.net.count', { count })}
-          </span>
-        </div>
-        </div>
         {hovered && hover && (
           <HoverCard x={hover.x} y={hover.y} width={view.size.current.w} height={view.size.current.h} testId="net-tooltip">
             {hovered.kind === 'doc' ? (

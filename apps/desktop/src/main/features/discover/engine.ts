@@ -1,4 +1,5 @@
 import { arxivFromDoi, asObj, encodePath, findOwned, openAlexLink, pathDoi, type Net, type OwnedIndex } from '@rl/citations';
+import { isClassic, specificity } from './generality.js';
 import { DISCOVER_LIMITS, type DiscoverCandidate, type DiscoverReason } from '@rl/core';
 
 /**
@@ -17,7 +18,7 @@ type Obj = Record<string, unknown>;
 export const BRIDGE_THRESHOLD = 0.7;
 /** The most citing works read per document, and the candidates whose details are read. */
 const CITING_PER_DOC = 100;
-const DETAIL_CAP = 80;
+const DETAIL_CAP = 120;
 const BATCH = 50;
 
 export interface Deps {
@@ -86,7 +87,7 @@ async function readSide(deps: Deps, ids: string[]): Promise<Side> {
   return side;
 }
 
-function make(deps: Deps, w: Obj, score: number, reasons: DiscoverReason[], weak = false): DiscoverCandidate | null {
+function make(deps: Deps, w: Obj, score: number, reasons: DiscoverReason[], weak = false, classic = false): DiscoverCandidate | null {
   const link = openAlexLink(w, (deps.now?.() ?? new Date()).toISOString());
   const key = link.externalId;
   if (!key || !/^W\d{1,15}$/.test(key) || !link.title) return null;
@@ -107,13 +108,14 @@ function make(deps: Deps, w: Obj, score: number, reasons: DiscoverReason[], weak
     reasons,
     state: 'new',
     weak,
+    ...(classic ? { classic: true } : {}),
     fresh: false,
     summary: null,
   };
 }
 
 /** Candidates for the ids given, with details read for the ones the side already knows nothing about. */
-async function build(deps: Deps, ranked: Array<{ id: string; score: number; reasons: DiscoverReason[]; weak?: boolean }>, known: Map<string, Obj>): Promise<DiscoverCandidate[]> {
+async function build(deps: Deps, ranked: Array<{ id: string; score: number; reasons: DiscoverReason[]; weak?: boolean }>, known: Map<string, Obj>, coverage?: Map<string, number>): Promise<DiscoverCandidate[]> {
   const top = ranked.slice(0, DETAIL_CAP);
   const need = top.filter((r) => !known.has(r.id)).map((r) => r.id);
   const got = new Map(known);
@@ -121,10 +123,17 @@ async function build(deps: Deps, ranked: Array<{ id: string; score: number; reas
     const id = workId(w['id']);
     if (id) got.set(id, w);
   }
-  const out: DiscoverCandidate[] = [];
-  for (const r of top) {
+  const now = deps.now?.() ?? new Date();
+  // Down-rank what everybody cites (old, enormously cited): the detail read here has the counts the lists lack.
+  const adjusted = top.map((r) => {
     const w = got.get(r.id);
-    const c = w ? make(deps, w, r.score, r.reasons, r.weak ?? false) : null;
+    const stats = { year: typeof w?.['publication_year'] === 'number' ? (w['publication_year'] as number) : null, cited: asNumber(w?.['cited_by_count']) };
+    return { r, w, factor: specificity(stats, now, coverage?.get(r.id) ?? 0), classic: isClassic(stats, now) };
+  });
+  adjusted.sort((x, y) => y.r.score * y.factor - x.r.score * x.factor || (x.r.id < y.r.id ? -1 : 1));
+  const out: DiscoverCandidate[] = [];
+  for (const a of adjusted) {
+    const c = a.w ? make(deps, a.w, a.r.score * a.factor, a.r.reasons, a.r.weak ?? false, a.classic) : null;
     if (c) out.push(c);
   }
   return out.slice(0, DISCOVER_LIMITS.candidates);
@@ -157,7 +166,8 @@ export async function extend(deps: Deps, ids: string[]): Promise<DiscoverCandida
     .sort(byScore);
   // With one document everything has the same coverage: the order then leans on how cited the work is (already in `pop`).
   const max = Math.max(0.0001, ...ranked.map((r) => r.score));
-  return build(deps, ranked.map((r) => ({ ...r, score: r.score / max })), side.known);
+  const coverage = new Map(ranked.map((r) => [r.id, (side.refs.get(r.id) ?? 0) / n]));
+  return build(deps, ranked.map((r) => ({ ...r, score: r.score / max })), side.known, n >= 3 ? coverage : undefined);
 }
 
 const asNumber = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);

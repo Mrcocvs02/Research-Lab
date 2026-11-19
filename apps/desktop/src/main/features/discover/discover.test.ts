@@ -93,9 +93,10 @@ describe('extend the bibliography', () => {
       { id: 20, title: 'Later survey of both topics', refs: [1, 2] },
     ]);
     const found = await extend(d, ['W1', 'W2', 'W3']);
-    expect(found.map((c) => c.key)).toEqual(['W10', 'W20', 'W11', 'W12']);
-    expect(found[0]!.reasons).toEqual([{ code: 'cited-by-owned', n: 2, of: 3 }]);
-    expect(found[1]!.reasons).toEqual([{ code: 'cites-owned', n: 2, of: 3 }]);
+    expect(found.map((c) => c.key)).toEqual(['W20', 'W10', 'W11', 'W12']);
+    expect(found[1]!.reasons).toEqual([{ code: 'cited-by-owned', n: 2, of: 3 }]);
+    expect(found[0]!.reasons).toEqual([{ code: 'cites-owned', n: 2, of: 3 }]);
+    // The older, widely cited work is down-ranked below the equally covered but less generic one.
     expect(found[0]!.score).toBe(1);
     expect(found.every((c) => c.state === 'new' && c.summary === null && !c.fresh)).toBe(true);
   });
@@ -265,5 +266,21 @@ describe('saved searches', () => {
     expect(await pruneRuns(dir, 90, false, now)).toBe(1);
     expect(await readRun(dir, 'old-run')).toBeNull();
     expect((await listRuns(dir)).map((r) => r.id)).toEqual(['new-run']);
+  });
+});
+
+describe('generality down-ranking (D-492)', () => {
+  const now = new Date('2026-06-01T00:00:00Z');
+  it('ranks a recent specific work above an old, hugely cited one and flags classics', async () => {
+    const { specificity, isClassic } = await import('./generality.js');
+    const classic = { year: 1995, cited: 40000 };
+    const recent = { year: 2022, cited: 60 };
+    expect(isClassic(classic, now)).toBe(true);
+    expect(isClassic(recent, now)).toBe(false);
+    expect(isClassic({ year: 2024, cited: 5000 }, now)).toBe(false);
+    expect(specificity(recent, now)).toBeGreaterThan(specificity(classic, now));
+    expect(specificity(classic, now)).toBeGreaterThanOrEqual(0.25);
+    // Cited by nearly all seeds counts less.
+    expect(specificity(recent, now, 1)).toBeLessThan(specificity(recent, now, 0));
   });
 });

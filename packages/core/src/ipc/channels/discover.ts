@@ -36,6 +36,8 @@ export const discoverCandidateSchema = z.object({
   state: z.enum(['new', 'later', 'dismissed', 'imported']),
   /** A bridge below the bibliometric threshold: hidden behind "Mostra i candidati deboli". */
   weak: z.boolean(),
+  /** Old and enormously cited: hidden unless "Includi classici" is on (D-492). */
+  classic: z.boolean().optional(),
   /** Not in the previous run of the same search ("nuovi" badge). */
   fresh: z.boolean(),
   summary: discoverSummarySchema.nullable(),

@@ -69,7 +69,12 @@ const digitsOf = (s: string): string => s.replace(/\D+/g, '');
 
 /** The naming convention (D-493): `_` -> space, spaces collapsed, capital initial, the rest as written, at most 60 characters. */
 export function conventionName(label: string): string {
-  const t = label.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  // A short token with no vowel (`pqr`, `zk`, `kt` in `3-kt`) is a sigla written in lower case: capitals, as the convention wants.
+  const t = label
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/(?<![\p{L}\p{N}])[b-df-hj-np-tv-xz]{2,5}(?![\p{L}\p{N}])/giu, (m) => m.toUpperCase());
   const out = t.charAt(0).toUpperCase() + t.slice(1);
   return out.length > MAX_NAME ? out.slice(0, MAX_NAME).trim() : out;
 }
@@ -82,6 +87,8 @@ export function splitAcronymName(label: string): { name: string; acro: string } 
 }
 /** A sigla: one token of 2-8 letters or digits, all capitals as written. */
 export const isSigla = (label: string): boolean => /^[\p{Lu}\p{N}]{2,8}$/u.test(label.trim()) && /\p{Lu}/u.test(label);
+/** A sigla as old keyword lists write it: one lower-case token of 2-5 letters (`abc`, `xy`); weaker evidence than capitals. */
+const isLowerSigla = (label: string): boolean => /^\p{Ll}{2,5}$/u.test(label.trim());
 
 /** English plural of one token to its singular, or the token itself. */
 function enSingular(t: string): string {
@@ -314,13 +321,33 @@ function namePairs(ix: Index, active: ReviewNode[], excluded: (a: string, b: str
     }
   }
 
-  // R4 sigla <-> expansion: the initials of an expanded name equal a sigla.
-  const siglas = new Map<string, string[]>();
+  // R4 sigla <-> expansion: the initials of an expanded name equal a sigla. Only a node whose LABEL is the sigla (capitals, or one
+  // short lower-case token as old keyword lists write them) is the sigla itself. A sigla met only as an alias, or as the "(S)" of
+  // a node already named by another expansion, means two expansions that share an acronym ("Alpha learning" with the alias AL
+  // against "ancient lore"): a maybe, never ticked (D-505).
+  const siglas = new Map<string, Array<{ id: string; own: 'upper' | 'lower' | 'borrowed' }>>();
+  const addSigla = (key: string, id: string, own: 'upper' | 'lower' | 'borrowed'): void => {
+    (siglas.get(key) ?? siglas.set(key, []).get(key) ?? []).push({ id, own });
+  };
+  for (const n of active) {
+    if (isSigla(n.label)) addSigla(formKey(n.label), n.id, 'upper');
+    else if (isLowerSigla(n.label)) addSigla(formKey(n.label), n.id, 'lower');
+    else {
+      for (const f of forms(n)) {
+        const sp = splitAcronymName(f);
+        if (isSigla(f)) addSigla(formKey(f), n.id, 'borrowed');
+        else if (sp) addSigla(formKey(sp.acro), n.id, 'borrowed');
+      }
+    }
+  }
+  // A sigla whose initials fit two or more different expansions ("xy": two names with the initials x, y) is ambiguous: a maybe.
+  // Expansions are told apart by their stemmed words, so "Delta zeta" and "Delta zetas (DZ)" are one expansion, not two.
+  const expansions = new Map<string, Set<string>>();
   for (const n of active) {
     for (const f of forms(n)) {
-      const sp = splitAcronymName(f);
-      if (isSigla(f)) (siglas.get(formKey(f)) ?? siglas.set(formKey(f), []).get(formKey(f)) ?? []).push(n.id);
-      else if (sp) (siglas.get(formKey(sp.acro)) ?? siglas.set(formKey(sp.acro), []).get(formKey(sp.acro)) ?? []).push(n.id);
+      const base = splitAcronymName(f)?.name ?? f;
+      const acro = acroOf(base);
+      if (acro && acro.length >= 2) (expansions.get(acro) ?? expansions.set(acro, new Set()).get(acro))?.add(tokensOf(base).map(stemToken).join(' '));
     }
   }
   for (const n of active) {
@@ -328,11 +355,18 @@ function namePairs(ix: Index, active: ReviewNode[], excluded: (a: string, b: str
       const base = splitAcronymName(f)?.name ?? f;
       const acro = acroOf(base);
       if (!acro || acro.length < 2) continue;
-      for (const other of siglas.get(acro) ?? []) {
+      const ambiguous = (expansions.get(acro)?.size ?? 0) >= 2;
+      for (const { id: other, own } of siglas.get(acro) ?? []) {
         if (other === n.id) continue;
+        if (ambiguous) {
+          put(n.id, other, 'acronym-expansion', 'maybe');
+          continue;
+        }
         const o = ix.byId.get(other) as ReviewNode;
         const linked = overlap(ix, n.id, other).shared >= 1 || o.aliases.some((x) => normalizeName(x) === normalizeName(n.label)) || n.aliases.some((x) => normalizeName(x) === normalizeName(o.label));
-        put(n.id, other, 'acronym-expansion', linked ? 'sure' : 'likely');
+        if (own === 'upper') put(n.id, other, 'acronym-expansion', linked ? 'sure' : 'likely');
+        else if (own === 'lower') put(n.id, other, 'acronym-expansion', linked ? 'likely' : 'maybe');
+        else put(n.id, other, 'acronym-expansion', 'maybe');
       }
     }
   }

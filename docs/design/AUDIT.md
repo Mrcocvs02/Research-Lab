@@ -943,3 +943,61 @@ Oggetto: `main` a `v1.0.0` (ramo `diag2`), app compilata guidata con uno script 
 ### Limiti
 
 Una sola libreria reale piccola (25 lavori, 1 livello di cluster): soglie e famiglie vanno riprovate su librerie da centinaia di lavori (corpus sintetico del repository). La rete dei tag "senza parole chiave" e "con doppioni uniti" è una ricostruzione fuori dall'app con le stesse regole (scarto di 4 nodi e 5 archi rispetto all'app). Il rilevatore di quasi-doppioni è a regole e rivisto a mano: le coppie di inclusione sono candidate, non decisioni. L'espansione a più passi è stata misurata su due passi.
+
+## Verifica onda 14 (dati reali)
+
+Oggetto: ramo `ver14` (= `main` a a2ec88c), app compilata guidata con uno script Playwright `_electron` fuori dal repository (finestra fuori schermo, sonda `__rlMapProbe` con `RL_E2E=1`), rete tagliata, nessuna cartella abilitata all'AI, nessuna chiamata all'AI. Dati: **copia** temporanea della stessa cartella reale delle diagnosi precedenti con la copia della cartella dati della libreria (25 documenti nel modello, 220 tag importati dal vecchio indice). Percorso dell'utente: riordino guidato con i predefiniti (Accetta le sicure, famiglie proposte), poi Mappa in ogni opzione di "Raggruppa per", Vicinato, percorso, Vocabolario, griglia della libreria a 1280 e 1920 in chiaro e scuro, selezione di 5 lavori. Qui solo numeri aggregati e schemi generici; copie, schermate e dati temporanei cancellati alla fine. Correzioni in D-505 … D-507.
+
+**Verdetto.** Così come era stata consegnata, l'onda 14 **peggiorava** la libreria dell'utente: il riordino con i predefiniti fondeva due tag diversi fra le sicure e una macro-area dentro una parola chiave fra le probabili spuntate, mandava 8 sotto-aree e 2 macro-aree in Parole chiave insieme ai loro gemelli e trasformava 124 parole chiave in una famiglia "a più valori"; la Mappa mostrava "Keywords" come blocco di Topic (il 90 % di "chiarezza" era quell'artefatto) e, dopo il riordino, Automatica metteva 21 lavori su 25 in "Senza valore". Con le correzioni il vocabolario è pulito e la Mappa è **chiara e utile**: 3 blocchi con nomi di temi veri (13 · 8 · 4), tutti i 25 titoli a 1280 e 1920, nessuna collisione, archi solo su richiesta. Resta un limite dei dati più che dell'app: **Topic non raggruppa** (48 % dei lavori in un blocco chiaro) perché una macro-area sta sull'80 % dei lavori e un'altra sul 60 %; la Mappa ripiega su Automatica, come previsto, ma l'app potrebbe aiutare di più (W11).
+
+### Numeri (prima → dopo, contro §19.5)
+
+| Misura | Prima | Consegnata | Con D-505 … D-507 | Obiettivo |
+| --- | --- | --- | --- | --- |
+| Fusioni sicure / sbagliate | — | 5 / 1 | 3 / 0 | nessuna sbagliata |
+| Probabili spuntate / sbagliate | — | 2 / 1 (macro-area fusa in una parola chiave) | 6 / 0 | — |
+| Concetti doppi uniti dalle fusioni | ~18 concetti | ~5 | ~9 (il resto: varianti mandate in Parole chiave dai gemelli o tolte come metadati); 0 doppioni nelle famiglie | richiamo ≥ 90 % |
+| Tag delle famiglie su un solo lavoro | 59 % (di tutti) | 84 % | 25 % (7 di 28) | ≤ 25 % |
+| Gemelli nelle famiglie · Da sistemare · stili | 13 · 220 · 5 | 0 · 0 · 3 | 1 · 0 · 1 | 0 · 0 · 1 |
+| Topic: profondità · valori di livello 1 | 1 · — | 2 · 10 | 2 · 11 | ≥ 2 · 4-8 |
+| Proposte · applicare un passo · Annulla tutto | — | 0,61 s · 0,9-1,5 s · 3,1 s | uguale | ≤ 1 s · ≤ 2 s · identico |
+| Mappa: nodi non-lavoro | — | 0 | 0 | 0 |
+| Topic, lavori in un blocco chiaro | — | 90 % (falso: blocco "Keywords") | 48 % (non idonea → Automatica) | ≥ 80 % |
+| Automatica dopo il riordino | 13 · 8 · 4 | 2 · 2 · 21 "Senza valore" | 13 · 8 · 4 | — |
+| Titoli visibili (25 lavori) 1280 · 1920 · collisioni | — | 5-6 · 25 · 0 | 25 · 25 · 0 | 25 · 25 · 0 |
+| Archi: selezionato · Forti (grado massimo) | — | ≤ 4 · 2 | uguale | ≤ 5 · ≤ 2 |
+| Cornice sopra la tela (Mappa) | 16-20 % | 0 | 0 | 0 |
+| Vicinato: nodi · Allarga · incroci | — | 9 · 24 · 0 (stella sul centro) | uguale, senza minimappa | ≤ 4 archi per nodo, ≤ 1 incrocio |
+| Vocabolario: nodi · archi a riposo | — | 28 · 0 | uguale | ≤ 40 · 0 |
+| Scheda: rapporto · miniatura · titoli tagliati | 1,42-1,87 · 6-9 % · 20/25 | 0,76-0,77 · 56-57 % · 0 | uguale | 0,72-0,80 · ≥ 45 % · 0 |
+| Selezione di 5 lavori | 3064 px, 87 righe | 388 px, 16 righe, 2 tag in tutti, 10 in alcuni ripiegati | uguale | ≤ 800 px |
+
+"Annulla tutto" ripristina tassonomia e tag di ogni documento; cambiano solo i contatori (`revision`, `updatedAt`) e la migrazione una tantum della provenienza (`tagOrigin`), che resta.
+
+### Risultati
+
+| Id | Gravità | Dove | Problema | Esito |
+| --- | --- | --- | --- | --- |
+| W1 | **bloccante** | Riordino, passi 1-2 | R4 prendeva la sigla anche dagli alias: due forme estese con le stesse iniziali (una con la sigla come alias) diventavano "sicure"; una macro-area finiva fusa in una parola chiave | **corretto** (D-505): sigla solo dall'etichetta; da alias, da "(S)" o ambigua = forse |
+| W2 | **bloccante** | Riordino, passo 3 | I gemelli andavano tutti in Parole chiave, temi compresi: 8 sotto-aree e 2 macro-aree sparivano dalla Mappa | **corretto** (D-506): i temi restano, vanno solo le parole chiave; gruppi di soli temi lasciati |
+| W3 | **bloccante** | Riordino, passo 4 | Il gruppo `extra:` del vecchio indice (124 parole chiave) diventava una famiglia a più valori | **corretto** (D-506): oltre 12 valori è un elenco di parole chiave |
+| W4 | **bloccante** | Mappa, Topic | La radice Parole chiave era un'area: blocco "Keywords" con 10 lavori | **corretto** (D-507) |
+| W5 | **bloccante** | Mappa, Automatica | Dopo il riordino i lavori con tag cambiati erano esclusi: 21 su 25 "Senza valore" | **corretto** (D-507) |
+| W6 | importante | Mappa a 1280 | 5-6 titoli su 25 (soglia della cella 110 px) | **corretto**: 90 px (riga di 32 px per un'etichetta di 30) |
+| W7 | importante | Raggruppa per | Le famiglie del vocabolario (`family`) non erano offerte; i gruppi `extra:` già migrati sì | **corretto** (`root:<id>`, D-507) |
+| W8 | minore | Riordino, nomi | `msm` → "Msm"; "Nome (SIGLA)" contato come secondo stile | **corretto** (D-505) |
+| W9 | minore | Vicinato | Minimappa su 9 nodi (copriva un'etichetta); "Raggruppato per X" due volte; nomi dei gruppi di Automatica da parole chiave grezze | **corretto** (D-507) |
+| W10 | minore | Barra della Mappa | A 1280 il menu "Raggruppa per" si riduceva alla freccia | **corretto** (128-200 px) |
+| W11 | importante | Topic | 48 % di lavori chiari: una macro-area generica (80 % dei lavori) e una larga (60 %); a pari peso il valore principale si sceglie per id | aperto: nel passo 4 proporre di togliere, o rendere famiglia a sé, un valore oltre il 50 % (il controllo `generic` lo trova già); nei blocchi scegliere il valore principale per specificità (peso × log(N / lavori del valore)) |
+| W12 | importante | Vicinato | Legenda e conteggio assoluti sopra la tela (3-4 nodi coperti); etichette tagliate al bordo | aperto: stessa striscia / colonna della Mappa; inquadratura con margine per le etichette |
+| W13 | importante | Barra della Mappa | A 1280 con Automatica "Dai un nome con Claude" spinge ricerca e Filtri fuori dallo schermo (barra orizzontale) | aperto: il pulsante nel popover della striscia sotto 1440 px |
+| W14 | minore | Dettaglio del lavoro | "Tag in comune" elenca anche le parole chiave coi nomi grezzi | aperto: filtrare la famiglia Parole chiave |
+| W15 | minore | Riordino | ~20 tag "cognome_iniziale" (autori usati come tag) non sono riconosciuti come metadati; finiscono in Parole chiave | aperto: regola metadati "autore" contro gli autori dei documenti |
+| W16 | minore | Topic | 11 valori di livello 1 (le macro-aree dell'utente); le sotto-aree vanno alla macro con P massima, spesso la più grande | aperto: scegliere per lift fra quelle con P ≥ 0,5 |
+| W17 | minore | Mappa | Dopo il riordino l'intestazione dice "20 documenti nuovi": sono cambiati, non nuovi; la pillola "Riordina i tag" apre le Impostazioni invece del riordino | aperto |
+| W18 | minore | Libreria | Nessuna taglia S/M/L delle schede; la riga dei chip si taglia a metà parola senza "+N" | aperto |
+| W19 | minore | Nessuno (disposizione libera) | A 1280 la legenda occupa una fascia sopra la tela e un nome di cluster si sovrappone a un titolo | aperto |
+
+### Limiti
+
+Una sola libreria reale piccola; il corpus di 300 lavori non è stato rifatto qui. Il percorso nell'interfaccia (Maiusc+clic) non è stato provato fino in fondo dallo script: `graph:path` trova una catena di 2 passi per una coppia su tre e "Nessun percorso" per le altre a soglia normale. Il richiamo dei concetti è contato a mano su ~18 concetti ricostruiti dai nomi. Le correzioni dei pacchetti sono state provate nell'app con alias temporanei (tolti); typecheck con alias temporanei, test unitari toccati (405), check:budget e check:generality verdi.

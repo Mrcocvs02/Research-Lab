@@ -22,13 +22,29 @@ export function weightsOf(rec: DocumentRecord): Array<{ id: string; w: number }>
   return rec.tags.map((id) => ({ id, w: scores.get(id) ?? 1 }));
 }
 
+/** The nodes without the keywords family (§19.1.1: keywords never reach the Map), D-505. */
+export function withoutKeywords<T extends { id: string; parents: readonly string[]; family?: string | undefined }>(nodes: readonly T[]): T[] {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const memo = new Map<string, boolean>();
+  const inKeywords = (id: string, depth = 0): boolean => {
+    const known = memo.get(id);
+    if (known !== undefined) return known;
+    const n = byId.get(id);
+    memo.set(id, false); // cycle guard
+    const r = !!n && depth < 50 && (n.family === 'keywords' || n.parents.some((p) => inKeywords(p, depth + 1)));
+    memo.set(id, r);
+    return r;
+  };
+  return nodes.filter((n) => !inKeywords(n.id));
+}
+
 export async function areaModel(rt: LibraryRuntime, view: LibraryView, scope: Scope): Promise<AreaModel> {
   const key = `${view.key}|${JSON.stringify(scope ?? null)}`;
   const wanted = await scopeIds(rt, view, scope);
   // A project's membership is not part of the library state: that scope is never reused.
   if (last && last.key === key && scope?.projectId === undefined) return last.model;
   const docs = view.records.filter((r) => !wanted || wanted.has(r.id)).map((r) => ({ id: r.id, tags: weightsOf(r) }));
-  const model = computeAreas(view.tax?.nodes ?? [], docs);
+  const model = computeAreas(withoutKeywords(view.tax?.nodes ?? []), docs);
   last = { key, model };
   return model;
 }

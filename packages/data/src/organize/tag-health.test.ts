@@ -50,6 +50,8 @@ describe('tag health, one check at a time', () => {
     expect(nameStyle('Long name (ABC)')).toBe('acronym');
     expect(get(health({ nodes: [node('Alpha'), node('beta gamma'), node('delta_eps')], docs: [] }), 'styles')).toMatchObject({ count: 3, flagged: true });
     expect(get(health({ nodes: [node('Alpha'), node('Beta')], docs: [] }), 'styles')).toMatchObject({ count: 1, flagged: false });
+    // The convention's own "Extended name (ACR)" is not a second style (D-505).
+    expect(get(health({ nodes: [node('Alpha'), node('Long name (ABC)')], docs: [] }), 'styles')).toMatchObject({ count: 1, flagged: false });
   });
   it('metadata: tags that are a venue or a publication status', () => {
     const h = health({ nodes: [node('preprint'), node('Fine')], docs: [] });

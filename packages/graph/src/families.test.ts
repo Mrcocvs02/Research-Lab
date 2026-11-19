@@ -38,6 +38,18 @@ describe('tagMemberships', () => {
     expect(g.docs.get('a')).toEqual([{ cluster: 'grp:Lab One', w: 1 }]);
     expect(g.labels.get('grp:Lab One')).toBe('Lab One');
   });
+  it('root:<id> uses the values of level 1 under a family root of the controlled vocabulary (D-505)', () => {
+    const fam = [node('meth'), node('m1', { parents: ['meth'] }), node('m1-sub', { parents: ['m1'] }), node('m2', { parents: ['meth'] }), node('other')];
+    expect(parseFamily('root:meth')).toEqual({ kind: 'root', value: 'meth' });
+    const m = tagMemberships(parseFamily('root:meth'), fam, [
+      { id: 'a', tags: [{ id: 'm1-sub', w: 1 }] },
+      { id: 'b', tags: [{ id: 'm2', w: 1 }, { id: 'other', w: 1 }] },
+      { id: 'c', tags: [{ id: 'other', w: 1 }] },
+    ]);
+    expect(m.docs.get('a')).toEqual([{ cluster: 'm1', w: 1 }]);
+    expect(m.docs.get('b')).toEqual([{ cluster: 'm2', w: 1 }]);
+    expect(m.docs.has('c')).toBe(false);
+  });
 });
 
 describe('familyModel', () => {

@@ -5,7 +5,7 @@
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { constants } from 'node:fs';
-import { copyFile, mkdir, open, readFile, rename, stat, unlink } from 'node:fs/promises';
+import { copyFile, link, mkdir, open, readFile, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError, PDF_WRITE_LIMITS } from '@rl/core';
 import { atomicWriteJson, isInside as insideRoot, sha256File } from '@rl/core/node';
@@ -107,6 +107,34 @@ export async function replaceWithRetry(tmp: string, dest: string, delays: readon
       if (i >= delays.length) throw new LockedError();
       await sleep(delays[i]!);
     }
+  }
+}
+
+/**
+ * `replaceWithRetry` that does not lose a write landing between the last check and the rename (J5). A rename cannot be made conditional
+ * on Windows or macOS, so the version being replaced is kept and verified instead:
+ *  1. a second name of `dest` is made (hard link, one inode: it follows an in-place write too; a copy where links are refused),
+ *  2. its hash must be `expectedHash`, else nothing is replaced ('changed'),
+ *  3. rename over `dest`,
+ *  4. the kept version is hashed again: if it is no longer `expectedHash`, another program wrote in the window, and that version is renamed
+ *     back over ours ('changed': our update is dropped, theirs is never lost; the caller leaves it to the scan, the usual conflict path).
+ * A program that swaps the whole file between steps 1 and 3 by rename is the part no portable API closes; the window is a few ms.
+ */
+export async function replaceGuarded(tmp: string, dest: string, expectedHash: string, delays?: readonly number[]): Promise<'replaced' | 'changed'> {
+  const kept = tempNameFor(dest);
+  try {
+    await link(dest, kept);
+  } catch {
+    await copyFile(dest, kept, constants.COPYFILE_EXCL);
+  }
+  try {
+    if ((await sha256File(kept)) !== expectedHash) return 'changed';
+    await replaceWithRetry(tmp, dest, delays);
+    if ((await sha256File(kept)) === expectedHash) return 'replaced';
+    await replaceWithRetry(kept, dest, delays); // theirs goes back
+    return 'changed';
+  } finally {
+    await unlink(kept).catch(() => {});
   }
 }
 

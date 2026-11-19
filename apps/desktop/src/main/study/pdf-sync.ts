@@ -30,7 +30,7 @@ import { atomicWriteJson, resolveInRoot, sha256File } from '@rl/core/node';
 import type { PlanAnnot, SyncResult } from '@rl/data/pdf-annot';
 import type { LibraryRuntime } from '../library/library-runtime.js';
 import type { MainServices } from '../ipc/handlers/services.js';
-import { Journal, LockedError, copyOriginal, fingerprint, replaceWithRetry, sameFingerprint, tempNameFor, writeTempTruncated, writeTempWithAppend } from './pdf-files.js';
+import { Journal, LockedError, copyOriginal, fingerprint, replaceGuarded, sameFingerprint, tempNameFor, writeTempTruncated, writeTempWithAppend } from './pdf-files.js';
 
 type Plan = Extract<SyncResult, { ok: true }>;
 const PDF_EXT = /\.pdf$/i;
@@ -72,7 +72,6 @@ export class PdfSync {
   private readonly queue = new Queue();
   private readonly jobs = new Map<string, Job>();
   /** Hash and size of the files this process is about to put in place: the watcher event of our own replacement is recognised (§8.3.3 step 7). */
-  readonly expectedWrites = new Set<string>();
 
   constructor(private readonly s: MainServices, private readonly enabled: boolean = s.pdfWriteEnabled ?? PDF_WRITE_ENABLED) {
     this.dir = path.join(s.localDataDir, 'pdf-write');
@@ -438,16 +437,21 @@ export class PdfSync {
       const now = await fingerprint(abs).catch(() => null);
       if (!now || !sameFingerprint(before, now) || (await stat(abs)).mtimeMs !== mtimeMs) return { kind: 'changed' };
       const stamp = nowIso();
-      this.expectedWrites.add(`${v.sha256}:${v.size}`);
       // The record knows the new file BEFORE the replacement, so the scan that the watcher starts cannot take it for a change by someone else.
       await rt.store.documents.update(docId, (cur) => ({ ...cur!, pdfWrite: { ...pdfWrite!, own: [...(cur!.pdfWrite?.own ?? pdfWrite!.own), { hash: v.sha256, size: v.size, at: stamp }].slice(-L.ownHashes) }, updatedAt: stamp }));
+      let swapped: 'replaced' | 'changed';
       try {
-        await replaceWithRetry(tmp, abs);
+        swapped = await replaceGuarded(tmp, abs, hash);
       } catch (e) {
-        this.expectedWrites.delete(`${v.sha256}:${v.size}`);
         await rt.store.documents.update(docId, (cur) => ({ ...cur!, pdfWrite: { ...cur!.pdfWrite!, own: cur!.pdfWrite!.own.filter((o) => o.hash !== v.sha256) }, updatedAt: nowIso() })).catch(() => {});
         if (e instanceof LockedError) return { kind: 'locked' };
         throw e;
+      }
+      if (swapped === 'changed') {
+        // Another program wrote in the last instant: its version is back in place (replaceGuarded); the record forgets our hash and the
+        // scan sees the new file as a change by someone else (to look at), like the other conflict cases.
+        await rt.store.documents.update(docId, (cur) => ({ ...cur!, pdfWrite: { ...cur!.pdfWrite!, own: cur!.pdfWrite!.own.filter((o) => o.hash !== v.sha256) }, updatedAt: nowIso() })).catch(() => {});
+        return { kind: 'changed' };
       }
 
       // 8. after the replacement: the record follows the file
@@ -457,8 +461,6 @@ export class PdfSync {
     } finally {
       await unlink(tmp).catch(() => {});
       await this.journal.remove(tmp);
-      const m = this.mem.get(`${libId}|${docId}`);
-      if (m) setTimeout(() => this.expectedWrites.clear(), 60_000).unref();
     }
   }
 
@@ -561,9 +563,9 @@ export class PdfSync {
         const newHash = await sha256File(tmp);
         const now = await fingerprint(abs);
         if (!sameFingerprint(before, now)) throw new AppError('CONFLICT', 'The file changed meanwhile', { reason: 'changed' });
-        this.expectedWrites.add(`${newHash}:${(await stat(tmp)).size}`);
         try {
-          await replaceWithRetry(tmp, abs);
+          // Same guard as a write: a version written by another program in the last instant is put back, and the restore reports a conflict.
+          if ((await replaceGuarded(tmp, abs, rec.hash)) === 'changed') throw new AppError('CONFLICT', 'The file changed meanwhile', { reason: 'changed' });
         } catch (e) {
           if (e instanceof LockedError) throw new AppError('PERMISSION_DENIED', 'The file is open in another program', { reason: 'locked' });
           throw e;

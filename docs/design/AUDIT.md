@@ -988,15 +988,15 @@ Oggetto: ramo `ver14` (= `main` a a2ec88c), app compilata guidata con uno script
 | W8 | minore | Riordino, nomi | `msm` → "Msm"; "Nome (SIGLA)" contato come secondo stile | **corretto** (D-505) |
 | W9 | minore | Vicinato | Minimappa su 9 nodi (copriva un'etichetta); "Raggruppato per X" due volte; nomi dei gruppi di Automatica da parole chiave grezze | **corretto** (D-507) |
 | W10 | minore | Barra della Mappa | A 1280 il menu "Raggruppa per" si riduceva alla freccia | **corretto** (128-200 px) |
-| W11 | importante | Topic | 48 % di lavori chiari: una macro-area generica (80 % dei lavori) e una larga (60 %); a pari peso il valore principale si sceglie per id | aperto: nel passo 4 proporre di togliere, o rendere famiglia a sé, un valore oltre il 50 % (il controllo `generic` lo trova già); nei blocchi scegliere il valore principale per specificità (peso × log(N / lavori del valore)) |
-| W12 | importante | Vicinato | Legenda e conteggio assoluti sopra la tela (3-4 nodi coperti); etichette tagliate al bordo | aperto: stessa striscia / colonna della Mappa; inquadratura con margine per le etichette |
-| W13 | importante | Barra della Mappa | A 1280 con Automatica "Dai un nome con Claude" spinge ricerca e Filtri fuori dallo schermo (barra orizzontale) | aperto: il pulsante nel popover della striscia sotto 1440 px |
-| W14 | minore | Dettaglio del lavoro | "Tag in comune" elenca anche le parole chiave coi nomi grezzi | aperto: filtrare la famiglia Parole chiave |
-| W15 | minore | Riordino | ~20 tag "cognome_iniziale" (autori usati come tag) non sono riconosciuti come metadati; finiscono in Parole chiave | aperto: regola metadati "autore" contro gli autori dei documenti |
-| W16 | minore | Topic | 11 valori di livello 1 (le macro-aree dell'utente); le sotto-aree vanno alla macro con P massima, spesso la più grande | aperto: scegliere per lift fra quelle con P ≥ 0,5 |
-| W17 | minore | Mappa | Dopo il riordino l'intestazione dice "20 documenti nuovi": sono cambiati, non nuovi; la pillola "Riordina i tag" apre le Impostazioni invece del riordino | aperto |
-| W18 | minore | Libreria | Nessuna taglia S/M/L delle schede; la riga dei chip si taglia a metà parola senza "+N" | aperto |
-| W19 | minore | Nessuno (disposizione libera) | A 1280 la legenda occupa una fascia sopra la tela e un nome di cluster si sovrappone a un titolo | aperto |
+| W11 | importante | Topic | 48 % di lavori chiari: una macro-area generica (80 % dei lavori) e una larga (60 %); a pari peso il valore principale si sceglie per id | **corretto** (D-508) |
+| W12 | importante | Vicinato | Legenda e conteggio assoluti sopra la tela (3-4 nodi coperti); etichette tagliate al bordo | **corretto** (D-508) |
+| W13 | importante | Barra della Mappa | A 1280 con Automatica "Dai un nome con Claude" spinge ricerca e Filtri fuori dallo schermo (barra orizzontale) | **corretto** (D-508) |
+| W14 | minore | Dettaglio del lavoro | "Tag in comune" elenca anche le parole chiave coi nomi grezzi | **corretto** (D-508) |
+| W15 | minore | Riordino | ~20 tag "cognome_iniziale" (autori usati come tag) non sono riconosciuti come metadati; finiscono in Parole chiave | **corretto** (D-508) |
+| W16 | minore | Topic | 11 valori di livello 1 (le macro-aree dell'utente); le sotto-aree vanno alla macro con P massima, spesso la più grande | **corretto** (D-508) |
+| W17 | minore | Mappa | Dopo il riordino l'intestazione dice "20 documenti nuovi": sono cambiati, non nuovi; la pillola "Riordina i tag" apre le Impostazioni invece del riordino | **corretto** (D-508) |
+| W18 | minore | Libreria | Nessuna taglia S/M/L delle schede; la riga dei chip si taglia a metà parola senza "+N" | **corretto** (D-508) |
+| W19 | minore | Nessuno (disposizione libera) | A 1280 la legenda occupa una fascia sopra la tela e un nome di cluster si sovrappone a un titolo | **corretto** (D-508) |
 
 ### Limiti
 

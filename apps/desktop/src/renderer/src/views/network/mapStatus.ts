@@ -1,4 +1,4 @@
-type T = (key: string, options?: Record<string, unknown>) => string;
+import type { TFunction } from 'i18next';
 interface Drift {
   pending: number;
   changed?: number | undefined;
@@ -6,7 +6,7 @@ interface Drift {
 }
 
 /** The header of a Map that is out of date: documents new since the build, documents changed since (after a tidy-up, say), documents removed (D-508). */
-export function staleLine(s: Drift, t: T): string {
+export function staleLine(s: Drift, t: TFunction): string {
   const changed = Math.min(s.changed ?? 0, s.pending);
   const fresh = s.pending - changed;
   const parts: string[] = [];

@@ -1,7 +1,8 @@
+import type { TFunction } from 'i18next';
 import { describe, expect, it } from 'vitest';
 import { staleLine } from './mapStatus';
 
-const t = (key: string, o: Record<string, unknown> = {}) => `${key}:${String(o['count'])}`;
+const t = ((key: string, o: Record<string, unknown> = {}) => `${key}:${String(o['count'])}`) as unknown as TFunction;
 
 describe('staleLine (W17)', () => {
   it('new and changed documents are told apart', () => {

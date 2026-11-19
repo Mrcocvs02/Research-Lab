@@ -397,7 +397,7 @@ interface Props extends ColumnsProps {
   mapVersion: number;
   mapReady: boolean;
   /** "Show on the Map" from the vocabulary: the Map grouped by that family. */
-  onShowInMap(family: string): void;
+  onShowInMap(family: string, nodeIds: string[]): void;
 }
 
 /**

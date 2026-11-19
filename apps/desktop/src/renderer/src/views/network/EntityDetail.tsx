@@ -27,44 +27,32 @@ interface Props {
 export function EntityDetail({ mode, entity, peers, yearRange, onClose, onOpenDoc }: Props) {
   const { t } = useTranslation();
   const lib = useApp().activeLibraryId ?? '';
-  const open = useOpenInLibrary(mode);
+  const open = useOpenInLibrary();
   const [docs, setDocs] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
   const [related, setRelated] = useState<Array<{ to: 'author' | 'topic'; nodes: Related }>>([]);
   const [mergeWith, setMergeWith] = useState('');
-  const dim = mode === 'author' ? 'author' : 'topic';
   const key = entity.id.startsWith('author:') ? entity.id.slice(7) : entity.id;
 
   useEffect(() => {
     let live = true;
     setDocs([]);
     setTotal(0);
-    if (mode === 'topic') {
-      rl.invoke('graph:map', {}).then(
-        (m) => {
-          if (!live) return;
-          const ids = m.points.filter((p) => p.clusters.includes(entity.id)).map((p) => p.docId);
-          setDocs(ids.slice(0, PAGE));
-          setTotal(ids.length);
-        },
-        () => undefined,
-      );
-    } else {
-      rl.invoke('explore:documents', { dimension: dim, id: entity.id, limit: PAGE, offset: 0 }).then(
-        (r) => live && (setDocs(r.docIds), setTotal(r.total)),
-        () => undefined,
-      );
-    }
-    const targets: Array<'author' | 'topic'> = mode === 'author' ? ['topic'] : mode === 'tag' ? ['author', 'topic'] : ['author'];
-    Promise.all(targets.map((to) => rl.invoke('explore:related', { from: { dimension: dim, id: entity.id }, to, limit: 5 }).then((r) => ({ to, nodes: r.nodes }), () => ({ to, nodes: [] as Related })))).then((r) => live && setRelated(r.filter((x) => x.nodes.length > 0)));
+    rl.invoke('explore:documents', { dimension: 'author', id: entity.id, limit: PAGE, offset: 0 }).then(
+      (r) => live && (setDocs(r.docIds), setTotal(r.total)),
+      () => undefined,
+    );
+    rl.invoke('explore:related', { from: { dimension: 'author', id: entity.id }, to: 'topic', limit: 5 }).then(
+      (r) => live && setRelated(r.nodes.length > 0 ? [{ to: 'topic', nodes: r.nodes }] : []),
+      () => undefined,
+    );
     return () => {
       live = false;
     };
-  }, [entity.id, mode, dim]);
+  }, [entity.id]);
 
   const more = () => {
-    if (mode === 'topic') return;
-    rl.invoke('explore:documents', { dimension: dim, id: entity.id, limit: PAGE, offset: docs.length }).then(
+    rl.invoke('explore:documents', { dimension: 'author', id: entity.id, limit: PAGE, offset: docs.length }).then(
       (r) => setDocs((d) => [...d, ...r.docIds]),
       () => undefined,
     );
@@ -94,29 +82,27 @@ export function EntityDetail({ mode, entity, peers, yearRange, onClose, onOpenDo
           {t('network.ent.openLibrary')}
         </button>
       </div>
-      {mode === 'author' && (
-        <div className="net-toolbar ent-alias" data-testid="entity-alias">
-          {forms.length > 1 && (
-            <button type="button" onClick={() => void splitAuthor(lib, key).catch(() => {})} data-testid="entity-split">
-              {t('network.ent.split')}
-            </button>
-          )}
-          <label className="net-field">
-            <span>{t('network.ent.mergeWith')}</span>
-            <select value={mergeWith} onChange={(e) => setMergeWith(e.target.value)} data-testid="entity-merge-select">
-              <option value="">{t('network.scope.pick')}</option>
-              {candidates.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {safeText(p.label)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="button" disabled={mergeWith === ''} onClick={() => (void mergeAuthors(lib, key, mergeWith.slice(7)).catch(() => {}), setMergeWith(''))} data-testid="entity-merge">
-            {t('network.ent.merge')}
+      <div className="net-toolbar ent-alias" data-testid="entity-alias">
+        {forms.length > 1 && (
+          <button type="button" onClick={() => void splitAuthor(lib, key).catch(() => {})} data-testid="entity-split">
+            {t('network.ent.split')}
           </button>
-        </div>
-      )}
+        )}
+        <label className="net-field">
+          <span>{t('network.ent.mergeWith')}</span>
+          <select value={mergeWith} onChange={(e) => setMergeWith(e.target.value)} data-testid="entity-merge-select">
+            <option value="">{t('network.scope.pick')}</option>
+            {candidates.map((p) => (
+              <option key={p.id} value={p.id}>
+                {safeText(p.label)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" disabled={mergeWith === ''} onClick={() => (void mergeAuthors(lib, key, mergeWith.slice(7)).catch(() => {}), setMergeWith(''))} data-testid="entity-merge">
+          {t('network.ent.merge')}
+        </button>
+      </div>
       <h3>{t('network.ent.docs')}</h3>
       <ul className="sim-list" data-testid="entity-docs">
         {docs.map((d) => (
@@ -125,7 +111,7 @@ export function EntityDetail({ mode, entity, peers, yearRange, onClose, onOpenDo
           </li>
         ))}
       </ul>
-      {docs.length < total && mode !== 'topic' && (
+      {docs.length < total && (
         <button type="button" onClick={more} data-testid="entity-docs-more">
           {t('network.explore.more', { count: total - docs.length })}
         </button>

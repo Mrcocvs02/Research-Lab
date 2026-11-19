@@ -250,28 +250,18 @@
       "namesake_one": "Possible namesake: {{count}} form of the name",
       "namesake_other": "Possible namesake: {{count}} forms of the name",
       "groupLine": {
-        "tag": "Branch: {{name}}",
-        "topic": "Part of: {{name}}",
         "author": "Group of {{name}}"
       },
       "links": {
-        "tag": "Often with",
-        "topic": "Close to",
         "author": "Co-authors"
       },
       "announce": {
-        "tag": "Tag {{name}}, {{count}} documents, {{links}} links",
-        "topic": "Topic {{name}}, {{count}} documents, {{links}} links",
         "author": "Author {{name}}, {{count}} documents, {{links}} co-authors"
       },
       "surprise": {
-        "tag": "{{a}} and {{b}} appear together in {{n}} documents.",
-        "topic": "{{a}} and {{b}} are far apart on the Overview but share {{n}} tagged documents.",
         "author": "{{a}} and {{b}} might know each other: {{n}} co-authors in common, never a paper together."
       },
       "kind": {
-        "tag": "tags",
-        "topic": "topics",
         "author": "authors"
       },
       "empty": {

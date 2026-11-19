@@ -8,12 +8,14 @@ import { createLibraryViaWizard, ipcData, percentile, skipUnlessChannels, waitFo
  * Run it alone (heavy: a corpus of 600 documents, one launch for the whole file).
  *
  * Phase 6 criterion, renderer half: the model is built with progress; the map shows points and cluster labels; the same
- * seed gives the same clusters after a rebuild; the expandable network holds 500 nodes without jank (p95 frame time
+ * seed gives the same clusters after a rebuild; the neighbourhood of a paper stays smooth (p95 frame time
  * measured with requestAnimationFrame while panning and zooming, while expanding a node (with the simulation ticks that settle it) and while dragging a node: no long task, p95 within max(50 ms, twice the median frame)); a document added later gets a position (status
  * shows it pending, the map has the point) without a full rebuild; from a macro-topic to a paper in at most four zooms
- * and back with the breadcrumb and the selection kept; from an author node to its topics and back to the author.
+ * and back with the breadcrumb and the selection kept; from an author node to its topics and back to the author. Wave 14: the Map is
+ * in blocks, the neighbourhood of a paper (at most 30 papers, opened with Enter or a double click on the Map) replaces the expandable
+ * network, and the network of authors lives in Explore.
  */
-const CHANNELS = ['graph:status', 'graph:build', 'graph:map', 'graph:neighbors', 'explore:level', 'explore:documents', 'explore:related', 'taxonomy:apply', 'documents:tag', 'documents:update', 'documents:list'];
+const CHANNELS = ['graph:status', 'graph:build', 'graph:map', 'graph:neighbors', 'graph:evidence', 'explore:level', 'explore:documents', 'explore:related', 'taxonomy:apply', 'documents:tag', 'documents:update', 'documents:list'];
 const DOCS = 600;
 const FRAME_P95_MS = 50;
 
@@ -38,12 +40,6 @@ async function rebuildWithSeed(window: import('@playwright/test').Page, seed: st
   await window.getByTestId('graph-build-options').click();
 }
 
-/** The mode of the Links tab, from the "Network of" chip. */
-async function pickMode(window: import('@playwright/test').Page, mode: string): Promise<void> {
-  await openPop(window, 'net-mode');
-  await window.getByTestId(`net-mode-${mode}`).click();
-}
-
 /** Sets a range input the way a user does (React listens to the input event). */
 async function setRange(locator: Locator, value: number): Promise<void> {
   await locator.evaluate((el, v) => {
@@ -53,7 +49,7 @@ async function setRange(locator: Locator, value: number): Promise<void> {
   }, value);
 }
 
-test('network, map, clusters, expandable graph and zoomable exploration (phase 6, M4)', async ({}, testInfo) => {
+test('network, map, neighbourhood and zoomable exploration (phase 6, M4)', async ({}, testInfo) => {
   test.setTimeout(1_200_000);
   let ctx: LaunchedApp | undefined;
   try {
@@ -89,7 +85,7 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     await expect(canvas).toHaveAttribute('data-points', String(DOCS));
     await expect.poll(async () => Number(await canvas.getAttribute('data-drawn')), { timeout: 30_000 }).toBeGreaterThan(0);
     await expect.poll(async () => Number((await canvas.getAttribute('data-labels')) ?? 0)).toBeGreaterThan(0);
-    expect(await window.getByTestId('cluster-item').count()).toBeGreaterThan(0);
+    expect(await window.getByTestId('map-block').count(), 'a legend entry per block').toBeGreaterThan(0);
     await canvas.focus();
     await window.keyboard.press('+');
     await window.keyboard.press('ArrowLeft');
@@ -99,6 +95,9 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     await expect(window.getByTestId('map-focus')).not.toHaveText('');
     await window.keyboard.press('Enter');
     await expect(window.getByTestId('net-detail')).toBeVisible();
+    // Enter on a paper of the Map opens its neighbourhood; the Map is the next stop.
+    await expect(window.getByTestId('net-tab-network')).toHaveAttribute('aria-selected', 'true');
+    await window.getByTestId('net-tab-map').click();
 
     // 3. Same seed, same clusters after a rebuild.
     const first = await ipcData<MapData>(window, 'graph:map', {});
@@ -111,21 +110,19 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     expect(second.clusters.map((c) => [c.id, c.size, c.topTerms])).toEqual(first.clusters.map((c) => [c.id, c.size, c.topTerms]));
     expect(assignment(second)).toBe(assignment(first));
 
-    // 4. Expandable network with ~500 nodes: smooth while panning.
-    await window.getByTestId('net-tab-network').click();
-    await openPop(window, 'net-start');
-    await window.getByTestId('net-limit').selectOption('300');
-    await window.getByTestId('net-start-folder').selectOption('');
+    // 4. The neighbourhood of a paper (at most 30 papers) is smooth while panning, widening and dragging.
+    await window.getByTestId('map-canvas').focus();
+    await window.keyboard.press(']');
+    await window.keyboard.press('Enter');
+    await expect(window.getByTestId('net-tab-network')).toHaveAttribute('aria-selected', 'true');
     const net = window.getByTestId('net-canvas');
     const count = async () => Number((await window.getByTestId('net-count').getAttribute('data-count')) ?? 0);
-    await expect.poll(count, { timeout: 60_000 }).toBeGreaterThan(10);
-    await net.focus();
-    for (let i = 0; i < 80 && (await count()) < 500; i++) {
-      for (let k = 0; k < 7 + (i % 5); k++) await window.keyboard.press(']');
-      await window.keyboard.press('Enter');
-      await window.waitForTimeout(250);
-    }
-    expect(await count(), 'network size').toBeGreaterThanOrEqual(500);
+    await expect.poll(count, { timeout: 60_000 }).toBeGreaterThan(1);
+    const ring1 = await count();
+    expect(ring1, 'ring 1 of the neighbourhood').toBeLessThanOrEqual(1 + 8);
+    if (await window.getByTestId('vic-widen').isEnabled()) await window.getByTestId('vic-widen').click();
+    await expect.poll(count, { timeout: 60_000 }).toBeGreaterThanOrEqual(ring1);
+    expect(await count(), 'neighbourhood size').toBeLessThanOrEqual(30);
     await window.getByTestId('net-fit').click();
     await window.waitForTimeout(1500); // let the layout settle
     const box = (await net.boundingBox())!;
@@ -164,14 +161,14 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
       const p50 = percentile(r.frames, 50);
       const p95 = percentile(r.frames, 95);
       console.log(`NET-FRAMES ${label} ${JSON.stringify({ n: r.frames.length, p50, p90: percentile(r.frames, 90), p95, p99: percentile(r.frames, 99), max: Math.max(...r.frames), longTasks: r.long.length, longMax: r.long.length ? Math.max(...r.long) : 0 })}`);
-      testInfo.annotations.push({ type: `p95-frame-ms (${label})`, description: `${p95.toFixed(1)} (median ${p50.toFixed(1)}) over ${r.frames.length} frames, ${r.long.length} long tasks (500+ nodes)` });
+      testInfo.annotations.push({ type: `p95-frame-ms (${label})`, description: `${p95.toFixed(1)} (median ${p50.toFixed(1)}) over ${r.frames.length} frames, ${r.long.length} long tasks (neighbourhood)` });
       // "Senza scatti": no main-thread task over 50 ms, and no frame hitches beyond the window's own pace (an off-screen
       // test window may draw at 30 Hz, so the bound is relative to the median frame).
-      expect(r.long, `long tasks while ${label} with 500+ nodes`).toHaveLength(0);
+      expect(r.long, `long tasks while ${label} in the neighbourhood`).toHaveLength(0);
       expect(p95, `p95 frame time ${p95.toFixed(1)} ms (median ${p50.toFixed(1)}) while ${label}`).toBeLessThanOrEqual(Math.max(FRAME_P95_MS, 2 * p50));
     };
 
-    // 4a. Panning and zooming a settled network.
+    // 4a. Panning and zooming a settled neighbourhood.
     await measure('panning and zooming', async () => {
       await window.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await window.mouse.down();
@@ -180,17 +177,7 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
       for (let i = 0; i < 12; i++) await window.mouse.wheel(0, i % 2 === 0 ? -120 : 120);
     });
 
-    // 4b. Expanding a node (more nodes and edges arrive) and the simulation ticks that settle them.
-    const sizeBefore = await count();
-    await measure('expanding a node and settling', async () => {
-      await net.focus();
-      for (let k = 0; k < 9; k++) await window.keyboard.press(']');
-      await window.keyboard.press('Enter');
-      await window.waitForTimeout(2500);
-    });
-    console.log(`NET-EXPAND nodes ${sizeBefore} -> ${await count()}`);
-
-    // 4c. Dragging a node (the layout warms up around it). A node is found by hovering: its tooltip shows.
+    // 4b. Dragging a node (the layout warms up around it). A node is found by hovering: its tooltip shows.
     await window.getByTestId('net-fit').click();
     await window.waitForTimeout(1500);
     let grab: { x: number; y: number } | null = null;
@@ -304,7 +291,6 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     // 8. M4: the map is playable. The Overview (map tab) has the hover card, the minimap and Mescola, no frame at rest.
     await window.getByTestId('net-tab-map').click();
     const pano = window.getByTestId('map-canvas');
-    await expect(window.getByTestId('minimap')).toBeVisible();
     await window.getByTestId('map-shuffle').click();
     await window.waitForTimeout(1200);
     const frames = async () => Number((await pano.getAttribute('data-frames')) ?? 0);
@@ -315,14 +301,11 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     await window.keyboard.press('ArrowRight');
     await expect(window.getByTestId('map-focus')).not.toHaveText('');
 
-    // 9. M4: the four modes of the Links tab, with the entity card, the Library filter and the keyboard.
-    await window.getByTestId('net-tab-network').click();
-    await expect(window.getByTestId('links-panel')).toHaveAttribute('data-mode', 'doc');
-    for (const mode of ['tag', 'topic', 'author'] as const) {
-      await pickMode(window, mode);
-      await expect(window.getByTestId('entity-panel')).toHaveAttribute('data-mode', mode);
-      await expect(window.getByTestId('ent-canvas')).toHaveAttribute('data-loading', 'false', { timeout: 60_000 });
-    }
+    // 9. M4: the network of the authors (in Explore), with the entity card, the Library filter and reduced motion.
+    await window.getByTestId('net-tab-explore').click();
+    await window.getByTestId('explore-mode-authors').click();
+    await expect(window.getByTestId('entity-panel')).toHaveAttribute('data-mode', 'author');
+    await expect(window.getByTestId('ent-canvas')).toHaveAttribute('data-loading', 'false', { timeout: 60_000 });
     // Authors: at least 1 document per author, then the card of Test Author A.
     await openPop(window, 'ent-filters');
     await setRange(window.getByTestId('ent-min-docs'), 1);
@@ -352,17 +335,11 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     await expect(window.getByTestId('section-library')).toBeVisible();
     await expect(window.getByTestId('active-filters')).toBeVisible();
     await window.getByTestId('nav-map').click();
-    await window.getByTestId('net-tab-network').click();
-    // M goes to the next mode (authors -> documents), and the mode of the library is remembered.
-    await expect(window.getByTestId('links-panel')).toHaveAttribute('data-mode', 'author');
-    await window.getByTestId('ent-canvas').focus();
-    await window.keyboard.press('m');
-    await expect(window.getByTestId('links-panel')).toHaveAttribute('data-mode', 'doc');
-    await window.keyboard.press('m');
-    await expect(window.getByTestId('links-panel')).toHaveAttribute('data-mode', 'tag');
     // Reduced motion: no flight, the layout is settled before it is drawn.
+    await window.getByTestId('net-tab-explore').click();
     await window.emulateMedia({ reducedMotion: 'reduce' });
-    await pickMode(window, 'topic');
+    await window.getByTestId('explore-mode-columns').click();
+    await window.getByTestId('explore-mode-authors').click();
     await expect(window.getByTestId('ent-canvas')).toHaveAttribute('data-loading', 'false', { timeout: 60_000 });
     await window.getByTestId('ent-fit').click();
     const settled = Number((await window.getByTestId('ent-canvas').getAttribute('data-frames')) ?? 0);

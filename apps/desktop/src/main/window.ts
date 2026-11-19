@@ -32,6 +32,8 @@ export function createMainWindow(): BrowserWindow {
       devTools: !!getRuntime().rendererDevUrl,
       // A hidden test window must not have its timers and rendering throttled.
       backgroundThrottling: !hidden,
+      // e2e runs only: the preload exposes `window.rlE2E` when it sees this flag.
+      ...(getRuntime().e2e ? { additionalArguments: ['--rl-e2e'] } : {}),
     },
   });
   win.once('ready-to-show', () => (hidden ? win.showInactive() : win.show()));

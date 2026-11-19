@@ -151,7 +151,7 @@ export function EntityNet({ active, scopes, selectedId, onSelect, onSelectDoc, o
     tintOf.current.set(n.key, c);
     return c;
   };
-  const isSelf = (n: NetNode) => n.kind === 'entity' && mode === 'author' && n.entity !== undefined && selfKeys.has(n.entity.id.slice(7));
+  const isSelf = (n: NetNode) => n.kind === 'entity' && n.entity !== undefined && selfKeys.has(n.entity.id.slice(7));
   const radiusOf = (n: NetNode) => n.r ?? 4;
 
   function getBounds(): Bounds | null {
@@ -214,12 +214,12 @@ export function EntityNet({ active, scopes, selectedId, onSelect, onSelectDoc, o
         if (members.length < 3 || !label) continue;
         const cx = members.reduce((sum, n) => sum + sx(n.x), 0) / members.length;
         const cy = members.reduce((sum, n) => sum + sy(n.y), 0) / members.length;
-        const text = mode === 'author' ? t('network.ent.groupOf', { name: label }) : label;
+        const text = t('network.ent.groupOf', { name: label });
         texts.push(shortLabel(text));
         labels.push({ id: texts.length - 1, x: cx, y: cy, w: ctx.measureText(shortLabel(text)).width + 8, size: 1e6 + members.length, forced: false });
       }
       // Edges: curved and tapered below 3000, straight lines above.
-      const visible: Array<{ a: NetNode; b: NetNode; w: number; implies: boolean; theme: boolean }> = [];
+      const visible: Array<{ a: NetNode; b: NetNode; w: number; theme: boolean }> = [];
       for (const e of net.edges) {
         const a = net.nodes.get(e.a);
         const b = net.nodes.get(e.b);
@@ -229,7 +229,7 @@ export function EntityNet({ active, scopes, selectedId, onSelect, onSelectDoc, o
         const bx = sx(b.x);
         const by = sy(b.y);
         if ((ax < -50 && bx < -50) || (ay < -50 && by < -50) || (ax > w + 50 && bx > w + 50) || (ay > h + 50 && by > h + 50)) continue;
-        visible.push({ a, b, w: e.weight, implies: e.kind === 'implies', theme: e.kind === 'theme' });
+        visible.push({ a, b, w: e.weight, theme: e.kind === 'theme' });
       }
       const curved = visible.length <= MAX_CURVED;
       const onPath = new Set<string>();
@@ -243,10 +243,10 @@ export function EntityNet({ active, scopes, selectedId, onSelect, onSelectDoc, o
         const dim = lit !== null && !incident ? 0.35 : focusSet && !(focusSet.has(e.a.key) && focusSet.has(e.b.key)) ? 0.12 : 1;
         const onP = onPath.has(`${e.a.key}|${e.b.key}`);
         const base = mix(colorOf(e.a, th), th.muted, 0.5);
-        if (e.implies || e.theme) {
-          ctx.setLineDash(e.theme ? [2, 4] : [5, 4]);
+        if (e.theme) {
+          ctx.setLineDash([2, 4]);
           ctx.strokeStyle = base;
-          ctx.globalAlpha = (e.theme ? 0.22 : 0.3) * dim;
+          ctx.globalAlpha = 0.22 * dim;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(ax, ay);
@@ -451,7 +451,7 @@ export function EntityNet({ active, scopes, selectedId, onSelect, onSelectDoc, o
     const e = n.entity;
     if (!e) return n.label;
     const links = net.neighbors(n.key).length;
-    return t(`network.ent.announce.${mode}`, { name: e.label, count: e.count, links, topic: e.groupLabel ?? '' });
+    return t('network.ent.announce.author', { name: e.label, count: e.count, links });
   };
 
   /** Double click: a paper opens, an author brings its two-step neighbourhood into focus. */
@@ -549,7 +549,7 @@ export function EntityNet({ active, scopes, selectedId, onSelect, onSelectDoc, o
     const pos = layoutAnchors(d.nodes, centroids.current);
     const raws: RawNode[] = d.nodes.map((n) => ({ kind: 'entity', id: n.id, label: n.label, count: n.count, x: pos.get(n.id)!.x, y: pos.get(n.id)!.y, entity: n, group: n.group || undefined, r: nodeRadius(n.count, maxCount.current) }));
     for (const n of d.nodes) levelOf.current.set(`entity:${n.id}`, level);
-    const links: Array<{ a: string; b: string; kind: EdgeKind; weight: number }> = d.edges.map((e) => ({ a: `entity:${e.a}`, b: `entity:${e.b}`, kind: e.implies ? 'implies' : 'link', weight: e.w }));
+    const links: Array<{ a: string; b: string; kind: EdgeKind; weight: number }> = d.edges.map((e) => ({ a: `entity:${e.a}`, b: `entity:${e.b}`, kind: 'link', weight: e.w }));
     if (themes && mode === 'author') for (const e of themeEdges(d.nodes, d.edges)) links.push({ a: `entity:${e.a}`, b: `entity:${e.b}`, kind: 'theme', weight: e.w });
     const first = prevMode.current !== mode;
     net.load(raws, links, !first && count > 0 ? 0.3 : 0.6);
@@ -714,11 +714,11 @@ export function EntityNet({ active, scopes, selectedId, onSelect, onSelectDoc, o
     e.preventDefault();
   };
 
-  const openLibrary = useOpenInLibrary(mode);
+  const openLibrary = useOpenInLibrary();
 
   const doSurprise = () => {
     if (!data) return;
-    const s = pickSurprise(mode, data.nodes, data.edges, (id) => nodeAt(`entity:${id}`), rand.current);
+    const s = pickSurprise(data.nodes, data.edges, rand.current);
     if (!s) return void setNote(t('network.ent.noSurprise'));
     setSurprise(s);
     const a = nodeAt(`entity:${s.a}`);

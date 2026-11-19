@@ -28,6 +28,11 @@ export function strongestNew(nodes: readonly RawNode[], edges: readonly RawEdge[
   return { nodes: picked, edges: edges.filter((e) => keep.has(e.from) && keep.has(e.to)) };
 }
 
+/** Ring 1 keeps only evidence above the threshold of the library: similarity edges lighter than `tau` go, citations and links stay. */
+export function aboveTau<E extends { kind: string; weight: number }>(edges: readonly E[], tau: number): E[] {
+  return edges.filter((e) => e.kind !== 'similar' || e.weight >= tau);
+}
+
 /** At most `max` edges for each paper, the strongest first; every edge of the centre is kept. */
 export function capEdges<E extends { a: string; b: string; weight: number }>(edges: readonly E[], center: string | null, max = EDGES_PER_NODE): E[] {
   const deg = new Map<string, number>();

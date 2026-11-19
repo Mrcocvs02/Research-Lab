@@ -62,6 +62,11 @@ test('PDFs show their first page in the grid, cached across a restart', async ()
     const shown = (await widths(window)).filter((x) => x.w > 0);
     for (const t of shown) expect(t.src).toMatch(/^rl-thumb:\/\/thumb\/[0-9a-f]{16}\?v=[0-9a-f]{8}$/);
     await expect(thumbs(window).first()).toBeVisible();
+    // The card is vertical (D-500): a 4:3 view of the top of the first page over the full title, so the card is taller than wide.
+    const thumb = (await window.locator('[data-testid="doc-thumb"]').first().boundingBox())!;
+    expect(thumb.width / thumb.height, 'thumbnail 4:3').toBeCloseTo(4 / 3, 1);
+    const card = (await window.getByTestId('search-result').first().boundingBox())!;
+    expect(card.height, 'vertical card').toBeGreaterThan(card.width);
     const ids = shown.map((x) => /thumb\/([0-9a-f]{16})/.exec(x.src)![1]!);
 
     // Each shown document is now cached: main answers with the url and nothing left to draw.

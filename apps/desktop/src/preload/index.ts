@@ -42,3 +42,5 @@ const bridge: RlBridge = {
 };
 
 contextBridge.exposeInMainWorld('rlBridge', bridge);
+// Set by the main process only in a development run with RL_E2E=1 (runtime.ts); lets the renderer expose its e2e probes.
+if (process.argv.includes('--rl-e2e')) contextBridge.exposeInMainWorld('rlE2E', true);

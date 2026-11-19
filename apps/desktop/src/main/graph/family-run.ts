@@ -194,9 +194,10 @@ export async function runFamily(s: MainServices, req: { family?: string | undefi
   const families = await listFamilies(s, view, req.scope, recs);
   if (!req.family) return { families, items: [] };
   const m = await familyAreas(s, view, req.scope, req.family);
-  const ids = req.docIds ?? [...m.docs.keys()];
   const offer = families.find((f) => f.id === req.family);
   const laid = offer?.eligible === false ? null : await blocksOf(s, await valuesOf(s, view, req.scope, req.family, recs), recs, req.aspect ?? 1.6);
+  // In blocks every paper of the scope has its cell (one with no value, or added after the model was built, sits in the last block).
+  const ids = req.docIds ?? (laid && m.docs.size > 0 ? recs.map((r) => r.id) : [...m.docs.keys()]);
   const items: Item[] = [];
   for (const id of ids) {
     const sh = m.docs.get(id);

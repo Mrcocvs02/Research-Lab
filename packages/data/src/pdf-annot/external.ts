@@ -4,8 +4,8 @@
 import { Ref } from './objects.js';
 import { getPage, resolve, tick, type Doc } from './doc.js';
 import { colorName, readAnnot } from './annot.js';
-import { fromPdfRects, pageGeometry } from './geometry.js';
-import { pageCountOf } from './plan.js';
+import { pageGeometry } from './geometry.js';
+import { appRects, pageCountOf } from './plan.js';
 
 export interface ExternalItem {
   /** `<page>:<object>.<generation>`: names the annotation again at import time (the file is read again then). */
@@ -20,7 +20,6 @@ export interface ExternalItem {
 }
 
 const MAX_ITEMS = 500;
-const clamp = (n: number) => Math.min(1, Math.max(0, n));
 
 export function listExternal(doc: Doc): { items: ExternalItem[]; truncated: boolean } {
   const items: ExternalItem[] = [];
@@ -37,7 +36,8 @@ export function listExternal(doc: Doc): { items: ExternalItem[]; truncated: bool
       const f = readAnnot(doc, el);
       if (!f || f.nm?.startsWith('rl-') || (f.subtype !== 'Highlight' && f.subtype !== 'Underline') || f.rects.length === 0) continue;
       if (items.length >= MAX_ITEMS) return { items, truncated: true };
-      const rects = fromPdfRects(f.rects.slice(0, 200), g).map(([u0, v0, u1, v1]) => ({ x: clamp(u0), y: clamp(v0), w: clamp(u1) - clamp(u0), h: clamp(v1) - clamp(v0) }));
+      const rects = appRects(f.rects.slice(0, 200), g);
+      if (rects.length === 0) continue;
       const color = colorName(f.sem.c);
       items.push({ key: `${i + 1}:${el.n}.${el.g}`, kind: f.subtype === 'Underline' ? 'underline' : 'highlight', page: i + 1, rects, ...(color ? { color } : {}), ...(f.sem.t ? { comment: f.sem.t } : {}), ...(f.sem.a ? { author: f.sem.a } : {}) });
     }

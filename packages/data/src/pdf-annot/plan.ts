@@ -6,7 +6,7 @@ import { Name, PdfError, Ref, Str, asNum, damaged, ser, type Dict, type Val } fr
 import { dictOf, fileSource, getPage, resolve, setDeadline, tick, type Doc, type Page } from './doc.js';
 import { analyze, type Reason } from './refuse.js';
 import { annotObjects, colorName, COLORS, readAnnot, revOf, semOf, type AnnotSpec, type Rgb } from './annot.js';
-import { fromPdfRects, pageGeometry, toPdfRects, type Rect } from './geometry.js';
+import { fromPdfRects, pageGeometry, toPdfRects, type Geom, type Rect } from './geometry.js';
 import { reconcile, type AppItem, type PdfItem, type Verdict } from './reconcile.js';
 
 export interface PlanAnnot {
@@ -69,6 +69,10 @@ export type SyncResult =
 const refKey = (r: Ref) => `${r.n} ${r.g}`;
 const rgbOf = (name: string): Rgb => COLORS[name] ?? COLORS['yellow']!;
 const clamp = (n: number) => Math.min(1, Math.max(0, n));
+/** Normalised rectangles of the app from user-space ones: the ones with a non-finite value (an extreme page box) are dropped. */
+export function appRects(rects: Rect[], g: Geom): Array<{ x: number; y: number; w: number; h: number }> {
+  return fromPdfRects(rects, g).filter((r) => r.every(Number.isFinite)).map(([u0, v0, u1, v1]) => ({ x: clamp(u0), y: clamp(v0), w: clamp(u1) - clamp(u0), h: clamp(v1) - clamp(v0) }));
+}
 
 /** The `/Annots` of a page as the original elements (non-references are kept as they are), and its own reference when it is indirect. */
 function annotsOf(doc: Doc, page: Page): { arr: Val[]; ref: Ref | undefined } {
@@ -94,6 +98,20 @@ function scanPages(doc: Doc, pages: number[]): { items: PdfItem[]; external: num
     }
   }
   return { items, external };
+}
+
+/** True when an annotation of another program on the page has the same subtype and the same rectangles (±0.004 of the page) as `x`. */
+function presentInFile(doc: Doc, x: PlanAnnot): boolean {
+  const page = getPage(doc, x.page - 1);
+  if (!page) return false;
+  const g = pageGeometry(page), sub = x.kind === 'underline' ? 'Underline' : 'Highlight';
+  return annotsOf(doc, page).arr.some((el) => {
+    tick();
+    const f = el instanceof Ref ? readAnnot(doc, el) : null;
+    if (!f || f.nm?.startsWith('rl-') || f.subtype !== sub) return false;
+    const have = appRects(f.rects, g);
+    return x.rects.every((r) => have.some((h) => (['x', 'y', 'w', 'h'] as const).every((k) => Math.abs(h[k] - r[k]) <= 0.004)));
+  });
 }
 
 /** `/Count` of the root of the page tree. */
@@ -141,13 +159,15 @@ export async function planSync(req: SyncRequest): Promise<SyncResult> {
       }
       const ids = new Set([...req.otherIds, ...req.annotations.map((x) => x.id)]);
       verdict = reconcile(items, scan.items, ids, new Set(Object.keys(req.known)));
+      // A highlight another program already put in the file (and the user imported into the app) is not written a second time.
+      verdict.add = verdict.add.filter((a) => !presentInFile(doc, req.annotations.find((x) => x.id === a.id)!));
     }
 
     const marks: Mark[] = verdict.relink.map((r) => ({ id: r.id, objNum: r.ref.n, gen: r.ref.g, rev: r.rev }));
     const adopt: AdoptItem[] = verdict.adopt.map((p) => {
       const g = pageGeometry(getPage(doc, p.page - 1)!);
       const c = colorName(p.sem.c);
-      const rects = fromPdfRects(readAnnot(doc, p.ref)?.rects ?? [], g).map(([u0, v0, u1, v1]) => ({ x: clamp(u0), y: clamp(v0), w: clamp(u1) - clamp(u0), h: clamp(v1) - clamp(v0) }));
+      const rects = appRects(readAnnot(doc, p.ref)?.rects ?? [], g);
       return { id: p.id, ...(c ? { color: c } : {}), comment: p.sem.t, ...(rects.length ? { rects } : {}) };
     });
     const common = { cleared: verdict.remove.map((p) => p.id), adopt, missing: verdict.missing, conflicts: verdict.conflicts, foreign: verdict.foreign, external: scan.external, revisions: doc.sections, pages: total, size: src.size, trailingBytes: doc.trailing };

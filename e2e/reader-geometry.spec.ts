@@ -121,7 +121,7 @@ test.describe.serial('reader geometry (H0)', () => {
     title = file!.title!;
     const size = (await PDFDocument.load(await readFile(path.join(ctx.library!.root, file!.relPath)))).getPage(0).getSize();
     media = { w: size.width, h: size.height };
-    await window.getByTestId('search-sort').selectOption('title');
+    await sortByTitle(window);
     docId = documentIdFromHash(file!.sha256);
   });
 
@@ -398,7 +398,7 @@ test.describe.serial('annotation check job (R0)', () => {
     const file = a.library!.manifest!.files.find((f) => f.format === 'pdf' && f.title && f.hasText !== false);
     test.skip(!file, 'needs a PDF with text and a title');
     docId = documentIdFromHash(file!.sha256);
-    await win.getByTestId('search-sort').selectOption('title');
+    await sortByTitle(win);
 
     // The reader makes the right highlight (geom 2): the ground truth, measured on the drawn text.
     const row = rowByTitle(win, file!.title!);
@@ -471,3 +471,11 @@ test.describe.serial('annotation check job (R0)', () => {
     expect((await list()).find((x) => x.id === fixed.id)!.geom).toBeUndefined();
   });
 });
+
+/** The sort order lives in the View popover of the header: open it, choose, close it again. */
+async function sortByTitle(window: Page): Promise<void> {
+  if (!(await window.getByTestId('search-sort').isVisible())) await window.getByTestId('view-menu').click();
+  await window.getByTestId('search-sort').selectOption('title');
+  await window.keyboard.press('Escape');
+  await expect(window.getByTestId('search-sort')).toBeHidden();
+}

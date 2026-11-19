@@ -62,7 +62,7 @@ async function start(testInfo: Parameters<typeof skipUnlessChannels>[1], pdfCons
   const files: Array<{ title: string; abs: string; docId: string }> = [];
   for (const f of ctx.library!.manifest!.files.filter((x) => x.format === 'pdf' && x.title)) {
     const hit = (await searchHits(window, f.title!)).map((h) => idOf(h)).find((x) => x !== undefined);
-    if (hit) files.push({ title: f.title!, abs: path.join(ctx.library!.root, f.relPath), docId: hit });
+    if (hit && !files.some((x) => x.docId === hit)) files.push({ title: f.title!, abs: path.join(ctx.library!.root, f.relPath), docId: hit });
     if (files.length === 2) break;
   }
   test.skip(files.length < 2, 'needs two PDFs with a title');
@@ -126,7 +126,11 @@ test('create, edit and delete highlights: written into the PDF at the close of t
 
     // "No reload after our own write": same scroll position, no new request for the document.
     const area = window.getByTestId('reader-pages-area');
+    // The pages must be laid out and drawn first, or the position asked for is clamped to the top and settles later by itself.
+    await expect.poll(() => area.evaluate((el) => el.scrollHeight - el.clientHeight), { timeout: 30_000 }).toBeGreaterThan(300);
+    await expect(area.locator('.page canvas').first()).toBeVisible({ timeout: 30_000 });
     await area.evaluate((el) => (el.scrollTop = 120));
+    await expect.poll(() => area.evaluate((el) => el.scrollTop)).toBeGreaterThan(100);
     const scrollBefore = await area.evaluate((el) => el.scrollTop);
     const requests = () => window.evaluate(() => performance.getEntriesByType('resource').filter((e) => e.name.startsWith('rl-doc:')).length);
     const requestsBefore = await requests();
@@ -147,7 +151,7 @@ test('create, edit and delete highlights: written into the PDF at the close of t
     expect(sha(await readFile(path.join(ctx.library!.root, '.lab', 'pdf-originals', copies[0]!)))).toBe(sha(original));
     // nothing else next to the original
     expect((await readdir(path.dirname(doc.abs))).filter((n) => /\.rl-[0-9a-f]{8}\.tmp$/.test(n))).toEqual([]);
-    expect(await area.evaluate((el) => el.scrollTop)).toBe(scrollBefore);
+    expect(Math.abs((await area.evaluate((el) => el.scrollTop)) - scrollBefore)).toBeLessThan(1); // sub-pixel layout rounding only
     expect(await requests()).toBe(requestsBefore);
     await window.getByTestId('reader-study-menu').click();
     await expect(window.getByTestId('reader-pdf-status')).toContainText('In the PDF');
@@ -290,8 +294,9 @@ test('"Export an annotated copy": only the copy is written, where the user picke
     expect((await ipc(window, 'annotations:exportCopy', { docId: doc.docId, destination: path.join(outDir, 'not-picked') })).ok).toBe(false);
 
     await openInReader(window, doc.title);
-    await window.getByTestId('reader-study-menu').click();
-    await window.getByTestId('reader-pdf-export').click();
+    // The annotated copy is offered in the reader's More menu (design ARCHITETTURA-UI §4 reader bar, "Esporta copia annotata…").
+    await window.getByTestId('reader-more').click();
+    await window.getByTestId('reader-export-copy').click();
     await expect.poll(async () => (await readdir(outDir)).filter((n) => n.endsWith('(annotated).pdf')).length, { timeout: 60_000 }).toBe(1);
     const name = (await readdir(outDir)).find((n) => n.endsWith('(annotated).pdf'))!;
     const copy = await readFile(path.join(outDir, name));

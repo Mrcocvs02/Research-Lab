@@ -67,9 +67,9 @@ test('hostile titles, authors, snippets and cards are rendered as inert text', a
     const pane = window.getByTestId('results-pane');
     const inert = async () => {
       // Nothing the documents contain became an element.
-      // The only SVG allowed is the app's static file-type glyph (no text, scripts or foreign objects inside).
-      await expect(pane.locator('img, script, iframe, b, style, a, svg:not(.type-icon > svg)')).toHaveCount(0);
-      await expect(pane.locator('.type-icon > svg :is(script, foreignObject, text, a)')).toHaveCount(0);
+      // The only SVGs allowed are the app's own static glyphs: the file-type glyph and the "More actions" dots of the row (no text, scripts or foreign objects inside).
+      await expect(pane.locator('img, script, iframe, b, style, a, svg:not(.type-icon > svg, [data-testid="row-more"] > svg)')).toHaveCount(0);
+      await expect(pane.locator('.type-icon > svg :is(script, foreignObject, text, a), [data-testid="row-more"] > svg :not(circle)')).toHaveCount(0);
       expect(await window.evaluate(() => (window as unknown as { __pwned?: unknown }).__pwned)).toBeUndefined();
       expect(await window.locator('img[src="x"], iframe[src^="javascript:"]').count()).toBe(0);
       expect(dialogs).toEqual([]);

@@ -18,7 +18,7 @@ import { useLocalFlag } from '../../lib/useLocalFlag';
 import { NoteEditor } from '../notes/NoteEditor';
 import { NotesList } from '../notes/NotesList';
 import { safeText } from '../library/safeText';
-import { AnnotationLayers, AnnotationList } from './AnnotationParts';
+import { AnnotationLayers, AnnotationList, announceCropSaved } from './AnnotationParts';
 import { AnnotationPopover, ConfirmErase, SelectionPopover, type Anchor } from './AnnotationPopover';
 import { CropLayer, type CropDrag } from './CropLayer';
 import { CropPopover } from './CropPopover';
@@ -349,7 +349,7 @@ export function ReaderView({ target, onClose, split }: Props) {
             for (const a of gone) {
               const back = await ann.save({ kind: a.kind, page: a.page, rects: a.rects, text: a.text, color: colorOf(a.color), ...(a.geom === 2 ? { geom: 2 as const } : {}), ...(a.comment ? { comment: a.comment } : {}), ...(a.crop ? { crop: a.crop } : {}) });
               const image = images.get(a.id);
-              if (back && image) await rl.invoke('crops:save', { docId, annId: back.id, image }).catch(reportError);
+              if (back && image) await rl.invoke('crops:save', { docId, annId: back.id, image }).then(() => announceCropSaved(back.id), reportError);
             }
           })();
         },
@@ -432,6 +432,7 @@ export function ReaderView({ target, onClose, split }: Props) {
       if (!saved) return;
       try {
         await rl.invoke('crops:save', { docId, annId: saved.id, image: img.base64 });
+        announceCropSaved(saved.id);
       } catch (e) {
         await ann.remove(saved.id);
         reportError(e);

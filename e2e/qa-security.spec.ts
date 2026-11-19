@@ -3,6 +3,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { launchApp } from './helpers/launch';
+import { createLibraryViaWizard } from './helpers/phase1';
 
 /**
  * Security checks on the built app. The e2e app runs from source with `electron <dir>`, so
@@ -114,7 +115,8 @@ test.describe('settings.json problems are shown to the user and the file is not 
 
   test('a corrupt file: banner with the reason, copy kept next to it', async () => {
     const dir = await seeded('{this is not json');
-    const ctx = await launchApp({ env: { RL_USER_DATA_DIR: dir } });
+    const folder = await mkdtemp(path.join(os.tmpdir(), 'rl-e2e-lib-'));
+    const ctx = await launchApp({ dialogPath: folder, offline: true, env: { RL_USER_DATA_DIR: dir } });
     try {
       const banner = ctx.window.getByTestId('notice-banner');
       await expect(banner).toBeVisible();
@@ -122,11 +124,15 @@ test.describe('settings.json problems are shown to the user and the file is not 
       const copies = (await readdir(dir)).filter((f) => f.startsWith('settings.json.invalid-'));
       expect(copies).toHaveLength(1);
       expect(await readFile(path.join(dir, copies[0]!), 'utf8')).toBe('{this is not json');
+      // A first start shows the wizard over the banner (the shell is behind the modal): the notice waits for the user, then is dismissed.
+      await createLibraryViaWizard(ctx.window, { name: 'Notice library' });
+      await expect(banner.locator('[data-notice="settings-reset"]')).toBeVisible();
       await banner.getByRole('button').click();
       await expect(banner).toBeHidden();
     } finally {
       await ctx.close();
       await rm(dir, { recursive: true, force: true });
+      await rm(folder, { recursive: true, force: true });
     }
   });
 

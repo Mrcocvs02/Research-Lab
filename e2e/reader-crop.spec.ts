@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { skipUnlessChannels } from './helpers/phase1';
+import { ipcData, skipUnlessChannels } from './helpers/phase1';
 import { openSyntheticLibrary, rowByTitle } from './helpers/ui';
 
 /**
@@ -14,7 +14,7 @@ const CHANNELS = ['reader:open', 'annotations:save', 'annotations:list', 'crops:
 const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 
 async function openFirstPdf(window: Page, title: string): Promise<void> {
-  await window.getByTestId('search-sort').selectOption('title');
+  await sortByTitle(window);
   const row = rowByTitle(window, title);
   await row.hover();
   await row.getByTestId('row-read').click();
@@ -105,11 +105,8 @@ test('colour meanings: the names show on the colour dots and filter the annotati
   const { ctx, window } = await openSyntheticLibrary(testInfo, 'papers');
   try {
     await skipUnlessChannels(window, testInfo, CHANNELS);
-    await window.evaluate(async () => {
-      const rl = (window as unknown as { rl: { invoke(c: string, p: unknown): Promise<unknown> } }).rl;
-      const { activeLibraryId } = (await rl.invoke('library:list', {})) as { activeLibraryId: string };
-      await rl.invoke('library:setConfig', { libraryId: activeLibraryId, patch: { annotations: { colorMeanings: ['Key result', '', '', '', ''] } } });
-    });
+    const { activeLibraryId } = await ipcData<{ activeLibraryId: string }>(window, 'library:list', {});
+    await ipcData(window, 'library:setConfig', { libraryId: activeLibraryId, patch: { annotations: { colorMeanings: ['Key result', '', '', '', ''] } } });
     await window.reload();
     const file = ctx.library!.manifest!.files.find((f) => f.format === 'pdf' && f.title && f.hasText !== false);
     test.skip(!file, 'needs a PDF with a title');
@@ -121,3 +118,11 @@ test('colour meanings: the names show on the colour dots and filter the annotati
     await ctx.close();
   }
 });
+
+/** The sort order lives in the View popover of the header: open it, choose, close it again. */
+async function sortByTitle(window: Page): Promise<void> {
+  if (!(await window.getByTestId('search-sort').isVisible())) await window.getByTestId('view-menu').click();
+  await window.getByTestId('search-sort').selectOption('title');
+  await window.keyboard.press('Escape');
+  await expect(window.getByTestId('search-sort')).toBeHidden();
+}

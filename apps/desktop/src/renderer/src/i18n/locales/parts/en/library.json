@@ -63,8 +63,8 @@
     "selCompareNeeds": "Select 2 to {{max}} documents",
     "selGroups": "Research group overview…",
     "selGroupsNeeds": "Select at most {{max}} documents",
-    "selTimeline": "Timeline"
-  },
-  "selSideBySide": "Read side by side",
-  "selSideReason": "Select 2 documents"
+    "selTimeline": "Timeline",
+    "selSideBySide": "Read side by side",
+    "selSideReason": "Select 2 documents"
+  }
 }

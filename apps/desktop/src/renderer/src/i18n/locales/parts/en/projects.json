@@ -63,7 +63,22 @@
     "selected_other": "{{count}} selected",
     "clearSelection": "Clear selection",
     "selectionActions": "Actions on the selected documents",
-    "pickAll": "Select all documents"
+    "pickAll": "Select all documents",
+    "bib": {
+      "copy": "Copy BibTeX references",
+      "link": "Link a .bib file…",
+      "linkedTo": "Linked to {{file}}. Updated at {{time}}",
+      "copied": "BibTeX references copied to the clipboard ({{count}}).",
+      "overwrite": "Overwrite",
+      "recreate": "Recreate",
+      "retry": "Retry",
+      "unlink": "Unlink",
+      "state": {
+        "changed-outside": "The .bib file was changed outside the app: it is not rewritten.",
+        "missing": "The file {{file}} is gone.",
+        "error": "The file {{file}} could not be written."
+      }
+    }
   },
   "notes": {
     "label": "Notes (Markdown)"
@@ -80,21 +95,6 @@
     "moved": "{{title}} is now number {{position}} of {{total}}",
     "addAll": "Add all {{count}} documents not in the plan",
     "addOne": "Add: {{title}}"
-  },
-  "bib": {
-    "copy": "Copy BibTeX references",
-    "link": "Link a .bib file…",
-    "linkedTo": "Linked to {{file}}. Updated at {{time}}",
-    "copied": "BibTeX references copied to the clipboard ({{count}}).",
-    "overwrite": "Overwrite",
-    "recreate": "Recreate",
-    "retry": "Retry",
-    "unlink": "Unlink",
-    "state": {
-      "changed-outside": "The .bib file was changed outside the app: it is not rewritten.",
-      "missing": "The file {{file}} is gone.",
-      "error": "The file {{file}} could not be written."
-    }
   },
   "schema": {
     "tab": "Schema",

@@ -63,8 +63,8 @@
     "selCompareNeeds": "Seleziona da 2 a {{max}} documenti",
     "selGroups": "Panoramica dei gruppi di ricerca…",
     "selGroupsNeeds": "Seleziona al massimo {{max}} documenti",
-    "selTimeline": "Linea del tempo"
-  },
-  "selSideBySide": "Leggi affiancati",
-  "selSideReason": "Seleziona 2 documenti"
+    "selTimeline": "Linea del tempo",
+    "selSideBySide": "Leggi affiancati",
+    "selSideReason": "Seleziona 2 documenti"
+  }
 }

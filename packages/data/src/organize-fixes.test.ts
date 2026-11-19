@@ -129,6 +129,52 @@ describe('targeted taxonomy undo leaves no orphan tag and no cycle (3)', () => {
   });
 });
 
+describe('a run of overlapping steps unwinds like a stack (D-504)', () => {
+  /** Taxonomy nodes (without counters) and the tags of every document: what "the exact previous state" means. */
+  const state = async () => {
+    const tax = await store.readTaxonomy();
+    const docs = await store.documents.list();
+    return JSON.stringify({ nodes: tax.nodes, distinct: tax.distinct ?? [], docs: docs.map((d) => [d.id, [...d.tags].sort()]).sort() });
+  };
+  const seedShared = () =>
+    seed(
+      ['a', 'a2', 'b', 'b2', 'c', 'c2', 'd', 'e'].map((id) => node(id)),
+      [1, 2, 3, 4].map((n) => doc(n, { tags: n % 2 ? ['a', 'b', 'c', 'd'] : ['a2', 'b', 'e'] })),
+    );
+  const steps = [
+    ops({ op: 'merge', from: 'a2', into: 'a' }),
+    ops({ op: 'merge', from: 'b2', into: 'b' }),
+    ops({ op: 'merge', from: 'c2', into: 'c' }),
+    ops({ op: 'merge', from: 'e', into: 'a' }),
+    ops({ op: 'merge', from: 'd', into: 'b' }),
+    ops({ op: 'merge', from: 'c', into: 'a' }),
+  ];
+
+  it('apply six steps on shared documents, then undo in reverse order: the same taxonomy and tags', async () => {
+    await seedShared();
+    await org.tagDocuments([hex(3)], ['b2', 'c2']);
+    const initial = await state();
+    const ids: string[] = [];
+    for (const o of steps) ids.push((await org.applyTaxonomy(o)).changeId);
+    expect(await state()).not.toBe(initial);
+    // A plain undo of the first merge is refused (the later ones touched the same documents)...
+    expect(await code(org.undo(ids[0]))).toMatchObject({ code: 'CONFLICT' });
+    // ...while the unwind, later steps first and carrying the documents it already put back, always works.
+    const settled = new Set<string>();
+    for (const id of [...ids].reverse()) for (const d of (await org.undo(id, settled)).docIds) settled.add(d);
+    expect(await state()).toBe(initial);
+  });
+
+  it('undoing step 2 while steps 3 and 4 stand is refused and changes nothing', async () => {
+    await seedShared();
+    const ids: string[] = [];
+    for (const o of steps.slice(0, 4)) ids.push((await org.applyTaxonomy(o)).changeId);
+    const after = await state();
+    expect(await code(org.undo(ids[1]))).toMatchObject({ code: 'CONFLICT' });
+    expect(await state()).toBe(after);
+  });
+});
+
 describe('a taxonomy batch is all or nothing (4)', () => {
   /** A store whose taxonomy write fails as if another device had changed the file. */
   const conflicting = (inner: FileLibraryStore) =>

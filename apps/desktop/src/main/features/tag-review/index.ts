@@ -2,7 +2,7 @@ import { AppError, type TaxonomyOp } from '@rl/core';
 import { conventionName, mergeOps, reviewTags, tagHealth, tagStats, type CleanupInput, type CleanupRow, type DocEdit, type Proposal, type ReviewResult } from '@rl/data/tag-vocabulary';
 import { settle } from '../../ipc/handlers/organize-handlers.js';
 import type { MainServices } from '../../ipc/handlers/services.js';
-import { aiKeyOf, applyAi, dismissedOf, load, readState, toView, writeState, type Step } from './state.js';
+import { aiKeyOf, applyAi, dismissedOf, laterApplied, load, readState, toView, writeState, type Step } from './state.js';
 
 /**
  * Vocabulary review and guided cleanup (D-493 .. D-497), loaded on demand behind the `tagReview:*` handlers: the detector,
@@ -168,11 +168,20 @@ export async function skipStep(s: MainServices, req: { step: number }) {
 export async function undoRun(s: MainServices, req: { step?: number | undefined }) {
   const rt = await s.runtime.require();
   const state = await readState(rt.store.dataDir);
+  const applied = state.run.steps.filter((x) => x.status === 'applied' && x.changeIds.length > 0);
+  // D-504: steps are undone like a stack, later ones first. One step alone is refused while a later one still stands,
+  // because the later step may have worked on the same documents and tags.
+  if (req.step !== undefined) {
+    const later = laterApplied(applied, req.step);
+    if (later > 0) throw new AppError('CONFLICT', `Undo the ${later} later step${later === 1 ? '' : 's'} first (or use Undo all)`, { conflict: 'later-steps', later });
+  }
   const todo = state.run.steps.filter((x) => x.status === 'applied' && (req.step === undefined || x.step === req.step)).reverse();
   let undone = 0;
+  const settled = new Set<string>();
   for (const st of todo) {
     for (const id of [...st.changeIds].reverse()) {
-      const r = await rt.organizer.undo(id);
+      const r = await rt.organizer.undo(id, settled);
+      for (const d of r.docIds) settled.add(d);
       await settle(s, rt, r, [{ kind: 'taxonomy' }, { kind: 'documents' }]);
       undone++;
     }

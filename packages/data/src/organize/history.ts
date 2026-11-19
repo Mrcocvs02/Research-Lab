@@ -53,6 +53,8 @@ export interface HistoryResult {
   changeId: string;
   summary: string;
   documentsChanged: number;
+  /** The documents this change rewrote. */
+  docIds: string[];
   /** Documents whose search-index entry must be refreshed. */
   reindex: string[];
   touched: { documents: boolean; taxonomy: boolean; projects: boolean };
@@ -179,6 +181,8 @@ export interface TaxonomyRestoreCheck {
   docsWith(nodeId: string): Array<{ id: string; updatedAt: string }>;
   /** Documents this same undo restores (their tags go back to what they were before the change). */
   restoring: ReadonlySet<string>;
+  /** Documents an unwinding run (D-504) already put back to the state right after this change: their newer `updatedAt` is the unwind's own. */
+  settled?: ReadonlySet<string>;
 }
 
 const inUse = (id: string, details: Rec = {}) => new AppError('CONFLICT', 'A tag the undo would remove is in use; the change cannot be reverted safely', { conflict: 'in-use', id, ...details });
@@ -243,7 +247,7 @@ export function restoreTaxonomy(cur: TaxonomyFile, entries: readonly ChangeEntry
   for (const r of readded) {
     const into = cur.nodes.find((n) => n.mergedFrom?.includes(r.id));
     if (!into) continue;
-    const later = (check?.docsWith(into.id) ?? []).filter((d) => !check?.restoring.has(d.id) && d.updatedAt >= r.at);
+    const later = (check?.docsWith(into.id) ?? []).filter((d) => !check?.restoring.has(d.id) && !check?.settled?.has(d.id) && d.updatedAt >= r.at);
     if (later.length > 0) throw inUse(into.id, { documents: later.length, merged: r.id });
   }
   // The restored links must not close a cycle with what changed since.
@@ -370,7 +374,7 @@ export class HistoryService {
       });
   }
 
-  async undo(changeId?: string): Promise<HistoryResult> {
+  async undo(changeId?: string, settled?: ReadonlySet<string>): Promise<HistoryResult> {
     const groups = await this.groups();
     const a = this.analyse(groups);
     let g: Group | undefined;
@@ -382,7 +386,7 @@ export class HistoryService {
       g = this.defaultUndo(groups, a);
       if (!g) throw new AppError('NOT_FOUND', 'Nothing to undo');
     }
-    return this.revert(g, a.depth.get(g.changeId) === 0 ? 'Undo' : 'Redo');
+    return this.revert(g, a.depth.get(g.changeId) === 0 ? 'Undo' : 'Redo', settled);
   }
 
   async redo(changeId?: string): Promise<HistoryResult> {
@@ -403,7 +407,7 @@ export class HistoryService {
   }
 
   /** Applies the inverse of `g` as a new change group (itself undoable). Nothing is written if anything conflicts. */
-  private async revert(g: Group, word: 'Undo' | 'Redo'): Promise<HistoryResult> {
+  private async revert(g: Group, word: 'Undo' | 'Redo', settled?: ReadonlySet<string>): Promise<HistoryResult> {
     if (g.partial) throw partialGroup(g.changeId);
     if (!g.entries.every((e) => SUPPORTED.has(e.action))) throw new AppError('INVALID_REQUEST', 'This change cannot be undone', { changeId: g.changeId });
     const now = this.c.now().toISOString();
@@ -426,7 +430,7 @@ export class HistoryService {
       const infos = await this.c.docInfos(true);
       const byNode = new Map<string, Array<{ id: string; updatedAt: string }>>();
       for (const d of infos) for (const t of new Set(d.tags)) byNode.set(t, [...(byNode.get(t) ?? []), { id: d.id, updatedAt: d.updatedAt }]);
-      taxCheck = { docsWith: (id) => byNode.get(id) ?? [], restoring: new Set(docEntries.keys()) };
+      taxCheck = { docsWith: (id) => byNode.get(id) ?? [], restoring: new Set(docEntries.keys()), ...(settled ? { settled } : {}) };
       restoreTaxonomy(taxBefore, taxEntries, taxCheck);
     }
     const projFinal = new Map<string, Project | null>();
@@ -469,7 +473,7 @@ export class HistoryService {
       const infos: DocInfo[] = await this.c.docInfos(true);
       for (const id of docsWithAnyTag(infos, affectedNodeIds(taxBefore, taxAfter))) reindex.add(id);
     }
-    return { target: g.changeId, changeId, summary, documentsChanged: docs.length, reindex: [...reindex], touched: { documents: docs.length > 0, taxonomy: taxEntries.length > 0, projects: projEntries.size > 0 } };
+    return { target: g.changeId, changeId, summary, documentsChanged: docs.length, docIds: docs, reindex: [...reindex], touched: { documents: docs.length > 0, taxonomy: taxEntries.length > 0, projects: projEntries.size > 0 } };
   }
 }
 

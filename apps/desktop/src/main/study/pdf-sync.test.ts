@@ -152,7 +152,7 @@ beforeEach(async () => {
   w = await world();
   w.anns.set(DOC, annotationFileSchema.parse({ docId: DOC, annotations: [ann('a1'), ann('a2', { rects: [{ x: 0.3, y: 0.5, w: 0.2, h: 0.05 }] })] }));
 });
-const rmWorld = (x: World) => import('node:fs/promises').then((m) => m.rm(x.dir, { recursive: true, force: true }));
+const rmWorld = (x: World) => import('node:fs/promises').then((m) => m.rm(x.dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 /** A new world in place of the one `beforeEach` made (the old folder is removed). */
 async function fresh(over: Parameters<typeof world>[0]): Promise<void> {
   await rmWorld(w);

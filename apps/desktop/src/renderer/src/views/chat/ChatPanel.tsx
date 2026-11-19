@@ -1,6 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AI_LIMITS, type ReasoningLevel } from '@rl/core';
+import { Button } from '../../components/Button';
+import { ChoiceChip } from '../../components/ChoiceChip';
+import { IconButton } from '../../components/IconButton';
+import { IconMore } from '../../components/icons';
+import { Menu } from '../../components/Menu';
 import { ErrorNote } from '../../components/ui';
 import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
@@ -124,6 +129,8 @@ export function ChatPanel() {
   const [reasoning, setReasoning] = useState<ReasoningLevel | null>(null);
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreAnchor = useRef<HTMLSpanElement>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const log = useRef<HTMLOListElement>(null);
   // A search leaves the draft of the input alone.
@@ -133,6 +140,7 @@ export function ChatPanel() {
   const models = ai?.models ?? [];
   const effectiveModel = model && models.some((m) => m.id === model) ? model : (ai?.defaultModel ?? models[0]?.id ?? '');
   const effectiveReasoning = reasoning ?? ai?.defaultReasoning ?? 'low';
+  const reasoningName = (r: ReasoningLevel) => t(`settings.library.reasoning${r === 'low' ? 'Low' : r === 'medium' ? 'Medium' : 'High'}`).toLowerCase();
   const modelLabel = (id: string | undefined) => models.find((m) => m.id === id)?.label ?? id ?? '';
 
   // The context: the open document (with its page) when the reader is open, otherwise the selection of the library.
@@ -227,12 +235,31 @@ export function ChatPanel() {
   return (
     <div className="chat-panel" data-testid="chat-content">
       <div className="chat-toolbar">
-        <button type="button" onClick={() => { chat.newConversation(); setView('chat'); }} data-testid="chat-new">
-          {t('chat.new')}
-        </button>
-        <button type="button" onClick={() => (view === 'history' ? setView('chat') : showHistory())} aria-pressed={view === 'history'} data-testid="chat-history-toggle">
-          {t('chat.history')}
-        </button>
+        {usageText && (
+          <span className="chat-usage-counter hint" data-testid="chat-usage" role="status">
+            {usageText}
+          </span>
+        )}
+        <span ref={moreAnchor} className="chat-toolbar__more">
+          <IconButton label={t('chat.more')} size="sm" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)} data-testid="chat-more">
+            <IconMore size={16} />
+          </IconButton>
+        </span>
+        <Menu
+          anchor={moreAnchor}
+          open={moreOpen}
+          onClose={() => setMoreOpen(false)}
+          label={t('chat.more')}
+          groups={[
+            {
+              id: 'conversations',
+              items: [
+                { id: 'new', label: t('chat.new'), testId: 'chat-new', onSelect: () => (chat.newConversation(), setView('chat')) },
+                { id: 'history', label: view === 'history' ? t('chat.backToChat') : t('chat.history'), testId: 'chat-history-toggle', onSelect: () => (view === 'history' ? setView('chat') : showHistory()) },
+              ],
+            },
+          ]}
+        />
       </div>
 
       {chat.statusError ? <ErrorNote testId="ai-status-error">{errorMessage(chat.statusError, t)}</ErrorNote> : null}
@@ -361,29 +388,13 @@ export function ChatPanel() {
               </div>
             )}
             <div className="chat-composer-row">
-              {usageText && (
-                <span className="chat-usage-counter hint" data-testid="chat-usage" role="status">
-                  {usageText}
-                </span>
-              )}
-              <select className="chat-chip-select" aria-label={t('chat.model')} value={effectiveModel} onChange={(e) => setModel(e.target.value)} data-testid="chat-model">
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-              <select className="chat-chip-select" aria-label={t('chat.reasoning')} value={effectiveReasoning} onChange={(e) => setReasoning(e.target.value as ReasoningLevel)} data-testid="chat-reasoning">
-                {REASONING.map((r) => (
-                  <option key={r} value={r}>
-                    {t('chat.reasoningChip', { level: t(`settings.library.reasoning${r === 'low' ? 'Low' : r === 'medium' ? 'Medium' : 'High'}`).toLowerCase() })}
-                  </option>
-                ))}
-              </select>
+              <ChoiceChip text={modelLabel(effectiveModel)} heading={t('chat.model')} value={effectiveModel} options={models.map((m) => ({ id: m.id, label: m.label || m.id }))} onPick={setModel} testId="chat-model" />
+              <ChoiceChip text={t('chat.reasoningChip', { level: reasoningName(effectiveReasoning) })} heading={t('chat.reasoning')} value={effectiveReasoning} options={REASONING.map((r) => ({ id: r, label: reasoningName(r) }))} onPick={(r) => setReasoning(r as ReasoningLevel)} testId="chat-reasoning" />
+              <span className="chat-composer-row__fill" />
               {chat.sending && (
-                <button type="button" onClick={() => void chat.cancel()} data-testid="chat-cancel">
+                <Button size="sm" onClick={() => void chat.cancel()} data-testid="chat-cancel">
                   {t('chat.cancel')}
-                </button>
+                </Button>
               )}
               <button type="submit" className="primary chat-send" disabled={!canSend} title={t('chat.sendTip')} aria-label={t('chat.send')} data-testid="chat-send">
                 <span aria-hidden="true">↑</span>

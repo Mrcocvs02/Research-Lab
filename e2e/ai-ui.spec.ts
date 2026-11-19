@@ -103,6 +103,7 @@ test('enable a folder, preview and confirm, streamed answer with card and chip, 
     // The panel remembers whether it was left open (`rl.chatOpen`): open it only if it is closed.
     if (!(await window.getByTestId('chat-content').isVisible())) await window.getByTestId('chat-toggle').click();
     await expect(window.getByTestId('chat-content')).toBeVisible({ timeout: 30_000 });
+    await window.getByTestId('chat-more').click();
     await window.getByTestId('chat-history-toggle').click();
     const item = window.getByTestId('history-item').first();
     await expect(item).toBeVisible({ timeout: 30_000 });

@@ -53,6 +53,8 @@
       "newDocs": "New:",
       "asksAgain": "Send will ask for confirmation again.",
       "details": "Details"
-    }
+    },
+    "more": "More",
+    "backToChat": "Back to the conversation"
   }
 }

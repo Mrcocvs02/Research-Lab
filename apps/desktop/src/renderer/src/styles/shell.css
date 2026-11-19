@@ -651,9 +651,12 @@
   overflow: hidden;
   color: var(--text-muted);
   font-size: var(--fs-caption);
+  line-height: 16px;
   text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Z15: two lines at most instead of a cut sentence; the whole text is the tooltip. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .chat-body {
   display: flex;

@@ -25,7 +25,7 @@ function Ring({ value }: { value: number | undefined }) {
 }
 
 /** The short text of the chip (4.10): what is going on in a few words; the full sentence is the tooltip and the popover. Pure, so it is tested. */
-export function shortScanText(scan: { state: string; phase?: string | undefined; processed: number; total?: number | undefined; seen?: number | undefined }, t: (k: string, o?: Record<string, unknown>) => string): string {
+export function shortScanText(scan: { state: string; phase?: string | undefined; processed: number; total?: number | undefined; seen?: number | undefined }, t: ReturnType<typeof useTranslation>['t']): string {
   if (scan.state === 'running') {
     const total = scan.phase === 'hashing' ? (scan.total as number | undefined) : scan.total;
     const done = scan.phase === 'hashing' ? (scan.seen ?? 0) : scan.processed;

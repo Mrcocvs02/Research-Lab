@@ -159,7 +159,9 @@
       "ready": "Draft ✦ of {{date}}: you can edit it",
       "copy": "Copy the Markdown",
       "copied": "Report copied.",
-      "list": "Reports"
+      "list": "Reports",
+      "pdf": "Save as PDF…",
+      "exported": "PDF saved: {{file}}"
     },
     "cite": {
       "menu": "✦ Suggest citations…",
@@ -186,6 +188,17 @@
       "newClaim": "New claim",
       "stance": "The evidence",
       "saved": "Evidence saved in the outline of the project."
+    },
+    "model": "Model",
+    "findEvidence": {
+      "button": "✦ Find evidence",
+      "title": "Find evidence for the claim",
+      "what": "The claim and {{count}} passages found in your library are sent (never the whole PDFs).",
+      "none": "No passage supports or contradicts this claim.",
+      "noCandidates": "No passage in the library to check against this claim.",
+      "accept": "Accept",
+      "accepted": "Evidence added to the claim.",
+      "proposal": "Proposal"
     }
   },
   "prisma": {

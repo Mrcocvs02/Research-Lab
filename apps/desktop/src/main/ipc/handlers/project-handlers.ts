@@ -19,4 +19,6 @@ export const projectSchemaHandlers = (s: MainServices): DomainHandlers<'project'
   'project:reportRun': async (req) => (await ai()).reportRun(s, req),
   'project:citePreview': async (req) => (await ai()).citePreview(s, req),
   'project:citeRun': async (req) => (await ai()).citeRun(s, req),
+  'project:evidencePreview': async (req) => (await ai()).evidencePreview(s, req),
+  'project:evidenceRun': async (req) => (await ai()).evidenceRun(s, req),
 });

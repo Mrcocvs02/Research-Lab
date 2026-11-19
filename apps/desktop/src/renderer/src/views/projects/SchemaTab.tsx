@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Channels, Claim, Outline, ResponseOf } from '@rl/core';
 import { Button } from '../../components/Button';
 import { Chip } from '../../components/Chip';
+import { Lazy, lazyView } from '../../components/Lazy';
 import { EmptyState } from '../../components/EmptyState';
 import { IconProject } from '../../components/icons-shell';
 import { useNav } from '../../lib/nav';
@@ -10,6 +11,8 @@ import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
 import { safeText } from '../library/safeText';
 import { claimsByQuestion, claimState, draftToOutline, outlineToDraft, visibleClaims, type OutlineDraft } from './schemaModel';
+
+const EvidenceDialog = lazyView(() => import('./EvidenceDialog'), ['projects']);
 
 export type SchemaInfo = ResponseOf<Channels, 'project:schema'>;
 
@@ -48,7 +51,7 @@ function OutlineEditor({ outline, onSave, onCancel }: { outline: Outline | null;
   );
 }
 
-function ClaimCard({ claim, titles, onChange, onRemove }: { claim: Claim; titles: ReadonlyMap<string, string>; onChange(c: Claim): void; onRemove(): void }) {
+function ClaimCard({ claim, titles, onChange, onRemove, onFind }: { claim: Claim; titles: ReadonlyMap<string, string>; onChange(c: Claim): void; onRemove(): void; onFind(): void }) {
   const { t } = useTranslation();
   const nav = useNav();
   const state = claimState(claim);
@@ -58,6 +61,9 @@ function ClaimCard({ claim, titles, onChange, onRemove }: { claim: Claim; titles
         <span className="schema-claim__text">«{safeText(claim.text)}»</span>
         {state === 'none' && <Chip kind="status" tone="warning">{t('schema.noEvidence')}</Chip>}
         {state === 'disputed' && <Chip kind="status" tone="warning">{t('schema.disputed')}</Chip>}
+        <Button variant="ghost" size="sm" onClick={onFind} data-testid="schema-find-evidence">
+          {t('schema.findEvidence.button')}
+        </Button>
         <Button variant="ghost" size="sm" onClick={onRemove} data-testid="schema-claim-remove">
           {t('schema.removeClaim')}
         </Button>
@@ -94,6 +100,7 @@ export default function SchemaTab({ projectId, info, titles, onChanged }: { proj
   const [adding, setAdding] = useState(false);
   const [claimText, setClaimText] = useState('');
   const [claimQuestion, setClaimQuestion] = useState('');
+  const [finding, setFinding] = useState<string | null>(null);
   const { outline, claims } = info;
   const run = async (op: () => Promise<unknown>) => {
     try {
@@ -179,7 +186,7 @@ export default function SchemaTab({ projectId, info, titles, onChanged }: { proj
               ) : (
                 <ul className="schema-claims">
                   {g.claims.map((c) => (
-                    <ClaimCard key={c.id} claim={c} titles={titles} onChange={(next) => void saveClaim(next)} onRemove={() => void run(() => rl.invoke('project:removeClaim', { projectId, id: c.id }))} />
+                    <ClaimCard key={c.id} claim={c} titles={titles} onChange={(next) => void saveClaim(next)} onRemove={() => void run(() => rl.invoke('project:removeClaim', { projectId, id: c.id }))} onFind={() => setFinding(c.id)} />
                   ))}
                 </ul>
               )}
@@ -194,6 +201,11 @@ export default function SchemaTab({ projectId, info, titles, onChanged }: { proj
             </dl>
           )}
         </>
+      )}
+      {finding !== null && claims.some((c) => c.id === finding) && (
+        <Lazy>
+          <EvidenceDialog projectId={projectId} claim={claims.find((c) => c.id === finding)!} onClose={() => setFinding(null)} onAccepted={onChanged} />
+        </Lazy>
       )}
     </div>
   );

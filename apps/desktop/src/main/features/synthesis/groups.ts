@@ -5,19 +5,21 @@ import { aiVisible, approxTokens, folderOf } from '@rl/ai';
 import { cleanGroups, GROUPS_TOKENS, GROUPS_VERSION, groupsAnswerSchema, groupsPrompt, groupsSystem } from '@rl/ai/synthesis';
 import { AppError, documentIdSchema, GROUPS_LIMITS, groupsOverviewSchema, type DocumentId, type DocumentRecord, type GroupsOverview } from '@rl/core';
 import { atomicWriteFile } from '@rl/core/node';
+import { asObj, encodePath, pathDoi } from '@rl/citations';
 import { callStructured } from '../../analysis/call.js';
 import { availability, loadCtx, monthUsage, type AiCtx } from '../../ai/service.js';
 import { createToolsHost } from '../../ai/tools-host.js';
 import { aiSends, isToolPurpose, monthOf } from '../../ai/usage.js';
 import type { MainServices } from '../../ipc/handlers/services.js';
 import { costDecision } from '../ai/batch.js';
+import { online } from '../../citations/context.js';
 import { cheapModel } from './compare.js';
 
 /**
  * The research-group overview on request (feature 12, §17.4.19, D-393): a Markdown note in `notes/groups/<id>.md` with the authors,
  * the recurring co-authors, the tags and the main works with links, from the library data on this machine, and the themes written
  * by Claude (✦, one small request: metadata of papers of enabled folders only). Without Claude the data is saved all the same
- * ("sintesi non scritta"). Institutions are not in the library data: the overview does not state any. Loaded on demand.
+ * ("sintesi non scritta"). Institutions come from OpenAlex (public metadata, by DOI, no key and no Claude); offline or unknown, the section is left out. Loaded on demand.
  */
 const running = new Map<string, AbortController>();
 
@@ -45,10 +47,50 @@ const norm = (a: string) => a.normalize('NFKD').replace(/\p{M}+/gu, '').toLowerC
 /** A name that is a single word or ends in a bare initial cannot be told from another author: its data is incomplete. */
 const ambiguous = (a: string) => norm(a).split(' ').length < 2 || /\b[a-z]$/.test(norm(a));
 
+/** The institutions of the authorships of OpenAlex works: how many of the works each one appears in (once per work), the most frequent first. */
+export function institutionCounts(works: readonly unknown[]): Array<{ name: string; docs: number }> {
+  const count = new Map<string, { name: string; docs: number }>();
+  for (const w of works) {
+    const names = new Map<string, string>();
+    const authorships = asObj(w)['authorships'];
+    for (const a of Array.isArray(authorships) ? authorships : []) {
+      const insts = asObj(a)['institutions'];
+      for (const i of Array.isArray(insts) ? insts : []) {
+        const n = asObj(i)['display_name'];
+        if (typeof n === 'string' && n.trim() !== '') names.set(norm(n), n.trim().slice(0, 200));
+      }
+    }
+    for (const [k, n] of names) count.set(k, { name: count.get(k)?.name ?? n, docs: (count.get(k)?.docs ?? 0) + 1 });
+  }
+  return [...count.values()].sort((a, b) => b.docs - a.docs || a.name.localeCompare(b.name)).slice(0, 15);
+}
+
+const INSTITUTION_DOCS = 60;
+const BATCH = 25;
+/** Institutions of the group from OpenAlex, by the DOI of the papers; any failure (offline, unknown work) gives an empty list, never an error. */
+async function fetchInstitutions(s: MainServices, docs: readonly DocumentRecord[]): Promise<Array<{ name: string; docs: number }>> {
+  const dois = [...new Set(docs.map((d) => (d.doi ? pathDoi(d.doi) : null)).filter((x): x is string => !!x))].slice(0, INSTITUTION_DOCS);
+  if (dois.length === 0) return [];
+  try {
+    const { net } = await online(s);
+    const works: unknown[] = [];
+    for (let i = 0; i < dois.length; i += BATCH) {
+      const filter = encodeURIComponent(`doi:${dois.slice(i, i + BATCH).map((d) => `https://doi.org/${encodePath(d)}`).join('|')}`);
+      const r = asObj(await net.json(`https://api.openalex.org/works?filter=${filter}&per-page=${BATCH}&select=id,authorships`, undefined, 4 * 1024 * 1024));
+      if (Array.isArray(r['results'])) works.push(...r['results']);
+    }
+    return institutionCounts(works);
+  } catch {
+    return [];
+  }
+}
+
 export interface GroupData {
   authors: Array<{ name: string; docs: number }>;
   pairs: Array<{ a: string; b: string; docs: number }>;
   tags: Array<{ label: string; docs: number }>;
+  /** From OpenAlex; empty when offline or unknown (the section is then left out). */
+  institutions?: Array<{ name: string; docs: number }>;
   incomplete: string[];
 }
 
@@ -79,8 +121,8 @@ export function groupData(docs: readonly DocumentRecord[], tagLabel: (id: string
 export function overviewMarkdown(p: { docs: readonly DocumentRecord[]; data: GroupData; written: { overview: string; themes: Array<{ name: string; summary: string; keys: string[] }> } | null; keyDoc: ReadonlyMap<string, DocumentRecord>; at: string; lang: 'it' | 'en' }): string {
   const it = p.lang === 'it';
   const L = it
-    ? { title: 'Panoramica dei gruppi di ricerca', themes: 'Temi', authors: 'Autori', co: 'Coautori ricorrenti', tags: 'Argomenti (tag)', works: 'Lavori principali', none: 'Sintesi non scritta: Claude non è stato usato o non è disponibile.', inc: 'Dati incompleti (solo il nome nella libreria)', papers: 'lavori', updated: 'Aggiornata il' }
-    : { title: 'Research group overview', themes: 'Themes', authors: 'Authors', co: 'Recurring co-authors', tags: 'Topics (tags)', works: 'Main works', none: 'Synthesis not written: Claude was not used or is not available.', inc: 'Incomplete data (only the name in the library)', papers: 'papers', updated: 'Updated' };
+    ? { title: 'Panoramica dei gruppi di ricerca', themes: 'Temi', authors: 'Autori', co: 'Coautori ricorrenti', tags: 'Argomenti (tag)', works: 'Lavori principali', none: 'Sintesi non scritta: Claude non è stato usato o non è disponibile.', inst: 'Istituzioni (OpenAlex)', inc: 'Dati incompleti (solo il nome nella libreria)', papers: 'lavori', updated: 'Aggiornata il' }
+    : { title: 'Research group overview', themes: 'Themes', authors: 'Authors', co: 'Recurring co-authors', tags: 'Topics (tags)', works: 'Main works', none: 'Synthesis not written: Claude was not used or is not available.', inst: 'Institutions (OpenAlex)', inc: 'Incomplete data (only the name in the library)', papers: 'papers', updated: 'Updated' };
   const link = (d: DocumentRecord) => `[${esc(d.title ?? d.path.split('/').pop() ?? d.id)}](lab://doc/${d.id})${d.year ? ` (${d.year})` : ''}`;
   const out: string[] = [`# ${L.title}`, `${L.updated} ${p.at.slice(0, 10)} · ${p.docs.length} ${L.papers}`, ''];
   out.push(`## ${L.themes}${p.written ? ' ✦' : ''}`);
@@ -89,6 +131,7 @@ export function overviewMarkdown(p: { docs: readonly DocumentRecord[]; data: Gro
     for (const t of p.written.themes) out.push(`- **${esc(t.name)}**: ${esc(t.summary)} ${t.keys.map((k) => p.keyDoc.get(k)).filter((d): d is DocumentRecord => !!d).map(link).join('; ')}`);
   } else out.push(L.none);
   out.push('', `## ${L.authors}`, ...p.data.authors.slice(0, 40).map((a) => `- ${esc(a.name)} (${a.docs})`));
+  if (p.data.institutions?.length) out.push('', `## ${L.inst}`, ...p.data.institutions.map((x) => `- ${esc(x.name)} (${x.docs})`));
   if (p.data.pairs.length) out.push('', `## ${L.co}`, ...p.data.pairs.map((x) => `- ${esc(x.a)} + ${esc(x.b)} (${x.docs})`));
   if (p.data.tags.length) out.push('', `## ${L.tags}`, ...p.data.tags.map((x) => `- ${esc(x.label)} (${x.docs})`));
   out.push('', `## ${L.works}`, ...[...p.docs].sort((a, b) => (b.year ?? 0) - (a.year ?? 0)).slice(0, 30).map((d) => `- ${link(d)}${d.authors.length ? ` — ${esc(d.authors.slice(0, 3).join(', '))}${d.authors.length > 3 ? ' et al.' : ''}` : ''}`));
@@ -185,7 +228,7 @@ export async function runGroups(s: MainServices, req: { token: string; docIds: s
     }
   }
   const at = new Date().toISOString();
-  const data = groupData(p.docs, p.tagLabel);
+  const data = { ...groupData(p.docs, p.tagLabel), institutions: await fetchInstitutions(s, p.docs) };
   const synthesis = written && (written.overview !== '' || written.themes.length > 0) ? 'written' : 'not-written';
   const body = overviewMarkdown({ docs: p.docs, data, written: synthesis === 'written' ? written : null, keyDoc: p.keyDoc, at, lang: cfg.language });
   const id = groupId(req.docIds);

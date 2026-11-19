@@ -85,9 +85,9 @@ export const bibChannels = defineChannels('bib', {
     request: z.object({ selection: exportSelectionSchema, format: z.enum(['bibtex', 'ris', 'csl']), destination: z.string().min(1).max(1024), fileName: z.string().max(120).optional() }),
     response: reply<{ count: number; file: string }>(),
   },
-  /** A text file (SVG or Markdown of the PRISMA diagram) to a new file in a folder chosen with `dialog:chooseFolder`; an existing file is never overwritten (the name gets a number). */
+  /** A text file (SVG or Markdown of the PRISMA diagram, or `pdf`: the Markdown of a report laid out as a plain PDF) to a new file in a folder chosen with `dialog:chooseFolder`; an existing file is never overwritten (the name gets a number). */
   saveText: {
-    request: z.object({ destination: z.string().min(1).max(1024), fileName: z.string().max(100), ext: z.enum(['svg', 'md']), text: z.string().max(400_000) }),
+    request: z.object({ destination: z.string().min(1).max(1024), fileName: z.string().max(100), ext: z.enum(['svg', 'md', 'pdf']), text: z.string().max(400_000) }),
     response: reply<{ file: string }>(),
   },
   /** The PRISMA counts of a project: the app's own (from its "extend" searches) plus what the user added for steps done outside. */

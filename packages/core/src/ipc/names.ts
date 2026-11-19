@@ -189,6 +189,8 @@ export const CHANNEL_NAMES: readonly string[] = [
   'project:citePreview',
   'project:citeRun',
   'project:consent',
+  'project:evidencePreview',
+  'project:evidenceRun',
   'project:removeClaim',
   'project:reportGet',
   'project:reportPreview',

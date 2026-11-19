@@ -18,6 +18,7 @@ import { rl } from '../../lib/rl';
 import { RlError } from '../../lib/rl-error';
 import { useApp } from '../../state/app-context';
 import { WorkRow } from '../citations/WorkRow';
+import { REASONS } from '../projects/prismaModel';
 import { safeText } from '../library/safeText';
 import { bridgePath, strengthDots } from '../network/BridgePath';
 import { setMapBridge } from '../network/bridgeIntent';
@@ -151,7 +152,33 @@ function SummaryBar({ run, onRun }: { run: DiscoverRun; onRun(r: DiscoverRun): v
   );
 }
 
-function Candidate({ run, c, onMark }: { run: DiscoverRun; c: DiscoverCandidate; onMark(key: string, state: DiscoverCandidate['state']): void }) {
+/** The short list of reasons (and a free one) asked when a candidate of a project's search is rejected. */
+export function RejectPicker({ onPick, onCancel }: { onPick(reason: string): void; onCancel(): void }) {
+  const { t } = useTranslation();
+  const [code, setCode] = useState<string>(REASONS[0]);
+  const [text, setText] = useState('');
+  const other = code === 'other';
+  return (
+    <span data-testid="run-reject">
+      <select value={code} onChange={(e) => setCode(e.target.value)} aria-label={t('discover.reject.title')} data-testid="run-reject-reason">
+        {[...REASONS, 'other'].map((r) => (
+          <option key={r} value={r}>
+            {t(`discover.reject.${r}`)}
+          </option>
+        ))}
+      </select>
+      {other && <input type="text" maxLength={200} value={text} placeholder={t('discover.reject.otherPlaceholder')} onChange={(e) => setText(e.target.value)} data-testid="run-reject-text" />}{' '}
+      <button type="button" className="link" onClick={() => onPick(other ? text.trim() || 'other' : code)} data-testid="run-reject-confirm">
+        {t('discover.reject.confirm')}
+      </button>{' '}
+      <button type="button" className="link" onClick={onCancel} data-testid="run-reject-cancel">
+        {t('common.cancel')}
+      </button>
+    </span>
+  );
+}
+
+function Candidate({ run, c, onMark }: { run: DiscoverRun; c: DiscoverCandidate; onMark(key: string, state: DiscoverCandidate['state'], reason?: string): void }) {
   const { t } = useTranslation();
   const { reportError, info } = useNotify();
   const { invalidateAll } = useLibraryEvents();
@@ -172,6 +199,9 @@ function Candidate({ run, c, onMark }: { run: DiscoverRun; c: DiscoverCandidate;
     }
   };
   const title = safeText(c.title ?? '');
+  // A rejection in a project's "extend" search carries its reason, for the PRISMA diagram (D-439).
+  const needsReason = run.kind === 'extend' && !!run.projectId;
+  const [rejecting, setRejecting] = useState(false);
   const [ea, eb] = [run.sides[0]?.[0], run.sides[1]?.[0]];
   // The path the Map draws (A, the bridge outside the library, B), also as a line of text.
   const path = bridge && ea && eb ? bridgePath(ea, { key: c.key, title: c.title }, eb) : null;
@@ -224,9 +254,13 @@ function Candidate({ run, c, onMark }: { run: DiscoverRun; c: DiscoverCandidate;
           <button type="button" className="link" disabled={!idKind} title={idKind ? undefined : t('discover.searches.noId')} onClick={() => void importIt()} aria-label={`${t('discover.searches.import')}: ${title}`} data-testid="run-import">
             {t('discover.searches.import')}
           </button>
-          <button type="button" className="link" onClick={() => onMark(c.key, 'dismissed')} aria-label={`${t('discover.dismiss')}: ${title}`} data-testid="run-dismiss">
-            {t('discover.dismiss')}
-          </button>
+          {rejecting ? (
+            <RejectPicker onPick={(reason) => onMark(c.key, 'dismissed', reason)} onCancel={() => setRejecting(false)} />
+          ) : (
+            <button type="button" className="link" onClick={() => (needsReason ? setRejecting(true) : onMark(c.key, 'dismissed'))} aria-label={`${t('discover.dismiss')}: ${title}`} data-testid="run-dismiss">
+              {t('discover.dismiss')}
+            </button>
+          )}
         </>
       )}
     </WorkRow>
@@ -239,10 +273,10 @@ function RunBody({ run, onRun }: { run: DiscoverRun; onRun(r: DiscoverRun): void
   const { openReader } = useReader();
   const [weak, setWeak] = useState(false);
   const bridge = run.kind === 'bridge';
-  const mark = async (key: string, state: DiscoverCandidate['state']) => {
+  const mark = async (key: string, state: DiscoverCandidate['state'], reason?: string) => {
     onRun({ ...run, items: run.items.map((c) => (c.key === key ? { ...c, state } : c)) });
     // Transient answers (offline, missing identifier) were never saved: nothing to write.
-    if (run.outcome === 'ok' || run.outcome === 'no-bridge') await rl.invoke('discover:mark', { id: run.id, key, state }).catch(() => undefined);
+    if (run.outcome === 'ok' || run.outcome === 'no-bridge') await rl.invoke('discover:mark', { id: run.id, key, state, ...(reason ? { reason } : {}) }).catch(() => undefined);
   };
   const shown = run.items.filter((c) => c.state !== 'dismissed' && (!bridge || weak || !c.weak));
   return (
@@ -299,7 +333,7 @@ function RunBody({ run, onRun }: { run: DiscoverRun; onRun(r: DiscoverRun): void
       {shown.length > 0 && (
         <ul className="work-list" aria-label={t('discover.searches.list')}>
           {shown.map((c) => (
-            <Candidate key={c.key} run={run} c={c} onMark={(k, s) => void mark(k, s)} />
+            <Candidate key={c.key} run={run} c={c} onMark={(k, s, r) => void mark(k, s, r)} />
           ))}
         </ul>
       )}

@@ -159,7 +159,9 @@
       "ready": "Bozza ✦ del {{date}}: puoi modificarla",
       "copy": "Copia il Markdown",
       "copied": "Resoconto copiato.",
-      "list": "Resoconti"
+      "list": "Resoconti",
+      "pdf": "Salva come PDF…",
+      "exported": "PDF salvato: {{file}}"
     },
     "cite": {
       "menu": "✦ Suggerisci citazioni…",
@@ -186,6 +188,17 @@
       "newClaim": "Nuova affermazione",
       "stance": "La prova",
       "saved": "Prova salvata nello schema del progetto."
+    },
+    "model": "Modello",
+    "findEvidence": {
+      "button": "✦ Cerca prove",
+      "title": "Cerca prove per l'affermazione",
+      "what": "Si inviano l'affermazione e {{count}} passaggi trovati nella tua libreria (mai i PDF interi).",
+      "none": "Nessun passaggio sostiene o contraddice questa affermazione.",
+      "noCandidates": "Nessun passaggio nella libreria da confrontare con questa affermazione.",
+      "accept": "Accetta",
+      "accepted": "Prova aggiunta all'affermazione.",
+      "proposal": "Proposta"
     }
   },
   "prisma": {

@@ -46,6 +46,13 @@ export const reportRequestSchema = z.object({
 
 const projectId = z.object({ projectId: itemIdSchema });
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const evidenceItemSchema = z.object({
+  docId: documentIdSchema,
+  title: z.string(),
+  page: z.number().int().positive(),
+  stance: z.enum(['supports', 'contradicts']),
+  excerpt: z.string().max(OUTLINE_LIMITS.excerpt),
+});
 const candidateSchema = z.object({
   docId: documentIdSchema,
   title: z.string(),
@@ -91,6 +98,10 @@ export const projectSchemaChannels = defineChannels('project', {
   citePreview: { request: projectId.extend({ text: z.string().trim().min(1).max(OUTLINE_LIMITS.paragraph), model: z.string().min(1).max(100).optional() }), response: z.object({ text: z.string(), consent: z.boolean(), candidates: z.number().int().nonnegative(), ...sendCosts }) },
   /** Up to three candidates for one paragraph: local retrieval, then Claude reorders them (needs the project consent). */
   citeRun: { request: projectId.extend({ text: z.string().trim().min(1).max(OUTLINE_LIMITS.paragraph), model: z.string().min(1).max(100).optional(), confirmed: z.boolean().default(false) }), response: z.object({ items: z.array(candidateSchema).max(3) }) },
+  /** The exact text "Find evidence" would send for a claim (its text and the best local passages); nothing leaves. */
+  evidencePreview: { request: projectId.extend({ claimId: itemIdSchema, model: z.string().min(1).max(100).optional() }), response: z.object({ text: z.string(), candidates: z.number().int().nonnegative(), ...sendCosts }) },
+  /** Local search in the index, then Claude (Haiku) sorts the best passages into supports, contradicts or not relevant; each stays a proposal until the user accepts it. */
+  evidenceRun: { request: projectId.extend({ claimId: itemIdSchema, model: z.string().min(1).max(100).optional(), confirmed: z.boolean().default(false) }), response: z.object({ items: z.array(evidenceItemSchema).max(10) }) },
   /** An accepted suggestion: the paper becomes a source of the question in the outline. */
   assignCitation: { request: projectId.extend({ questionId: questionIdSchema, docId: documentIdSchema }), response: z.object({ outline: outlineSchema }) },
 });

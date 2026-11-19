@@ -5,7 +5,7 @@ import { AppError, type MAINTENANCE_TARGETS } from '@rl/core';
 
 type MaintenanceTarget = (typeof MAINTENANCE_TARGETS)[number];
 import type { MainServices } from '../ipc/handlers/services.js';
-import { backupRunning } from '../backup/service.js';
+import { backupRunning } from '../backup/registry.js';
 import { forgetGraphModel, graphBuilding } from '../graph/service.js';
 import { graphPaths } from '../graph/paths.js';
 import { localPaths } from '../library/library-runtime.js';

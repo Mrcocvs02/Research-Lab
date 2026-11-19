@@ -3337,3 +3337,301 @@ Totali stimati: renderer +45-55 KiB (tutto pigro), main lazy +40 KiB (≈ 418/43
 10. **"Trova un ponte" spostato** nel piede del dialogo: si trova ancora (tavolozza, Scopri, Mappa)?
 11. **Sincronizzazione** di `doc-links.json` e `manuscript.json` tra due computer: ricerche in parallelo, collegamenti tolti su uno e rimessi sull'altro.
 12. **Annulla e coerenza:** una ricerca = una voce di Cronologia; togliere un collegamento dalla Mappa aggiorna la scheda del documento e viceversa.
+
+## 19. Dopo 1.0: vocabolario dei tag, Mappa dei lavori, schede della libreria (D-493 … D-501)
+
+Origine: verdetto dell'utente sulla 1.0 ("la rete è un groviglio inutilizzabile; deve aiutare a muoversi tra i paper") e diagnosi su dati reali (`docs/design/AUDIT.md`, "Diagnosi rete e libreria (post 1.0)": 220 tag, 59 % singoletti, ~16 concetti in 2-5 grafie, 66 tag gemelli, profondità 1, 4 stili di nome; rete dei tag 84 nodi e 364 archi, 11 incroci per arco). Priorità dell'utente: **prima la qualità dei tag** (A), che toglie alla radice il 90 % degli archi del gomitolo; poi la Mappa (B) e la libreria (C).
+
+Questa sezione **prevale** su §4.20-§4.22, §16.3, §17.4 (rete dei tag, modi di Collegamenti), §18.3.7 e D-489 (Raggruppa per), `docs/design/tag-families.md` e D-491 (famiglie da suggerimento di gruppo) dove li contraddice. Restano: regole dei menu (D-412), stati vuoti, testi it/en e accessibilità (§12), palette e formula dei colori (§18.3.4-§18.3.6), fisica a molle (§18.3.1) dove resta una simulazione. I testid sono fissati qui. Ogni compito rimanda solo a `CLAUDE.md` e alla sua sottosezione.
+
+### 19.1 Il vocabolario controllato (A, D-493 … D-497)
+
+#### 19.1.1 Modello: tag canonico, varianti, famiglie
+
+- **Tag canonico** = nodo attivo della tassonomia; `label` è la sola forma mostrata ovunque. **Varianti** = `aliases` (grafie, plurali, sigle, forme estese, nomi uniti). Un nome che entra dall'utente, da un import o dall'AI si risolve **sempre** al canonico: `normalizeName` più la chiave di forma (§19.1.3) su `label` e `aliases`. Un alias non è mai un tag a sé.
+- **Famiglia** = nodo **radice** con il nuovo campo `family`:
+  - `'many'`: un lavoro può avere più valori (tipico: Topic);
+  - `'one'`: al più **un** valore per lavoro (tipici: Metodo, Sistema, Tecnica, Tipo di paper; i nomi sono dell'utente, l'app non ne impone);
+  - `'keywords'`: la famiglia **Parole chiave**, al più una per libreria, piatta (profondità 1); serve alla ricerca e ai filtri, **mai** alla Mappa, alle schede, alla rete o all'AI.
+- **Gerarchia obbligatoria nelle famiglie:** radice (famiglia) → livello 1 **valore** (es. area) → livello 2 **sotto-area** → livello 3 **dettaglio**. Profondità massima 3 sotto la radice (`move` oltre → `INVALID_REQUEST`, `details.reason = 'depth'`). Ogni tag sta in **una sola** famiglia; più genitori sono permessi solo dentro la stessa famiglia (DAG, peso diviso come §18.3.4) e la salute li segnala.
+- **Da sistemare**: gruppo virtuale dell'albero con i tag fuori da ogni famiglia (radici senza `family` e loro discendenti). Non sono famiglie della Mappa né valori del blocco dell'AI.
+- `family` vale solo su una radice: un `move` che dà genitori a una radice-famiglia la toglie (con avviso nell'interfaccia). Le famiglie derivate `level:`/`prefix:` restano solo per "Gruppo" (`grp:`, D-488), che è `'many'`.
+- **Migrazione di D-491** (proposta del passo 4 del riordino, mai in silenzio): ogni famiglia `extra:<Nome>` diventa una radice `<Nome>` con i suoi membri come figli; `family` = `'one'` se almeno l'80 % dei lavori con un valore ne ha uno solo, altrimenti `'many'` con la proposta "rendila a un valore".
+- **I metadati non sono tag:** rivista, stato di pubblicazione, anno, tipo di documento stanno nei campi del documento. La salute segnala i tag che coincidono con una rivista o un suo alias (`taxonomy.venues`) o con parole di stato (`preprint`, `arxiv`, `published`, `in press`, `accepted` e corrispondenti it) e propone "Sposta nel campo".
+- **Convenzione dei nomi (una sola):** iniziale maiuscola, il resto come scritto; spazi, mai `_`; singolare; sigle in maiuscolo; quando esistono sigla e forma estesa il canonico è "Forma estesa (SIGLA)" e la sigla resta alias; lingua com'è scritta (nessuna traduzione); al più 60 caratteri. Il selettore applica da sé solo `_` → spazio e l'iniziale maiuscola, mostrando il risultato prima di creare; il resto lo propone il passo 5 del riordino. Il vecchio nome resta sempre alias.
+
+**Contratti** (`packages/core/src/model/taxonomy.ts`, `channels/taxonomy.ts`, `model/document.ts`):
+- nodo: `family?: 'one' | 'many' | 'keywords'`;
+- file: `distinct?: Array<{ a: id, b: id }>` (≤ 5000; coppie dette "non sono uguali", non ordinate, non tornano tra le proposte);
+- nuove operazioni di `taxonomy:apply`: `setFamily {id, family | null}` (solo radici; una seconda `'keywords'` → `INVALID_REQUEST`), `markDistinct {a, b}`, `unmarkDistinct {a, b}`; `merge` invariata più la regola di provenienza (§19.1.2);
+- documento: `tagOrigin?: Record<id, 'ai' | 'import'>` (≤ `L.tags` chiavi; assente = **a mano**).
+
+#### 19.1.2 Provenienza (mano / AI / importato)
+
+- Si scrive nei punti d'ingresso: proposta dell'AI accettata → `'ai'`; import (BibTeX, Zotero, RDF, vecchio indice) → `'import'`; tag aggiunto dall'utente → chiave tolta (mano); "Conferma" su un tag dell'AI o importato (voce del chip) → chiave tolta. Un `merge` dà a `into` la provenienza più forte delle due (mano > ai > import).
+- **Migrazione una volta** (chunk `tag-review`, voce di registro `system`): tag presenti in `ai.suggestedTags.value` → `'ai'`; tag di nodi `origin: 'import'` su documenti con `legacy` → `'import'`. Su librerie nuove non fa nulla.
+- **Si vede:** sul chip un segno piccolo dopo il nome, `✦` (AI) o `⇣` (importato), niente per la mano, con `title` "Proposto dall'AI e accettato il …" / "Importato da …" (`tag-origin`, `data-origin`). Nell'editor del nodo: "Su 12 lavori: 8 a mano · 3 AI · 1 importato". Filtro nel `⋯` del facet dei tag: "Solo tag da confermare (AI o importati)".
+- `origin` del **nodo** (chi lo ha creato) resta com'è.
+
+#### 19.1.3 Quasi-doppioni: il rilevatore (locale, `packages/data/src/organize/tag-review.ts`)
+
+Funzione pura: nodi non `deprecated` (esclusi `grp:`, e Parole chiave per le fusioni; incluse per i gemelli), tag diretti dei documenti, `distinct`. Uscita: proposte `{ id, kind, tags[], keep, label?, confidence: 'sure' | 'likely' | 'maybe', reason, evidence: { papers: Record<id, n>, shared, jaccard } }`.
+
+**Chiavi** (per ogni label e alias):
+- `k_form` = `normalizeName` senza ciò che non è lettera o cifra (`2-x` = `2x`, `parola_parola` = `parolaparola`);
+- `k_stem` = gettoni con radice leggera: inglese (`ies` → `y`; `es` dopo s, x, z, ch, sh; `s` finale non dopo s, u, i), lingue romanze (gettoni di almeno 5 lettere: via l'ultima vocale `a e i o`, così `concetto` = `concetti`); gettoni riuniti;
+- `k_acro` = iniziali dei gettoni significativi (parole vuote brevi it/en/fr/es/de: of, the, and, for, in, on, a, an, to, with, di, del, della, dei, degli, delle, e, per, con, su, da, la, il, lo, le, gli, de, des, du, et, y, el, los, las, und, der, die, das, von, für) per label di almeno 2 gettoni; una **sigla** è un gettone solo di 2-8 lettere o cifre, tutto maiuscolo nel label oppure tra parentesi in un altro label; "Nome (SIGLA)" dà entrambe le chiavi.
+
+**Regole** (le cifre devono coincidere sempre: `2x` ≠ `3x`):
+
+| Regola | Tipo | Condizione | Fiducia |
+| --- | --- | --- | --- |
+| R1 forma | fusione | `k_form` uguale (maiuscole, separatori, accenti) | sicura |
+| R2 plurale | fusione | `k_stem` uguale, stesso numero di gettoni, differenza solo nella desinenza | sicura (altrimenti probabile) |
+| R3 sigla nel nome | fusione | "X (S)" e un altro label uguale a S o a X | sicura |
+| R4 sigla ↔ estesa | fusione | `k_acro(X) = S` (senza maiuscole), S ≥ 2 caratteri | probabile; sicura se condividono ≥ 1 lavoro o uno è alias dell'altro |
+| R5 grafia | fusione | Damerau-Levenshtein ≤ 1 su `k_form` con lunghezza ≥ 6 (≤ 2 da 12), o coppie regionali (`our/or`, `ise/ize`, `isation/ization`, `yse/yze`, `tre/ter`, `ll/l`) | forse; probabile se Jaccard dei lavori ≥ 0,5 |
+| R6 alias in collisione | fusione | il label di A è alias di B | sicura |
+| R7 gemelli | gruppo | stessi lavori esatti, almeno 2 | probabile |
+| R8 inclusione | genitore | gettoni di A ⊂ gettoni di B (dopo la radice), o lavori(B) ⊆ lavori(A) con \|B\| ≥ 2 e \|A\| > \|B\| | probabile se valgono entrambe, forse se una |
+| R9 co-occorrenza | sinonimo? | P(A\|B) ≥ 0,8 e P(B\|A) ≥ 0,8 con ≥ 3 lavori in comune | forse (decide l'utente, o la conferma di Claude) |
+
+- **Scala:** nessun confronto di tutte le coppie: secchi per `k_form`, `k_stem`, `k_acro`, prime 3 lettere di `k_form` con lunghezza ±2 (R5), impronta dell'insieme di lavori (R7), indice tag → lavori per R8/R9 solo sui tag con ≥ 2 lavori. Tempo: ≤ 200 ms per 220 tag, ≤ 1,5 s per 5000 (misura sul corpus sintetico), nel chunk pigro del main, senza worker.
+- **Concetti:** le proposte di fusione sicure e probabili si uniscono (union-find) in un **concetto** = una riga con tutte le varianti. Scelta del canonico: "Estesa (SIGLA)" se ci sono sigla ed estesa (costruito se manca); altrimenti la variante con più lavori; a pari merito il singolare, poi più gettoni (estesa sopra sigla), poi senza `_`, poi id. Il label finale segue la convenzione dei nomi.
+- **Gemelli (R7):** se i membri sono anche legati da R1-R6 → fusione; altrimenti azione predefinita "Sposta in Parole chiave" quando il gruppo ha ≥ 4 tag o nessun legame di nome (blocchi di parole chiave copiati insieme), altrimenti "Unisci in uno". L'utente sceglie per gruppo.
+- Esclusi sempre: coppie in `distinct`, nodi `deprecated`, tag derivati `grp:`.
+
+**✦ Conferma con Claude (facoltativa):** "✦ Chiedi conferma (N coppie incerte)" (`tag-review-ai`) per le righe forse e probabili. Si inviano **solo** i nomi dei tag con il percorso della famiglia e il numero di lavori, mai testi o titoli; solo tag usati su almeno un lavoro di una cartella abilitata (nessuna abilitata → pulsante spento con il motivo). Percorso di consenso esistente (D-416): anteprima del testo esatto, modello (Haiku predefinito), costo e tetto giornaliero, invio registrato (`ai-send`, `purpose: 'tag-review'`, `docIds: []`). Risposta per coppia: `same | broader | narrower | related | different` + una riga. Mai applicata da sola: `same` → riga probabile con il segno "Claude: uguali"; `broader/narrower` → proposta di genitore; `different` → la riga scende fra le "forse", ripiegata. Risposte in cache per coppia di label (`tag-review.json`).
+
+**Lista di revisione** (scheda **Da rivedere** della gestione dei tag, `tag-review-list`):
+
+```
+Da rivedere (23)   [✓ Accetta le sicure (9)]   Mostra: (Doppioni · Gemelli · Genitori · Nomi · Metadati)   [✦ Chiedi conferma (6)]
+● Sicuro · forma      2x · 2-x                              → tieni [2x ▾]                    3 lavori   (Unisci) (Non sono uguali)
+● Sicuro · sigla      ABC · ABCs · alfa_beta_gamma          → «Alfa beta gamma (ABC)» ✎       12 lavori  (Unisci) (Non sono uguali)
+◐ Probabile · grafia  colour x · color x                    → tieni [Color x ▾]               4 lavori   (Unisci) (Non sono uguali)
+◐ Gemelli (11 tag)    a · b · c · … sugli stessi 3 lavori   → (Sposta in Parole chiave ▾)                (Applica) (Lascia)
+○ Genitore            X metodi sotto X                      4 di 4 lavori di «X metodi» hanno X          (Metti sotto) (No)
+```
+
+- Riga = `tag-review-row` (`data-kind` `merge|twins|parent|name|metadata`, `data-confidence`); selettore del canonico `tag-review-keep` (✎ per riscriverlo); `tag-review-accept`, `tag-review-reject`; in testa `tag-review-accept-sure`. Al passaggio: lavori per variante, lavori in comune, "Mostra i lavori" (filtra la Libreria).
+- **Un clic = una modifica annullabile:** "Unisci" è **un** `taxonomy:apply` (merge delle varianti nel canonico, `rename`, `setAliases`) = una voce di Cronologia; avviso "Uniti 3 tag in «…» · Annulla" (8 s). "Accetta le sicure" = un solo gruppo (spezzato in più chiamate oltre 200 operazioni, stesso `changeId`). "Non sono uguali" = `markDistinct`, anch'esso annullabile.
+- Tastiera: ↑/↓ fra le righe, Invio = azione principale, N = "Non sono uguali", Ctrl+Z annulla.
+- Ricalcolo completo dopo ogni modifica (economico); la riga accettata sparisce in 150 ms (subito con movimento ridotto).
+
+#### 19.1.4 Salute del vocabolario (`packages/data/src/organize/tag-health.ts`)
+
+Striscia in testa alla gestione dei tag (`tag-health`), un chip per controllo con conteggio (`tag-health-chip-<kind>`); un clic apre la lista o l'albero filtrati. Il chip è neutro sotto la soglia.
+
+| Controllo (`kind`) | Definizione | Soglia "da guardare" |
+| --- | --- | --- |
+| `singletons` | tag su un solo lavoro, Parole chiave escluse | > 25 % dei tag delle famiglie |
+| `dupes` | concetti con proposte sicure o probabili | > 0 |
+| `twins` | gruppi di tag con gli stessi lavori (≥ 2), Parole chiave escluse | > 0 |
+| `generic` | tag su più del 50 % dei lavori (librerie ≥ 10 lavori) | > 0 (proposta: farne una famiglia o toglierlo, non distingue) |
+| `orphans` | tag in "Da sistemare" | > 0 |
+| `multiparent` | tag con più genitori | > 0 |
+| `onevalue` | lavori con 2+ valori in una famiglia `'one'` | > 0 |
+| `styles` | stili di nome diversi (`parola_parola`, minuscolo con spazi, iniziale maiuscola, "Nome (SIGLA)", altro) | > 1 |
+| `metadata` | tag che sono riviste o stati di pubblicazione | > 0 |
+| `unused` | tag su 0 lavori | > 0 (proposta: elimina) |
+| `depth` | profondità massima della famiglia `'many'` più grande | < 2 con più di 12 valori |
+
+Accanto: **Riordina…** (`tag-cleanup-open`). Nella barra laterale della Libreria la voce "Gestisci tag" ha un punto quando un import porta controlli nuovi (una volta per insieme di problemi, mai insistente).
+
+#### 19.1.5 Riordino guidato (una volta, veloce e reversibile)
+
+Pagina a tutta larghezza dentro la gestione dei tag (`tag-cleanup`), passi in un indicatore in alto (`tag-cleanup-step-<n>`). Ogni passo mostra "prima → dopo" (tag, singoletti, concetti doppi, tag senza famiglia, profondità), le sue proposte con le **sicure già spuntate** e tre pulsanti: **Applica e continua** (`tag-cleanup-apply`, un gruppo di modifiche = una voce di Cronologia), **Salta** (`tag-cleanup-skip`), **Annulla questo passo** (`tag-cleanup-undo-step`, dopo l'applicazione). Lo stato (passi fatti e loro `changeId`) sta in `<dataDir>/tag-review.json`: si può smettere e riprendere.
+
+1. **Doppioni sicuri** (R1, R2, R3, R6): tutti spuntati.
+2. **Doppioni probabili** (R4, R5, R9): solo i probabili spuntati; ✦ conferma facoltativa.
+3. **Gemelli**: per gruppo Unisci in uno | Sposta in Parole chiave | Lascia (predefinito come §19.1.3).
+4. **Famiglie e gerarchia** (tavola a due colonne: a sinistra "Da sistemare (N)" ordinati per lavori, a destra gli alberi delle famiglie; trascinamento o selezione + "Metti in…"; le proposte compaiono già piazzate come righe fantasma da confermare):
+   - famiglie esistenti (D-491) → radici, tipo proposto come §19.1.1;
+   - suggerimenti di gruppo importati (regola generale: è la convenzione del vecchio indice): `macro` → valori di livello 1 di **Topic** (creata se manca, `'many'`); `micro` → sotto-aree sotto il `macro` con P(macro | micro) massima se ≥ 0,5, altrimenti direttamente sotto Topic e segnate; `extra` (parole chiave) → **Parole chiave**, salvo i tag con ≥ 3 lavori che R8 mette sotto un tag di famiglia (proposti come dettaglio);
+   - senza suggerimenti: tag con ≥ max(3, 10 % dei lavori) proposti come valori di Topic, gli altri in Parole chiave; l'utente sposta;
+   - più genitori → uno solo (predefinito: quello con più lavori in comune);
+   - famiglie `'one'` con lavori a 2+ valori → un valore per lavoro (predefinito: peso più alto, poi il più specifico) oppure "rendila a più valori";
+   - se la libreria ha tipi di documento, proposta (spenta di serie) di una famiglia `'one'` "Tipo di paper" dai valori del campo.
+5. **Nomi**: tabella vecchio → nuovo secondo la convenzione (spuntabile riga per riga; il vecchio resta alias); metadati → "Sposta nel campo" (scrive rivista o stato dove il campo è vuoto e toglie il tag; dove il campo ha un altro valore il tag resta e la riga lo dice).
+6. **Riepilogo** (`tag-cleanup-summary`): tabella prima/dopo; **Annulla tutto il riordino** (`tag-cleanup-undo-all`: annulla i gruppi del giro in ordine inverso; anche dalla Cronologia, dove il giro è una voce raggruppata "Riordino del vocabolario (N passi)"); "Vai alla Mappa".
+
+Tempi: proposte iniziali ≤ 1 s su 220 tag; applicare un passo ≤ 2 s (librerie di qualche centinaio di lavori); l'intero riordino della libreria dell'utente ≤ 10 minuti di lavoro umano con i predefiniti. Stima sulla libreria dell'audit: ~24 tag ridondanti uniti, 13 gruppi gemelli risolti, ~100-130 parole chiave in Parole chiave, ~30-45 tag in famiglie, Topic a 2-3 livelli con 4-8 valori di livello 1.
+
+#### 19.1.6 AI vincolata al vocabolario
+
+- **Blocco TAXONOMY** dei prompt (`packages/ai/src/suggest.ts`, `analysis/prompts.ts`, `analysis/candidates.ts`): solo nodi di famiglie `'one'`/`'many'` (né Parole chiave né Da sistemare), ognuno con il percorso "Famiglia › Valore › Sotto-area" e, per le famiglie `'one'`, la riga "at most one value of family F".
+- **Pulizia della risposta:** id fuori dal blocco scartati; in una famiglia `'one'` resta il valore di peso maggiore; `newTags` con `parentId` fuori da una famiglia (o in Parole chiave) scartati; ogni nuovo label passa dal rilevatore contro il vocabolario: R1/R2/R3/R6 → diventa la proposta del tag esistente ("nome simile a «X»"); R4/R5 → resta nuovo con il suggerimento "Simile a «X»".
+- **Nuovi tag come proposte separate**, mai mescolate ai chip: riquadro "Nuovi tag proposti" (`tag-new-proposal`) nell'hub Da rivedere e nella scheda del documento, con il posto suggerito "Topic › Area › **[nuovo]**" e le azioni **Crea qui** (`tag-new-create`), **Usa «X» invece** (`tag-new-use-existing`, quando c'è un simile), **Rifiuta**. Creato → nodo `origin: 'ai'`, assegnazione `tagOrigin: 'ai'`.
+- Le parole chiave dell'AI restano in `ai.keywords` (campo a parte), mai tag.
+
+#### 19.1.7 Tag importati (Zotero, BibTeX, RDF, vecchio indice)
+
+- Funzione condivisa `resolveIncomingLabels(labels, taxonomy)` in `packages/data/src/organize/tag-resolve.ts` → `{ matched: label → id, aliasAdds: [{ id, alias }], fresh: label[] }`, solo con le regole **sicure** (R1, R2 sicura, R3, R6). Un label riconosciuto va al canonico e, se è una forma nuova, diventa suo alias.
+- I label nuovi diventano nodi `origin: 'import'` in **Da sistemare**, con label secondo la convenzione dei nomi e l'originale come alias; assegnazioni `tagOrigin: 'import'`.
+- Dove la fonte distingue i tag automatici (Zotero RDF `z:AutomaticTag`, JSON `type: 1`), nel dialogo d'import: "Tag automatici: come parole chiave (predefinito) | ignora". Le collezioni importate come tag stanno sotto una famiglia "Collezioni" (`'many'`, creata se serve) con la loro gerarchia (oltre 3 livelli: appiattite al terzo).
+- Resoconto dell'import (`import-tags-summary`): "34 tag: 20 già nel vocabolario · 6 uniti a un tag simile · 8 nuovi da sistemare · **Rivedi**" (apre Da rivedere filtrata sui nuovi).
+- Il vecchio indice usa la stessa funzione al posto della corrispondenza esatta e scrive `group` come prima (serve al passo 4).
+
+#### 19.1.8 Dove vive nell'interfaccia
+
+- **Gestione dei tag** (`taxonomy-manager`): striscia della salute e Riordina…; schede **Albero** (`tax-tab-tree`) | **Da rivedere (N)** (`tax-tab-review`). Nell'albero le famiglie stanno in cima, ciascuna con il distintivo del tipo "un valore" / "più valori" (`tax-family-kind`), poi **Da sistemare (N)** (`tax-unsorted`), poi **Parole chiave (N)** ripiegata (`tax-keywords`). "Nuova famiglia" (`tax-family-new`) sostituisce la sezione `TaxonomyFamilies` (che si toglie). Editor del nodo: percorso "Famiglia › …" in sola lettura, varianti (alias), provenienza, "Simili" (le proposte che lo toccano, con Unisci).
+- **Scheda del documento**: tag in righe per famiglia (`doc-tags-family`, `data-family`): "Topic: Area › Sotto-area · Metodo: X · Tipo di paper: Y"; per `'one'` un solo chip che si sostituisce; Parole chiave ripiegate "+12 parole chiave"; segni di provenienza. Il selettore risolve alias e varianti ("abcs → Alfa beta gamma (ABC)") e, prima di creare un tag nuovo, mostra "Simile a: «X» · Usa X" (`tag-picker-similar`) e chiede dove metterlo (predefinito: la famiglia dell'ultimo tag scelto, altrimenti Da sistemare).
+- **Libreria**: facet dei tag diviso per famiglia (Topic ad albero, una lista per ogni famiglia `'one'`, Parole chiave ripiegata); sulla scheda al più 2 chip (il valore di livello 1 delle prime due famiglie in ordine).
+- **Selezione multipla**: §19.3.2.
+
+### 19.2 La Mappa dei lavori (B, D-498, D-499)
+
+#### 19.2.1 Viste e predefiniti
+
+Schede: **Mappa** (ex Panorama) | **Vicinato** (ex Collegamenti) | **Esplora** | **Sorprendimi**. In Mappa e Vicinato **ogni nodo è un lavoro**, sempre: niente nodi di tag, cartella, famiglia o argomento. Tag e cartelle diventano filtri ("Limita a: tag ▾ · cartella ▾") e chip del lavoro selezionato. "Rete di: Tag / Argomenti" esce da Collegamenti; resta solo la vista **Vocabolario** in Esplora (§19.2.7); la rete degli **Autori** passa anch'essa in Esplora, come vista avanzata.
+
+**Prima vista su una libreria come quella dell'utente** (25 lavori): scheda Mappa; Raggruppa per **Topic** se passa la prova di §19.2.2, altrimenti **Automatica** (4 blocchi: 10 · 8 · 4 · 3); titoli di tutti i 25 lavori visibili a 1280 e 1920; nessun arco finché non si seleziona un lavoro; selezionato, al più 5 archi; legenda nella colonna a lato (1920) o nella striscia sopra la tela (1280); niente minimappa. Se Topic non passa: pillola una volta "Topic non raggruppa ancora bene (34 % dei lavori in un valore chiaro) · Riordina i tag" (apre il riordino). Suggerimento del primo uso: "Clic: i collegamenti del lavoro · Doppio clic: il suo vicinato · Alt+←: indietro · ✕".
+
+#### 19.2.2 Raggruppa per: blocchi di lavori, nessun nodo di famiglia
+
+- Controllo **visibile** nella barra della Mappa (non più dentro Filtri): `Raggruppa per [Topic ▾]` (`map-group-by`); opzioni: le famiglie che passano la prova, **Automatica** (comunità, §18.3.7), **Nessuno** (disposizione libera del Panorama di oggi, con le etichette di §19.2.4). Ricordato in `rl.map.family`.
+- **Prova di una famiglia** (in `family-run`, nell'ambito): copertura (lavori con un valore / lavori) ≥ 0,6; chiarezza (lavori con quota del valore principale ≥ 0,6 / lavori con un valore) ≥ 0,7; da 2 a 12 valori di livello 1 (oltre 12 ammessa se i primi 12 coprono ≥ 80 %: il resto va in "Altro"). Le famiglie `'one'` sono chiare per costruzione; Parole chiave mai. Una famiglia che non passa resta nel menu, **spenta**, con il motivo (`map-group-reason`): "Solo il 34 % dei lavori ha un valore chiaro · Riordina i tag".
+- **Blocchi** (calcolo puro `packages/graph/src/blocks.ts`, nel main; il renderer disegna e anima):
+  1. Un blocco per valore di livello 1, ordinati per lavori; "Altro" (valori oltre il 12°) e **Senza valore** (bordo tratteggiato) per ultimi.
+  2. Ogni lavoro occupa una **cella** di 150 × 54 unità del mondo (punto + due righe di etichetta). Colonne del blocco c = max(1, round(√(0,36 · n))), righe ⌈n / c⌉: blocchi quasi quadrati.
+  3. **Impacchettamento a scaffali** dei blocchi, in ordine di grandezza, con larghezza obiettivo √(area totale · rapporto della tela); spazio fra blocchi 60; fascia del nome di 34 sopra ogni blocco. Il rapporto della tela arriva nella richiesta (`aspect`); si ricalcola se cambia di oltre il 15 % (300 ms dopo l'ultimo ridimensionamento), poi si reinquadra.
+  4. **Dentro il blocco**: ordine per sotto-area (livello 2, per numero di lavori), poi per la proiezione delle coordinate della mappa di oggi sull'asse principale del blocco (PCA 2D, segno deterministico); riempimento a serpentina per righe, così i lavori simili stanno vicini. Con ≥ 8 lavori e ≥ 2 sotto-aree di ≥ 2 lavori, ogni sotto-area inizia una riga nuova con un piccolo nome (fascia di 20, `--fs-small`, `--text-muted`).
+  5. Lavoro con più valori: nel blocco del valore principale; al più 2 puntini satellite (4 px) delle tinte degli altri; al passaggio i blocchi degli altri valori si accendono (bordo `--accent`).
+  6. Deterministico (pari merito per id); **nessuna sovrapposizione per costruzione**. Cambio di famiglia: i lavori volano dalla vecchia alla nuova cella in 300 ms (movimento ridotto: salto).
+- **Colore = blocco**: il punto prende la tinta del valore del suo blocco (§18.3.5; oltre 7 valori `--area-other`), così posizione e colore dicono la stessa cosa. Con Nessuno restano i colori per macro-area di §18.3.4.
+- **Nome del blocco** (`map-block-label`): nome del valore + "(12)", semibold, scalato con lo zoom fra 12 e 20 px, sempre visibile, tagliato con ellissi alla larghezza del blocco (intero nel cartellino); clic = seleziona il blocco (gli altri al 35 %), doppio clic = inquadra il blocco. Ogni blocco ha un elemento accessibile (`map-block`, `data-value`, `data-count`) nell'elenco accessibile (`L`).
+
+**Contratti** (`channels/graph.ts`): `graph:family` riceve `aspect` e restituisce, oltre a ciò che dà oggi, `eligible: boolean`, `reason?: { coverage, clarity, values }`, `blocks: [{ id, label, count, x, y, w, h, sub: [{ id, label, y }] }]` e per ogni lavoro `cell: [x, y]`. L'elenco senza `family` dà per ogni famiglia `eligible` e `reason`.
+
+#### 19.2.3 Archi: prove, soglia, al più k per nodo
+
+- **Tipi di prova:** citazione (in un verso o nell'altro), collegamento dell'utente (`linked`, §18.2), somiglianza. Punteggio e = 1 per citazione o collegamento, w per la somiglianza; più prove sulla stessa coppia: somma limitata a 1, con tutti i segni. A pari punteggio prima le esplicite.
+- **Soglia della libreria τ** (nel main, per modello e ambito, in cache): W = pesi dei 10 vicini più simili di ogni lavoro; Normale τ = clamp(P75(W); 0,15; 0,50), Rigorosa clamp(P90; 0,20; 0,60), Ampia clamp(P50; 0,10; 0,40); con meno di 8 lavori 0,25. **Nessun arco di somiglianza sotto τ**, mai. Si legge in Filtri › Collegamenti: "Somiglianza da 0,21 (75° percentile della libreria)" (`map-threshold`, Rigorosa | Normale | Ampia).
+- **k per nodo:** al lavoro selezionato o al passaggio, i suoi k = 5 archi più forti; in modalità Forti un arco si disegna solo se è fra i primi k = 2 di **entrambi** i capi (grado ≤ 2 garantito).
+- **Modalità** nella barra (`map-edges-mode`): **Del selezionato** (predefinita, `map-edges-selected`) | **Forti** (`map-edges-strong`) | **Nessuno** (`map-edges-none`); chip delle prove (`map-ev-citations`, `map-ev-links`, `map-ev-similar`), tutti accesi.
+- **Fasci fra blocchi** (Forti): gli archi fra due blocchi diversi diventano **un solo** arco aggregato fra i bordi dei blocchi, spessore 1-6 px dal numero di coppie, solo se ≥ 2 (`map-bundle`); clic: elenco "7 coppie tra A e B" con i titoli, ognuno apre il lavoro. Dentro un blocco: archi corti curvi.
+- Stile: citazione piena con freccia, collegamento in `--accent`, somiglianza sottile tratteggiata con opacità `edgeAlpha(w)`. Al passaggio su un arco: "cita · simile 0,42 · stesso Metodo (Y)".
+- **Contratto:** nuovo `graph:evidence { scope?, strictness }` → `{ tau, edges: [{ a, b, e, kinds: ('cites' | 'linked' | 'similar')[], w? }] }`, al più 5 per lavoro (≤ 5 · n), calcolato una volta per ambito e soglia; il renderer sceglie cosa disegnare.
+
+#### 19.2.4 Etichette: titoli leggibili e senza collisioni
+
+- Testo: riga 1 titolo breve tagliato a parola alla larghezza della cella sullo schermo (caratteri ≈ larghezza in px / 6,5, al più 40), riga 2 "Cognome anno" in `--text-muted`. Font 12-13 px, alone `--bg` di 3 px.
+- **Livelli:** quando la cella è larga almeno 110 px sullo schermo, tutte le etichette (con 25 lavori: sempre); sotto, solo le forzate (passaggio, selezionato, vicini del selezionato, capi del percorso) più i **nodi centrali** (primo 10 % per grado di prova nell'ambito, almeno uno per blocco), scelti con `pickLabels` (griglia anti-collisione, §4.20). Con Nessuno (disposizione libera) lo stesso, con tetto di 40 etichette in vista.
+- **Zero collisioni** fra etichette disegnate e fra etichette e nomi dei blocchi (i nomi entrano nella griglia come forzati).
+
+#### 19.2.5 Navigazione: vicinato, percorso, indietro
+
+- **Clic** su un lavoro: selezione, i suoi archi (k = 5), etichette dei vicini forzate, gli altri al 35 %; dettaglio nel pannello a lato (`net-detail`), che **prende spazio** e restringe la tela, mai sopra.
+- **Doppio clic, Invio o "Vicinato"** nel pannello: scheda Vicinato con quel lavoro al centro (`vic-focus`).
+- **Vicinato** (`GraphNet` in modo solo lavori): centro fissato; anello 1 = i suoi k = 8 vicini di prova più forti sopra τ ("Mostra di più" +8, al più 16, `vic-more`); anello 2 solo con **Allarga** (`vic-widen`: per ogni lavoro dell'anello 1 i suoi 3 più forti non già presenti; tetto 30 nodi). Disposizione: le molle di §18.3.1 più un vincolo radiale (raggio obiettivo h · 2,4 · REST per l'anello h, forza 0,08). Archi solo di prova, al più 4 per nodo (tutti quelli del centro). I tipi `tags`, `folder`, `children`, `documents` escono da `DEFAULT_KINDS` e dall'interfaccia. Al passaggio il perché (`vic-why`). Clic su un vicino = nuovo centro (volo di 300 ms).
+- **Percorso fra due lavori:** Maiusc+clic sul secondo lavoro, "Percorso fino a…" nel `⋯` del pannello (`path-start`), o due lavori selezionati nella Libreria. Nuovo `graph:path { a, b, strictness }`: Dijkstra sul grafo di prova sopra 0,75 · τ, costo 1 − e + 0,15 per passo, al più 6 passi. Si mostra nel Vicinato come catena da sinistra a destra (`path-chain`) con la prova di ogni passo. Nessun percorso: "Nessun percorso sopra la soglia · Prova Ampia · Trova un ponte (fuori libreria)" (il ponte di §17.4.17 resta).
+- **Indietro / Avanti** (`map-back`, `map-forward`): pila di 50 stati {scheda, famiglia, selezione, centro, percorso, inquadratura} comune a Mappa e Vicinato; Alt+← / Alt+→ e i tasti laterali del mouse. Briciole "A › B › C" nella barra del Vicinato (`map-crumbs`), mai sulla tela.
+- "Vai a" (ricerca nella Mappa) vola al lavoro e lo seleziona.
+
+#### 19.2.6 Legenda e cornice fuori dalla tela
+
+- Finestra ≥ 1440 px: **colonna a lato** di 248 px (`map-side`) con Raggruppa per, elenco dei blocchi (pallino, nome, conteggio; clic = vola e accende), modalità degli archi, chip delle prove, soglia, conteggio dei lavori, minimappa solo oltre 150 lavori (in fondo alla colonna). Richiudibile in una barra di 40 px (ricordata).
+- Sotto 1440 px: colonna chiusa di serie e, sopra la tela, una **striscia** di una riga (`map-strip`) con i blocchi come chip scorrevoli e i controlli in un popover.
+- **Nessun riquadro assoluto sopra la tela** (legenda, conteggio, minimappa, note): solo il cartellino al passaggio, transitorio. L'inquadratura usa il rettangolo della tela, che non ha più nulla sopra.
+
+#### 19.2.7 Vocabolario (in Esplora)
+
+- Esplora ha un `Segmented` **Colonne | Vocabolario | Autori** (`explore-mode`); Colonne è quello di oggi; Autori è la rete di oggi spostata (vista avanzata).
+- **Vocabolario** (`vocab-view`, nuovo chunk `VocabularyTree`): albero ordinato da sinistra a destra della famiglia scelta (Topic predefinito), livelli 1-2 (il 3 si apre su un nodo), una riga di 22 px per foglia: **nessuna collisione per costruzione**, etichette sempre visibili; dimensione del nodo dai lavori del sottoalbero (`counts.subtree` di `taxonomy:get`). Mai Parole chiave né Da sistemare.
+- Legami trasversali: al più 2 per nodo, solo con lift ≥ 2 e ≥ 2 lavori in comune, tratteggiati e **solo al passaggio** (nuovo `graph:vocabLinks { family }` → `[{ a, b, lift, shared }]`, calcolato in `families.ts`). Tetto di 40 nodi in vista, il resto in "+N" per genitore.
+- Clic su un nodo (`vocab-node`): "Mostra nella Mappa" (Mappa raggruppata per quella famiglia, con il blocco o i lavori del nodo accesi) e "Mostra nella Libreria".
+
+### 19.3 Libreria (C, D-500)
+
+#### 19.3.1 Scheda della griglia: verticale, miniatura leggibile, titolo intero
+
+- **Causa di L1 e correzione:** `.doc { align-items: center }` (riga ~834 di `library.css`) viene dopo `.doc-card { align-items: stretch }` (riga ~383) e vince a pari specificità; `.doc-sub .doc-tags { flex: none; flex-wrap: nowrap }` allarga la riga al contenuto. Correzione: selettore `.doc.doc-card` (specificità più alta) con `flex-direction: column; align-items: stretch`; `.doc-card .doc-main { width: 100%; min-width: 0 }`; `.doc-card .doc-sub .doc-tags { flex: 0 1 auto; min-width: 0; overflow: hidden }` con "+N" dentro la scheda. Le regole della riga (`.doc`) dell'elenco non cambiano.
+- **Forma:** larghezza W fra il minimo e il massimo della taglia; colonne = max(1, ⌊(spazio + 12) / (min + 12)⌋), W = min(max, (spazio − 12 · (colonne − 1)) / colonne), griglia centrata. **Altezza** = clamp(round(1,32 · W); 230; 420) (rapporto ≈ 0,76, vicino a una A4 in verticale), calcolata dalla larghezza: la griglia virtuale riceve l'altezza dell'elemento dalla larghezza delle colonne, non più `ROW_HEIGHT.card` fisso.
+- **Taglia** (`card-size`, nel menu Vista, ricordata): S 170-210 · **M 210-260 (predefinita)** · L 260-320. La bitmap resta a `THUMB_CSS_WIDTH` 240 × DPR (a DPR 1 la taglia L ingrandisce al più ×1,33: accettato, nessuna rigenerazione delle miniature).
+- **Miniatura** in alto a tutta larghezza, area 4:3 (W × 0,75), `object-fit: cover; object-position: top`: la parte alta della prima pagina (titolo e autori) a grandezza leggibile, ≈ 57 % dell'area della scheda. Pagine orizzontali o quasi quadrate (larghezza / altezza > 0,9: slide, poster): `contain` su `--page-bg`. Senza miniatura: riquadro `--surface-2` con l'icona del tipo.
+- **Sotto:** titolo 14 px/600, a sinistra, al più 3 righe (`line-clamp: 3`); riga "Cognome et al. · 2021" con ellissi; riga di al più 2 chip (§19.1.8) più "+N"; pallino di stato in fondo a destra con `title`.
+- **Azioni al passaggio** (Leggi, Scheda, ⋯) in una barra in basso sulla miniatura, su una sfumatura da `--bg` a trasparente, mai sopra lo stato; casella di selezione in alto a sinistra sulla miniatura (come oggi). Tastiera e focus invariati.
+
+#### 19.3.2 Selezione multipla: solo ciò che è comune
+
+Pannello della selezione (`sel-summary`, nuovo chunk `SelectionSummary`, sostituisce `BulkTagEditor`):
+
+```
+5 lavori selezionati                                              [Leggi] [⋯]
+Tipo          Articolo                                    ← uguale in tutti
+Anni          2017–2025
+Rivista       3 diverse ▸
+Autori in comune   nessuno
+Cartella      …/sotto-cartella                            ← la più profonda comune
+Stato         3 da leggere · 2 letti
+Progetti      P1 (5 di 5) · altri 2 ▸
+Tag in tutti (2)       [Topic: Area X ✕] [Metodo: Y ✕]     (+ Aggiungi a tutti)
+▸ Tag in alcuni (14)
+▸ Parole chiave in comune (1)
+Aggiungi tag a tutti · Aggiungi a progetto · Stato di lettura ▾ · Trova collegamenti · Esporta ▾
+```
+
+- Un campo si mostra intero **solo se è uguale in tutti** (`sel-field-<nome>`: `type`, `years`, `venue`, `authors`, `folder`, `status`, `projects`); altrimenti un riassunto: intervallo per i numeri, "k diverse ▸" per le categorie (aperto: valori con conteggi "3 di 5", al più 10), conteggi per lo stato. **Mai un elenco per lavoro.**
+- **Tag in tutti** (`sel-tags-all`): chip per famiglia, ✕ toglie da tutti (un'operazione annullabile). **Tag in alcuni** (`sel-tags-some`) ripiegato: aperto, i primi 10 per conteggio, riga `sel-tag-some-row` "Z · 3 di 5 · [Aggiungi agli altri 2] [Togli]", poi "Mostra tutti (14)". Tag impliciti nascosti. Parole chiave a parte, ripiegate.
+- "Aggiungi a tutti" (`sel-add-all`) con una famiglia `'one'`: conferma "Sostituisce il Metodo in 3 lavori" (annullabile).
+- Con le pieghe chiuse il pannello sta in una schermata (5 lavori: ≤ 15 righe, ≤ 800 px a 1280×800).
+
+### 19.4 Compiti, file, budget, prove (D-501)
+
+Ordine: **A prima**. Al massimo 2 compiti insieme, su file disgiunti. Durante l'onda solo typecheck, build, check:budget e check:generality; test scritti dai compiti ed eseguiti alla fine (D-443), quelli pesanti uno alla volta. Implementatori Sonnet.
+
+| Passo | Compito | File di proprietà | Budget |
+| --- | --- | --- | --- |
+| 14a | **A1 · Vocabolario: modello, rilevatore, salute, riordino (main)** §19.1.1-§19.1.5, §19.1.7 (solo `tag-resolve`) | `packages/core/src/model/taxonomy.ts`, `document.ts` (`tagOrigin`), `channels/taxonomy.ts`; nuovo `channels/tag-review.ts` (`tagReview:get` → proposte e salute, `tagReview:apply` {passo o righe} → `changeId`, `tagReview:reject`, `tagReview:aiPreview` / `aiRun`, `tagReview:run` stato del giro, `tagReview:undoRun`); `packages/data/src/organize/taxonomy-ops.ts` (`setFamily`, `markDistinct`, `unmarkDistinct`, profondità, provenienza nel `merge`), nuovi `tag-review.ts`, `tag-health.ts`, `tag-cleanup.ts` (proposte dei passi 3-5), `tag-resolve.ts` (+ test); nuovo chunk pigro `main/features/tag-review/**` (gestori, migrazioni di §19.1.1-§19.1.2, `tag-review.json`, conferma con Claude) | main lazy `tag-review` ≤ 24 KiB; entry del main ≤ +1,5 KiB (schemi); JS iniziale del renderer ≤ +1 KiB |
+| 14b | **A2 · Gestione dei tag: salute, Da rivedere, riordino (interfaccia)** §19.1.3 (lista), §19.1.4, §19.1.5, §19.1.8 (gestione) | `views/library/TaxonomyManager.tsx`, `taxonomyModel.ts`, `useTaxonomy.tsx`; `TaxonomyFamilies.tsx` (tolto); nuovi `views/library/tags/**` (`TagHealth.tsx`, `TagReview.tsx`, `TagCleanup.tsx`, `FamilyBoard.tsx`, modelli puri + test); i18n `taxonomy` | nuovi chunk `TagReview` ≤ 16 KiB (attesi 9-12), `TagCleanup` ≤ 16 (12-15; se sfora, `FamilyBoard` in un chunk a sé) |
+| 14b ∥ | **A3 · Provenienza e vocabolario ai bordi** §19.1.2, §19.1.6, §19.1.7, §19.1.8 (scheda, selettore, facet) | `main/features/bib/importer.ts` (+ lettori per i tag automatici), `packages/data/src/legacy-importer.ts`, `main/ai/review.ts`, `main/ai/jobs.ts`, `main/inbox/service.ts` (nuovi tag), `packages/ai/src/suggest.ts`, `analysis/prompts.ts`, `analysis/candidates.ts`; `views/library/TagParts.tsx`, `DocPanel.tsx` (solo la sezione dei tag del documento), `Facets.tsx`; i18n `library` | chunk esistenti del renderer ≤ +4 KiB; main ≤ +3 KiB nei chunk esistenti, entry ≤ +0,5 |
+| 14c | **B1 · Mappa: prove, soglia, blocchi, percorso (main)** §19.2.2-§19.2.3, §19.2.5 (`graph:path`), §19.2.7 (`vocabLinks`) | `packages/core/src/ipc/channels/graph.ts`; nuovi `packages/graph/src/blocks.ts`, `evidence.ts` (τ, k, Dijkstra) + test; `families.ts` (prova di eleggibilità, `vocabLinks`); `main/graph/family-run.ts`, `service.ts`, nuovo chunk `main/graph/evidence-run.ts` | main lazy +8 KiB (`evidence-run` ≤ 8); entry ≤ +0,8 KiB |
+| 14c ∥ | **C1 · Libreria: scheda verticale e selezione comune** §19.3 | `views/library/library.css`, `DocViews.tsx`, `LibraryView.tsx`, `DocPanel.tsx` (togliere `BulkTagEditor`; A3 già unito), nuovi `views/library/selection/SelectionSummary.tsx`, `selectionSummary.ts` (puro, + test); i18n `library` | nuovo chunk `SelectionSummary` ≤ 16 KiB (attesi 5-7); chunk della libreria ≤ 0 netti |
+| 14d | **B2a · Mappa: blocchi, etichette, archi, cornice** §19.2.1-§19.2.4, §19.2.6 | `views/network/MapCanvas.tsx`, `MapPanel.tsx`, `GroupBy.tsx`, `AreaLegend.tsx`, `MiniMap.tsx`, `labelsLod.ts`, `mapModel.ts`, `edges.ts`, `network.css`, nuovi `blocksDraw.ts`, `MapSide.tsx` (+ test); i18n `network` | chunk `NetworkView` ≤ +6 KiB netti |
+| 14d ∥ | **B2b · Vicinato, percorso, Indietro, Vocabolario** §19.2.5, §19.2.7 | `views/network/NetworkView.tsx`, `GraphNet.tsx`, `forceSim.ts` (vincolo radiale), `EntityNet.tsx` (via i modi Tag e Argomenti), `Explore.tsx`, `NetChrome.tsx`, `LinksPanel.tsx`, nuovi `navStack.ts`, `VocabularyTree.tsx`, `vicinity.css` (+ test); nuova parte i18n `vicinity` | nuovo chunk `VocabularyTree` ≤ 16 KiB (attesi 6-8); `NetworkView` ≤ +4 KiB |
+| fine | Test unitari; e2e uno alla volta (nuove `tag-cleanup.spec.ts`, `map-blocks.spec.ts`; aggiornate `network.spec.ts`, `ui-library.spec.ts`, `thumbs.spec.ts`, `import-bib.spec.ts`, `ai-review.spec.ts`, `design-audit.spec.ts`); revisione; coppia di design Opus sui dati reali con lo script dell'audit | — | — |
+
+**Tetti** (D-487: si alzano una volta, con voce): JS totale del renderer 2280 → 2350 KiB, totale del renderer 2420 → 2490, lazy del main 480 → 515; JS iniziale del renderer 396 ed entry del main 1120 **invariati** (se i contratti non ci stanno si snelliscono gli schemi). Codice tolto che compensa: `TaxonomyFamilies.tsx`, l'unione dei tag di `BulkTagEditor`, i modi Tag e Argomenti di `EntityNet`, i riquadri assoluti della Mappa.
+
+**Prove unitarie** (scritte dai compiti):
+- `tag-review.test.ts`: ogni regola in positivo e in negativo su un corpus sintetico con gli schemi dell'audit (nomi generici: `concetto/concetti`, `2x/2-x`, `ABC/alfa_beta_gamma/ABCs/Alfa beta gamma (ABC)`, `colour x/color x`, `2x/3x` mai, blocchi gemelli, coppie `X/X metodi`); precisione delle sicure ≥ 95 %, richiamo dei concetti doppi del corpus ≥ 90 %; `distinct` rispettato; canonico come da regola; 5000 tag ≤ 1,5 s (solo misura).
+- `tag-health.test.ts` (ogni controllo e soglia), `tag-cleanup.test.ts` (macro/micro/extra → livelli; P(macro | micro); nomi con sigle conservate; **idempotenza**: dopo l'applicazione nessuna proposta nuova), `tag-resolve.test.ts`, `taxonomy-ops.test.ts` (`setFamily`, profondità, `distinct`, provenienza del `merge`; giro applicato e annullato → `taxonomy.json` e tag dei documenti **identici byte per byte**).
+- `prompts` / `suggest`: blocco senza Parole chiave e Da sistemare, un valore per le famiglie `'one'`, nuovo tag simile convertito nel tag esistente.
+- `blocks.test.ts` (nessuna sovrapposizione di celle e fasce, deterministico, ordine, sotto-aree, stabilità fra famiglie), `evidence.test.ts` (τ dai percentili, nessun arco sotto τ, grado ≤ k in Forti, esplicite prima, percorso), eleggibilità in `families.test.ts`; `labelsLod` sui blocchi: zero collisioni a 1280 e 1920; `navStack.test.ts`; `selectionSummary.test.ts` (campi comuni, "3 di 5", impliciti nascosti); dimensioni della scheda (rapporto e colonne).
+
+**e2e:** `tag-cleanup.spec.ts` (tassonomia disordinata sintetica: passi 1-6, Accetta le sicure, Annulla tutto → stato iniziale); `map-blocks.spec.ts` (Raggruppa per, blocchi, nessuna collisione, cornice fuori dalla tela, Indietro, Vicinato, percorso). Misure della tela con una sonda solo e2e (`window.__rlMapProbe()` con `RL_E2E=1`: nodi, riquadri delle etichette, archi, rettangoli della cornice), nessun costo nell'app normale.
+
+### 19.5 Criteri di accettazione su dati reali
+
+Misurati alla fine dalla coppia di design con lo script dell'audit (fuori dal repository, copia dei dati, solo numeri aggregati) sulla libreria reale, più il corpus sintetico di 300 lavori per la scala.
+
+| Parte | Misura | Obiettivo |
+| --- | --- | --- |
+| A | concetti doppi rimasti dopo il riordino con i predefiniti | richiamo sui ~16 concetti dell'audit ≥ 90 %, nessuna fusione sbagliata fra le sicure |
+| A | tag delle famiglie su un solo lavoro | ≤ 25 % (da 59 %) |
+| A | gemelli nelle famiglie · tag in Da sistemare · stili di nome | 0 · 0 · 1 (da 13 gruppi · 220 · 4) |
+| A | profondità di Topic · valori di livello 1 | ≥ 2 (da 1) · 4-8 (da 22 aree) |
+| A | proposte iniziali · applicare un passo · Annulla tutto | ≤ 1 s · ≤ 2 s · stato identico byte per byte |
+| A | import di un `.bib` con varianti di tag esistenti | 100 % delle varianti sicure risolte al canonico, nessun doppione creato |
+| B | nodi non-lavoro in Mappa e Vicinato | 0 |
+| B | Topic dopo il riordino: lavori con un blocco chiaro (quota ≥ 0,6) | ≥ 80 % (da 34-50 %), prova di §19.2.2 superata |
+| B | etichette di lavoro visibili alla prima vista (25 lavori) · collisioni fra etichette | 25/25 a 1280 e 1920 (da 0) · 0 |
+| B | 300 lavori, vista intera: collisioni · blocchi con nome visibile | 0 · 100 % |
+| B | archi per nodo: selezionato · Forti · Vicinato | ≤ 5 · ≤ 2 · ≤ 4 (centro escluso) |
+| B | archi di somiglianza sotto τ | 0 (oggi mediana 0,063 disegnata) |
+| B | incroci per arco nel Vicinato · nodi coperti dalla cornice | ≤ 1 (da 11) · 0 (da 11-14) |
+| B | Vocabolario: nodi in vista · archi visibili a riposo | ≤ 40 · 0 (solo al passaggio) |
+| C | rapporto della scheda · area della miniatura | 0,72-0,80 (da 1,42-1,87) · ≥ 45 % della scheda (da 6-9 %) |
+| C | schede con contenuto più largo della scheda (`scrollWidth > clientWidth`) | 0 a 1280 e 1920 (da 20/25) |
+| C | pannello di 5 lavori con pieghe chiuse | ≤ 800 px (da 3064), 0 righe per lavoro |
+
+### 19.6 Rischi aperti per il revisore avversario
+
+1. **Radice leggera:** `k_stem` può unire parole diverse di lingue romanze; per questo R2 è sicura solo se cambia la sola desinenza: contare gli errori fra le sicure sui dati veri.
+2. **Sigle ambigue:** una sigla di 2 lettere combacia con molte estese: R4 resta probabile senza lavori in comune.
+3. **Famiglie `'one'` rigide:** un lavoro davvero a due metodi; l'uscita è "rendila a più valori", ma i blocchi usano il valore principale: verificare che la scelta si capisca.
+4. **Scaffali contro mappa libera:** la griglia nei blocchi è leggibile ma perde le distanze; verificare che la serpentina tenga vicini i simili (distanza media nella griglia dei 3 vicini più simili ≤ 1,6 celle).
+5. **τ su librerie piccole:** con 25 lavori i percentili sono rumorosi; bastano il pavimento 0,15 e la regola sotto 8 lavori?
+6. **Sincronizzazione** di `family`, `distinct` e `tagOrigin` con una versione vecchia dell'app che riscrive i file senza i campi nuovi (li perderebbe): accettato per una libreria a utente singolo, da dire nelle note di versione.
+7. **Annulla tutto** dopo modifiche a mano fra un passo e l'altro: l'annullamento per gruppi si ferma con un messaggio se un gruppo successivo tocca gli stessi nodi.

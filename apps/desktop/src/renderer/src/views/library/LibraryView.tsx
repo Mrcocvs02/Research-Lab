@@ -28,9 +28,9 @@ import { useScanStatus } from './useScanStatus';
 import { TaxonomyProvider } from './useTaxonomy';
 import './library.css';
 
-// The detail panel, the bulk tag editor, the taxonomy manager and the project dialog load when they are first used.
+// The detail panel, the selection summary, the taxonomy manager and the project dialog load when they are first used.
 const DocumentCard = lazyView(() => import('./DocPanel').then((m) => ({ default: m.DocumentCard })), ['doc', 'library', 'doc-projects-reader', 'doc-reader', 'doc-review']);
-const BulkTagEditor = lazyView(() => import('./DocPanel').then((m) => ({ default: m.BulkTagEditor })), ['doc', 'library', 'doc-projects-reader', 'doc-reader', 'doc-review']);
+const SelectionSummary = lazyView(() => import('./selection/SelectionSummary'), ['doc', 'library']);
 const TaxonomyManager = lazyView(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })), ['taxonomy']);
 const LiteratureDialog = lazyView(() => import('../literature/LiteratureNote').then((m) => ({ default: m.LiteratureDialog })), ['literature', 'reader']);
 const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);
@@ -189,7 +189,7 @@ function LibraryInner() {
               onPropose={() => setJobOpen(true)}
               onLiterature={() => setLitOpen(true)}
               onClear={() => setSelection(emptySelection())}
-              tagEditor={(close) => <BulkTagEditor docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onClose={close} />}
+              tagEditor={(close) => <SelectionSummary docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onProject={() => { close(); setAddOpen(true); }} onClose={close} />}
             />
           ) : (
             <FacetBar facets={list.facets} browse={browse} anything={anything} onFilters={(filters) => set({ filters })} onTags={(tags) => set({ tags })} onFolder={(folder) => set({ folder })} onClearAll={clearAll} resources={showResources} onResources={setShowResources} />
@@ -273,7 +273,7 @@ function LibraryInner() {
                   {single ? (
                     <DocumentCard key={single} docId={single} onClose={() => setDetailOpen(false)} />
                   ) : many ? (
-                    <BulkTagEditor docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onClose={() => setDetailOpen(false)} />
+                    <SelectionSummary docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onProject={() => setAddOpen(true)} onClose={() => setDetailOpen(false)} />
                   ) : (
                     <p className="hint detail-empty" data-testid="detail-empty">
                       {t('library.detailEmpty')}

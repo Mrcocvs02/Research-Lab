@@ -24,8 +24,10 @@ import { useTaxonomy } from './useTaxonomy';
 export { baseName, fileExt };
 export type ViewMode = 'list' | 'grid';
 
-export const ROW_HEIGHT = { browse: 60, search: 100, card: 188 } as const;
-const CARD_MIN_WIDTH = 236;
+export const ROW_HEIGHT = { browse: 60, search: 100 } as const;
+/** Card size M (D-500): column width between the two, height from the width (an A4 page in portrait, about 1.32 x). */
+const CARD = { min: 210, gap: 12, ratio: 1.32, minHeight: 230, maxHeight: 420 } as const;
+const cardHeight = (columnWidth: number) => Math.max(CARD.minHeight, Math.min(CARD.maxHeight, Math.round(CARD.ratio * (columnWidth - 4))));
 
 /**
  * The first page of a PDF in the grid (D-196), or the type icon: while the image is not there yet, for every other
@@ -34,9 +36,15 @@ const CARD_MIN_WIDTH = 236;
 function GridThumb({ docId, path, missing }: { docId: string; path: string; missing: boolean }) {
   const url = useThumbUrl(fileExt(path) === 'pdf' && !missing ? docId : null);
   const [broken, setBroken] = useState<string | null>(null);
+  // Landscape or nearly square pages (slides, posters) are shown whole instead of cropped to the top.
+  const [wide, setWide] = useState(false);
   return (
-    <span className="doc-thumb" data-testid="doc-thumb" data-has-image={url !== null && broken !== url ? 'true' : 'false'}>
-      {url !== null && broken !== url ? <img src={url} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setBroken(url)} /> : <TypeIcon path={path} large />}
+    <span className="doc-thumb" data-testid="doc-thumb" data-has-image={url !== null && broken !== url ? 'true' : 'false'} data-wide={wide}>
+      {url !== null && broken !== url ? (
+        <img src={url} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setBroken(url)} onLoad={(e) => setWide(e.currentTarget.naturalHeight > 0 && e.currentTarget.naturalWidth / e.currentTarget.naturalHeight > 0.9)} />
+      ) : (
+        <TypeIcon path={path} large />
+      )}
     </span>
   );
 }
@@ -59,7 +67,7 @@ export function TypeIcon({ path, large }: { path: string; large?: boolean }) {
 function StudyBadge({ state }: { state: DocRow['studyState'] }) {
   const { t } = useTranslation();
   return (
-    <span className={`study study-${state}`} data-testid="study-badge" data-state={state}>
+    <span className={`study study-${state}`} data-testid="study-badge" data-state={state} title={t(`study.${state}`)}>
       {t(`study.${state}`)}
     </span>
   );
@@ -125,6 +133,37 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
   const meta = [authors, row.year, row.type === null ? null : safeText(row.type)].filter((x) => x !== '' && x !== null && x !== undefined);
   const readable = canRead(row.path, row.missing);
   const cls = ['doc', view === 'grid' ? 'doc-card' : 'doc-row', selected ? 'is-selected' : '', active ? 'active' : '', row.missing ? 'missing' : ''].filter(Boolean).join(' ');
+  const actions = (
+    <span className="doc-actions" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+          {readable ? (
+            <Button size="sm" variant="primary" tabIndex={-1} onClick={() => onRead()} data-testid="row-read">
+              {t('docs.read')}
+            </Button>
+          ) : (
+            <Button size="sm" variant="primary" tabIndex={-1} disabled={row.missing} disabledReason={t('docs.missing')} onClick={onOpenFile} data-testid="row-open">
+              {t('library.open')}
+            </Button>
+          )}
+          <Button size="sm" tabIndex={-1} onClick={onDetail} data-testid="row-detail">
+            {t('docs.details')}
+          </Button>
+          <span ref={moreRef}>
+            <IconButton label={t('library.rowMore')} variant="secondary" size="sm" tabIndex={-1} aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)} data-testid="row-more">
+              <IconMore size={16} />
+            </IconButton>
+          </span>
+          {menuOpen && (
+            <Menu
+              anchor={moreRef}
+              open
+              onClose={() => setMenuOpen(false)}
+              label={t('library.rowMore')}
+              width={260}
+              groups={rowMenu(t, row.missing, onOpenFile, onReveal)}
+            />
+          )}
+        </span>
+  );
   return (
     <div
       id={`doc-${row.docId}`}
@@ -140,14 +179,21 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
       <span className={selected ? 'doc-cb is-on' : 'doc-cb'} aria-hidden="true" data-testid="row-check" onClick={(e) => { e.stopPropagation(); onToggle(); }} onDoubleClick={(e) => e.stopPropagation()}>
         {selected && <IconCheck size={16} />}
       </span>
-      {view === 'grid' ? <GridThumb docId={row.docId} path={row.path} missing={row.missing} /> : <TypeIcon path={row.path} />}
+      {view === 'grid' ? (
+        <div className="doc-thumbwrap">
+          <GridThumb docId={row.docId} path={row.path} missing={row.missing} />
+          {actions}
+        </div>
+      ) : (
+        <TypeIcon path={row.path} />
+      )}
       <div className="doc-main">
         <h3 className="result-title" data-testid="result-title" title={title}>
           {title}
         </h3>
         <div className="doc-sub">
           {meta.length > 0 && <p className="result-meta">{meta.join(' · ')}</p>}
-          <Tags tags={row.tags} max={view === 'grid' ? 3 : 4} />
+          <Tags tags={row.tags} max={view === 'grid' ? 2 : 4} />
         </div>
         {view === 'list' && searching && row.snippet && (
           <p className="result-snippet" data-testid="result-snippet" data-field={row.field}>
@@ -199,35 +245,7 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
         )}
         <StudyBadge state={row.studyState} />
         {row.missing && <span className="badge badge-warn">{t('docs.missing')}</span>}
-        <span className="doc-actions" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-          {readable ? (
-            <Button size="sm" variant="primary" tabIndex={-1} onClick={() => onRead()} data-testid="row-read">
-              {t('docs.read')}
-            </Button>
-          ) : (
-            <Button size="sm" variant="primary" tabIndex={-1} disabled={row.missing} disabledReason={t('docs.missing')} onClick={onOpenFile} data-testid="row-open">
-              {t('library.open')}
-            </Button>
-          )}
-          <Button size="sm" tabIndex={-1} onClick={onDetail} data-testid="row-detail">
-            {t('docs.details')}
-          </Button>
-          <span ref={moreRef}>
-            <IconButton label={t('library.rowMore')} variant="secondary" size="sm" tabIndex={-1} aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)} data-testid="row-more">
-              <IconMore size={16} />
-            </IconButton>
-          </span>
-          {menuOpen && (
-            <Menu
-              anchor={moreRef}
-              open
-              onClose={() => setMenuOpen(false)}
-              label={t('library.rowMore')}
-              width={260}
-              groups={rowMenu(t, row.missing, onOpenFile, onReveal)}
-            />
-          )}
-        </span>
+        {view === 'list' && actions}
       </div>
     </div>
   );
@@ -254,6 +272,22 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
   const { t } = useTranslation();
   const { openReader } = useReader();
   const [columns, setColumns] = useState(1);
+  // The width of one column of the grid, from the width of the list: the height of a card follows it.
+  const wrap = useRef<HTMLDivElement>(null);
+  const [columnWidth, setColumnWidth] = useState<number>(CARD.min);
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el || view !== 'grid') return;
+    const measure = () => {
+      const w = (el.firstElementChild as HTMLElement | null)?.clientWidth ?? el.clientWidth;
+      if (w > 0) setColumnWidth(w / Math.max(1, Math.floor(w / (CARD.min + CARD.gap))));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [view]);
   const selRef = useRef(selection);
   selRef.current = selection;
 
@@ -370,7 +404,7 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const activeIndex = useMemo(() => { const at = indexOfId(list.ids(), selection.active); return at >= 0 ? at : null; }, [list.version, list.total, selection.active]);
   const activeRow = activeIndex !== null ? list.rowAt(activeIndex) : undefined;
-  const itemHeight = view === 'grid' ? ROW_HEIGHT.card : searching ? ROW_HEIGHT.search : ROW_HEIGHT.browse;
+  const itemHeight = view === 'grid' ? cardHeight(columnWidth) : searching ? ROW_HEIGHT.search : ROW_HEIGHT.browse;
   // The rows around the viewport, as the virtual list reports them: the PDFs among them get a thumbnail (grid only).
   const [shown, setShown] = useState<readonly [number, number]>([0, -1]);
   const range = useCallback(
@@ -397,11 +431,12 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
   }, [view, shown, list.version]);
 
   return (
+    <div className="vl-wrap" ref={wrap}>
     <VirtualList
       key={view}
       count={list.total}
       itemHeight={itemHeight}
-      {...(view === 'grid' ? { minColumnWidth: CARD_MIN_WIDTH } : {})}
+      {...(view === 'grid' ? { minColumnWidth: CARD.min + CARD.gap } : {})}
       onRange={range}
       onColumns={setColumns}
       activeIndex={activeIndex}
@@ -432,5 +467,6 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
         );
       }}
     />
+    </div>
   );
 }

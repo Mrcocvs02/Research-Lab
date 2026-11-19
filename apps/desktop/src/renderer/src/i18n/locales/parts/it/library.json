@@ -69,6 +69,37 @@
     "selLinks": "Trova collegamenti…",
     "docLinksFind": "Trova collegamenti…",
     "moreKeywords": "+{{count}} parole chiave",
-    "hideKeywords": "Nascondi le parole chiave"
+    "hideKeywords": "Nascondi le parole chiave",
+    "sel": {
+      "type": "Tipo",
+      "years": "Anni",
+      "authors": "Autori in comune",
+      "folder": "Cartella",
+      "status": "Stato",
+      "none": "nessuno",
+      "different_one": "{{count}} diverso",
+      "different_other": "{{count}} diversi",
+      "nOf": "{{n}} di {{total}}",
+      "state": {
+        "to-read_one": "{{count}} da leggere",
+        "to-read_other": "{{count}} da leggere",
+        "reading_one": "{{count}} in lettura",
+        "reading_other": "{{count}} in lettura",
+        "read_one": "{{count}} letto",
+        "read_other": "{{count}} letti"
+      },
+      "tagsAll_one": "Tag in tutti ({{count}})",
+      "tagsAll_other": "Tag in tutti ({{count}})",
+      "noneShared": "Nessun tag è in tutti.",
+      "removeAll": "Togli {{name}} da tutti",
+      "addAll": "Aggiungi un tag a tutti…",
+      "tagsSome_one": "Tag in alcuni ({{count}})",
+      "tagsSome_other": "Tag in alcuni ({{count}})",
+      "addToOthers_one": "Aggiungi all'altro {{count}}",
+      "addToOthers_other": "Aggiungi agli altri {{count}}",
+      "remove": "Togli",
+      "showAll": "Mostra tutti ({{count}})",
+      "toProject": "Aggiungi a progetto…"
+    }
   }
 }

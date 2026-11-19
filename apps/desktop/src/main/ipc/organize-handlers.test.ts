@@ -58,6 +58,7 @@ async function harness() {
       openPath: async (p: string) => (opened.push(p), openError),
       showItemInFolder: (p: string) => void revealed.push(p),
     },
+    localDataDir: os.tmpdir(),
   } as unknown as MainServices;
   const dispatch = createDispatcher(channels, buildHandlers(services), log);
   const call = async (c: string, p: unknown = {}) => dispatch(c, p);

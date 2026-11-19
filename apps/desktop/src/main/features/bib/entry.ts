@@ -37,6 +37,12 @@ export const clip = (s: string | null | undefined, max: number = LIMITS.text): s
   return t === '' ? null : t.slice(0, max);
 };
 
+/** Like `clip`, but keeps the line breaks of a note (paragraphs from HTML notes). */
+export const clipNote = (s: string | null | undefined, max: number = LIMITS.notes): string | null => {
+  const t = (s ?? '').replace(/[^\S\n]+/g, ' ').replace(/ ?\n[ \n]*/g, '\n').trim();
+  return t === '' ? null : t.slice(0, max);
+};
+
 export function normDoi(s: string | null | undefined): string | null {
   const m = /10\.\d{4,9}\/[^\s"<>]+/.exec(s ?? '');
   return m ? m[0].replace(/[.,;)]+$/, '').toLowerCase().slice(0, 300) : null;

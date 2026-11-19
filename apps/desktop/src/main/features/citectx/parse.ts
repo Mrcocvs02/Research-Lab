@@ -43,7 +43,7 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function cites(sentence: string, m: Mention): boolean {
   if (m.n !== null) for (const b of sentence.matchAll(/\[([^\]]{1,40})\]/g)) if (bracketHas(b[1]!, m.n)) return true;
-  if (m.surname && m.year) return new RegExp(`${escapeRe(m.surname)}[^.;]{0,50}?${m.year}`, 'iu').test(sentence);
+  if (m.surname && m.year) return new RegExp(`${escapeRe(m.surname)}(?:\\s+et\\s+al\\.)?[^.;]{0,50}?${m.year}`, 'iu').test(sentence);
   return false;
 }
 
@@ -51,7 +51,7 @@ const sentencesOf = (text: string): string[] =>
   text
     .replace(/-\r?\n(?=\p{Ll})/gu, '')
     .replace(/\s+/g, ' ')
-    .split(/(?<=[.!?])\s+(?=[\p{Lu}\[(])/u)
+    .split(/(?<=[.!?])(?<!\bal\.)\s+(?=[\p{Lu}\[(])/u)
     .map((x) => x.trim())
     .filter((x) => x.length >= 20);
 

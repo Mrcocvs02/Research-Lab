@@ -24,6 +24,7 @@ const call = async (c: string, p: unknown = {}): Promise<IpcEnvelope> => {
         return d;
       },
     },
+    localDataDir: os.tmpdir(),
   } as unknown as MainServices;
   return createDispatcher(channels, buildHandlers(s), log)(c, p);
 };

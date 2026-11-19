@@ -1,3 +1,4 @@
+import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { AppError, channels, createDispatcher, createMemoryLogger, documentRecordSchema, type IpcEnvelope } from '@rl/core';
 import { buildHandlers, type MainServices } from './handlers/index.js';
@@ -50,7 +51,7 @@ function setup() {
   };
   const runtime = { sync: async () => {}, hold: () => () => {}, status: () => ({}), require: async () => rt as never } as unknown as MainServices['runtime'];
   const log = createMemoryLogger();
-  const dispatch = createDispatcher(channels, buildHandlers({ runtime, log } as unknown as MainServices), log);
+  const dispatch = createDispatcher(channels, buildHandlers({ runtime, log, localDataDir: tmpdir() } as unknown as MainServices), log);
   return { call: (c: string, p: unknown = {}) => dispatch(c, p), order };
 }
 

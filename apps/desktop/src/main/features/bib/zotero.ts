@@ -1,6 +1,6 @@
 import { copyFile, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { blank, cleanAuthors, cleanList, clip, LIMITS, normArxiv, normDoi, yearOf, type BibEntry, type BibRead } from './entry.js';
+import { blank, cleanAuthors, cleanList, clip, clipNote, LIMITS, normArxiv, normDoi, yearOf, type BibEntry, type BibRead } from './entry.js';
 
 type Row = Record<string, string | number | bigint | null | Uint8Array>;
 interface Db {
@@ -85,7 +85,7 @@ export async function readZotero(file: string, tmpRoot: string): Promise<BibRead
     const creators = group(all(SQL.creators), (r) => ({ kind: s(r['kind']), name: s(r['mode']) === '1' ? s(r['last']) : s(r['last']) && s(r['first']) ? `${s(r['last'])}, ${s(r['first'])}` : s(r['last']) || s(r['first']) }));
     const tags = group(all(SQL.tags), (r) => s(r['name']));
     const cols = group(all(SQL.collections), (r) => s(r['name']));
-    const notes = group(all(SQL.notes), (r) => clip(htmlToText(s(r['note'])), LIMITS.notes));
+    const notes = group(all(SQL.notes), (r) => clipNote(htmlToText(s(r['note'])), LIMITS.notes));
     const atts = group(all(SQL.attachments), (r) => ({ key: s(r['key']), mode: Number(r['mode']), path: s(r['path']), type: s(r['type']) }));
     const entries: BibEntry[] = [];
     const skipped: BibRead['skipped'] = [];

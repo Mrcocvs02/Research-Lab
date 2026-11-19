@@ -56,6 +56,7 @@ async function harness() {
     runtime: { sync: async () => {}, hold: () => () => {}, status: () => ({}), require: async () => rt },
     libraries: { profile: async () => ({ rootPath: root, id: 'lib-1' }) },
     shell: { openPath: async () => '', showItemInFolder: () => {}, openExternal: async (u: string) => void opened.push(u) },
+    localDataDir: os.tmpdir(),
   } as unknown as MainServices;
   const dispatch = createDispatcher(channels, buildHandlers(services), log);
   return async (c: string, p: unknown = {}) => dispatch(c, p);

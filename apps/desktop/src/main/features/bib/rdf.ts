@@ -1,4 +1,4 @@
-import { blank, cleanAuthors, cleanList, clip, LIMITS, normArxiv, normDoi, yearOf, type BibEntry, type BibRead } from './entry.js';
+import { blank, cleanAuthors, cleanList, clip, clipNote, LIMITS, normArxiv, normDoi, yearOf, type BibEntry, type BibRead } from './entry.js';
 
 /** A minimal XML tree: enough for Zotero RDF. No entity beyond the five and numeric ones, no DTD, no external reference. */
 interface Node {
@@ -132,13 +132,13 @@ export function readRdf(xml: string, base: string): BibRead {
         const p = f?.attrs['rdf:resource'];
         if (p) e.files.push(p.replace(/^file:\/\//, ''));
       } else if (memos.has(r)) {
-        const t = clip(htmlToText(find(byId.get(r)!, 'rdf:value')?.text ?? ''), LIMITS.notes);
+        const t = clipNote(htmlToText(find(byId.get(r)!, 'rdf:value')?.text ?? ''), LIMITS.notes);
         if (t) e.notes.push(t);
       }
     }
     // Memos can also be nested in the item (`<dcterms:isReferencedBy><bib:Memo>`).
     for (const memo of n.children.flatMap((c) => c.children).filter((c) => c.name === 'bib:Memo')) {
-      const t = clip(htmlToText(find(memo, 'rdf:value')?.text ?? ''), LIMITS.notes);
+      const t = clipNote(htmlToText(find(memo, 'rdf:value')?.text ?? ''), LIMITS.notes);
       if (t) e.notes.push(t);
     }
     if (e.title === null && e.authors.length === 0) {

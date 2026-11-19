@@ -74,6 +74,12 @@ describe('columns', () => {
 
   it('labels a paper without authors by its title', () => {
     expect(paperLabel({ docId: A, title: 'A very long title indeed', authors: [], year: 2000 })).toBe('A very long titl 2000');
+    // Real metadata often writes "Surname I." (audit on real data, D-490): the initial is not the surname.
+    expect(paperLabel({ docId: A, title: 't', authors: ['Rossi M.'], year: 2021 })).toBe('Rossi 2021');
+    expect(paperLabel({ docId: A, title: 't', authors: ['Rossi J.-P.'], year: 2021 })).toBe('Rossi 2021');
+    expect(paperLabel({ docId: A, title: 't', authors: ['Mario Rossi'], year: 2021 })).toBe('Rossi 2021');
+    expect(paperLabel({ docId: A, title: 't', authors: ['M. Rossi'], year: 2021 })).toBe('Rossi 2021');
+    expect(paperLabel({ docId: A, title: 't', authors: ['Wu'], year: 2021 })).toBe('Wu 2021');
   });
 });
 

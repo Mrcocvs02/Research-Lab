@@ -33,3 +33,5 @@ button.ms-source { cursor: pointer; }
 .ms-cell[data-state='empty'] { color: var(--text-muted); }
 .ms-cell[data-state='proposed'] { border: 1px dashed var(--accent); }
 .ms-cell-pop { margin-top: 8px; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; }
+/* The warning sign keeps its space even inside a flex row header (audit on real data, D-490). */
+.ms-gap-mark { margin-inline-end: 4px; }

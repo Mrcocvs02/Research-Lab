@@ -99,7 +99,11 @@ export function computeAreas(nodes: readonly AreaNode[], docs: readonly AreaDoc[
   const cover = (a: string): number => withTags.reduce((n, r) => n + ([...r.w.keys()].some((t) => anc(t).has(a)) ? 1 : 0), 0);
 
   // 1. Areas: the roots; a root that covers 80 % of the tagged documents gives way to its children (at most twice).
-  let set = [...live.keys()].filter((id) => parentsOf(id).length === 0).sort(cmp);
+  // When the taxonomy has a hierarchy (two roots or more with children), a root without children is a loose tag, not an area:
+  // it colours a document only when none of the document's tags reaches a real area (audit on real data, D-490).
+  const roots = [...live.keys()].filter((id) => parentsOf(id).length === 0).sort(cmp);
+  const loose = new Set(roots.filter((id) => kids.has(id)).length >= 2 ? roots.filter((id) => !kids.has(id)) : []);
+  let set = roots.filter((id) => !loose.has(id));
   for (let round = 0; round < DESCENTS && withTags.length > 0; round++) {
     const next: string[] = [];
     let changed = false;
@@ -113,7 +117,7 @@ export function computeAreas(nodes: readonly AreaNode[], docs: readonly AreaDoc[
     set = [...new Set(next)];
     if (!changed) break;
   }
-  const areaSet = new Set(set);
+  const areaSet = new Set([...set, ...loose]);
   const branchOf = (area: string, x: string): string => (x === area ? '' : (kids.get(area) ?? []).find((c) => anc(x).has(c)) ?? '');
 
   // 2-3. Leaves of each document and the contributions to areas and branches.
@@ -130,16 +134,20 @@ export function computeAreas(nodes: readonly AreaNode[], docs: readonly AreaDoc[
     const ancestorOfOther = new Set<string>();
     for (const t of ids) for (const a of anc(t)) if (a !== t) ancestorOfOther.add(a);
     const row: Row = { id: r.id, m: new Map(), br: new Map() };
-    for (const x of ids) {
-      if (ancestorOfOther.has(x)) continue;
-      const mine = [...anc(x)].filter((a) => areaSet.has(a));
-      if (mine.length === 0) continue;
-      const c = r.w.get(x)! / mine.length;
-      for (const a of mine) {
-        row.m.set(a, (row.m.get(a) ?? 0) + c);
-        const b = branchOf(a, x);
-        const bm = row.br.get(a) ?? row.br.set(a, new Map()).get(a)!;
-        bm.set(b, (bm.get(b) ?? 0) + c);
+    // First the real areas; the loose roots only for a document that reaches none.
+    for (const fallback of [false, true]) {
+      if (fallback && (row.m.size > 0 || loose.size === 0)) break;
+      for (const x of ids) {
+        if (ancestorOfOther.has(x)) continue;
+        const mine = [...anc(x)].filter((a) => areaSet.has(a) && loose.has(a) === fallback);
+        if (mine.length === 0) continue;
+        const c = r.w.get(x)! / mine.length;
+        for (const a of mine) {
+          row.m.set(a, (row.m.get(a) ?? 0) + c);
+          const b = branchOf(a, x);
+          const bm = row.br.get(a) ?? row.br.set(a, new Map()).get(a)!;
+          bm.set(b, (bm.get(b) ?? 0) + c);
+        }
       }
     }
     if (row.m.size === 0) continue;

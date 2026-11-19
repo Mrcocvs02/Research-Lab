@@ -316,7 +316,8 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         const tin = n.kind === 'doc' && n.group !== undefined ? tp?.tint.get(n.group) : undefined;
         const ac = colorFn ? colorFn(n.ar, n.az) : null;
         const ring = colorFn !== null && n.kind === 'doc' && ac === null;
-        ctx.fillStyle = ring ? th.bg : ac ?? (tin !== undefined ? (th.tints[tin] ?? th.accent) : (th[NODE_FILL[n.kind]] as string));
+        // A tag outside every area (a loose tag, D-490) stays neutral instead of the heavy text colour.
+        ctx.fillStyle = ring ? th.bg : ac ?? (colorFn && n.kind === 'tag' ? th.muted : tin !== undefined ? (th.tints[tin] ?? th.accent) : (th[NODE_FILL[n.kind]] as string));
         ctx.strokeStyle = ring ? th.areas[8]! : th.bg;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -1089,6 +1090,8 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
           {announce}
         </span>
         {pill}
+        {/* Legend and node count stack in one column, so they never overlap (audit on real data, D-490). */}
+        <div className="net-bl">
         {areaState && areaRef.current.on && (
           <AreaLegend
             title={family !== TOPIC_FAMILY ? t('network.group.grouped', { name: familyName(t, families, family) }) : undefined}
@@ -1115,6 +1118,7 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
             <span className="key-folder">{t('network.net.folderNode')}</span>
             <span className="key-tag">{t('network.net.tagNode')}</span>
           </span>
+        </div>
         </div>
         {hovered && hover && (
           <HoverCard x={hover.x} y={hover.y} width={view.size.current.w} height={view.size.current.h} testId="net-tooltip">

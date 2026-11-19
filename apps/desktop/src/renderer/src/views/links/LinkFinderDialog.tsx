@@ -263,7 +263,7 @@ export function LinkFinderDialog({ docIds, onClose, onShowMap }: { docIds: strin
                 <ul className="lf-list">{result.added.map((x) => row(x, 'added'))}</ul>
               </>
             ) : (
-              <p data-testid="lf-none">{result.below[0] ? t('links.none', { title: clean(result.below[0].title), score: result.below[0].weight.toFixed(2) }) : t('links.noneAny')}</p>
+              <p data-testid="lf-none">{result.skipped.existing > 0 ? t('links.noneNew', { count: result.skipped.existing }) : result.below[0] ? t('links.none', { title: clean(result.below[0].title), score: result.below[0].weight.toFixed(2) }) : t('links.noneAny')}</p>
             )}
             {(result.skipped.existing > 0 || result.skipped.dismissed > 0) && <p className="hint">{t('links.skipped', result.skipped)}</p>}
             {result.below.length > 0 && (

@@ -1,6 +1,6 @@
 .lf-body { display: flex; flex-direction: column; gap: var(--space-3, 12px); min-width: min(560px, 90vw); }
 .lf-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.lf-row { display: grid; grid-template-columns: 1fr auto auto; gap: 2px 10px; align-items: center; }
+.lf-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 2px 10px; align-items: center; }
 .lf-row__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lf-row__weight { font-variant-numeric: tabular-nums; color: var(--accent); }
 .lf-row__why { grid-column: 1 / -1; }
@@ -11,3 +11,10 @@
 .lf-row .lf-row__weight { grid-column: 2; }
 .lf-run { display: flex; gap: 8px; align-items: center; }
 .lf-progress { width: 160px; max-width: 40vw; }
+/* Long titles and reasons wrap or shorten inside the dialog instead of widening it (audit on real data, D-490). */
+.lf-body { min-width: 0; max-width: 100%; }
+.lf-body > .net-field { max-width: 100%; min-width: 0; flex-wrap: wrap; }
+.lf-body select { min-width: 0; max-width: 100%; flex: 1 1 12em; text-overflow: ellipsis; }
+.lf-row__why { overflow-wrap: anywhere; }
+/* The finder lists titles and reasons: a wider dialog than the default 520 px. */
+.rl-dialog:has(.lf-body) { width: min(640px, 92vw); }

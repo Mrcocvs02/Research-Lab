@@ -1,22 +1,44 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { Channels, RequestOf } from '@rl/core';
+import { Button } from '../../components/Button';
+import { Lazy, lazyView } from '../../components/Lazy';
 import { familyLabel, useFamily, type FamilyInfo } from './grouping';
 
+const FamilyNamesDialog = lazyView(() => import('./FamilyNamesDialog'), ['network', 'projects']);
+type Scope = RequestOf<Channels, 'graph:nameFamily'>['scope'];
+
 /** "Group by: Topic | Group | Method | ..." (§18.3.7): the family that colours and pulls the nodes of the Map together. */
-export function GroupBy({ families }: { families: readonly FamilyInfo[] }) {
+export function GroupBy({ families, scope }: { families: readonly FamilyInfo[]; scope?: Scope }) {
   const { t } = useTranslation();
   const [family, setFamily] = useFamily();
+  const [naming, setNaming] = useState(false);
   const shown = families.some((f) => f.id === family) ? families : [...families, { id: family, label: family, count: 0 }];
   return (
-    <label className="net-field net-pop-row">
-      <span>{t('network.group.by')}</span>
-      <select value={family} onChange={(e) => setFamily(e.target.value)} data-testid="map-group-by">
-        {shown.map((f) => (
-          <option key={f.id} value={f.id}>
-            {familyLabel(t, f)}
-          </option>
-        ))}
-      </select>
-    </label>
+    <>
+      <label className="net-field net-pop-row">
+        <span>{t('network.group.by')}</span>
+        <select value={family} onChange={(e) => setFamily(e.target.value)} data-testid="map-group-by">
+          {shown.map((f) => (
+            <option key={f.id} value={f.id}>
+              {familyLabel(t, f)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {family === 'auto' && (
+        <div className="net-field net-pop-row">
+          <Button size="sm" onClick={() => setNaming(true)} data-testid="map-group-name">
+            {t('network.group.nameButton')}
+          </Button>
+        </div>
+      )}
+      {naming && (
+        <Lazy>
+          <FamilyNamesDialog scope={scope} onClose={() => setNaming(false)} />
+        </Lazy>
+      )}
+    </>
   );
 }
 

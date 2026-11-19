@@ -2,6 +2,7 @@ import { visibleGroupTags, type DocumentRecord } from '@rl/core';
 import { autoMemberships, familyModel, neighborsOf, parseFamily, tagMemberships, type AreaModel, type AreaSummary, type FamilyNode, type Memberships } from '@rl/graph';
 import type { MainServices } from '../ipc/handlers/services.js';
 import { areaModel, weightsOf } from './areas-run.js';
+import { readNames } from './family-names-store.js';
 import { drift, loadModel, modelId } from './service.js';
 import { loadView, scopeIds, type LibraryView } from './view.js';
 
@@ -19,6 +20,7 @@ interface Item {
 
 const GROUP_HINT = 'extra:';
 let last: { key: string; model: AreaModel } | null = null;
+export const scopeKey = (scope: Scope): string => JSON.stringify(scope ?? null);
 
 const docTags = (rec: DocumentRecord, withGroups: boolean): Array<{ id: string; w: number }> => (withGroups ? [...weightsOf(rec), ...visibleGroupTags(rec).map((id) => ({ id, w: 1 }))] : weightsOf(rec));
 
@@ -42,7 +44,7 @@ async function listFamilies(s: MainServices, view: LibraryView, scope: Scope): P
 }
 
 /** The memberships of the community family: Louvain on the weighted neighbours of the model, labelled by the recurring tags. */
-async function autoModel(s: MainServices, view: LibraryView, scope: Scope): Promise<Memberships | null> {
+export async function autoModel(s: MainServices, view: LibraryView, scope: Scope): Promise<Memberships | null> {
   const rt = await s.runtime.require();
   const lm = await loadModel(s, rt);
   if (!lm) return null;
@@ -70,12 +72,14 @@ async function familyAreas(s: MainServices, view: LibraryView, scope: Scope, fam
   if (ref.kind === 'topic') return areaModel(await s.runtime.require(), view, scope);
   const rt = await s.runtime.require();
   const lm = ref.kind === 'auto' ? await loadModel(s, rt) : null;
-  const key = `${view.key}|${family}|${JSON.stringify(scope ?? null)}|${lm ? modelId(lm.model) : ''}`;
+  const names = lm ? await readNames(s, rt, modelId(lm.model)) : {};
+  const key = `${view.key}|${family}|${scopeKey(scope)}|${lm ? modelId(lm.model) : ''}|${JSON.stringify(names)}`;
   // A project's membership is not part of the library state: that scope is never reused.
   if (last && last.key === key && scope?.projectId === undefined) return last.model;
   const wanted = await scopeIds(rt, view, scope);
   const recs = view.records.filter((r) => !wanted || wanted.has(r.id));
   const mem = ref.kind === 'auto' ? await autoModel(s, view, scope) : tagMemberships(ref, (view.tax?.nodes ?? []) as FamilyNode[], recs.map((r) => ({ id: r.id, tags: docTags(r, ref.kind === 'prefix') })));
+  if (ref.kind === 'auto' && mem) for (const id of [...mem.labels.keys()]) mem.labels.set(id, names[`${scopeKey(scope)}|${id}`] ?? mem.labels.get(id)!);
   const colors = new Map<string, string>();
   if (ref.kind !== 'auto' && ref.kind !== 'prefix') for (const n of view.tax?.nodes ?? []) if (n.color) colors.set(n.id, n.color);
   const model = familyModel(mem ?? { labels: new Map(), docs: new Map() }, recs.length, 'Other', colors);

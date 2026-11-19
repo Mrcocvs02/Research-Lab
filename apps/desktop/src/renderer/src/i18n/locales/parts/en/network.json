@@ -414,7 +414,15 @@
       "auto": "Automatic",
       "other": "other",
       "none": "none",
-      "grouped": "Grouped by {{name}}"
+      "grouped": "Grouped by {{name}}",
+      "nameButton": "✦ Name with Claude",
+      "nameTitle": "Name the clusters",
+      "nameWhat": "The top tags and the titles of papers in enabled folders of {{count}} clusters are sent.",
+      "nameNothing": "Nothing to name: the automatic family needs a built model and papers in enabled folders.",
+      "nameNone": "No names proposed.",
+      "nameAccept": "Accept",
+      "nameAcceptAll": "Accept all ({{count}})",
+      "named": "Names saved."
     }
   }
 }

@@ -16,7 +16,7 @@ import { reasonLine, weightBar, type LinkReasons } from '../links/reasons';
 import { reducedMotion } from './camera';
 import { AreaLegend, AreaNote, useAreaColors } from './AreaLegend';
 import { GroupBy, GroupLabel } from './GroupBy';
-import { applyShares, familyName, nameClusters, TOPIC_FAMILY, useFamilies, useFamily, type FamilyShares } from './grouping';
+import { applyShares, familyName, nameClusters, TOPIC_FAMILY, useFamilies, useFamily, useFamilyRev, type FamilyShares } from './grouping';
 import { areaNoteNeeded, areaSummary, withUserTints, assignAreaSlots, colorCache, loadAreaMemo, mainArea, saveAreaMemo, shareIn, type AreaDef } from './areaColors';
 import { Segmented } from '../../components/Segmented';
 import { assignKeyTints, mix, readTheme, type MapTheme } from './colors';
@@ -123,6 +123,8 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
   // Group by (D-489): the family of the chosen tag kind (or communities) colours the nodes and shapes the springs.
   const [family] = useFamily();
   const families = useFamilies(undefined, active);
+  const famRev = useFamilyRev();
+  const lastRev = useRef(famRev);
   const familyRef = useRef(family);
   familyRef.current = family;
   const [areaState, setAreaState] = useState<{ defs: AreaDef[]; slots: number[] } | null>(null);
@@ -555,6 +557,13 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
     if (net.size > 0) void applyFamily(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [family]);
+
+  useEffect(() => {
+    if (lastRev.current === famRev) return;
+    lastRev.current = famRev;
+    if (net.size > 0 && familyRef.current !== TOPIC_FAMILY) void applyFamily(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [famRev]);
 
   async function expand(n: NetNode): Promise<void> {
     const valid = kindsRef.current.filter((k) => VALID[n.kind].includes(k));

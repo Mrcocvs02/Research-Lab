@@ -414,7 +414,15 @@
       "auto": "Automatica",
       "other": "altro",
       "none": "senza",
-      "grouped": "Raggruppato per {{name}}"
+      "grouped": "Raggruppato per {{name}}",
+      "nameButton": "✦ Dai un nome con Claude",
+      "nameTitle": "Dai un nome ai cluster",
+      "nameWhat": "Si inviano i tag principali e i titoli dei lavori nelle cartelle abilitate di {{count}} cluster.",
+      "nameNothing": "Niente da nominare: la famiglia automatica richiede un modello costruito e lavori in cartelle abilitate.",
+      "nameNone": "Nessun nome proposto.",
+      "nameAccept": "Accetta",
+      "nameAcceptAll": "Accetta tutti ({{count}})",
+      "named": "Nomi salvati."
     }
   }
 }

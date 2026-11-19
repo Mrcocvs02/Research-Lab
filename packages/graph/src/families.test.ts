@@ -41,7 +41,7 @@ describe('tagMemberships', () => {
 });
 
 describe('familyModel', () => {
-  it('keeps the biggest eight clusters and gathers the rest in "other"', () => {
+  it('keeps the biggest seven clusters and gathers the rest in "other"', () => {
     const labels = new Map<string, string>();
     const docs = new Map<string, Array<{ cluster: string; w: number }>>();
     let d = 0;
@@ -52,9 +52,9 @@ describe('familyModel', () => {
     const model = familyModel({ labels, docs }, d + 5, 'Other');
     expect(model.areas).toHaveLength(FAMILY_TOP + 1);
     expect(model.areas.map((a) => a.id)).toContain(OTHER_CLUSTER);
-    expect(model.areas.find((a) => a.id === OTHER_CLUSTER)!.count).toBe(4 + 3 + 2);
+    expect(model.areas.find((a) => a.id === OTHER_CLUSTER)!.count).toBe(5 + 4 + 3 + 2);
     expect(model.total).toBe(d + 5);
-    expect(model.areas[0]!.id).toBe('c0');
+    expect(model.areas.filter((a) => a.id !== OTHER_CLUSTER)[0]!.id).toBe('c0');
   });
   it('a document in two clusters gets both shares (it lands between them)', () => {
     const docs = new Map([

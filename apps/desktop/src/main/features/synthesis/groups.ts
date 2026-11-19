@@ -175,7 +175,7 @@ export async function runGroups(s: MainServices, req: { token: string; docIds: s
       try {
         const deviceId = (await s.settings.get()).deviceId;
         const { value } = await callStructured(
-          { s, ctx, provider: ctx.provider, signal: ctl.signal, confirmed: true, deviceId, addUsd: () => {} },
+          { s, ctx, provider: ctx.provider, signal: ctl.signal, confirmed: req.confirmed, deviceId, addUsd: () => {} },
           { purpose: 'groups', model: est.model, reasoning: cfg.ai.defaultReasoning, system: p.system, prompt: p.prompt, schema: groupsAnswerSchema, docIds: p.enabled.map((d) => d.id), folders: [...new Set(p.enabled.map((d) => folderOf(d.path)))] },
         );
         written = cleanGroups(value, new Set(p.keyDoc.keys()));

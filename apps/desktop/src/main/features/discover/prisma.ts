@@ -33,11 +33,20 @@ const SOURCE_CITING = 'openalex-citing';
 const fileOf = (dataDir: string, projectId: string) => path.join(dataDir, 'discover', 'prisma', `${itemIdSchema.parse(projectId)}.json`);
 
 async function read(file: string): Promise<PrismaFile> {
+  const empty = (): PrismaFile => ({ runs: {}, decisions: {}, extra: emptyCounts() });
+  let text: string;
   try {
-    const f = JSON.parse(await readFile(file, 'utf8')) as Partial<PrismaFile>;
+    text = await readFile(file, 'utf8');
+  } catch (e) {
+    // Only "there is no file" is an empty state; a file that cannot be read now (EBUSY, EPERM...) is an error, not a blank to write over.
+    if (['ENOENT', 'ENOTDIR'].includes((e as NodeJS.ErrnoException).code ?? '')) return empty();
+    throw e;
+  }
+  try {
+    const f = JSON.parse(text) as Partial<PrismaFile>;
     return { runs: f.runs ?? {}, decisions: f.decisions ?? {}, extra: { ...emptyCounts(), ...(f.extra ?? {}) } };
   } catch {
-    return { runs: {}, decisions: {}, extra: emptyCounts() };
+    return empty();
   }
 }
 

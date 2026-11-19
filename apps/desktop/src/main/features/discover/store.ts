@@ -10,13 +10,36 @@ import { atomicWriteJson } from '@rl/core/node';
 const dir = (dataDir: string) => path.join(dataDir, 'discover', 'runs');
 const fileOf = (dataDir: string, id: string) => path.join(dir(dataDir), `${itemIdSchema.parse(id)}.json`);
 
+/**
+ * The run, or null when the file does not exist or is not a valid run. Any other failure (a file held by another
+ * program: EBUSY, EPERM...) is thrown: it must never look like "no file", or the caller would write over the real one.
+ */
 export async function readRun(dataDir: string, id: string): Promise<DiscoverRun | null> {
+  let text: string;
   try {
-    const r = discoverRunSchema.safeParse(JSON.parse(await readFile(fileOf(dataDir, id), 'utf8')));
+    text = await readFile(fileOf(dataDir, id), 'utf8');
+  } catch (e) {
+    if (['ENOENT', 'ENOTDIR'].includes((e as NodeJS.ErrnoException).code ?? '')) return null;
+    throw e;
+  }
+  try {
+    const r = discoverRunSchema.safeParse(JSON.parse(text));
     return r.success ? r.data : null;
   } catch {
     return null;
   }
+}
+
+const chains = new Map<string, Promise<unknown>>();
+/** Runs `fn` after every earlier read-modify-write of the same run (candidates are marked quickly; summaries and re-runs write the whole file). */
+export function serialRun<T>(id: string, fn: () => Promise<T>): Promise<T> {
+  const next = (chains.get(id) ?? Promise.resolve()).then(fn, fn);
+  const tail = next.then(() => undefined, () => undefined);
+  chains.set(id, tail);
+  void tail.then(() => {
+    if (chains.get(id) === tail) chains.delete(id);
+  });
+  return next;
 }
 
 export async function writeRun(dataDir: string, run: DiscoverRun): Promise<void> {

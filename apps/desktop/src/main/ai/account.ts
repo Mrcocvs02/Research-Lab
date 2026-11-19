@@ -46,6 +46,8 @@ export const realIo = (): AccountIo => ({
       }),
     ),
   openConsole(exe, args, env) {
+    // `start` and the terminal would look a relative name up in the working directory or the PATH.
+    if (!path.isAbsolute(exe)) throw new AppError('INVALID_REQUEST', 'The Claude Code path must be absolute');
     if (process.platform === 'win32') {
       // `start` goes through cmd.exe: a path with one of its metacharacters is refused, never escaped.
       if (/[&|<>^%"\r\n]/.test(exe)) throw new AppError('INVALID_REQUEST', 'The Claude Code path cannot be opened in a console');

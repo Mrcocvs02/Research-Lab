@@ -17,10 +17,20 @@ export interface BibStatus {
 const sha256Of = (text: string): string => createHash('sha256').update(text).digest('hex');
 const RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)$/i;
 const NAME_OK = /^[^<>:"/\\|?*\u0000-\u001f]+$/;
+const validName = (name: string): boolean => /\.bib$/i.test(name) && NAME_OK.test(name) && !RESERVED.test(path.parse(name).name) && !/[. ]$/.test(name.slice(0, -4)) && name.length <= 120;
 const unlinked: BibStatus = { linked: false, file: null, state: 'ok', at: null };
 
+const chains = new Map<string, Promise<unknown>>();
+const serial = <T>(id: string, fn: () => Promise<T>): Promise<T> => {
+  const next = (chains.get(id) ?? Promise.resolve()).then(fn, fn);
+  chains.set(id, next.catch(() => undefined));
+  return next;
+};
+
 /** Records of `ids`, each with a cite key: a document that has none gets one now, by the library's key schema, and keeps it for good (stable keys). */
-export async function withKeys(rt: LibraryRuntime, ids: readonly string[]): Promise<Array<{ doc: DocumentRecord; key: string }>> {
+export const withKeys = (rt: LibraryRuntime, ids: readonly string[]): Promise<Array<{ doc: DocumentRecord; key: string }>> => serial(`keys:${rt.libraryId}`, () => assignKeys(rt, ids));
+
+async function assignKeys(rt: LibraryRuntime, ids: readonly string[]): Promise<Array<{ doc: DocumentRecord; key: string }>> {
   const store = rt.store;
   const schema = (await store.readConfig()).citeKeySchema;
   const all = await store.documents.list();
@@ -66,19 +76,14 @@ async function setLink(s: MainServices, rt: LibraryRuntime, id: string, link: Pr
   return saved;
 }
 
-const chains = new Map<string, Promise<unknown>>();
-const serial = <T>(id: string, fn: () => Promise<T>): Promise<T> => {
-  const next = (chains.get(id) ?? Promise.resolve()).then(fn, fn);
-  chains.set(id, next.catch(() => undefined));
-  return next;
-};
-
 /** Rewrites the linked file when it is exactly what the app wrote last (D-421); otherwise nothing is written. */
 async function writeLinked(s: MainServices, rt: LibraryRuntime, id: string, force: boolean): Promise<BibStatus> {
   const p = await projectOf(rt, id);
   const link = p.bibLink;
   if (!link) return unlinked;
   try {
+    // The record travels with the library: the name is checked again here, not only when the link was made.
+    if (!validName(link.file)) return statusOf(p, 'error');
     if (await isInsideLibrary(rt.store.rootPath, link.dir)) return statusOf(p, 'error');
     const target = new ExportTarget(link.dir);
     const current = await target.read(link.file);
@@ -105,7 +110,7 @@ export async function manage(s: MainServices, req: LinkRequest): Promise<BibStat
   if (req.op === 'unlink') return unlink(s, req);
   if (req.op === 'status') return status(s, req);
   if (req.op === 'overwrite') return sync(s, req.projectId, true);
-  return link(s, { projectId: req.projectId, destination: req.destination ?? '', fileName: req.fileName ?? '' });
+  return serial(req.projectId, () => link(s, { projectId: req.projectId, destination: req.destination ?? '', fileName: req.fileName ?? '' }));
 }
 
 async function link(s: MainServices, req: { projectId: string; destination: string; fileName: string }): Promise<BibStatus> {
@@ -113,7 +118,7 @@ async function link(s: MainServices, req: { projectId: string; destination: stri
   const dir = s.approved.resolve(req.destination, 'export-destination');
   if (dir === null) throw new AppError('INVALID_REQUEST', 'The folder was not chosen with the folder dialog', { reason: 'destination-not-approved' });
   const name = req.fileName.trim().replace(/(\.bib)?$/i, '.bib');
-  if (!NAME_OK.test(name) || RESERVED.test(path.parse(name).name) || /[. ]$/.test(name.slice(0, -4)) || name.length > 120) throw new AppError('INVALID_REQUEST', 'Not a valid file name', { reason: 'invalid-name' });
+  if (!validName(name)) throw new AppError('INVALID_REQUEST', 'Not a valid file name', { reason: 'invalid-name' });
   if (await isInsideLibrary(rt.store.rootPath, dir)) throw new AppError('CONFLICT', 'The .bib file cannot be inside the library folder', { reason: 'inside-library' });
   const p = await projectOf(rt, req.projectId);
   const target = new ExportTarget(dir);
@@ -121,7 +126,10 @@ async function link(s: MainServices, req: { projectId: string; destination: stri
   // A file that is not one of ours is never overwritten.
   if (existing !== null && !existing.startsWith(GENERATED_LINE)) throw new AppError('CONFLICT', 'A file with this name exists and was not written by the app', { reason: 'not-ours' });
   const { text } = await render(rt, p.members.map((m) => m.docId));
-  await target.write(name, text);
+  // A new file is created exclusively; one of ours (it starts with the generated line) is replaced.
+  if (existing === null) {
+    if (!(await target.writeNew(name, text))) throw new AppError('CONFLICT', 'A file with this name was created meanwhile', { reason: 'not-ours' });
+  } else await target.write(name, text);
   const saved = await setLink(s, rt, req.projectId, { dir, file: name, hash: sha256Of(text), at: new Date().toISOString() });
   return statusOf(saved, 'ok');
 }

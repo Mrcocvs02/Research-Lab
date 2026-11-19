@@ -20,6 +20,9 @@ export function esc(s: string): string {
     .replace(/[{}]/g, (c) => (balanced ? c : `\\${c}`));
 }
 
+/** A cite key as written to a file: anything that could end the entry or add a field is replaced (keys come from imported files). */
+export const safeKey = (key: string): string => key.replace(/[^\w:.\-+/]/g, '_') || 'key';
+
 export type BibDoc = Pick<DocumentRecord, 'title' | 'authors' | 'year' | 'doi' | 'arxivId' | 'ref'>;
 
 const PROCEEDINGS = /proceedings|conference|workshop|symposium|congress|meeting/i;
@@ -35,7 +38,7 @@ export function bibtexEntry(d: BibDoc, key: string): string {
   if (d.ref.venueRef) lines.push(['note', `{${esc(d.ref.venueRef)}}`]);
   if (d.doi) lines.push(['doi', `{${d.doi.replace(/[{}\\]/g, '')}}`]);
   if (d.arxivId) lines.push(['eprint', `{${d.arxivId.replace(/[{}\\]/g, '')}}`], ['archiveprefix', '{arXiv}']);
-  return `@${type}{${key},\n${lines.map(([k, v]) => `  ${k} = ${v}`).join(',\n')}\n}\n`;
+  return `@${type}{${safeKey(key)},\n${lines.map(([k, v]) => `  ${k} = ${v}`).join(',\n')}\n}\n`;
 }
 
 /** The whole file: the generated-by line, then the entries in key order. */

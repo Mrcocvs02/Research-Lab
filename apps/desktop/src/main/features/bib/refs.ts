@@ -3,7 +3,7 @@ import { AppError, EXPORT_LIMITS, type ExportSelection } from '@rl/core';
 import { ExportTarget, isInsideLibrary } from '../../export/target.js';
 import { collect } from '../../export/collect.js';
 import type { MainServices } from '../../ipc/handlers/services.js';
-import { bibtexFile, type BibDoc } from './bibtex-write.js';
+import { bibtexFile, safeKey, type BibDoc } from './bibtex-write.js';
 
 export type RefFormat = 'bibtex' | 'ris' | 'csl';
 export const EXTENSION: Record<RefFormat, string> = { bibtex: 'bib', ris: 'ris', csl: 'json' };
@@ -19,7 +19,7 @@ export function risFile(items: readonly Item[]): string {
     const venue = d.ref.venue ?? null;
     const tag = (t: string, v: string | null | undefined) => v && out.push(`${t}  - ${one(v)}`);
     tag('TY', venue === null ? 'GEN' : PROCEEDINGS.test(venue) ? 'CPAPER' : 'JOUR');
-    tag('ID', key);
+    tag('ID', safeKey(key));
     tag('TI', d.title);
     for (const a of d.authors) tag('AU', a);
     if (d.year !== null) tag('PY', String(d.year));
@@ -48,8 +48,8 @@ export function cslFile(items: readonly Item[]): string {
     .map(({ doc: d, key }) => {
       const venue = d.ref.venue ?? null;
       return {
-        id: key,
-        'citation-key': key,
+        id: safeKey(key),
+        'citation-key': safeKey(key),
         type: venue === null ? 'document' : PROCEEDINGS.test(venue) ? 'paper-conference' : 'article-journal',
         ...(d.title ? { title: d.title } : {}),
         ...(d.authors.length > 0 ? { author: d.authors.map(csName) } : {}),
@@ -68,12 +68,13 @@ export const render = (format: RefFormat, items: readonly Item[]): string => (fo
 const BASE = /^[^<>:"/\\|?*\u0000-\u001f]+$/;
 const RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)$/i;
 
-/** The next free `base.ext`, `base-2.ext`... in the folder (nothing is overwritten). */
-async function freeName(target: ExportTarget, base: string, ext: string): Promise<string> {
-  let file = `${base}.${ext}`;
-  for (let n = 2; (await target.read(file)) !== null && n < 100; n++) file = `${base}-${n}.${ext}`;
-  if ((await target.read(file)) !== null) throw new AppError('CONFLICT', 'Too many files with this name', { reason: 'exists' });
-  return file;
+/** Writes `text` as `base.ext`, `base-2.ext`... : the first name that does not exist, created exclusively (nothing is overwritten, even in a race). */
+async function writeFree(target: ExportTarget, base: string, ext: string, text: string): Promise<string> {
+  for (let n = 1; n < 100; n++) {
+    const file = n === 1 ? `${base}.${ext}` : `${base}-${n}.${ext}`;
+    if (await target.writeNew(file, text)) return file;
+  }
+  throw new AppError('CONFLICT', 'Too many files with this name', { reason: 'exists' });
 }
 
 async function folderOf(s: MainServices, destination: string, fileName: string | undefined, ext: string, fallback: string): Promise<{ target: ExportTarget; base: string }> {
@@ -89,9 +90,7 @@ async function folderOf(s: MainServices, destination: string, fileName: string |
 /** The PRISMA diagram (SVG) or its table (Markdown), written as a new file in a folder chosen by the user. */
 export async function saveText(s: MainServices, req: { destination: string; fileName: string; ext: 'svg' | 'md'; text: string }): Promise<{ file: string }> {
   const { target, base } = await folderOf(s, req.destination, req.fileName, req.ext, 'prisma');
-  const file = await freeName(target, base, req.ext);
-  await target.write(file, req.text);
-  return { file };
+  return { file: await writeFree(target, base, req.ext, req.text) };
 }
 
 /**
@@ -109,7 +108,6 @@ export async function exportRefs(
   if (docs.length === 0) throw new AppError('INVALID_REQUEST', 'Nothing to export', { reason: 'empty' });
   if (docs.length > EXPORT_LIMITS.documents) throw new AppError('INVALID_REQUEST', 'Too many documents', { reason: 'too-many' });
   const text = render(req.format, await keys(docs.map((d) => d.id)));
-  const file = await freeName(target, base, EXTENSION[req.format]);
-  await target.write(file, text);
+  const file = await writeFree(target, base, EXTENSION[req.format], text);
   return { count: docs.length, file: path.basename(file) };
 }

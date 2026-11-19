@@ -69,6 +69,12 @@ async function readCapped(res: Response): Promise<string> {
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
+const sameAddresses = (a: readonly string[], b: readonly string[]): boolean => {
+  const x = new Set(a.map((s) => s.toLowerCase()));
+  const y = new Set(b.map((s) => s.toLowerCase()));
+  return y.size > 0 && x.size === y.size && [...y].every((s) => x.has(s));
+};
+
 export interface PreviewDeps extends GuardOptions {
   fetch: typeof fetch;
   /** Resolves a name to its addresses; absent: the system resolver. */
@@ -85,14 +91,22 @@ export async function loadPreview(startUrl: string, d: PreviewDeps): Promise<Pre
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const v = checkPublicUrl(url, d);
     if (!v.ok) throw new PreviewError('refused');
+    const lookup = () => (d.resolve ? d.resolve(v.url.hostname) : dns.lookup(v.url.hostname, { all: true }).then((r) => r.map((x) => x.address))).catch(() => [] as string[]);
+    let before: string[] = [];
     if (!d.allowLocal) {
-      const addrs = await (d.resolve ? d.resolve(v.url.hostname) : dns.lookup(v.url.hostname, { all: true }).then((r) => r.map((x) => x.address))).catch(() => [] as string[]);
-      if (!checkResolved(addrs)) throw new PreviewError(addrs.length === 0 ? 'unreachable' : 'refused');
+      before = await lookup();
+      if (!checkResolved(before)) throw new PreviewError(before.length === 0 ? 'unreachable' : 'refused');
     }
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
     try {
       const res = await d.fetch(v.url.href, { signal: ctl.signal, credentials: 'omit', redirect: 'manual', headers: { Accept: 'text/html,application/xhtml+xml', 'User-Agent': 'ResearchLab-link-preview' } } as RequestInit);
+      // The request resolves the name by itself and cannot be pinned to the address checked above: the name is resolved once
+      // more now that the connection is made, and an answer that differs (DNS rebinding) discards the response unread.
+      if (!d.allowLocal && !sameAddresses(before, await lookup())) {
+        await res.body?.cancel().catch(() => {});
+        throw new PreviewError('refused');
+      }
       if (res.status >= 300 && res.status < 400) {
         const next = res.headers.get('location');
         await res.body?.cancel().catch(() => {});

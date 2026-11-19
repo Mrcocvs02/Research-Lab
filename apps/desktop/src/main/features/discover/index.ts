@@ -12,7 +12,7 @@ import type { LibraryRuntime } from '../../library/library-runtime.js';
 import { cacheHash, chunk, costDecision } from '../ai/batch.js';
 import { abstracts, bridge, extend, question, resolveSeed, type Deps, type Seed } from './engine.js';
 import { newStats, recordDecision, recordRun, type ExtendStats } from './prisma.js';
-import { listRuns, pruneRuns, readRun, removeRun, writeRun } from './store.js';
+import { listRuns, pruneRuns, readRun, removeRun, serialRun, writeRun } from './store.js';
 import { cleanSummaries, readCachedSummary, SUMMARY_BLOCK, SUMMARY_TOKENS, SUMMARY_VERSION, summaryAnswerSchema, summaryPrompt, summarySystem } from './summary.js';
 
 /**
@@ -162,9 +162,16 @@ export async function rerunDiscover(s: MainServices, req: { token: string; id: s
     return was ? { ...c, state: was.state, summary: was.summary, fresh: false } : { ...c, fresh: old.items.length > 0 };
   });
   const run: DiscoverRun = { ...out, items, fresh: items.filter((c) => c.fresh).length, id: old.id, createdAt: old.createdAt, summarizedWith: old.summarizedWith, ...(old.projectId ? { projectId: old.projectId } : {}) };
-  await writeRun(rt.store.dataDir, run);
-  if (stats) await recordRun(s, run, stats);
-  return { run };
+  // The choices made while the search ran again stay: the file as it is now decides, not the copy read at the start.
+  const written = await serialRun(old.id, async () => {
+    const cur = (await readRun(rt.store.dataDir, old.id)) ?? old;
+    const now = new Map(cur.items.map((c) => [c.key, c]));
+    const merged: DiscoverRun = { ...run, items: run.items.map((c) => (now.has(c.key) ? { ...c, state: now.get(c.key)!.state, summary: now.get(c.key)!.summary } : c)) };
+    await writeRun(rt.store.dataDir, merged);
+    return merged;
+  });
+  if (stats) await recordRun(s, written, stats);
+  return { run: written };
 }
 
 export const cancelDiscover = async (req: { token: string }): Promise<{ ok: true }> => {
@@ -184,9 +191,12 @@ export async function getDiscover(s: MainServices, req: { id: string }): Promise
 
 export async function markDiscover(s: MainServices, req: { id: string; key: string; state: DiscoverCandidate['state']; reason?: string | undefined }): Promise<{ ok: true }> {
   const dir = (await s.runtime.require()).store.dataDir;
-  const run = await readRun(dir, req.id);
-  if (!run) throw new AppError('NOT_FOUND', 'Unknown search');
-  await writeRun(dir, { ...run, items: run.items.map((c) => (c.key === req.key ? { ...c, state: req.state } : c)) });
+  const run = await serialRun(req.id, async () => {
+    const cur = await readRun(dir, req.id);
+    if (!cur) throw new AppError('NOT_FOUND', 'Unknown search');
+    await writeRun(dir, { ...cur, items: cur.items.map((c) => (c.key === req.key ? { ...c, state: req.state } : c)) });
+    return cur;
+  });
   await recordDecision(s, run, req.key, req.state, req.reason);
   return { ok: true };
 }
@@ -291,7 +301,7 @@ export async function summarizeDiscover(s: MainServices, req: { token: string; i
     await mkdir(cacheDir, { recursive: true });
     for (const block of chunk(toSend, SUMMARY_BLOCK)) {
       const { value } = await callStructured(
-        { s, ctx, provider, signal: ctl.signal, confirmed: true, deviceId, addUsd: () => {} },
+        { s, ctx, provider, signal: ctl.signal, confirmed: req.confirmed, deviceId, addUsd: () => {} },
         { purpose: 'discover', model, reasoning: cfg.ai.defaultReasoning, system: summarySystem(cfg.language), prompt: summaryPrompt(block), schema: summaryAnswerSchema, docIds: [], folders: [] },
       );
       const clean = cleanSummaries(value, new Set(block.map((b) => b.key)));
@@ -306,9 +316,12 @@ export async function summarizeDiscover(s: MainServices, req: { token: string; i
     if (running.get(req.token) === ctl) running.delete(req.token);
   }
   // The run as it is now (the user may have marked candidates while the blocks were written).
-  const fresh = (await readRun(dir, req.id)) ?? run;
-  const next: DiscoverRun = { ...fresh, summarizedWith: found.size > 0 ? model : fresh.summarizedWith, items: fresh.items.map((c) => (found.has(c.key) ? { ...c, summary: found.get(c.key)! } : c)) };
-  await writeRun(dir, next);
+  const next = await serialRun(req.id, async () => {
+    const fresh = (await readRun(dir, req.id)) ?? run;
+    const merged: DiscoverRun = { ...fresh, summarizedWith: found.size > 0 ? model : fresh.summarizedWith, items: fresh.items.map((c) => (found.has(c.key) ? { ...c, summary: found.get(c.key)! } : c)) };
+    await writeRun(dir, merged);
+    return merged;
+  });
   return { run: next, written: found.size - cached, cached, noAbstract: todo.length - text.size };
 }
 

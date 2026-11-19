@@ -16,6 +16,9 @@ import { takeMapBridge } from './bridgeIntent';
 import { rl } from '../../lib/rl';
 import { RlError } from '../../lib/rl-error';
 import { safeText } from '../library/safeText';
+import { Segmented } from '../../components/Segmented';
+import { AreaLegend, useAreaColors } from './AreaLegend';
+import { areaFallback, assignAreaSlots, loadAreaMemo, saveAreaMemo } from './areaColors';
 import { adjacencyOf, assignTints, type TintMemo } from './colors';
 import { rng } from './playful';
 import { MapCanvas, type MapHandle } from './MapCanvas';
@@ -100,6 +103,16 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     // A new document placed incrementally (pending/documents) changes the map without a rebuild.
   }, [usable, scope, mapVersion, status.documents, status.pending, status.builtAt]);
 
+  const [byArea, setByArea] = useAreaColors();
+  // Colour by macro-area (D-483): with no area, one area, or colouring switched off, the topics colour the points.
+  const fallback = useMemo(() => (map ? areaFallback(map.areas, map.withArea, map.n) : { use: 'topics' as const, reason: 'none' as const }), [map]);
+  const areaSlots = useMemo(() => {
+    if (!map || map.areas.length === 0) return null;
+    const r = assignAreaSlots(map.areas, loadAreaMemo());
+    saveAreaMemo(r.memo);
+    return r.slots;
+  }, [map]);
+  const areaProp = useMemo(() => (map && byArea && fallback.use === 'areas' && areaSlots ? { defs: map.areas, slots: areaSlots } : null), [map, byArea, fallback, areaSlots]);
   const tl = useTimeline(map);
   const depth = map?.levels.length ?? 0;
   const lvl = Math.min(level, Math.max(depth - 1, 0));
@@ -216,12 +229,34 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
       pill = <Pill testId="map-omitted">{t('network.mapOmitted', { count: map.omitted, shown: map.n })}</Pill>;
     } else if (hint) {
       pill = <Pill testId="map-hint">{t('network.hint')}</Pill>;
+    } else if (byArea && fallback.use === 'topics') {
+      pill = (
+        <Pill testId="map-color-note">
+          {t(fallback.reason === 'single' ? 'network.area.areaSingle' : 'network.area.areaNoTags')}
+          {fallback.reason !== 'single' && (
+            <button type="button" className="link" onClick={() => nav.navigate({ view: 'settings' })}>
+              {t('network.area.manageTags')}
+            </button>
+          )}
+        </Pill>
+      );
+    } else if (areaProp && fallback.sparse !== undefined) {
+      pill = (
+        <Pill testId="map-color-note">
+          {t('network.area.areaSparse', { count: fallback.sparse })}
+          <button type="button" className="link" onClick={() => setByArea(false)}>
+            {t('network.area.areaByTopic')}
+          </button>
+        </Pill>
+      );
     }
   }
 
   const levels = map?.levels ?? [];
   const legend =
-    map && !tooFew ? (
+    map && !tooFew && areaProp ? (
+      <AreaLegend defs={areaProp.defs} slots={areaProp.slots} without={map.n - map.withArea} onLight={(a) => handle.current?.lightArea(a)} onIsolate={(a) => handle.current?.isolateArea(a)} />
+    ) : map && !tooFew ? (
       <ul className="legend" data-testid="cluster-legend" aria-label={t('network.legend')}>
         {clusters.slice(0, 8).map((c, i) => {
           const txt = clusterText(c);
@@ -311,6 +346,19 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
               </div>
             )}
             <div className="net-pop-sec">{t('network.look')}</div>
+            <div className="net-field net-pop-row">
+              <span>{t('network.area.colorMode')}</span>
+              <Segmented<'areas' | 'topics'>
+                size="sm"
+                label={t('network.area.colorMode')}
+                value={areaProp ? 'areas' : 'topics'}
+                onChange={(v) => setByArea(v === 'areas')}
+                options={[
+                  { value: 'areas', label: t('network.area.colorAreas'), testId: 'map-color-areas', disabled: fallback.use === 'topics', disabledReason: t(fallback.reason === 'single' ? 'network.area.areaSingle' : 'network.area.areaNoTags') },
+                  { value: 'topics', label: t('network.area.colorTopics'), testId: 'map-color-topics' },
+                ]}
+              />
+            </div>
             <label className="net-field net-pop-row">
               <span>{t('network.colorBy')}</span>
               <select value={lvl} onChange={(e) => setLevel(Number(e.target.value))} disabled={depth === 0} data-testid="map-level">
@@ -406,6 +454,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
             onRead={onRead}
             onExplore={onExplore}
             tints={tints}
+            areas={areaProp}
             allow={tl.only ?? allow}
             minimap={mini}
             bridge={bridge}

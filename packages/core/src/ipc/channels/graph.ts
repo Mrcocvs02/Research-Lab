@@ -27,6 +27,10 @@ export const graphStatusSchema = z.object({
   removed: z.number().int().nonnegative(),
 });
 
+/** Macro-areas (D-483): `ar` up to 3 triples [area, branch, share x 100], `az` the centrality x 100; `areas` is `{ id, label, count, branches }[]`. Built by the lazy `areas` chunk of the main process. */
+const A = { ar: z.array(z.array(z.number())).optional(), az: z.number().optional() };
+const areas = z.array(z.any()).optional();
+
 export const clusterViewSchema = z.object({
   id: z.string().max(100),
   parent: z.string().max(100).nullable(),
@@ -60,7 +64,8 @@ export const graphChannels = defineChannels('graph', {
       scope: z.object({ folder: relativePathSchema.optional(), projectId: z.string().max(100).optional(), tagId: itemIdSchema.optional() }).optional(),
     }),
     response: z.object({
-      points: z.array(z.object({ docId: documentIdSchema, x: z.number(), y: z.number(), clusters: z.array(z.string().max(100)).max(8) })).max(GRAPH_LIMITS.mapPoints),
+      points: z.array(z.object({ docId: documentIdSchema, x: z.number(), y: z.number(), clusters: z.array(z.string().max(100)).max(8), ...A })).max(GRAPH_LIMITS.mapPoints),
+      areas,
       clusters: z.array(clusterViewSchema),
       seed: z.number().int(),
       builtAt: isoDateSchema,
@@ -101,7 +106,8 @@ export const graphChannels = defineChannels('graph', {
       limit: z.number().int().min(1).max(GRAPH_LIMITS.neighbors).default(50),
     }),
     response: z.object({
-      nodes: z.array(z.object({ kind: z.enum(['doc', 'folder', 'tag']), id: z.string().max(1024), label: z.string(), count: z.number().int().nonnegative().optional() })),
+      nodes: z.array(z.object({ kind: z.enum(['doc', 'folder', 'tag']), id: z.string().max(1024), label: z.string(), count: z.number().int().nonnegative().optional(), ...A })),
+      areas,
       /** `from` / `to` are node KEYS `<kind>:<id>` (a folder and a tag may share the same id). */
       edges: z.array(z.object({ from: z.string().max(1100), to: z.string().max(1100), kind: z.enum(['similar', 'cites', 'tagged', 'contains']), weight: z.number().min(0).max(1) })),
     }),
@@ -136,6 +142,7 @@ export const graphChannels = defineChannels('graph', {
           group: z.string().max(1100),
           groupLabel: z.string().max(300).optional(),
           variants: z.array(z.string().max(300)).max(50).optional(),
+          ...A,
         }),
       ).max(GRAPH_LIMITS.entityNodes),
       edges: z.array(z.object({ a: z.string().max(1100), b: z.string().max(1100), w: z.number().min(0).max(1), n: z.number().int().nonnegative(), implies: z.boolean().optional() })).max(GRAPH_LIMITS.entityEdges),
@@ -146,6 +153,7 @@ export const graphChannels = defineChannels('graph', {
       yearRange: z.array(z.number().int()).length(2).optional(),
       /** Documents of the scope that the network was computed from. */
       documents: z.number().int().nonnegative(),
+      areas,
     }),
   },
   /**

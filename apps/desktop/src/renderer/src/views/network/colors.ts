@@ -10,6 +10,56 @@ export function readTints(el: Element, dark: boolean): string[] {
   return base.map((d, i) => css.getPropertyValue(`--cat-${i + 1}`).trim() || d);
 }
 
+/** Macro-area tints (D-483): `--area-1..7`, then "other areas" and "no area" (the fallback of the first frame, as `--cat-*`). */
+export const AREA_TINTS = 7;
+export const AREA_LIGHT = ['#195daa', '#c8741d', '#b95a93', '#017460', '#972e2d', '#8d73d1', '#857501', '#5c6b7a', '#696969'] as const;
+export const AREA_DARK = ['#5d94da', '#fec394', '#ee97c9', '#30b69a', '#d87972', '#c8b7ff', '#d0bf5e', '#9dadbe', '#ababab'] as const;
+const AREA_NAMES = ['--area-1', '--area-2', '--area-3', '--area-4', '--area-5', '--area-6', '--area-7', '--area-other', '--area-none'] as const;
+
+/** The nine area tokens of the element (index 7 = other areas, 8 = no area), falling back to the built-in values. */
+export function readAreas(el: Element, dark: boolean): string[] {
+  const css = getComputedStyle(el);
+  const base = dark ? AREA_DARK : AREA_LIGHT;
+  return AREA_NAMES.map((n, i) => css.getPropertyValue(n).trim() || base[i]!);
+}
+
+export type Lab = readonly [number, number, number];
+const lin = (v: number): number => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+const gam = (v: number): number => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+
+/** OKLab of an sRGB colour (Ottosson). */
+export function toOklab(c: string): Lab {
+  const [r, g, b] = parseColor(c).map((v) => lin(v / 255)) as [number, number, number];
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+}
+
+function labToLinear(L: number, a: number, b: number): [number, number, number] {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s];
+}
+
+/** `#rrggbb` of an OKLCh colour; the chroma is reduced until the colour is inside the sRGB gamut. */
+export function fromOklch(L: number, C: number, h: number): string {
+  let lo = 0;
+  let hi = Math.max(C, 0);
+  const inside = (c: number): boolean => labToLinear(L, c * Math.cos(h), c * Math.sin(h)).every((v) => v >= -0.0005 && v <= 1.0005);
+  if (!inside(hi)) {
+    for (let i = 0; i < 16; i++) {
+      const mid = (lo + hi) / 2;
+      if (inside(mid)) lo = mid;
+      else hi = mid;
+    }
+    hi = lo;
+  }
+  const rgb = labToLinear(L, hi * Math.cos(h), hi * Math.sin(h)).map((v) => Math.round(Math.min(1, Math.max(0, gam(Math.min(1, Math.max(0, v))))) * 255));
+  return `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
 export function hash32(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
@@ -174,6 +224,8 @@ export interface MapTheme {
   surface: string;
   border: string;
   tints: string[];
+  /** `--area-*`: seven tints, other areas, no area. */
+  areas: string[];
 }
 
 export function readTheme(el: Element, dark: boolean): MapTheme {
@@ -188,6 +240,7 @@ export function readTheme(el: Element, dark: boolean): MapTheme {
     surface: get('--surface', dark ? '#1a1b1f' : '#ffffff'),
     border: get('--border', dark ? '#33353c' : '#dedcd5'),
     tints: readTints(el, dark),
+    areas: readAreas(el, dark),
   };
 }
 

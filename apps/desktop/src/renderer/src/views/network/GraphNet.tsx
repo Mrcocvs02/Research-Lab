@@ -12,11 +12,13 @@ import { isDarkTheme } from '../../lib/theme';
 import { useLocalFlag } from '../../lib/useLocalFlag';
 import { safeText } from '../library/safeText';
 import { reducedMotion } from './camera';
-import { assignKeyTints, mix, readTheme, withAlpha, type MapTheme } from './colors';
-import { controlPoint, edgeAlpha, fillTapered, MAX_CURVED } from './edges';
+import { AreaLegend, useAreaColors } from './AreaLegend';
+import { areaSummary, assignAreaSlots, colorCache, loadAreaMemo, mainArea, saveAreaMemo, shareIn, type AreaDef } from './areaColors';
+import { Segmented } from '../../components/Segmented';
+import { assignKeyTints, mix, readTheme, type MapTheme } from './colors';
+import { controlPoint, edgeAlpha, edgeWidths, fillTapered, MAX_CURVED, STRAIGHT_ALPHA, straightWidth } from './edges';
 import { MAX_NET_NODES, Network, type EdgeKind, type NetNode, type NodeKind } from './forceSim';
 import { boundsOf, toScreenX, toScreenY, type Bounds } from './geometry';
-import { centroidOf, convexHull, hullShape, type Pt } from './hulls';
 import { clusterText } from './mapModel';
 import { DocCard, HoverCard, useRestingHover } from './HoverCard';
 import { pickLabels, shortLabel, type LabelCandidate } from './labelsLod';
@@ -101,6 +103,13 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
   /** The topics of the Panorama: the topic of each document (coarsest level), the tint of each topic and its name. */
   const topics = useRef<{ of: Map<string, string>; tint: Map<string, number>; name: Map<string, string> } | null>(null);
   const hoverKey = useRef<string | null>(null);
+  /** Macro-areas (D-483): the areas of the library and their tint slots, learnt from the answers of `graph:neighbors`. */
+  const [byArea, setByArea] = useAreaColors();
+  const [areaState, setAreaState] = useState<{ defs: AreaDef[]; slots: number[] } | null>(null);
+  const areaRef = useRef<{ on: boolean; defs: AreaDef[]; slots: number[]; names: Map<string, string> }>({ on: false, defs: [], slots: [], names: new Map() });
+  const areaPaint = useRef<{ dark: boolean; slots: unknown; fn: ReturnType<typeof colorCache> } | null>(null);
+  const litAreaRef = useRef<number | null>(null);
+  const isoAreaRef = useRef<number | null>(null);
   const [bridgeFrom, setBridgeFrom] = useState<string | null>(null);
   const refs = useRef({ selKey, cursor, pathKeys, focusKey, surprise, bridgeFrom });
   refs.current = { selKey, cursor, pathKeys, focusKey, surprise, bridgeFrom };
@@ -119,12 +128,24 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
   const untitled = t('network.untitled');
   const [hint, dismissHint] = useHint(active);
 
-  /** Documents take the colour and the hull of their topic (the same tints as the Panorama); the simulation pulls them towards it. */
+  /** Documents take the group of their macro-area (when one holds 60 % of them) or of their topic; the simulation pulls a group of three or more together. */
   function tagTopics(): void {
+    const ar = areaRef.current;
     const tp = topics.current;
-    if (!tp) return;
-    for (const n of net.nodes.values()) if (n.kind === 'doc' && n.group === undefined) n.group = tp.of.get(n.id);
+    const docs = [...net.nodes.values()].filter((n) => n.kind === 'doc');
+    // No area, or one, or no document with one: the topics colour the nodes.
+    ar.on = byAreaRef.current && ar.defs.length >= 2 && docs.some((n) => n.ar !== undefined && n.ar.length > 0);
+    ar.names = new Map();
+    for (const n of docs) {
+      if (ar.on) {
+        const a = mainArea(n.ar);
+        n.group = a >= 0 && shareIn(n.ar, a) >= 0.6 && ar.defs[a] ? `area:${ar.defs[a]!.id}` : undefined;
+        if (n.group) ar.names.set(n.group, ar.defs[a]!.label);
+      } else n.group = tp?.of.get(n.id);
+    }
   }
+  const byAreaRef = useRef(byArea);
+  byAreaRef.current = byArea;
 
   function getBounds(): Bounds | null {
     if (net.size === 0) return null;
@@ -166,36 +187,30 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
       const onPath = new Set<string>();
       if (path) for (let i = 0; i + 1 < path.length; i++) onPath.add(`${path[i]}|${path[i + 1]}`).add(`${path[i + 1]}|${path[i]}`);
       const fade = (k: string): number => (focusSet && !focusSet.has(k) ? 0.12 : hk && !near.has(k) ? 0.35 : pathSet && !pathSet.has(k) ? 0.25 : 1);
-      // Hulls of the topics (documents of one topic, widened and rounded), behind the edges.
+      // No outlines (D-482): the name of a group is a label at the centroid of its visible nodes (three or more).
       const tp = topics.current;
-      const topicTexts: Array<{ text: string; x: number; y: number }> = [];
-      if (tp) {
-        const groups = new Map<string, Pt[]>();
-        for (const n of nodes.values()) if (n.kind === 'doc' && n.group) (groups.get(n.group) ?? groups.set(n.group, []).get(n.group)!).push([sx(n.x), sy(n.y)]);
-        ctx.font = '600 13px system-ui, sans-serif';
-        for (const [id, pts] of groups) {
-          if (pts.length < 2) continue;
-          const tint = th.tints[tp.tint.get(id) ?? 0] ?? th.muted;
-          const hull = convexHull(pts);
-          const shape = hullShape(hull, 16);
-          if (shape.length < 3) continue;
-          ctx.beginPath();
-          ctx.moveTo(shape[0]![0], shape[0]![1]);
-          for (let i = 1; i < shape.length; i++) ctx.lineTo(shape[i]![0], shape[i]![1]);
-          ctx.closePath();
-          const hovered = hk ? nodes.get(hk)?.group === id : false;
-          ctx.fillStyle = withAlpha(tint, hovered ? 0.12 : dark ? 0.08 : 0.05);
-          ctx.fill();
-          if (hovered) {
-            ctx.strokeStyle = withAlpha(tint, 0.4);
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-          }
-          const c = centroidOf(hull);
-          const name = tp.name.get(id);
-          if (name) topicTexts.push({ text: shortLabel(name), x: c[0], y: Math.min(...hull.map((p) => p[1])) - 22 });
-        }
+      const ar = areaRef.current;
+      const groupAt = new Map<string, { x: number; y: number; n: number }>();
+      for (const n of nodes.values()) {
+        if (n.kind !== 'doc' || !n.group) continue;
+        const x = sx(n.x);
+        const y = sy(n.y);
+        if (x < 0 || y < 0 || x > w || y > h) continue;
+        const g = groupAt.get(n.group) ?? groupAt.set(n.group, { x: 0, y: 0, n: 0 }).get(n.group)!;
+        g.x += x;
+        g.y += y;
+        g.n++;
       }
+      const colorFn = (() => {
+        if (!ar.on) return null;
+        const c = areaPaint.current;
+        if (c && c.dark === dark && c.slots === ar.slots) return c.fn;
+        const fn = colorCache(ar.slots, th.areas);
+        areaPaint.current = { dark, slots: ar.slots, fn };
+        return fn;
+      })();
+      const areaLit = isoAreaRef.current ?? litAreaRef.current;
+      const areaFade = (n: NetNode): number => (areaLit === null || shareIn(n.ar, areaLit) >= 0.2 ? 1 : isoAreaRef.current !== null ? 0.15 : 0.25);
       const visible = [];
       for (const e of net.edges) {
         const a = nodes.get(e.a);
@@ -225,14 +240,17 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
           ctx.stroke();
           continue;
         }
-        ctx.globalAlpha = (curved ? edgeAlpha(e.kind === 'contains' || e.kind === 'tagged' ? 0.3 : e.weight, dark) : 0.3) * dim * (pathSet ? 0.5 : 1);
+        const we = e.kind === 'contains' || e.kind === 'tagged' ? 0.3 : e.weight;
+        const incident = hk !== null && (a.key === hk || b.key === hk);
+        ctx.globalAlpha = incident ? 0.9 : edgeAlpha(we, dark) * (curved ? 1 : STRAIGHT_ALPHA) * dim * (pathSet ? 0.5 : 1);
         if (curved && style.dash.length === 0) {
           ctx.fillStyle = col;
-          fillTapered(ctx, ax, ay, bx, by, e.kind === 'cites' ? 2.8 : 2.5, e.kind === 'cites' ? 0.6 : 0.8);
+          const wd = edgeWidths(we, e.kind === 'cites');
+          fillTapered(ctx, ax, ay, bx, by, wd.w0 + (incident ? 1 : 0), wd.w1 + (incident ? 1 : 0));
         } else {
           ctx.strokeStyle = col;
           ctx.setLineDash(style.dash);
-          ctx.lineWidth = 1;
+          ctx.lineWidth = (style.dash.length === 0 ? straightWidth(we) : 1) + (incident ? 1 : 0);
           ctx.beginPath();
           ctx.moveTo(ax, ay);
           ctx.lineTo(bx, by);
@@ -266,10 +284,12 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         const y = sy(n.y);
         if (x < -30 || y < -30 || x > w + 30 || y > h + 30) continue;
         const r = NODE_R * (n.key === hk ? 1.25 : 1);
-        ctx.globalAlpha = fade(n.key);
+        ctx.globalAlpha = fade(n.key) * areaFade(n);
         const tin = n.kind === 'doc' && n.group !== undefined ? tp?.tint.get(n.group) : undefined;
-        ctx.fillStyle = tin !== undefined ? (th.tints[tin] ?? th.accent) : (th[NODE_FILL[n.kind]] as string);
-        ctx.strokeStyle = th.bg;
+        const ac = colorFn ? colorFn(n.ar, n.az) : null;
+        const ring = colorFn !== null && n.kind === 'doc' && ac === null;
+        ctx.fillStyle = ring ? th.bg : ac ?? (tin !== undefined ? (th.tints[tin] ?? th.accent) : (th[NODE_FILL[n.kind]] as string));
+        ctx.strokeStyle = ring ? th.areas[8]! : th.bg;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         if (n.kind === 'doc') ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -305,14 +325,14 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
       }
       ctx.globalAlpha = 1;
       ctx.font = '600 13px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      for (const tt of topicTexts) {
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = th.bg;
-        ctx.strokeText(tt.text, tt.x, tt.y);
-        ctx.fillStyle = th.muted;
-        ctx.fillText(tt.text, tt.x, tt.y);
+      const groupIds = new Set<number>();
+      for (const [id, g] of groupAt) {
+        if (g.n < 3) continue;
+        const name = ar.on ? ar.names.get(id) : tp?.name.get(id);
+        if (!name) continue;
+        texts.push(shortLabel(name));
+        groupIds.add(texts.length - 1);
+        labels.push({ id: texts.length - 1, x: g.x / g.n, y: g.y / g.n, w: ctx.measureText(shortLabel(name)).width + 8, size: 1e6 + g.n, forced: false });
       }
       ctx.font = '12px system-ui, sans-serif';
       // Labels: everywhere when the network is small, else the ones that matter and do not overlap.
@@ -321,10 +341,12 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
       const chosen = nodes.size < 30 ? labels.map((_, i) => i) : pickLabels(labels, w, h, nodes.size <= 120 ? 400 : 60);
       for (const i of chosen) {
         const l = labels[i]!;
+        const isGroup = groupIds.has(l.id);
+        ctx.font = isGroup ? '600 13px system-ui, sans-serif' : '12px system-ui, sans-serif';
         ctx.lineWidth = 3;
         ctx.strokeStyle = th.bg;
         ctx.strokeText(texts[l.id]!, l.x, l.y);
-        ctx.fillStyle = th.text;
+        ctx.fillStyle = isGroup ? th.muted : th.text;
         ctx.fillText(texts[l.id]!, l.x, l.y);
       }
       ctx.textAlign = 'left';
@@ -447,6 +469,13 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
       const live = net.nodes.get(n.key);
       if (!live) return;
       const res = net.expand(live, r.nodes, r.edges);
+      if (r.areas && r.areas.length > 0 && areaRef.current.defs !== r.areas) {
+        const slots = assignAreaSlots(r.areas, loadAreaMemo());
+        saveAreaMemo(slots.memo);
+        areaRef.current.defs = r.areas;
+        areaRef.current.slots = slots.slots;
+        setAreaState({ defs: r.areas, slots: slots.slots });
+      }
       tagTopics();
       if (res.capped) setNote({ text: t('network.net.capped', { count: res.omitted, limit: MAX_NET_NODES }), only: live });
       else if (res.added === 0) setNote({ text: t('network.net.nothingNew') });
@@ -819,6 +848,25 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
                   </label>
                 ))}
               </fieldset>
+              <div className="net-pop-sec">{t('network.look')}</div>
+              <div className="net-field net-pop-row">
+                <span>{t('network.area.colorMode')}</span>
+                <Segmented<'areas' | 'topics'>
+                  size="sm"
+                  label={t('network.area.colorMode')}
+                  value={byArea ? 'areas' : 'topics'}
+                  onChange={(v) => {
+                    setByArea(v === 'areas');
+                    byAreaRef.current = v === 'areas';
+                    tagTopics();
+                    view.requestDraw();
+                  }}
+                  options={[
+                    { value: 'areas', label: t('network.area.colorAreas'), testId: 'net-color-areas' },
+                    { value: 'topics', label: t('network.area.colorTopics'), testId: 'net-color-topics' },
+                  ]}
+                />
+              </div>
             </div>
           )}
         </ChipPop>
@@ -915,6 +963,21 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
           {announce}
         </span>
         {pill}
+        {areaState && areaRef.current.on && (
+          <AreaLegend
+            defs={areaState.defs}
+            slots={areaState.slots}
+            without={[...net.nodes.values()].filter((n) => n.kind === 'doc' && !(n.ar && n.ar.length > 0)).length}
+            onLight={(a) => {
+              litAreaRef.current = a;
+              view.requestDraw();
+            }}
+            onIsolate={(a) => {
+              isoAreaRef.current = a;
+              view.requestDraw();
+            }}
+          />
+        )}
         <div className="net-legend-box">
           <span className="hint" data-testid="net-count" data-count={count} aria-live="polite">
             {t('network.net.count', { count })}
@@ -928,7 +991,7 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         {hovered && hover && (
           <HoverCard x={hover.x} y={hover.y} width={view.size.current.w} height={view.size.current.h} testId="net-tooltip">
             {hovered.kind === 'doc' ? (
-              <DocCard docId={hovered.id} />
+              <DocCard docId={hovered.id} area={areaRef.current.on ? areaSummary(hovered.ar, areaRef.current.defs) : undefined} />
             ) : (
               <strong className="hc-title">
                 {safeText(hovered.label)}

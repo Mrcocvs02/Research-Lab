@@ -244,7 +244,7 @@ describe('incremental placement and staleness', () => {
     const was = byId(before);
     const now = byId(after);
     // Nobody else moved.
-    for (const [id, p] of was) if (id !== hex(5)) expect(now.get(id)).toEqual(p);
+    for (const [id, p] of was) if (id !== hex(5)) expect(now.get(id)).toMatchObject({ x: (p as any).x, y: (p as any).y, clusters: (p as any).clusters });
     // The new document sits among the documents of its topic (tag2 = i % 4 === 2).
     const peers = [...was.values()].filter((_p: any, k: number) => k % 4 === 2) as any[];
     const cx = peers.reduce((s, p) => s + p.x, 0) / peers.length;
@@ -337,7 +337,7 @@ describe('graph:neighbors', () => {
     expect([...kinds].sort()).toEqual(['cites', 'contains', 'similar', 'tagged']);
     expect(doc.edges).toContainEqual({ from: `doc:${hex(0)}`, to: `doc:${hex(1)}`, kind: 'cites', weight: 1 });
     expect(doc.edges).toContainEqual({ from: `doc:${hex(2)}`, to: `doc:${hex(0)}`, kind: 'cites', weight: 1 });
-    expect(doc.nodes).toContainEqual({ kind: 'tag', id: 'tag0', label: 'Topic 0', count: COUNT / 4 });
+    expect(doc.nodes).toContainEqual(expect.objectContaining({ kind: 'tag', id: 'tag0', label: 'Topic 0', count: COUNT / 4 }));
     expect(doc.nodes.find((n: any) => n.kind === 'folder')).toMatchObject({ id: 'folder0', count: COUNT / 3 });
 
     const root = ok(await call('graph:neighbors', { node: { kind: 'folder', id: '' }, kinds: ['children'], limit: 10 }));

@@ -138,9 +138,10 @@ export class QuadTree {
 
   /**
    * The repulsion on the point `self` at (x, y): every other point pushes with `strength / d^2`; a cell far enough
-   * (`size / d < theta`) counts as one body at its centre of mass. Returns the sum in `out`.
+   * (`size / d < theta`) counts as one body at its centre of mass. Returns the sum in `out`. `minD2` is a floor for the
+   * squared distance (a push never grows past it) and `maxD2` a ceiling: bodies farther than that do not push at all.
    */
-  repulse(self: number, x: number, y: number, theta: number, strength: number, out: { x: number; y: number }, jitter = 0.01): void {
+  repulse(self: number, x: number, y: number, theta: number, strength: number, out: { x: number; y: number }, jitter = 0.01, minD2 = 0, maxD2 = Infinity): void {
     out.x = 0;
     out.y = 0;
     if (this.count === 0) return;
@@ -164,6 +165,8 @@ export class QuadTree {
           dy = ((self * 104729) % 17) / 17 - 0.5 + 0.01;
           d2 = dx * dx + dy * dy + jitter;
         }
+        if (d2 > maxD2) continue;
+        if (d2 < minD2) d2 = minD2;
         const f = (strength * m) / (d2 * Math.sqrt(d2));
         out.x += dx * f;
         out.y += dy * f;

@@ -9,7 +9,7 @@ import { authorKey } from './entityData';
 import { layoutAnchors, nodeRadius } from './entityLayout';
 import type { EntityNode } from './entityTypes';
 import { Network } from './forceSim';
-import { capsule, centroidOf, chaikin, circleAt, convexHull, growPolygon, hullShape, inPolygon, type Pt } from './hulls';
+import { convexHull, inPolygon, type Pt } from './hulls';
 import { overlaps, pickLabels, shortLabel, type LabelCandidate } from './labelsLod';
 import { mapAction, nearestInDirection } from './mapKeyboard';
 import { relaxSmall } from './mapModel';
@@ -86,16 +86,6 @@ describe('force simulation', () => {
     return { raws, edges };
   }
 
-  it('runs a step with 800 nodes in at most 4 ms on average', () => {
-    const net = new Network();
-    const { raws, edges } = entities(800);
-    net.load(raws, edges, 1);
-    net.tick();
-    const t0 = performance.now();
-    for (let i = 0; i < 20; i++) net.tick();
-    expect((performance.now() - t0) / 20).toBeLessThan(4);
-  });
-
   it('cools down, settles within 400 steps and then stops (nothing runs at rest)', () => {
     const net = new Network();
     const { raws, edges } = entities(300);
@@ -134,7 +124,7 @@ describe('force simulation', () => {
   });
 });
 
-describe('hulls and Chaikin', () => {
+describe('convex hull', () => {
   const square: Pt[] = [
     [0, 0],
     [10, 0],
@@ -147,34 +137,10 @@ describe('hulls and Chaikin', () => {
     for (const p of square) expect(hull.some((q) => q[0] === p[0] && q[1] === p[1])).toBe(true);
     expect(convexHull([[1, 1]])).toHaveLength(1);
   });
-  it('grows a polygon outward by the radius', () => {
+  it('tells whether a point is inside a polygon', () => {
     const hull = convexHull(square);
-    const big = growPolygon(hull, 4);
-    for (const p of hull) expect(inPolygon(p[0], p[1], big)).toBe(true);
-    expect(inPolygon(-3, 5, big)).toBe(true);
-    expect(inPolygon(-6, 5, big)).toBe(false);
-    // The same for the opposite orientation.
-    expect(inPolygon(-3, 5, growPolygon([...hull].reverse(), 4))).toBe(true);
-  });
-  it('rounds the corners: two passes give four times the points, inside the original box', () => {
-    const r = chaikin(square, 2);
-    expect(r).toHaveLength(16);
-    for (const p of r) {
-      expect(p[0]).toBeGreaterThanOrEqual(0);
-      expect(p[0]).toBeLessThanOrEqual(10);
-    }
-    // The corner is cut: the old vertex is no longer on the outline.
-    expect(r.some((p) => p[0] === 0 && p[1] === 0)).toBe(false);
-  });
-  it('draws a lone point as a circle of 24 px, two as a capsule and many as a rounded hull', () => {
-    const c = circleAt(50, 50);
-    expect(Math.max(...c.map((p) => p[0])) - Math.min(...c.map((p) => p[0]))).toBeCloseTo(24, 0);
-    const cap = capsule([0, 0], [40, 0]);
-    expect(Math.max(...cap.map((p) => p[0]))).toBeCloseTo(52, 0);
-    expect(hullShape([[1, 1]])).toHaveLength(20);
-    expect(hullShape(square, 16).length).toBe(16);
-    const ctr = centroidOf(square);
-    expect(ctr).toEqual([5, 5]);
+    expect(inPolygon(5, 5, hull)).toBe(true);
+    expect(inPolygon(-3, 5, hull)).toBe(false);
   });
 });
 

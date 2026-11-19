@@ -12,8 +12,10 @@ import { isDarkTheme } from '../../lib/theme';
 import { useApp } from '../../state/app-context';
 import { safeText } from '../library/safeText';
 import { migrateAliases, useAliasVersion } from './authorAliases';
-import { assignKeyTints, haloSprite, mix, readableColor, readTheme, withAlpha, type MapTheme } from './colors';
-import { controlPoint, edgeAlpha, fillTapered, MAX_CURVED } from './edges';
+import { AreaLegend, useAreaColors } from './AreaLegend';
+import { areaSummary, assignAreaSlots, colorCache, loadAreaMemo, saveAreaMemo, shareIn, type AreaDef } from './areaColors';
+import { assignKeyTints, haloSprite, mix, readableColor, readTheme, type MapTheme } from './colors';
+import { controlPoint, edgeAlpha, edgeWidths, fillTapered, MAX_CURVED, STRAIGHT_ALPHA, straightWidth } from './edges';
 import { authorKey, fetchEntityNetwork } from './entityData';
 import { layoutAnchors, nodeRadius } from './entityLayout';
 import { beginModeFlight, stepModeFlight, type ModeFlight } from './modeFlight';
@@ -22,7 +24,6 @@ import { degrees, missingMatches, sizedRadius, SIZE_BY, themeEdges, type SizeBy 
 import { MAX_NET_NODES, Network, type EdgeKind, type NetNode, type RawEdge, type RawNode } from './forceSim';
 import { boundsOf, toScreenX, toScreenY, type Bounds } from './geometry';
 import { HoverCard, useRestingHover, YearBars } from './HoverCard';
-import { convexHull, centroidOf, hullShape, type Pt } from './hulls';
 import { pickLabels, shortLabel, type LabelCandidate } from './labelsLod';
 import { firstNode, mapAction, nearestInDirection } from './mapKeyboard';
 import { MiniMap } from './MiniMap';
@@ -121,10 +122,29 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
   const maxCount = useRef(1);
   const rand = useRef(rng(Date.now() & 0xffff));
 
+  /** Macro-areas (D-483): colour by area when the network has at least two and a node with one. */
+  const [byArea, setByArea] = useAreaColors();
+  const [areaDefs, setAreaDefs] = useState<{ defs: AreaDef[]; slots: number[] } | null>(null);
+  const areaOn = byArea && areaDefs !== null && areaDefs.defs.length >= 2 && (data?.nodes.some((n) => n.ar && n.ar.length > 0) ?? false);
+  const areaOnRef = useRef(false);
+  areaOnRef.current = areaOn;
+  const areaFn = useRef<{ dark: boolean; slots: unknown; fn: ReturnType<typeof colorCache> } | null>(null);
+  const litAreaRef = useRef<number | null>(null);
+  const isoAreaRef = useRef<number | null>(null);
+  const areaDefsRef = useRef(areaDefs);
+  areaDefsRef.current = areaDefs;
   const colorOf = (n: NetNode, th: MapTheme): string => {
     if (n.kind === 'doc') return th.muted;
     const cached = tintOf.current.get(n.key);
     if (cached) return cached;
+    const ad = areaDefsRef.current;
+    if (areaOnRef.current && ad) {
+      let f = areaFn.current;
+      if (!f || f.dark !== th.dark || f.slots !== ad.slots) areaFn.current = f = { dark: th.dark, slots: ad.slots, fn: colorCache(ad.slots, th.areas) };
+      const c = f.fn(n.entity?.ar, n.entity?.az) ?? th.areas[8]!;
+      tintOf.current.set(n.key, c);
+      return c;
+    }
     const k = n.entity?.colorKey ?? '';
     const c = k === '' ? th.muted : k.startsWith('#') ? readableColor(k, th.bg, th.tints) : (th.tints[keyTints.current.get(k) ?? 0] ?? th.muted);
     tintOf.current.set(n.key, c);
@@ -175,7 +195,7 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
       }
       const pathSet = path ? new Set(path) : null;
       const fade = (k: string): number => (focusSet && !focusSet.has(k) ? 0.12 : lit && !near.has(k) ? 0.35 : pathSet && !pathSet.has(k) ? 0.25 : 1);
-      // Hulls of the groups.
+      // No outlines (D-482): the name of a group is a label at the centroid of its visible nodes (three or more).
       const groups = new Map<string, NetNode[]>();
       for (const n of nodes) if (n.group) (groups.get(n.group) ?? groups.set(n.group, []).get(n.group)!).push(n);
       const labels: LabelCandidate[] = [];
@@ -183,27 +203,19 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
       ctx.font = '600 13px system-ui, sans-serif';
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'center';
-      for (const [, members] of groups) {
-        const tint = colorOf(members[0]!, th);
-        const hull = convexHull(members.map((n) => [sx(n.x), sy(n.y)] as Pt));
-        const shape = hullShape(hull, 16);
-        if (shape.length < 3) continue;
-        ctx.beginPath();
-        ctx.moveTo(shape[0]![0], shape[0]![1]);
-        for (let i = 1; i < shape.length; i++) ctx.lineTo(shape[i]![0], shape[i]![1]);
-        ctx.closePath();
-        ctx.fillStyle = withAlpha(tint, dark ? 0.12 : 0.07);
-        ctx.fill();
-        ctx.strokeStyle = withAlpha(tint, dark ? 0.35 : 0.25);
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        const label = members[0]!.entity?.groupLabel;
-        if (label) {
-          const c = centroidOf(hull);
-          const text = mode === 'author' ? t('network.ent.groupOf', { name: label }) : label;
-          texts.push(shortLabel(text));
-          labels.push({ id: texts.length - 1, x: c[0], y: c[1] - Math.max(...hull.map((p) => Math.abs(p[1] - c[1]))) - 22, w: ctx.measureText(shortLabel(text)).width + 8, size: 1e6 + members.length, forced: false });
-        }
+      for (const [, all] of groups) {
+        const members = all.filter((n) => {
+          const x = sx(n.x);
+          const y = sy(n.y);
+          return x >= 0 && y >= 0 && x <= w && y <= h;
+        });
+        const label = all[0]!.entity?.groupLabel;
+        if (members.length < 3 || !label) continue;
+        const cx = members.reduce((sum, n) => sum + sx(n.x), 0) / members.length;
+        const cy = members.reduce((sum, n) => sum + sy(n.y), 0) / members.length;
+        const text = mode === 'author' ? t('network.ent.groupOf', { name: label }) : label;
+        texts.push(shortLabel(text));
+        labels.push({ id: texts.length - 1, x: cx, y: cy, w: ctx.measureText(shortLabel(text)).width + 8, size: 1e6 + members.length, forced: false });
       }
       // Edges: curved and tapered below 3000, straight lines above.
       const visible: Array<{ a: NetNode; b: NetNode; w: number; implies: boolean; theme: boolean }> = [];
@@ -253,14 +265,15 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
           ctx.stroke();
           continue;
         }
-        const alpha = (curved ? edgeAlpha(e.w, dark) : 0.3) * dim * (pathSet ? 0.5 : 1);
+        const alpha = incident ? 0.9 : edgeAlpha(e.w, dark) * (curved ? 1 : STRAIGHT_ALPHA) * dim * (pathSet ? 0.5 : 1);
         ctx.globalAlpha = alpha;
         if (curved) {
           ctx.fillStyle = base;
-          fillTapered(ctx, ax, ay, bx, by);
+          const wd = edgeWidths(e.w);
+          fillTapered(ctx, ax, ay, bx, by, wd.w0 + (incident ? 1 : 0), wd.w1 + (incident ? 1 : 0));
         } else {
           ctx.strokeStyle = base;
-          ctx.lineWidth = 1;
+          ctx.lineWidth = straightWidth(e.w) + (incident ? 1 : 0);
           ctx.beginPath();
           ctx.moveTo(ax, ay);
           ctx.lineTo(bx, by);
@@ -298,7 +311,8 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
         const y = sy(n.y);
         const r = radiusOf(n) * (n.key === hk ? 1.25 : 1);
         if (x < -r - 20 || y < -r - 20 || x > w + r + 20 || y > h + r + 20) continue;
-        ctx.globalAlpha = fade(n.key);
+        const areaLit = isoAreaRef.current ?? litAreaRef.current;
+        ctx.globalAlpha = fade(n.key) * (areaLit === null || n.kind !== 'entity' || shareIn(n.entity?.ar, areaLit) >= 0.2 ? 1 : isoAreaRef.current !== null ? 0.15 : 0.25);
         ctx.fillStyle = colorOf(n, th);
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -415,6 +429,13 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
       net.warm(0.3);
     },
   });
+
+  // Another colouring (areas or topics) or other areas: the colours of the nodes are worked out again.
+  useEffect(() => {
+    tintOf.current.clear();
+    view.requestDraw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areaOn, areaDefs]);
 
   function pick(n: NetNode | null): void {
     if (!n) return onSelect(null);
@@ -568,6 +589,11 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
     onData?.(d);
     levelOf.current.clear();
     tintOf.current.clear();
+    if (d.areas && d.areas.length > 0) {
+      const r = assignAreaSlots(d.areas, loadAreaMemo());
+      saveAreaMemo(r.memo);
+      setAreaDefs({ defs: d.areas, slots: r.slots });
+    } else setAreaDefs(null);
     keyTints.current = assignKeyTints(d.nodes.map((n) => n.colorKey).filter((k) => k !== '' && !k.startsWith('#')));
     maxCount.current = Math.max(1, ...d.nodes.map((n) => n.count));
     const pos = layoutAnchors(d.nodes, centroids.current);
@@ -880,6 +906,19 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
               </label>
             )}
             <div className="net-pop-sec">{t('network.look')}</div>
+            <div className="net-field net-pop-row">
+              <span>{t('network.area.colorMode')}</span>
+              <Segmented<'areas' | 'topics'>
+                size="sm"
+                label={t('network.area.colorMode')}
+                value={areaOn ? 'areas' : 'topics'}
+                onChange={(v) => setByArea(v === 'areas')}
+                options={[
+                  { value: 'areas', label: t('network.area.colorAreas'), testId: 'ent-color-areas', disabled: !areaDefs || areaDefs.defs.length < 2, disabledReason: t('network.area.areaNoTags') },
+                  { value: 'topics', label: t('network.area.colorTopics'), testId: 'ent-color-topics' },
+                ]}
+              />
+            </div>
             <div className="net-field net-pop-row" data-testid="ent-size-by">
               <span>{t('network.ent.sizeBy')}</span>
               <Segmented<SizeBy> size="sm" label={t('network.ent.sizeBy')} value={sizeBy} onChange={setSizeBy} options={SIZE_BY.map((s) => ({ value: s, label: t(`network.ent.sizeBy_${s}`), testId: `ent-size-${s}` }))} />
@@ -983,9 +1022,25 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
               {t('network.ent.documents', { count: hovered.entity.count })}
               {rangeYears ? ` · ${rangeYears[0]}–${rangeYears[1]}` : ''} <YearBars years={hovered.entity.years} range={rangeYears} />
             </span>
+            {areaOn && areaDefs && hovered.entity.ar && <span className="hc-line hint">{t('network.area.areaCard', { areas: safeText(areaSummary(hovered.entity.ar, areaDefs.defs)) })}</span>}
             {hovered.entity.groupLabel && <span className="hc-line hint">{t(`network.ent.groupLine.${mode}`, { name: safeText(hovered.entity.groupLabel) })}</span>}
             {topLinks(net, hovered, t, mode)}
           </HoverCard>
+        )}
+        {areaOn && areaDefs && (
+          <AreaLegend
+            defs={areaDefs.defs}
+            slots={areaDefs.slots}
+            without={data ? data.nodes.filter((n) => !(n.ar && n.ar.length > 0)).length : 0}
+            onLight={(a) => {
+              litAreaRef.current = a;
+              view.requestDraw();
+            }}
+            onIsolate={(a) => {
+              isoAreaRef.current = a;
+              view.requestDraw();
+            }}
+          />
         )}
         {mini && count > 0 && <MiniMap bounds={getBounds()} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={count + drilled} />}
       </div>

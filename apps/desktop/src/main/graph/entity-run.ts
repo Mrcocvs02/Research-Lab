@@ -1,5 +1,5 @@
 import { AppError, type DocumentRecord } from '@rl/core';
-import { buildEntityNetwork, type EntityInput, type EntityNetwork, type EntityRequest } from '@rl/graph';
+import { buildEntityNetwork, type AreaSummary, type EntityInput, type EntityNetwork, type EntityRequest } from '@rl/graph';
 import type { MainServices } from '../ipc/handlers/services.js';
 import type { LibraryRuntime } from '../library/library-runtime.js';
 import { readAuthorAliases } from './author-aliases.js';
@@ -43,7 +43,32 @@ export async function topicDocIds(s: MainServices, topic: string): Promise<strin
   return out;
 }
 
-export async function runEntityNetwork(s: MainServices, req: Req): Promise<EntityNetwork> {
+type WithAreas = Omit<EntityNetwork, 'nodes'> & { nodes: Array<EntityNetwork['nodes'][number] & { ar?: number[][] | undefined; az?: number | undefined }>; areas?: AreaSummary[] | undefined };
+
+/** The network with the macro-areas of its nodes (D-483), added on every answer so a taxonomy edit shows without recomputing the network. */
+export async function runEntityNetwork(s: MainServices, req: Req): Promise<WithAreas> {
+  const value = await computeNetwork(s, req);
+  if (value.nodes.length === 0) return value;
+  const rt = await s.runtime.require();
+  const view = await loadView(rt);
+  const lm = req.mode === 'tag' ? null : await loadModel(s, rt);
+  const { aliases } = await readAuthorAliases(rt);
+  const docClusters = new Map<string, string[]>();
+  if (lm) {
+    const m = lm.model;
+    const ids = m.clusters.map((c) => c.id);
+    for (let i = 0; i < m.ids.length; i++) docClusters.set(m.ids[i] as string, (m.cl[i] as number[]).map((c) => ids[c] as string));
+  }
+  const wanted = await scopeIds(rt, view, req.scope);
+  const docs = (await usable(rt, view)).filter((r) => !wanted || wanted.has(r.id));
+  // Annotated in place: the cached answer keeps its identity, and the areas are worked out again on every call.
+  const out = value as WithAreas;
+  const areas = await (await import('./areas-run.js')).annotateEntities(s, view, req, out.nodes, docs, docClusters, aliases);
+  if (areas) out.areas = areas;
+  return out;
+}
+
+async function computeNetwork(s: MainServices, req: Req): Promise<EntityNetwork> {
   const rt = await s.runtime.require();
   const view = await loadView(rt);
   const { aliases, key: aliasKey } = await readAuthorAliases(rt);

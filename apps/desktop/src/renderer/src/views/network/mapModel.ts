@@ -1,7 +1,8 @@
 import type { Channels, ResponseOf } from '@rl/core';
-import type { TintGroup } from './colors';
+import { NONE, colorCache, type AreaDef, type AreaTriples } from './areaColors';
+import { parseColor, type TintGroup } from './colors';
 import { boundsOf, PointGrid, toScreenX, toScreenY, type Bounds, type View } from './geometry';
-import { coreHull, coreRadius, restingFill, separateClusters, type Pt } from './hulls';
+import { separateClusters } from './hulls';
 import { collidePoints } from './quadtree';
 
 export type MapResponse = ResponseOf<Channels, 'graph:map'>;
@@ -25,6 +26,12 @@ export interface PreparedMap {
   builtAt: string;
   /** Documents left off because the library has more than the map can carry. */
   omitted: number;
+  /** Macro-areas (D-483): the areas of the library, and per point its shares and centrality (undefined: no area). */
+  areas: AreaDef[];
+  ar: Array<AreaTriples | undefined>;
+  az: Uint8Array;
+  /** Points with an area. */
+  withArea: number;
 }
 
 /**
@@ -65,7 +72,15 @@ export function prepareMap(r: MapResponse): PreparedMap {
   const xs = new Float32Array(n);
   const ys = new Float32Array(n);
   const indexOf = new Map<string, number>();
+  const ar = new Array<AreaTriples | undefined>(n);
+  const az = new Uint8Array(n);
+  let withArea = 0;
   r.points.forEach((p, i) => {
+    if (p.ar && p.ar.length > 0) {
+      ar[i] = p.ar;
+      az[i] = p.az ?? 0;
+      withArea++;
+    }
     ids[i] = p.docId;
     xs[i] = p.x;
     ys[i] = p.y;
@@ -118,7 +133,7 @@ export function prepareMap(r: MapResponse): PreparedMap {
     if (n <= 5000) collidePoints(xs, ys, n, (n <= 300 ? 14 : n <= 1500 ? 9 : 6) * unit);
   }
   const bounds = boundsOf(xs, ys, n);
-  return { n, ids, xs, ys, bounds, grid: new PointGrid(xs, ys, n, bounds), indexOf, levels, clusterById, groups, seed: r.seed, builtAt: r.builtAt, omitted: r.omitted };
+  return { n, ids, xs, ys, bounds, grid: new PointGrid(xs, ys, n, bounds), indexOf, levels, clusterById, groups, seed: r.seed, builtAt: r.builtAt, omitted: r.omitted, areas: r.areas ?? [], ar, az, withArea };
 }
 
 /** The text a cluster is shown with: Claude's label when there is one, else its most characteristic terms. */
@@ -146,14 +161,6 @@ export function stepPoint(list: readonly number[], current: number, forward: boo
   const at = list.indexOf(current);
   if (at < 0) return list[forward ? 0 : list.length - 1]!;
   return list[(at + (forward ? 1 : list.length - 1)) % list.length]!;
-}
-
-/** World hull of the CORE (80% closest points) of every cluster of a level (index = cluster): the far points never inflate it. */
-export function clusterHulls(map: PreparedMap, level: number): Pt[][] {
-  const g = map.groups[level];
-  const clusters = map.levels[level] ?? [];
-  if (!g) return [];
-  return clusters.map((_, s) => coreHull(map.xs, map.ys, g.order, g.starts[s]!, g.starts[s + 1]!));
 }
 
 /** Centre and radius (the farthest point) of every cluster of a level: what the adjacency of the hulls is computed from. */
@@ -188,14 +195,28 @@ export function tintGroups(map: PreparedMap, level: number): TintGroup[] {
   });
 }
 
-/** Core circles (centroid, 80th percentile radius) of the clusters of a level and which of them are filled at rest (§4.22). */
-export function restingHulls(map: PreparedMap, level: number): { circles: Array<{ cx: number; cy: number; r: number }>; fill: boolean[] } {
-  const g = map.groups[level];
-  const clusters = map.levels[level] ?? [];
-  if (!g) return { circles: [], fill: [] };
-  const circles = clusters.map((_, s) => coreRadius(map.xs, map.ys, g.order, g.starts[s]!, g.starts[s + 1]!));
-  return { circles, fill: restingFill(circles, clusters.map((c) => c.size), 8) };
-}
-
 /** Radius (screen px, 3 to 6) of a node by its weight `c` against the biggest `cmax` (§4.22). */
 export const nodeRadius = (c: number, cmax: number): number => 3 + 3 * Math.sqrt(Math.max(c, 0) / Math.max(cmax, 1));
+
+/** The colours of the points by macro-area, grouped so that one path is drawn per colour (5 bits per channel: a few hundred at most). */
+export interface PointPaint {
+  /** Colour of each point (`--area-none` for a point without area). */
+  colors: string[];
+  buckets: Array<{ color: string; idx: Uint32Array; none: boolean }>;
+}
+export function paintPoints(map: PreparedMap, slots: readonly number[], tokens: readonly string[]): PointPaint {
+  const of = colorCache(slots, tokens);
+  const none = tokens[NONE]!;
+  const colors = new Array<string>(map.n);
+  const groups = new Map<number, { color: string; idx: number[]; none: boolean }>();
+  for (let i = 0; i < map.n; i++) {
+    const c = of(map.ar[i], map.az[i]);
+    colors[i] = c ?? none;
+    const [r, g, b] = c ? parseColor(c) : [0, 0, 0];
+    const key = c ? ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3) : -1;
+    let e = groups.get(key);
+    if (!e) groups.set(key, (e = { color: c ?? none, idx: [], none: c === null }));
+    e.idx.push(i);
+  }
+  return { colors, buckets: [...groups.values()].map((e) => ({ color: e.color, idx: Uint32Array.from(e.idx), none: e.none })) };
+}

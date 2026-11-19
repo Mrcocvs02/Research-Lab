@@ -833,3 +833,59 @@
     transition: none;
   }
 }
+
+/* Legend of the macro-areas (D-483). */
+.area-legend .legend-title {
+  padding: 2px 6px;
+}
+.area-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+.area-ring {
+  box-sizing: border-box;
+  border: 1.5px solid var(--area-none);
+  background: transparent;
+}
+.area-legend .legend-more {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+}
+.area-legend .legend-key {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 6px 2px;
+  font-size: 11px;
+}
+.area-strip {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, var(--text-muted), color-mix(in srgb, var(--text-muted) 25%, var(--surface)));
+}
+.area-legend .legend-item[aria-pressed='true'] {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.net-wrap .area-legend {
+  position: absolute;
+  left: 12px;
+  bottom: 44px;
+  z-index: 3;
+  width: 240px;
+  max-height: calc(100% - 60px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border-radius: var(--r-md, 10px);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  border: 1px solid var(--border);
+}

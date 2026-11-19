@@ -3,6 +3,8 @@
  * TF-IDF vectors, nearest neighbours combined with shared citations and tags, seeded Louvain clustering in levels, a
  * seeded force layout, incremental placement of new documents, and zoomable exploration of topics, authors and venues.
  */
+export { computeAreas } from './areas.js';
+export type { AreaDoc, AreaModel, AreaNode, AreaShare, AreaSummary, AreaTriple } from './areas.js';
 export { MAX_EXPLORE_NODES, NO_ALIASES, authorKey, createExploreIndex, fold, resolveAuthor } from './explore.js';
 export { ENTITY_LIMIT, TOP_EDGES_PER_NODE, CONSORTIUM, buildEntityNetwork, communities, topEdges } from './entity-network.js';
 export type { EntityDoc, EntityEdge, EntityInput, EntityNetwork, EntityNode, EntityRequest } from './entity-network.js';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coreHull, coreRadius, restingFill, separateClusters } from './hulls';
+import { coreRadius, separateClusters } from './hulls';
 import { placeTopicLabels, TOPIC_LABEL_H } from './labelsLod';
 import { nodeRadius } from './mapModel';
 import { bridgePath } from './BridgePath';
@@ -80,7 +80,7 @@ describe('bridge on the map', () => {
   });
 });
 
-describe('Panorama hulls (§4.22)', () => {
+describe('Panorama groups (§4.22, D-482)', () => {
   /** Three tangled groups: the points of each lie around the same place. */
   const tangled = () => {
     const xs = new Float32Array(90);
@@ -99,24 +99,6 @@ describe('Panorama hulls (§4.22)', () => {
     separateClusters(xs, ys, order, starts, 3, 24);
     const c = [0, 1, 2].map((s) => coreRadius(xs, ys, order, starts[s]!, starts[s + 1]!));
     for (let a = 0; a < 3; a++) for (let b = a + 1; b < 3; b++) expect(Math.hypot(c[a]!.cx - c[b]!.cx, c[a]!.cy - c[b]!.cy)).toBeGreaterThanOrEqual(c[a]!.r + c[b]!.r);
-  });
-
-  it('fills at rest only disjoint groups, at most 8, and the resting set is pairwise disjoint', () => {
-    const circles = [
-      { cx: 0, cy: 0, r: 10 },
-      { cx: 15, cy: 0, r: 10 },
-      { cx: 100, cy: 0, r: 10 },
-    ];
-    expect(restingFill(circles, [5, 9, 3])).toEqual([false, false, true]);
-    const many = Array.from({ length: 12 }, (_, i) => ({ cx: i * 100, cy: 0, r: 10 }));
-    expect(restingFill(many, many.map((_, i) => 100 - i)).filter(Boolean).length).toBe(8);
-  });
-
-  it('keeps the core hull inside the 80% closest points', () => {
-    const xs = [0, 1, 0, 1, 0.5, 100];
-    const ys = [0, 0, 1, 1, 0.5, 100];
-    const hull = coreHull(xs, ys, [0, 1, 2, 3, 4, 5], 0, 6);
-    expect(Math.max(...hull.map((p) => p[0]))).toBeLessThan(2);
   });
 
   it('places the topic labels without collisions and hides the smallest', () => {

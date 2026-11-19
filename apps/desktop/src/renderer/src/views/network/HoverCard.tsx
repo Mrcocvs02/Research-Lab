@@ -97,7 +97,7 @@ export function useRestingHover<T>(ms = 150, grace = 0): [T | null, (h: T | null
 }
 
 /** The card of a document: title (two lines), authors and year, the topic. */
-export function DocCard({ docId, topic }: { docId: string; topic?: string | undefined }) {
+export function DocCard({ docId, topic, area }: { docId: string; topic?: string | undefined; area?: string | undefined }) {
   const { t } = useTranslation();
   const info = useDocInfo(docId);
   return (
@@ -111,6 +111,11 @@ export function DocCard({ docId, topic }: { docId: string; topic?: string | unde
         </span>
       )}
       {topic && <span className="hc-line hint">{t('network.card.topic', { topic: safeText(topic) })}</span>}
+      {area && (
+        <span className="hc-line hint" data-testid="card-areas">
+          {t('network.area.areaCard', { areas: safeText(area) })}
+        </span>
+      )}
     </>
   );
 }

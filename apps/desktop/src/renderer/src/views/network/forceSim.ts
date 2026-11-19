@@ -33,6 +33,8 @@ export interface NetNode {
   /** Macro-area shares and centrality of the node (D-483). */
   ar?: ReadonlyArray<ReadonlyArray<number>> | undefined;
   az?: number | undefined;
+  /** Neighbourhood view (section 19.2.5): the ring of the node around the centre (1, 2); the radial constraint holds it there. */
+  ring?: number | undefined;
 }
 
 export interface NetEdge {
@@ -87,6 +89,9 @@ const CLUSTER_PULL = 0.05;
 const REGROUP_ALPHA = 0.55;
 /** Weight of the edges that carry none (a tag or a folder holding a document). */
 const FLAT_WEIGHT = 0.3;
+/** Neighbourhood view: target radius of ring h is `h * RING_STEP * REST` and the strength of the pull to it (section 19.2.5). */
+export const RING_STEP = 2.4;
+export const RING_FORCE = 0.08;
 const DAMP = 0.6;
 const MAX_SPEED = 40;
 /** The temperature decays from 1 to this in about 300 steps. */
@@ -112,6 +117,14 @@ interface Sim {
   fx: Float64Array;
   fy: Float64Array;
   tree: QuadTree;
+}
+
+/** Radial constraint of the neighbourhood: the force on a node at offset (dx, dy) from the centre that pulls it to the radius of its ring (zero for the ring 0). */
+export function radialPull(dx: number, dy: number, ring: number, k = RING_FORCE): { x: number; y: number } {
+  const d = Math.hypot(dx, dy);
+  if (ring <= 0 || d < 1e-6) return { x: 0, y: 0 };
+  const f = ((ring * RING_STEP * REST - d) * k) / d;
+  return { x: dx * f, y: dy * f };
 }
 
 /** The clusters a node belongs to as `[cluster, share 0..1]` pairs (its macro-area / family triples); a node without any is in the "none" block (cluster -1). */
@@ -153,6 +166,8 @@ export class Network {
   energy = 0;
   /** Grouping by a family is on: the clusters of the nodes (their `ar` shares) shape the springs and pull the nodes to their centroids. */
   grouping = false;
+  /** Key of the centre of the neighbourhood view: nodes with a `ring` are pulled to their ring around it. */
+  center: string | null = null;
   private cache: Sim | null = null;
   private adj: { version: number; map: Map<string, string[]> } | null = null;
 
@@ -165,6 +180,7 @@ export class Network {
     this.nodes.clear();
     this.edges = [];
     this.edgeSet.clear();
+    this.center = null;
     this.alpha = 0;
     this.version++;
   }
@@ -239,6 +255,13 @@ export class Network {
     this.version++;
     this.alpha = fresh.length > 0 ? 0.7 : this.alpha;
     return { added: fresh.length, capped, omitted };
+  }
+
+  /** Replaces the edges with a subset of them (the neighbourhood keeps at most 4 per paper). */
+  setEdges(edges: NetEdge[]): void {
+    this.edges = edges;
+    this.edgeSet = new Set(edges.map((e) => `${e.a}|${e.b}|${e.kind}`));
+    this.version++;
   }
 
   private removeKeys(keys: Set<string>): void {
@@ -406,6 +429,17 @@ export class Network {
       fy[i]! += (ey / d) * f * c.es[k]!;
       fx[j]! -= (ex / d) * f * (2 - c.es[k]!);
       fy[j]! -= (ey / d) * f * (2 - c.es[k]!);
+    }
+    // Radial constraint of the neighbourhood view: each node of a ring is pulled to the radius of its ring around the centre.
+    const ci = this.center === null ? -1 : list.findIndex((x) => x.key === this.center);
+    if (ci >= 0) {
+      for (let i = 0; i < n; i++) {
+        const h = list[i]!.ring;
+        if (h === undefined || i === ci) continue;
+        const r = radialPull(xs[i]! - xs[ci]!, ys[i]! - ys[ci]!, h);
+        fx[i]! += r.x;
+        fy[i]! += r.y;
+      }
     }
     // Gravity only outside a free zone around the centre of mass, and the pull of a group of at least three nodes.
     cx /= Math.max(n, 1);

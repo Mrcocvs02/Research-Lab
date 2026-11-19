@@ -1,0 +1,173 @@
+/* Neighbourhood, path, history and Vocabulary (section 19.2.5, 19.2.7). Tokens only. */
+.vic-nav {
+  flex: none;
+  display: inline-flex;
+  gap: var(--space-1);
+}
+.vic-crumbs {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 0;
+  overflow: hidden;
+  font-size: var(--fs-small);
+}
+.vic-crumb {
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vic-crumb + .vic-crumb::before {
+  content: '›';
+  margin: 0 var(--space-1);
+  color: var(--text-muted);
+}
+span.vic-crumb {
+  color: var(--text-muted);
+}
+.vic-pick {
+  position: static;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.path-strip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  min-width: 0;
+}
+.path-chain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+}
+.path-chain li {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+.path-evidence {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.path-evidence::after {
+  content: ' →';
+}
+.path-node {
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.path-none {
+  flex: 1;
+}
+.path-close {
+  flex: none;
+  margin-left: auto;
+}
+
+.explore-modes {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.explore-mode-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.explore-mode-pane[hidden] {
+  display: none;
+}
+
+.vocab {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.vocab-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.vocab-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.vocab-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.vocab svg {
+  display: block;
+  font-size: var(--fs-small);
+}
+.vocab-edge {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  opacity: 0.6;
+}
+.vocab-cross {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+.vocab-node {
+  cursor: pointer;
+  outline: none;
+}
+.vocab-node circle {
+  fill: var(--accent);
+  stroke: var(--bg);
+  stroke-width: 1.5;
+}
+.vocab-node text {
+  fill: var(--text);
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 3px;
+}
+.vocab-node:hover circle,
+.vocab-node:focus-visible circle,
+.vocab-node.on circle {
+  stroke: var(--text);
+}
+.vocab-node.on text {
+  font-weight: 600;
+}
+.vocab-n,
+.vocab-more {
+  fill: var(--text-muted);
+}

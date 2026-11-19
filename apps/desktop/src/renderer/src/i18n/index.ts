@@ -49,6 +49,7 @@ export type StringPart =
   | 'shortcuts'
   | 'taxonomy'
   | 'tokenCap'
+  | 'vicinity'
   | 'wizard';
 
 const CORE: Record<UiLanguage, () => Promise<{ default: Dictionary }>> = {

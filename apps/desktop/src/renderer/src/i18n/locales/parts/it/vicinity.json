@@ -1,0 +1,43 @@
+{
+  "vicinity": {
+    "tab": "Vicinato",
+    "hint": "Clic su un lavoro: diventa il centro · Maiusc+clic: percorso fino a lui · Alt+←: indietro",
+    "crumbs": "Centri visitati",
+    "history": "Cronologia",
+    "back": "Indietro (Alt+←)",
+    "forward": "Avanti (Alt+→)",
+    "focus": "Vicinato",
+    "more": "Mostra altri {{count}}",
+    "widen": "Allarga",
+    "nothingNew": "Niente di nuovo attorno a questi lavori.",
+    "capped": "Il vicinato contiene al più {{count}} lavori.",
+    "none": "Nessun lavoro con prove sufficienti attorno a questo.",
+    "why": {
+      "cites": "cita o è citato",
+      "linked": "collegato da te",
+      "similar": "simile {{value}}"
+    },
+    "path": {
+      "title": "Percorso fra due lavori",
+      "start": "Percorso fino a…",
+      "pick": "Scegli il secondo lavoro (nella Mappa, nel Vicinato o in un elenco).",
+      "none": "Nessun percorso sopra la soglia",
+      "wide": "Prova Ampia",
+      "bridge": "Trova un ponte (fuori libreria)"
+    },
+    "vocab": {
+      "family": "Famiglia",
+      "label": "Albero del vocabolario",
+      "showMap": "Mostra nella Mappa",
+      "showLibrary": "Mostra nella Libreria",
+      "emptyTitle": "Nessun vocabolario da mostrare",
+      "emptyText": "La famiglia non ha ancora valori con lavori. Etichetta qualche lavoro o scegli un'altra famiglia."
+    },
+    "explore": {
+      "mode": "Vista",
+      "columns": "Colonne",
+      "vocab": "Vocabolario",
+      "authors": "Autori"
+    }
+  }
+}

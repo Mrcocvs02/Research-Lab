@@ -1,0 +1,43 @@
+{
+  "vicinity": {
+    "tab": "Neighbourhood",
+    "hint": "Click a paper to make it the centre · Shift+click: path to it · Alt+Left: back",
+    "crumbs": "Centres visited",
+    "history": "History",
+    "back": "Back (Alt+Left)",
+    "forward": "Forward (Alt+Right)",
+    "focus": "Neighbourhood",
+    "more": "Show {{count}} more",
+    "widen": "Widen",
+    "nothingNew": "Nothing new around these papers.",
+    "capped": "The neighbourhood holds at most {{count}} papers.",
+    "none": "No paper with enough evidence around this one.",
+    "why": {
+      "cites": "cites or is cited",
+      "linked": "linked by you",
+      "similar": "similar {{value}}"
+    },
+    "path": {
+      "title": "Path between two papers",
+      "start": "Path to…",
+      "pick": "Choose the second paper (in the Map, the Neighbourhood or a list).",
+      "none": "No path above the threshold",
+      "wide": "Try Wide",
+      "bridge": "Find a bridge (outside the library)"
+    },
+    "vocab": {
+      "family": "Family",
+      "label": "Vocabulary tree",
+      "showMap": "Show on the Map",
+      "showLibrary": "Show in the Library",
+      "emptyTitle": "No vocabulary to show",
+      "emptyText": "The family has no values with papers yet. Tag some papers or choose another family."
+    },
+    "explore": {
+      "mode": "View",
+      "columns": "Columns",
+      "vocab": "Vocabulary",
+      "authors": "Authors"
+    }
+  }
+}

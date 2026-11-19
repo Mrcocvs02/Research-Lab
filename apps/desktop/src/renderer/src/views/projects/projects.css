@@ -214,3 +214,124 @@
   display: inline-flex;
   gap: 2px;
 }
+/* the Schema tab (X7): outline, claims and evidence */
+.schema-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.schema-only {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.schema-edit textarea,
+.schema-add input[type='text'] {
+  width: 100%;
+}
+.schema-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.schema-add input[type='text'] {
+  flex: 1;
+  min-width: 220px;
+}
+.schema-outline dt {
+  font-weight: 600;
+  margin-top: var(--space-3);
+}
+.schema-outline dd {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.schema-question h3 {
+  font-size: var(--fs-base);
+  margin: var(--space-4) 0 var(--space-2);
+}
+.schema-claims,
+.schema-evidence,
+.schema-reports ul,
+.schema-cites {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.schema-claim {
+  padding: 8px 12px;
+  margin-bottom: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.schema-claim[data-state='none'] {
+  border-left: 3px solid var(--warning);
+}
+.schema-claim__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.schema-claim__text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.schema-evidence li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px 0;
+}
+.schema-invite {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.schema-reports {
+  margin-top: var(--space-4);
+}
+.schema-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--space-3);
+}
+.schema-send__text {
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--fs-small);
+}
+.schema-paragraphs {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--space-3);
+}
+.schema-paragraphs label {
+  display: flex;
+  gap: var(--space-2);
+  padding: 4px 0;
+}
+.schema-cites li {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+.schema-cites__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}

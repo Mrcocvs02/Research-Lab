@@ -1,9 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ANNOTATION_COLORS, type Annotation } from '@rl/core';
+import { Lazy, lazyView } from '../../components/Lazy';
+import { useNav } from '../../lib/nav';
 import { safeText } from '../library/safeText';
 import { colorName, useColorMeanings } from './colorMeaning';
 import { colorOf, excerpt, type AnnotationColor } from './geometry';
+
+// "Use as evidence" (§17.4.15): the dialog and its code load when the button is first used.
+const UseAsEvidence = lazyView(() => import('../projects/UseAsEvidence'), ['projects']);
 
 /** A place in the window (client coordinates) a popover hangs from. */
 export interface Anchor {
@@ -125,7 +131,10 @@ export function AnnotationPopover({
   onCommit,
   onDelete,
   onReconfirm,
+  docId,
 }: {
+  /** The open document; without it the one of the current place is used. */
+  docId?: string | undefined;
   annotation: Annotation;
   anchor: () => Anchor | null;
   commenting: boolean;
@@ -140,6 +149,9 @@ export function AnnotationPopover({
   onReconfirm(): void;
 }) {
   const { t } = useTranslation();
+  const nav = useNav();
+  const [evidence, setEvidence] = useState(false);
+  const doc = docId ?? nav.loc.docId;
   const field = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (commenting) field.current?.focus();
@@ -159,6 +171,11 @@ export function AnnotationPopover({
         <button type="button" className={annotation.comment ? 'is-on' : undefined} aria-pressed={commenting} onMouseDown={(e) => e.preventDefault()} onClick={onOpenComment} title={`${t('reader.ann.comment')} (C)`} data-testid="ann-comment-open">
           {t('reader.ann.commentShort')}
         </button>
+        {doc && annotation.text.trim() !== '' && (
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setEvidence(true)} data-testid="ann-use-evidence">
+            {t('reader.ann.useAsEvidence')}
+          </button>
+        )}
         <button type="button" className="danger" disabled={busy} onMouseDown={(e) => e.preventDefault()} onClick={onDelete} title={`${t('reader.ann.delete')} (Del)`} data-testid="ann-delete">
           {t('reader.ann.delete')}
         </button>
@@ -187,6 +204,7 @@ export function AnnotationPopover({
           </button>
         </div>
       )}
+      {evidence && doc && createPortal(<Lazy><UseAsEvidence docId={doc} annId={annotation.id} page={annotation.page} text={annotation.text} onClose={() => setEvidence(false)} /></Lazy>, document.body)}
     </Floating>
   );
 }

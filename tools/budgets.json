@@ -12,7 +12,11 @@
     "chunkCapsKB": {
       "NoteRich": 16,
       "LiteratureNote": 16,
-      "IncomingLinks": 16
+      "IncomingLinks": 16,
+      "SchemaTab": 16,
+      "ReportDialog": 16,
+      "CiteDialog": 16,
+      "UseAsEvidence": 16
     }
   },
   "main": {

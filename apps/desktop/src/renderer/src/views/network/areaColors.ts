@@ -23,19 +23,22 @@ export const NONE = AREA_TINTS + 1;
 const ROTATION = [0, 12, -12, 24, -24] as const;
 const MEMO_KEY = 'rl.map.areaHues';
 
+/** Id of the "other" cluster of a grouping family (the clusters beyond the biggest eight): it always takes the grey tint. */
+export const OTHER_CLUSTER_ID = '__other';
+
 /** Slot of each area (0..6 a tint, 7 the "other areas" tint): the biggest seven keep or get a free tint, the rest share the grey. */
 export function assignAreaSlots(defs: readonly AreaDef[], memo: Readonly<Record<string, number>> | null): { slots: number[]; memo: Record<string, number> } {
   const slots = new Array<number>(defs.length).fill(OTHER);
   const used = new Set<number>();
-  const top = defs.slice(0, AREA_TINTS);
-  top.forEach((d, i) => {
+  const top = defs.map((d, i) => ({ d, i })).filter(({ d }) => d.id !== OTHER_CLUSTER_ID).slice(0, AREA_TINTS);
+  top.forEach(({ d, i }) => {
     const old = memo?.[d.id];
     if (old !== undefined && old >= 0 && old < AREA_TINTS && !used.has(old)) {
       slots[i] = old;
       used.add(old);
     }
   });
-  top.forEach((_, i) => {
+  top.forEach(({ i }) => {
     if (slots[i] !== OTHER) return;
     for (let s = 0; s < AREA_TINTS; s++) {
       if (!used.has(s)) {
@@ -46,7 +49,7 @@ export function assignAreaSlots(defs: readonly AreaDef[], memo: Readonly<Record<
     }
   });
   const next: Record<string, number> = {};
-  top.forEach((d, i) => (next[d.id] = slots[i]!));
+  top.forEach(({ d, i }) => (next[d.id] = slots[i]!));
   return { slots, memo: next };
 }
 

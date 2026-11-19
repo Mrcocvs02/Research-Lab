@@ -4,6 +4,8 @@
  * seeded force layout, incremental placement of new documents, and zoomable exploration of topics, authors and venues.
  */
 export { computeAreas } from './areas.js';
+export { FAMILY_TOP, OTHER_CLUSTER, autoMemberships, familyModel, parseFamily, tagMemberships } from './families.js';
+export type { FamilyKind, FamilyNode, FamilyRef, Memberships } from './families.js';
 export type { AreaDoc, AreaModel, AreaNode, AreaShare, AreaSummary, AreaTriple } from './areas.js';
 export { MAX_EXPLORE_NODES, NO_ALIASES, authorKey, createExploreIndex, fold, resolveAuthor } from './explore.js';
 export { ENTITY_LIMIT, TOP_EDGES_PER_NODE, CONSORTIUM, buildEntityNetwork, communities, topEdges } from './entity-network.js';

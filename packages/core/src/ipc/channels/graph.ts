@@ -113,6 +113,23 @@ export const graphChannels = defineChannels('graph', {
     }),
   },
   /**
+   * Grouping families of the Map (D-489): `families` lists what the library offers ("topic", "level:method", "prefix:grp:", "auto", ...);
+   * with a `family` it also returns that family's clusters (`areas`, the biggest eight and "other") and, for each document of the scope (or
+   * only `docIds`), its shares `ar` / `az` like the macro-areas. Computed locally in a lazy chunk; nothing is written.
+   */
+  family: {
+    request: z.object({
+      family: z.string().max(200).optional(),
+      scope: z.object({ folder: relativePathSchema.optional(), projectId: z.string().max(100).optional(), tagId: itemIdSchema.optional() }).optional(),
+      docIds: z.array(documentIdSchema).max(GRAPH_LIMITS.mapPoints).optional(),
+    }),
+    response: z.object({
+      families: z.array(z.object({ id: z.string().max(200), label: z.string().max(200), count: z.number().int().nonnegative() })),
+      areas,
+      items: z.array(z.object({ id: documentIdSchema, ...A })).max(GRAPH_LIMITS.mapPoints),
+    }),
+  },
+  /**
    * Entity networks of the Map (D-387, D-454): tags (co-occurrence), topics (affinity of the model's clusters at a level)
    * and authors (co-authorship, consortia excluded), computed locally from the records and the model. At most `limit`
    * (800) nodes, the biggest, and the 8 heaviest edges of each. Ids are the ones of Explore (`author:<key>`, a taxonomy node,

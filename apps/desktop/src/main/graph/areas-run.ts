@@ -17,7 +17,7 @@ interface Annotated {
 let last: { key: string; model: AreaModel } | null = null;
 
 /** Weight of each tag of a record: the accepted score (D-447), else 1 for a tag set by hand. */
-function weightsOf(rec: DocumentRecord): Array<{ id: string; w: number }> {
+export function weightsOf(rec: DocumentRecord): Array<{ id: string; w: number }> {
   const scores = new Map((rec.ai.suggestedTagScores?.value ?? []).map((t) => [t.id, t.weight]));
   return rec.tags.map((id) => ({ id, w: scores.get(id) ?? 1 }));
 }

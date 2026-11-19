@@ -4,7 +4,7 @@ import { useLocalFlag } from '../../lib/useLocalFlag';
 import { safeText } from '../library/safeText';
 import { AREA_TINTS } from './colors';
 import { useNav } from '../../lib/nav';
-import { OTHER, areaFallback, type AreaDef } from './areaColors';
+import { OTHER, OTHER_CLUSTER_ID, areaFallback, type AreaDef } from './areaColors';
 import { Pill } from './NetChrome';
 
 /** Whether nodes are coloured by macro-area (true, the default) or by topic (D-483), remembered as a per-viewer convenience. */
@@ -18,6 +18,8 @@ interface Props {
   onLight(area: number | null): void;
   /** The area kept alone (the others fade), or null. */
   onIsolate(area: number | null): void;
+  /** Heading when the colours come from a grouping family ("Grouped by X"); the macro-area one otherwise. */
+  title?: string | undefined;
 }
 
 const token = (slot: number): string => `var(--area-${slot < AREA_TINTS ? slot + 1 : 'other'})`;
@@ -26,7 +28,7 @@ const token = (slot: number): string => `var(--area-${slot < AREA_TINTS ? slot +
  * Legend of the macro-areas (section 18.3.6): up to seven rows (dot, name, count), "other areas" and "no tags", and the strip
  * from full to faint. Hovering a row lights its area; a click isolates it (second click or Esc releases it).
  */
-export function AreaLegend({ defs, slots, without, onLight, onIsolate }: Props) {
+export function AreaLegend({ defs, slots, without, onLight, onIsolate, title }: Props) {
   const { t } = useTranslation();
   const [iso, setIso] = useState<number | null>(null);
   useEffect(() => {
@@ -40,8 +42,8 @@ export function AreaLegend({ defs, slots, without, onLight, onIsolate }: Props) 
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [iso, onIsolate]);
-  const shown = defs.map((d, i) => ({ d, i })).filter(({ i }) => (slots[i] !== OTHER || !!defs[i]?.color));
-  const rest = defs.map((d, i) => ({ d, i })).filter(({ i }) => (slots[i] === OTHER && !defs[i]?.color));
+  const shown = defs.map((d, i) => ({ d, i })).filter(({ i }) => (slots[i] !== OTHER || !!defs[i]?.color || defs[i]?.id === OTHER_CLUSTER_ID));
+  const rest = defs.map((d, i) => ({ d, i })).filter(({ i }) => (slots[i] === OTHER && !defs[i]?.color && defs[i]?.id !== OTHER_CLUSTER_ID));
   const row = (d: AreaDef, i: number, testId: string, color: string) => (
     <li key={d.id}>
       <button
@@ -68,8 +70,8 @@ export function AreaLegend({ defs, slots, without, onLight, onIsolate }: Props) 
     </li>
   );
   return (
-    <ul className="legend area-legend" data-testid="area-legend" aria-label={t('network.area.areaLegend')}>
-      <li className="legend-title hint">{t('network.area.areaLegend')}</li>
+    <ul className="legend area-legend" data-testid="area-legend" aria-label={title ?? t('network.area.areaLegend')}>
+      <li className="legend-title hint">{title ?? t('network.area.areaLegend')}</li>
       {shown.map(({ d, i }) => row(d, i, 'area-item', d.color ?? token(slots[i]!)))}
       {rest.length > 0 && (
         <li className="hint legend-more" data-testid="area-other" title={rest.map(({ d }) => safeText(d.label)).join(', ')}>

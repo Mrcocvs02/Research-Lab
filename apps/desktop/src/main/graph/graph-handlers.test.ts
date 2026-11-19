@@ -718,3 +718,24 @@ describe('graph:entityNetwork and the author corrections (N4)', () => {
     expect(await topicDocIds(services, 'c9.9')).toEqual([]);
   });
 });
+
+describe('graph:family', () => {
+  it('lists the families on offer and answers the clusters and shares of a family, the automatic one included', async () => {
+    const call = harness();
+    const list = ok(await call('graph:family', {}));
+    expect(list.families.map((f: any) => f.id)).toEqual(expect.arrayContaining(['topic', 'auto']));
+    expect(list.items).toEqual([]);
+    const topic = ok(await call('graph:family', { family: 'topic', docIds: [hex(0), hex(1)] }));
+    expect(topic.items.length).toBeGreaterThan(0);
+    // Without a model the communities are an empty family, not an error.
+    const none = ok(await call('graph:family', { family: 'auto' }));
+    expect(none.items).toEqual([]);
+    await built(call);
+    const auto = ok(await call('graph:family', { family: 'auto' }));
+    expect(auto.areas.length).toBeGreaterThan(1);
+    expect(auto.areas.length).toBeLessThanOrEqual(9);
+    for (const it of auto.items) expect(it.ar.reduce((s: number, t: number[]) => s + t[2]!, 0)).toBe(100);
+    const some = ok(await call('graph:family', { family: 'auto', docIds: [hex(0)] }));
+    expect(some.items.length).toBeLessThanOrEqual(1);
+  });
+});

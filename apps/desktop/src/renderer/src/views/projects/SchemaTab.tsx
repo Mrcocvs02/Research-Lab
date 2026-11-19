@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Channels, Claim, Outline, ResponseOf } from '@rl/core';
 import { Button } from '../../components/Button';
 import { Chip } from '../../components/Chip';
+import { Segmented } from '../../components/Segmented';
 import { Lazy, lazyView } from '../../components/Lazy';
 import { EmptyState } from '../../components/EmptyState';
 import { IconProject } from '../../components/icons-shell';
@@ -10,9 +11,11 @@ import { useNav } from '../../lib/nav';
 import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
 import { safeText } from '../library/safeText';
+import type { Paper } from './manuscript/manuscriptModel';
 import { claimsByQuestion, claimState, draftToOutline, outlineToDraft, visibleClaims, type OutlineDraft } from './schemaModel';
 
 const EvidenceDialog = lazyView(() => import('./EvidenceDialog'), ['projects']);
+const ManuscriptView = lazyView(() => import('./manuscript/ManuscriptView'), ['projects']);
 
 export type SchemaInfo = ResponseOf<Channels, 'project:schema'>;
 
@@ -92,9 +95,10 @@ function ClaimCard({ claim, titles, onChange, onRemove, onFind }: { claim: Claim
 }
 
 /** The "Schema" tab (§17.4.13-§17.4.15): the research outline with the claims and their evidence under each question; "Only evidence" is a filter, not a tab. */
-export default function SchemaTab({ projectId, info, titles, onChanged }: { projectId: string; info: SchemaInfo; titles: ReadonlyMap<string, string>; onChanged(): void }) {
+export default function SchemaTab({ projectId, info, titles, papers, initialMode = 'research', onChanged }: { projectId: string; info: SchemaInfo; titles: ReadonlyMap<string, string>; papers: readonly Paper[]; initialMode?: 'research' | 'manuscript'; onChanged(): void }) {
   const { t } = useTranslation();
   const { reportError } = useNotify();
+  const [mode, setMode] = useState<'research' | 'manuscript'>(initialMode);
   const [only, setOnly] = useState(false);
   const [editing, setEditing] = useState(info.outline === null);
   const [adding, setAdding] = useState(false);
@@ -116,9 +120,34 @@ export default function SchemaTab({ projectId, info, titles, onChanged }: { proj
   const groups = claimsByQuestion(outline, visibleClaims(claims, only), only);
   const noEvidenceAnywhere = claims.every((c) => c.evidence.length === 0);
 
+  const modes = (
+    <Segmented<'research' | 'manuscript'>
+      label={t('ms.modeLabel')}
+      size="sm"
+      value={mode}
+      onChange={setMode}
+      options={[
+        { value: 'research', label: t('ms.modeResearch'), testId: 'schema-mode-research' },
+        { value: 'manuscript', label: t('ms.modeManuscript'), testId: 'schema-mode-manuscript' },
+      ]}
+      className="schema-mode"
+    />
+  );
+  if (mode === 'manuscript') {
+    return (
+      <div className="schema" data-testid="project-schema">
+        <div className="schema-bar" data-testid="schema-mode">{modes}</div>
+        <Lazy>
+          <ManuscriptView projectId={projectId} papers={papers} claims={claims} onChanged={onChanged} />
+        </Lazy>
+      </div>
+    );
+  }
+
   return (
     <div className="schema" data-testid="project-schema">
       <div className="schema-bar">
+        <span data-testid="schema-mode">{modes}</span>
         <label className="schema-only">
           <input type="checkbox" checked={only} onChange={(e) => setOnly(e.target.checked)} data-testid="schema-only-evidence" /> {t('schema.onlyEvidence')}
         </label>

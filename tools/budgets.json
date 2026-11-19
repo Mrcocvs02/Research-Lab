@@ -20,7 +20,10 @@
       "CompareView": 16,
       "GroupsDialog": 16,
       "CitationsSection": 16,
-      "EvidenceDialog": 16
+      "EvidenceDialog": 16,
+      "ManuscriptView": 16,
+      "ManuscriptMatrix": 16,
+      "AssignDialog": 16
     }
   },
   "main": {

@@ -12,6 +12,7 @@ type Projects = ResponseOf<Channels, 'projects:list'>['items'];
 type Info = ResponseOf<Channels, 'project:schema'>;
 
 const NEW = '';
+type Sections = NonNullable<ResponseOf<Channels, 'project:manuscript'>['manuscript']>['sections'];
 
 /**
  * "Usa come prova" (§17.4.15), from the popover of a highlight in the reader: asks in which project (the document need not be in it:
@@ -32,6 +33,9 @@ export default function UseAsEvidence({ docId, annId, page, text, onClose }: { d
   const [questionId, setQuestionId] = useState('');
   const [stance, setStance] = useState<'supports' | 'contradicts'>('supports');
   const [busy, setBusy] = useState(false);
+  /** The sections of the manuscript of the project, when there is one (§18.1): the highlight can also go under one of them. */
+  const [sections, setSections] = useState<Sections>([]);
+  const [sectionId, setSectionId] = useState('');
 
   useEffect(() => {
     rl.invoke('projects:list', { kind: 'project' }).then((r) => {
@@ -42,6 +46,8 @@ export default function UseAsEvidence({ docId, annId, page, text, onClose }: { d
   useEffect(() => {
     setData(null);
     setClaimId(NEW);
+    setSections([]);
+    setSectionId('');
     if (!projectId) return;
     let alive = true;
     void Promise.all([rl.invoke('project:schema', { projectId }), rl.invoke('projects:get', { id: projectId })]).then(([s, d]) => {
@@ -50,6 +56,7 @@ export default function UseAsEvidence({ docId, annId, page, text, onClose }: { d
       setIsMember(d.members.some((m) => m.docId === docId));
       setQuestionId(s.outline?.questions[0]?.id ?? '');
     }, reportError);
+    void rl.invoke('project:manuscript', { projectId }).then((r) => alive && setSections((r.manuscript?.sections ?? []).filter((x) => !x.gone).sort((a, b) => a.order - b.order)), () => undefined);
     return () => {
       alive = false;
     };
@@ -64,6 +71,7 @@ export default function UseAsEvidence({ docId, annId, page, text, onClose }: { d
         ...(claimId === NEW ? { newClaim: { text: claimText, questionId: questionId || null } } : { claimId }),
         evidence: { docId, page, annId, stance, excerpt: text.replace(/\s+/g, ' ').trim().slice(0, 500) },
       });
+      if (sectionId) await rl.invoke('project:assign', { projectId, sectionId, refs: [{ kind: 'ann', docId, annId, page }], on: true });
       invalidate('projects');
       info(t('schema.evidence.saved'));
       onClose();
@@ -128,6 +136,19 @@ export default function UseAsEvidence({ docId, annId, page, text, onClose }: { d
                   </div>
                 )}
               </>
+            )}
+            {sections.length > 0 && (
+              <div className="field">
+                <label htmlFor="evidence-section">{t('ms.evidenceSection')}</label>
+                <select id="evidence-section" value={sectionId} onChange={(e) => setSectionId(e.target.value)} data-testid="evidence-section">
+                  <option value="">{t('ms.noSection')}</option>
+                  {sections.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {`${'– '.repeat(x.level - 1)}${safeText(x.title)}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
             <div className="schema-parts" role="radiogroup" aria-label={t('schema.evidence.stance')}>
               {(['supports', 'contradicts'] as const).map((s) => (

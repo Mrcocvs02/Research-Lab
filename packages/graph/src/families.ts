@@ -130,3 +130,96 @@ export function familyModel(m: Memberships, total: number, otherLabel: string, c
   const model = computeAreas(nodes, docs);
   return { ...model, total: Math.max(total, model.total) };
 }
+
+/** Thresholds of the eligibility test of a family for the blocks of the Map (D-498, section 19.2.2). */
+export const ELIGIBLE = { coverage: 0.6, clarity: 0.7, share: 0.6, maxValues: 12, cover: 0.8 } as const;
+export interface Eligibility {
+  eligible: boolean;
+  /** Papers with a value over papers. */
+  coverage: number;
+  /** Papers whose main value holds at least 0.6 of their weight over papers with a value. */
+  clarity: number;
+  /** Values of level 1. */
+  values: number;
+}
+
+/** The value with the biggest weight (ties: the smaller id). */
+export function mainValue(list: ReadonlyArray<{ v: string; w: number }>): string | null {
+  let best: { v: string; w: number } | null = null;
+  for (const e of list) if (e.w > 0 && (!best || e.w > best.w || (e.w === best.w && e.v < best.v))) best = e;
+  return best?.v ?? null;
+}
+
+/**
+ * The test: coverage >= 0.6, clarity >= 0.7, 2 to 12 values (more is fine when the 12 biggest hold 80% of the papers: the rest goes to "Other").
+ * A family of kind `one` is clear by construction; the keywords family never passes. `shares` is the weighted values of each paper (the ones with none may be left out).
+ */
+export function familyEligibility(shares: Iterable<ReadonlyArray<{ v: string; w: number }>>, total: number, opts: { one?: boolean; keywords?: boolean } = {}): Eligibility {
+  const main = new Map<string, number>();
+  let withValue = 0;
+  let clear = 0;
+  for (const list of shares) {
+    const m = mainValue(list);
+    if (m === null) continue;
+    withValue++;
+    main.set(m, (main.get(m) ?? 0) + 1);
+    const sum = list.reduce((s, e) => s + Math.max(0, e.w), 0);
+    if (opts.one || list.find((e) => e.v === m)!.w / sum >= ELIGIBLE.share) clear++;
+  }
+  const counts = [...main.values()].sort((a, b) => b - a);
+  const values = counts.length;
+  const coverage = total > 0 ? withValue / total : 0;
+  const clarity = withValue > 0 ? clear / withValue : 0;
+  const top = counts.slice(0, ELIGIBLE.maxValues).reduce((s, c) => s + c, 0);
+  const fits = values <= ELIGIBLE.maxValues || (withValue > 0 && top / withValue >= ELIGIBLE.cover);
+  const r = (v: number) => Math.round(v * 1000) / 1000;
+  return { eligible: !opts.keywords && coverage >= ELIGIBLE.coverage && clarity >= ELIGIBLE.clarity && values >= 2 && fits, coverage: r(coverage), clarity: r(clarity), values };
+}
+
+export interface VocabLink {
+  a: string;
+  b: string;
+  lift: number;
+  shared: number;
+}
+export const VOCAB_LINKS_PER_NODE = 2;
+const VOCAB_LIFT = 2;
+const VOCAB_SHARED = 2;
+
+/**
+ * Cross links of the vocabulary tree (section 19.2.7): pairs of nodes that appear together in at least 2 papers and 2 times more than chance
+ * (lift = shared x N / (n_a x n_b), N the papers with a node); at most 2 per node, the biggest lift first. `skip` leaves out pairs already
+ * related in the tree (an ancestor and its descendant). `nodesOf` lists, for each paper, the distinct nodes it carries.
+ */
+export function vocabLinks(nodesOf: Iterable<readonly string[]>, skip?: (a: string, b: string) => boolean): VocabLink[] {
+  const count = new Map<string, number>();
+  const pair = new Map<string, number>();
+  let n = 0;
+  for (const raw of nodesOf) {
+    const list = [...new Set(raw)].sort(cmp);
+    if (list.length === 0) continue;
+    n++;
+    for (const x of list) count.set(x, (count.get(x) ?? 0) + 1);
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const k = `${list[i]}\u0000${list[j]}`;
+      pair.set(k, (pair.get(k) ?? 0) + 1);
+    }
+  }
+  const cands: VocabLink[] = [];
+  for (const [k, shared] of pair) {
+    if (shared < VOCAB_SHARED) continue;
+    const [a, b] = k.split('\u0000') as [string, string];
+    const lift = (shared * n) / (count.get(a)! * count.get(b)!);
+    if (lift >= VOCAB_LIFT && !skip?.(a, b)) cands.push({ a, b, lift: Math.round(lift * 100) / 100, shared });
+  }
+  cands.sort((x, y) => y.lift - x.lift || y.shared - x.shared || cmp(x.a, y.a) || cmp(x.b, y.b));
+  const used = new Map<string, number>();
+  const out: VocabLink[] = [];
+  for (const c of cands) {
+    if ((used.get(c.a) ?? 0) >= VOCAB_LINKS_PER_NODE || (used.get(c.b) ?? 0) >= VOCAB_LINKS_PER_NODE) continue;
+    used.set(c.a, (used.get(c.a) ?? 0) + 1);
+    used.set(c.b, (used.get(c.b) ?? 0) + 1);
+    out.push(c);
+  }
+  return out;
+}

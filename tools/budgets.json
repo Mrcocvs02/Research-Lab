@@ -6,8 +6,8 @@
       "en"
     ],
     "initialJsKB": 396,
-    "totalJsKB": 2050,
-    "totalKB": 2170,
+    "totalJsKB": 2110,
+    "totalKB": 2230,
     "readerResourcesKB": 2760,
     "chunkCapsKB": {
       "NoteRich": 16,
@@ -17,7 +17,7 @@
   },
   "main": {
     "entryJsKB": 1110,
-    "lazyJsKB": 290,
+    "lazyJsKB": 340,
     "lazyChunkKB": 30,
     "lazyChunkOverrides": {
       "writer": 45

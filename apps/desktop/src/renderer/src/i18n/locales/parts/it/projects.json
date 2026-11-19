@@ -205,6 +205,7 @@
     "assessed": "Testi integrali valutati per l'idoneità",
     "excludedFull": "Testi integrali esclusi, con i motivi",
     "includedBox": "Studi inclusi nella revisione",
+    "sourceFallback": "da OpenAlex e dalla libreria",
     "source": {
       "openalex-cited": "OpenAlex (opere citate)",
       "openalex-citing": "OpenAlex (opere che citano)"

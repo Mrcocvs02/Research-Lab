@@ -204,6 +204,7 @@
     "excluded": "Records excluded",
     "assessed": "Full texts assessed for eligibility",
     "excludedFull": "Full texts excluded, with reasons",
+    "sourceFallback": "from OpenAlex and the library",
     "includedBox": "Studies included in the review",
     "source": {
       "openalex-cited": "OpenAlex (works cited)",

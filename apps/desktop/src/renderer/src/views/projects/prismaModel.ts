@@ -15,6 +15,8 @@ export interface Labels {
   assessed: string;
   excludedFull: string;
   includedBox: string;
+  /** Source shown when nothing identified the records yet. */
+  sourceFallback?: string;
 }
 
 interface Box {
@@ -34,10 +36,27 @@ export interface Layout {
 }
 
 const LEFT = { x: 90, w: 290 };
-const RIGHT = { x: 420, w: 230 };
+const RIGHT = { x: 420, w: 270 };
+/** Characters that fit in a box line (13 px text, about 7 px per character, 10 px padding each side). */
+const fit = (w: number) => Math.floor((w - 20) / 7);
 const LINE = 18;
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const boxH = (lines: number) => 14 + lines * LINE;
+/** Breaks a line at spaces so it stays inside a box of `max` characters; a word longer than that is cut with an ellipsis. */
+export function wrap(text: string, max: number): string[] {
+  const out: string[] = [];
+  let cur = '';
+  for (const raw of text.split(/\s+/)) {
+    const word = clip(raw, max);
+    if (cur && cur.length + 1 + word.length > max) {
+      out.push(cur);
+      cur = word;
+    } else cur = cur ? `${cur} ${word}` : word;
+  }
+  if (cur) out.push(cur);
+  return out.length ? out : [''];
+}
+const wrapAll = (lines: string[], w: number) => lines.flatMap((l) => wrap(l, fit(w)));
 
 /** Boxes and arrows of the PRISMA 2020 flow (identification, screening, included) from the counts. `name` turns a source or reason code into text. */
 export function layoutPrisma(c: PrismaCounts, reasons: PrismaState['screeningReasons'], L: Labels, name: (code: string) => string): Layout {
@@ -48,8 +67,9 @@ export function layoutPrisma(c: PrismaCounts, reasons: PrismaState['screeningRea
   const GAP = 34;
   let y = 10;
 
-  const identified = [`${L.identified} (n = ${total})`, ...c.identified.map((s) => `${clip(name(s.source), 30)} (n = ${s.count})`)];
-  const removed = [`${L.removedBefore}`, `${L.duplicates} (n = ${c.duplicates})`];
+  const sources = c.identified.length > 0 ? c.identified.map((s) => `${name(s.source)} (n = ${s.count})`) : L.sourceFallback ? [L.sourceFallback] : [];
+  const identified = wrapAll([`${L.identified} (n = ${total})`, ...sources], LEFT.w);
+  const removed = wrapAll([`${L.removedBefore}`, `${L.duplicates} (n = ${c.duplicates})`], RIGHT.w);
   const rowA = Math.max(boxH(identified.length), boxH(removed.length));
   phases.push({ y: y + rowA / 2, text: L.identification });
   boxes.push({ ...LEFT, y, h: rowA, lines: identified, head: true }, { ...RIGHT, y, h: rowA, lines: removed });
@@ -57,8 +77,8 @@ export function layoutPrisma(c: PrismaCounts, reasons: PrismaState['screeningRea
   arrows.push([LEFT.x + LEFT.w / 2, y + rowA, LEFT.x + LEFT.w / 2, y + rowA + GAP]);
   y += rowA + GAP;
 
-  const screened = [`${L.screened} (n = ${c.screened})`];
-  const excluded = [`${L.excluded} (n = ${c.excludedScreening})`, ...reasons.slice(0, 3).map((r) => `${clip(name(r.reason), 26)} (n = ${r.count})`)];
+  const screened = wrapAll([`${L.screened} (n = ${c.screened})`], LEFT.w);
+  const excluded = wrapAll([`${L.excluded} (n = ${c.excludedScreening})`, ...reasons.slice(0, 3).map((r) => `${name(r.reason)} (n = ${r.count})`)], RIGHT.w);
   const rowB = Math.max(boxH(screened.length), boxH(excluded.length));
   phases.push({ y: y + rowB / 2, text: L.screening });
   boxes.push({ ...LEFT, y, h: rowB, lines: screened }, { ...RIGHT, y, h: rowB, lines: excluded });
@@ -66,18 +86,18 @@ export function layoutPrisma(c: PrismaCounts, reasons: PrismaState['screeningRea
   arrows.push([LEFT.x + LEFT.w / 2, y + rowB, LEFT.x + LEFT.w / 2, y + rowB + GAP]);
   y += rowB + GAP;
 
-  const assessed = [`${L.assessed} (n = ${c.assessed})`];
-  const full = [`${L.excludedFull} (n = ${c.excludedFull.reduce((a, b) => a + b.count, 0)})`, ...c.excludedFull.slice(0, 5).map((r) => `${clip(r.reason, 26)} (n = ${r.count})`)];
+  const assessed = wrapAll([`${L.assessed} (n = ${c.assessed})`], LEFT.w);
+  const full = wrapAll([`${L.excludedFull} (n = ${c.excludedFull.reduce((a, b) => a + b.count, 0)})`, ...c.excludedFull.slice(0, 5).map((r) => `${r.reason} (n = ${r.count})`)], RIGHT.w);
   const rowC = Math.max(boxH(assessed.length), boxH(full.length));
   boxes.push({ ...LEFT, y, h: rowC, lines: assessed }, { ...RIGHT, y, h: rowC, lines: full });
   arrows.push([LEFT.x + LEFT.w, y + rowC / 2, RIGHT.x, y + rowC / 2]);
   arrows.push([LEFT.x + LEFT.w / 2, y + rowC, LEFT.x + LEFT.w / 2, y + rowC + GAP]);
   y += rowC + GAP;
 
-  const incl = [`${L.includedBox} (n = ${c.included})`];
-  phases.push({ y: y + boxH(1) / 2, text: L.included });
-  boxes.push({ ...LEFT, y, h: boxH(1), lines: incl, head: true });
-  return { w: RIGHT.x + RIGHT.w + 10, h: y + boxH(1) + 10, boxes, arrows, phases };
+  const incl = wrapAll([`${L.includedBox} (n = ${c.included})`], LEFT.w);
+  phases.push({ y: y + boxH(incl.length) / 2, text: L.included });
+  boxes.push({ ...LEFT, y, h: boxH(incl.length), lines: incl, head: true });
+  return { w: RIGHT.x + RIGHT.w + 10, h: y + boxH(incl.length) + 10, boxes, arrows, phases };
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

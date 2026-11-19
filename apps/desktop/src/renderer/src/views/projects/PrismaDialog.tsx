@@ -59,6 +59,7 @@ export default function PrismaDialog({ projectId, projectName, onClose }: { proj
       assessed: t('prisma.assessed'),
       excludedFull: t('prisma.excludedFull'),
       includedBox: t('prisma.includedBox'),
+      sourceFallback: t('prisma.sourceFallback'),
     }),
     [t],
   );

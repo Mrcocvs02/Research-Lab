@@ -346,6 +346,7 @@ function FreeCanvas({ map, level, selected, onSelect, onRead, onExplore, onVicin
         }
       }
       if (ctx.canvas.dataset['drawn'] !== String(count)) ctx.canvas.dataset['drawn'] = String(count);
+      let paperBoxes: Array<{ x: number; y: number; w: number; h: number }> = [];
       // Titles of the papers (section 19.2.4): the hovered, the selected, the neighbours of the selection and the central ones (by evidence), at most 40, none over another.
       if (!op && map.n > 0 && (map.n <= 3000 || v.k / fitView(map.bounds, w, h).k >= 2.5)) {
         const adj = freeAdj.current;
@@ -360,7 +361,7 @@ function FreeCanvas({ map, level, selected, onSelect, onRead, onExplore, onVicin
         if (selRef.current >= 0) for (const e of (adj.get(map.ids[selRef.current]!) ?? []).slice(0, 5)) force.add(map.indexOf.get(e.a === map.ids[selRef.current] ? e.b : e.a) ?? -1);
         const pick = new Set<number>([...vis.sort((a, b) => deg(b) - deg(a) || a - b).slice(0, FREE_LABEL_CAP * 2), ...[...force].filter((i) => i >= 0)]);
         const items = [...pick].map((i) => ({ id: map.ids[i]!, x: toScreenX(v, map.xs[i]!, w), y: toScreenY(v, map.ys[i]!, h), forced: force.has(i), rank: deg(i) }));
-        paintLabels(ctx, items, [], w, h, 150, th, () => view.requestDraw(), FREE_LABEL_CAP);
+        paperBoxes = paintLabels(ctx, items, [], w, h, 150, th, () => view.requestDraw(), FREE_LABEL_CAP);
       }
       // Hover halo (additive in the dark theme), selected and cursor rings.
       const at = (i: number): [number, number] => {
@@ -432,7 +433,7 @@ function FreeCanvas({ map, level, selected, onSelect, onRead, onExplore, onVicin
       ctx.textBaseline = 'middle';
       let shown = 0;
       labelBoxes.current = [];
-      const spots = placeTopicLabels(topicItems, w, h);
+      const spots = placeTopicLabels(topicItems, w, h, paperBoxes);
       for (const [id, at] of spots) {
         const tx = texts[id]!;
         const tint = areasRef.current ? th.muted : (th.tints[tintRef.current.tint[tx.c] ?? 0] ?? th.text);

@@ -16,7 +16,7 @@ import { useLocalChoice } from '../../lib/useLocalString';
 import { useLocalFlag } from '../../lib/useLocalFlag';
 import { useNotify } from '../../lib/notify';
 import { useApp } from '../../state/app-context';
-import { DocViews, type ViewMode } from './DocViews';
+import { CARD_SIZES, DocViews, type CardSize, type ViewMode } from './DocViews';
 import { browseFromIntent, hasAnyCondition, initialBrowse, planQuery, setTagFilter, withMissing, type BrowseState } from './docQuery';
 import { FacetBar } from './FacetBar';
 import { LibraryHeader } from './LibraryHeader';
@@ -62,13 +62,15 @@ function LibraryInner() {
   const text = useSearchText();
 
   const [state, setState] = useState<BrowseState>(() => browseFromIntent(takeLibraryIntent()));
+  const [cleanupFirst] = useState(() => takeLibraryIntent()?.cleanup === true);
   const browse = useMemo<BrowseState>(() => ({ ...state, text }), [state, text]);
   const [view, setView] = useLocalChoice<ViewMode>('rl.libraryView', ['list', 'grid'], 'list');
+  const [cardSize, setCardSize] = useLocalChoice<CardSize>('rl.cardSize', CARD_SIZES, 'm');
   const [tab, setTab] = useLocalChoice<PaneTab>('rl.libraryTab', TABS, 'folders');
   const [selection, setSelection] = useState<SelectionState>(emptySelection);
   const [detailOpen, setDetailOpen] = useLocalFlag('rl.detailOpen', false);
   const [navOpen, setNavOpen] = useState(false);
-  const [mode, setMode] = useState<'browse' | 'taxonomy'>('browse');
+  const [mode, setMode] = useState<'browse' | 'taxonomy'>(cleanupFirst ? 'taxonomy' : 'browse');
   const [addOpen, setAddOpen] = useState(false);
   const [showResources, setShowResources] = useState(false);
   const [jobOpen, setJobOpen] = useState(false);
@@ -161,6 +163,8 @@ function LibraryInner() {
         count={list.total}
         view={view}
         onView={setView}
+        cardSize={cardSize}
+        onCardSize={setCardSize}
         sort={browse.sort}
         hasText={browse.text.trim() !== ''}
         onSort={(sort) => set({ sort })}
@@ -177,7 +181,7 @@ function LibraryInner() {
 
       {mode === 'taxonomy' ? (
         <Lazy>
-          <TaxonomyManager onBack={() => setMode('browse')} />
+          <TaxonomyManager onBack={() => setMode('browse')} startCleanup={cleanupFirst} />
         </Lazy>
       ) : (
         <>
@@ -239,6 +243,7 @@ function LibraryInner() {
                 <DocViews
                   list={list}
                   view={view}
+                  cardSize={cardSize}
                   searching={searching}
                   selection={selection}
                   onSelection={setSelection}

@@ -11,11 +11,28 @@ type Scope = RequestOf<Channels, 'graph:nameFamily'>['scope'];
 /** Share of the papers that sit in a clear value of a family that did not pass the test (section 19.2.2), in percent. */
 export const clearShare = (f: Pick<FamilyInfo, 'reason'>): number => (f.reason ? Math.round(100 * f.reason.coverage * f.reason.clarity) : 0);
 
+/** "Name with Claude" for the Automatic groups: the button, and the dialog it opens (the caller owns the state: below 1440 px the button sits in a popover, D-508). */
+export function NameFamilyButton({ onClick }: { onClick(): void }) {
+  const { t } = useTranslation();
+  return (
+    <Button size="sm" onClick={onClick} data-testid="map-group-name">
+      {t('network.group.nameButton')}
+    </Button>
+  );
+}
+export function NameFamilyDialog({ scope, onClose }: { scope?: Scope; onClose(): void }) {
+  return (
+    <Lazy>
+      <FamilyNamesDialog scope={scope} onClose={onClose} />
+    </Lazy>
+  );
+}
+
 /**
  * "Group by: Topic | Group | Method | Automatic | None" (section 19.2.2), in the bar of the Map: the family whose values are the blocks.
  * A family that does not pass the test stays in the menu, off, with the reason; the one chosen is shown under the control when it is off.
  */
-export function GroupBy({ families, scope, withNone = false }: { families: readonly FamilyInfo[]; scope?: Scope; /** The Map offers "None" (the free layout); the networks do not. */ withNone?: boolean }) {
+export function GroupBy({ families, scope, withNone = false, nameInBar = true }: { families: readonly FamilyInfo[]; scope?: Scope; /** The Map offers "None" (the free layout); the networks do not. */ withNone?: boolean; /** The "Name with Claude" button of Automatic stays in the bar (false: the caller puts it elsewhere). */ nameInBar?: boolean }) {
   const { t } = useTranslation();
   const [family, setFamily] = useFamily();
   const [naming, setNaming] = useState(false);
@@ -40,16 +57,8 @@ export function GroupBy({ families, scope, withNone = false }: { families: reado
           {t('network.blocks.reason', { pct: clearShare(current) })}
         </span>
       )}
-      {family === 'auto' && (
-        <Button size="sm" onClick={() => setNaming(true)} data-testid="map-group-name">
-          {t('network.group.nameButton')}
-        </Button>
-      )}
-      {naming && (
-        <Lazy>
-          <FamilyNamesDialog scope={scope} onClose={() => setNaming(false)} />
-        </Lazy>
-      )}
+      {family === 'auto' && nameInBar && <NameFamilyButton onClick={() => setNaming(true)} />}
+      {naming && <NameFamilyDialog scope={scope} onClose={() => setNaming(false)} />}
     </>
   );
 }

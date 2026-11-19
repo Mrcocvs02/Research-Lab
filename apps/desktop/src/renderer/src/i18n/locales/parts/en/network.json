@@ -348,6 +348,8 @@
       "none": "Map not built",
       "stale_one": "{{count}} new document",
       "stale_other": "{{count}} new documents",
+      "changed_one": "{{count}} document changed",
+      "changed_other": "{{count}} documents changed",
       "removed_one": "{{count}} document removed",
       "removed_other": "{{count}} documents removed",
       "documents_one": "{{count}} document",
@@ -374,6 +376,7 @@
       "areaSparse_other": "Only {{count}} documents have tags: the others are empty rings",
       "areaByTopic": "Colour by topic",
       "manageTags": "Manage tags",
+      "tidyTags": "Tidy the tags",
       "areaIsolate": "Isolate the area {{name}}"
     },
     "edge": {

@@ -10,7 +10,7 @@ import { GRAPH_PAGES, GRAPH_TEXT_CHARS, docSig, folderOfPath, toGraphDoc } from 
 import { readMeta } from './model-meta.js';
 import { graphPaths } from './paths.js';
 import { TOP_TAGS, topTags } from './tag-top.js';
-import { loadView, titleOf, type LibraryView } from './view.js';
+import { keywordTagIds, loadView, titleOf, type LibraryView } from './view.js';
 
 /** Seed of the first build (a rebuild keeps the seed of the model it replaces unless one is given). */
 export const DEFAULT_SEED = 1;
@@ -131,15 +131,17 @@ export async function loadModel(s: MainServices, rt: LibraryRuntime): Promise<Lo
 export const modelId = (m: GraphModel): string => `${m.builtAt}:${m.seed}`;
 
 /** Documents that are new or changed since the model, and the model documents that are gone. */
-export function drift(view: LibraryView, m: Pick<GraphModel, 'ids' | 'sigs'>, index: Map<string, number>): { pending: DocumentRecord[]; removed: number } {
+export function drift(view: LibraryView, m: Pick<GraphModel, 'ids' | 'sigs'>, index: Map<string, number>): { pending: DocumentRecord[]; changed: number; removed: number } {
   const pending: DocumentRecord[] = [];
+  let changed = 0;
   for (const r of view.records) {
     const i = index.get(r.id);
     if (i === undefined || m.sigs[i] !== docSig(r)) pending.push(r);
+    if (i !== undefined && m.sigs[i] !== docSig(r)) changed++;
   }
   let removed = 0;
   for (const id of m.ids) if (!view.byId.has(id)) removed++;
-  return { pending, removed };
+  return { pending, changed, removed };
 }
 
 /* ------------------------------------------------ status, build, cancel ------------------------------------------------ */
@@ -179,6 +181,7 @@ export async function status(s: MainServices) {
     builtAt: sum.builtAt,
     seed: sum.seed,
     pending: d.pending.length,
+    changed: d.changed,
     removed: d.removed,
   };
 }
@@ -295,7 +298,8 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 function similarFromModel(view: LibraryView, lm: LoadedModel, rec: DocumentRecord, i: number, limit: number): SimilarItem[] {
   const m = lm.model;
-  const mine = new Set(view.tagsOf(rec));
+  const kw = keywordTagIds(view.tax);
+  const mine = new Set(view.tagsOf(rec).filter((t) => !kw.has(t)));
   const vec = (k: number) => modelVector(m, k);
   const vi = vec(i);
   const items: SimilarItem[] = [];
@@ -325,7 +329,8 @@ export async function similar(s: MainServices, docId: string, limit: number): Pr
   const { deviceId } = await s.settings.get();
   const args: GraphStoreArgs & { docId: string; limit: number } = { rootPath: rt.store.rootPath, dataDir: rt.store.dataDir, deviceId, docId, limit };
   const items = await engineOf(s).similar(args);
-  return items.filter((it) => view.byId.has(it.docId));
+  const kw = keywordTagIds(view.tax);
+  return items.filter((it) => view.byId.has(it.docId)).map((it) => (kw.size === 0 ? it : { ...it, shared: { ...it.shared, tags: it.shared.tags.filter((t) => !kw.has(t)) } }));
 }
 
 export async function surprising(s: MainServices, docId: string | undefined, limit: number) {

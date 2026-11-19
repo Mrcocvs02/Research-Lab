@@ -346,6 +346,10 @@
     "view": "View",
     "view_list": "List",
     "view_grid": "Grid",
+    "cardSize": "Card size",
+    "size_s": "S",
+    "size_m": "M",
+    "size_l": "L",
     "navigation": "Browse",
     "tabs": {
       "folders": "Folders",

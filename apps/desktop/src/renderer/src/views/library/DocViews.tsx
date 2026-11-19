@@ -18,6 +18,7 @@ import { formatSize } from './formatSize';
 import { safeText } from './safeText';
 import { plainSnippet, Snippet } from './Snippet';
 import { TagChip } from './TagParts';
+import { fitTags } from './tagFit';
 import { resolveId } from './taxonomyModel';
 import { useTaxonomy } from './useTaxonomy';
 
@@ -26,7 +27,11 @@ export type ViewMode = 'list' | 'grid';
 
 export const ROW_HEIGHT = { browse: 60, search: 100 } as const;
 /** Card size M (D-500): column width between the two, height from the width (an A4 page in portrait, about 1.32 x). */
-const CARD = { min: 210, gap: 12, ratio: 1.32, minHeight: 230, maxHeight: 420 } as const;
+/** Card sizes S / M / L: the narrowest column of the grid (D-508); M is the one of the audit. */
+export type CardSize = 's' | 'm' | 'l';
+export const CARD_SIZES: readonly CardSize[] = ['s', 'm', 'l'];
+const CARD_MIN: Record<CardSize, number> = { s: 170, m: 210, l: 280 };
+const CARD = { min: 210, gap: 12, ratio: 1.32, minHeight: 190, maxHeight: 460 } as const;
 const cardHeight = (columnWidth: number) => Math.max(CARD.minHeight, Math.min(CARD.maxHeight, Math.round(CARD.ratio * (columnWidth - 4))));
 
 /**
@@ -73,10 +78,12 @@ function StudyBadge({ state }: { state: DocRow['studyState'] }) {
   );
 }
 
-function Tags({ tags, max }: { tags: string[] | null; max: number }) {
+function Tags({ tags, max, width }: { tags: string[] | null; max: number; /** Room of one line (a card): the chips that fit, with "+N" for the rest. */ width?: number | undefined }) {
   const { t } = useTranslation();
   const { model } = useTaxonomy();
   if (!tags || tags.length === 0) return null;
+  const labelOf = (id: string): string => model.byId.get(resolveId(model, id))?.label ?? groupTagLabel(id);
+  if (width !== undefined) max = fitTags(tags.map(labelOf), width);
   const shown = tags.slice(0, max);
   return (
     <span className="doc-tags" data-testid="doc-tags">
@@ -107,6 +114,8 @@ interface ItemProps {
   onToggle(): void;
   /** The list is sorted by size: the size of the file is shown. */
   showSize: boolean;
+  /** Width of one card of the grid, in pixels. */
+  cardWidth: number;
 }
 
 /** The menu of a row: the two actions that leave the app (D-333; the reader and the card have buttons). */
@@ -123,7 +132,7 @@ function rowMenu(t: ReturnType<typeof useTranslation>['t'], missing: boolean, op
   ];
 }
 
-const DocItem = memo(function DocItem({ row, view, selected, active, searching, onClick, onDoubleClick, onOpenFile, onReveal, onRead, onDetail, onToggle, showSize }: ItemProps) {
+const DocItem = memo(function DocItem({ row, view, selected, active, searching, onClick, onDoubleClick, onOpenFile, onReveal, onRead, onDetail, onToggle, showSize, cardWidth }: ItemProps) {
   const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const moreRef = useRef<HTMLSpanElement>(null);
@@ -193,7 +202,7 @@ const DocItem = memo(function DocItem({ row, view, selected, active, searching, 
         </h3>
         <div className="doc-sub">
           {meta.length > 0 && <p className="result-meta">{meta.join(' · ')}</p>}
-          <Tags tags={row.tags} max={view === 'grid' ? 2 : 4} />
+          <Tags tags={row.tags} max={4} width={view === 'grid' ? cardWidth - 40 : undefined} />
         </div>
         {view === 'list' && searching && row.snippet && (
           <p className="result-snippet" data-testid="result-snippet" data-field={row.field}>
@@ -264,30 +273,33 @@ interface Props {
   ariaLabel: string;
   /** The list is sorted by file size: rows show it. */
   showSize?: boolean;
+  /** Size of the cards of the grid. */
+  cardSize?: CardSize;
 }
 
 /** The documents as a virtualised list or grid with multi-selection and keyboard navigation. */
-export function DocViews({ list, view, searching, selection, onSelection, onOpenDetail, onDeleteKey, ariaLabel, showSize = false }: Props) {
+export function DocViews({ list, view, searching, selection, onSelection, onOpenDetail, onDeleteKey, ariaLabel, showSize = false, cardSize = 'm' }: Props) {
   const { reportError, fail, info } = useNotify();
   const { t } = useTranslation();
   const { openReader } = useReader();
   const [columns, setColumns] = useState(1);
   // The width of one column of the grid, from the width of the list: the height of a card follows it.
   const wrap = useRef<HTMLDivElement>(null);
-  const [columnWidth, setColumnWidth] = useState<number>(CARD.min);
+  const minCol = CARD_MIN[cardSize];
+  const [columnWidth, setColumnWidth] = useState<number>(minCol);
   useEffect(() => {
     const el = wrap.current;
     if (!el || view !== 'grid') return;
     const measure = () => {
       const w = (el.firstElementChild as HTMLElement | null)?.clientWidth ?? el.clientWidth;
-      if (w > 0) setColumnWidth(w / Math.max(1, Math.floor(w / (CARD.min + CARD.gap))));
+      if (w > 0) setColumnWidth(w / Math.max(1, Math.floor(w / (minCol + CARD.gap))));
     };
     measure();
     if (typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [view]);
+  }, [view, minCol]);
   const selRef = useRef(selection);
   selRef.current = selection;
 
@@ -433,10 +445,10 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
   return (
     <div className="vl-wrap" ref={wrap}>
     <VirtualList
-      key={view}
+      key={`${view}${view === 'grid' ? cardSize : ''}`}
       count={list.total}
       itemHeight={itemHeight}
-      {...(view === 'grid' ? { minColumnWidth: CARD.min + CARD.gap } : {})}
+      {...(view === 'grid' ? { minColumnWidth: minCol + CARD.gap } : {})}
       onRange={range}
       onColumns={setColumns}
       activeIndex={activeIndex}
@@ -463,6 +475,7 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
             onDetail={() => row && onOpenDetail(row.docId)}
             onToggle={() => toggle(i)}
             showSize={showSize}
+            cardWidth={columnWidth}
           />
         );
       }}

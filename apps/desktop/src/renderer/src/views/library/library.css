@@ -1342,3 +1342,15 @@ button.page-chip {
   display: flex;
   flex-direction: column;
 }
+
+/* Grid cards: a chip is never cut in half; one wider than the line gets an ellipsis, and "+N" stays whole (D-508). */
+.doc-card .doc-sub .doc-tags .tag {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-card .doc-sub .doc-tags .tag-more {
+  flex: none;
+}

@@ -138,6 +138,7 @@
         "cooccurrence": "co-occorrenza",
         "venue": "rivista",
         "status": "stato",
+        "author": "nome di un autore",
         "underscore": "trattino basso",
         "case": "maiuscole",
         "long": "troppo lungo"
@@ -152,7 +153,8 @@
       },
       "field": {
         "venue": "rivista",
-        "status": "stato"
+        "status": "stato",
+        "author": "autore"
       },
       "papers_one": "{{count}} lavoro",
       "papers_other": "{{count}} lavori",
@@ -254,7 +256,8 @@
         "parent": "più genitori",
         "place": "posizione",
         "name": "nome",
-        "metadata": "metadati"
+        "metadata": "metadati",
+        "generic": "valore generico"
       },
       "marked": "da guardare",
       "remains": "alcuni lavori tengono il tag",
@@ -265,7 +268,8 @@
         "keywords": "Sposta in Parole chiave",
         "leave": "Lascia",
         "pick": "Un valore per lavoro",
-        "many": "Consenti più valori"
+        "many": "Consenti più valori",
+        "topic": "Metti sotto Topic"
       }
     },
     "board": {

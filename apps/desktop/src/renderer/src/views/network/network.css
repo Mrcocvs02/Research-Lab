@@ -904,30 +904,50 @@
   box-shadow: var(--e-2);
 }
 
-/* Collegamenti: the legend and the node count share the bottom-left corner in one column (audit on real data, D-490). */
+/* Collegamenti, Vicinato: the legend and the node count are one strip above the canvas, like the Map's (D-508); it scrolls sideways. */
 .net-bl {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  z-index: 3;
-  max-height: calc(100% - 24px);
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  pointer-events: none;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
 }
-.net-bl > * {
-  pointer-events: auto;
+.net-bl[hidden] {
+  display: none;
 }
-.net-wrap .net-bl .area-legend,
-.net-wrap .net-bl .net-legend-box {
+.net-bl .area-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  width: auto;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+.net-bl .area-legend .legend-key {
+  flex-direction: row;
+  align-items: center;
+  padding: 0 6px;
+}
+.net-bl .area-legend .area-strip {
+  width: 48px;
+}
+.net-bl .legend-item {
+  width: auto;
+}
+.net-bl .legend-text {
+  max-width: 160px;
+}
+.net-bl .net-legend-box {
   position: static;
-}
-.net-wrap .net-bl .area-legend {
-  flex: 0 1 auto;
-  min-height: 0;
-  max-height: none;
+  max-width: none;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
 }
 /* Panorama: "Grouped by X" is a small pill at the top right, clear of the hint pill at the top left. */
 .map-wrap > .group-label {
@@ -1106,4 +1126,33 @@
 .net-pop .group-by {
   display: flex;
   justify-content: space-between;
+}
+
+/* Free layout below 1440 px: the legend is one line in the strip, not a band over the canvas (D-508). */
+.map-strip-blocks > .legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  width: auto;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.map-strip-blocks > .legend li {
+  flex: none;
+}
+.map-strip-blocks > .legend .legend-item {
+  width: auto;
+}
+.map-strip-blocks > .legend .legend-text {
+  max-width: 160px;
+}
+.map-strip-blocks > .legend .legend-key {
+  flex-direction: row;
+  align-items: center;
+  padding: 0 6px;
+}
+.map-strip-blocks > .legend .area-strip {
+  width: 48px;
 }

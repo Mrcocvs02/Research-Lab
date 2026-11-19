@@ -62,10 +62,12 @@ export const TOPIC_LABEL_H = 18;
  * touches no label already placed (and stays in the view) wins. A topic with no free place is not labelled until the next zoom.
  * The biggest topics are placed first, so the smallest is the one hidden. Returns the centre of every label placed, by id.
  */
-export function placeTopicLabels(items: readonly TopicLabelItem[], width: number, height: number): Map<number, { x: number; y: number }> {
+export function placeTopicLabels(items: readonly TopicLabelItem[], width: number, height: number, avoid: readonly Box[] = []): Map<number, { x: number; y: number }> {
   const placed: Array<{ x: number; y: number; w: number }> = [];
   const out = new Map<number, { x: number; y: number }>();
-  const hit = (x: number, y: number, w: number) => placed.some((p) => Math.abs(p.x - x) < (p.w + w) / 2 && Math.abs(p.y - y) < TOPIC_LABEL_H);
+  // `avoid`: boxes already drawn (the titles of the papers in the free layout): a name never lands on one (D-508).
+  const hit = (x: number, y: number, w: number) =>
+    placed.some((p) => Math.abs(p.x - x) < (p.w + w) / 2 && Math.abs(p.y - y) < TOPIC_LABEL_H) || avoid.some((a) => !apart(a, { x: x - w / 2, y: y - TOPIC_LABEL_H / 2, w, h: TOPIC_LABEL_H }));
   const inside = (x: number, y: number, w: number) => x - w / 2 >= 0 && x + w / 2 <= width && y - TOPIC_LABEL_H / 2 >= 0 && y + TOPIC_LABEL_H / 2 <= height;
   for (const it of [...items].sort((a, b) => b.size - a.size || a.id - b.id)) {
     const b = it.box;

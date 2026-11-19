@@ -138,6 +138,7 @@
         "cooccurrence": "co-occurrence",
         "venue": "venue",
         "status": "status",
+        "author": "author name",
         "underscore": "underscore",
         "case": "capitalisation",
         "long": "too long"
@@ -152,7 +153,8 @@
       },
       "field": {
         "venue": "venue",
-        "status": "status"
+        "status": "status",
+        "author": "author"
       },
       "papers_one": "{{count}} paper",
       "papers_other": "{{count}} papers",
@@ -254,7 +256,8 @@
         "parent": "several parents",
         "place": "placement",
         "name": "name",
-        "metadata": "metadata"
+        "metadata": "metadata",
+        "generic": "generic value"
       },
       "marked": "check",
       "remains": "some papers keep the tag",
@@ -265,7 +268,8 @@
         "keywords": "Move to Keywords",
         "leave": "Leave",
         "pick": "One value per paper",
-        "many": "Allow many values"
+        "many": "Allow many values",
+        "topic": "Put under Topic"
       }
     },
     "board": {

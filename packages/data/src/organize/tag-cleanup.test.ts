@@ -36,6 +36,7 @@ function legacy(): CleanupInput {
     on(8, 'macro-two', 'micro-d'),
     on(9, 'macro-two'),
     on(10, 'micro-z'),
+    on(11),
   ];
   return { nodes, docs };
 }
@@ -219,5 +220,37 @@ describe('cleanup on real-shaped vocabularies (D-505)', () => {
     ];
     const move = cleanupPlan({ nodes, docs }, 4).rows.find((r) => r.id === 'place:micro-s')?.variants['default']?.ops[0];
     expect(move).toMatchObject({ parents: ['small-macro'] });
+  });
+});
+
+describe('generic macros, micro lift and author tags (D-508)', () => {
+  const nodes = [node('Wide', { group: 'macro' }), node('Narrow', { group: 'macro' }), node('Micro q', { group: 'micro' }), node('Other kw', { group: 'extra' })];
+  const docs: CleanupDoc[] = Array.from({ length: 12 }, (_, i) => ({ id: `d${i}`, tags: ['wide', ...(i < 3 ? ['narrow', 'micro-q'] : []), ...(i === 5 ? ['micro-q'] : [])] }));
+  const plan = cleanupPlan({ nodes, docs }, 4);
+  const row = (id: string) => plan.rows.find((r) => r.tags[0] === id);
+
+  it('a macro on more than half of the papers is a family of its own, not a Topic value (W11)', () => {
+    const wide = row('wide');
+    expect(wide).toMatchObject({ kind: 'generic', marked: true, variant: 'default' });
+    expect(wide?.variants['default']?.ops).toEqual([{ op: 'setFamily', id: 'wide', family: 'many' }]);
+    expect(Object.keys(wide?.variants ?? {})).toEqual(['default', 'topic', 'keywords']);
+    expect(row('narrow')?.kind).toBe('place');
+  });
+  it('a micro goes to the macro with the highest lift among those holding half of its papers (W16)', () => {
+    // micro-q: on 4 papers, 3 with narrow (P 0.75, lift 3) and 4 with wide (P 1, lift 1.2): narrow wins, not the biggest.
+    expect(row('micro-q')?.variants['default']?.ops).toEqual([{ op: 'move', id: 'micro-q', parents: ['narrow'] }]);
+  });
+  it('a small library has no generic value', () => {
+    const small = cleanupPlan({ nodes, docs: docs.slice(0, 6) }, 4);
+    expect(small.rows.some((r) => r.kind === 'generic')).toBe(false);
+  });
+  it('an author tag row only removes the tag from the papers', () => {
+    const ds: CleanupDoc[] = [{ id: 'a', tags: ['doe-j', 'x'], authors: ['Doe, Jane'] }, { id: 'b', tags: ['doe-j'], authors: ['Jane Doe'] }];
+    const rows = cleanupPlan({ nodes: [node('doe_j', { id: 'doe-j' }), node('x')], docs: ds }, 5).rows.filter((r) => r.kind === 'metadata');
+    expect(rows).toHaveLength(1);
+    const v = rows[0]?.variants['default'];
+    expect(rows[0]).toMatchObject({ kind: 'metadata', remains: false });
+    expect(v?.docEdits).toEqual([{ docId: 'a', removeTags: ['doe-j'] }, { docId: 'b', removeTags: ['doe-j'] }]);
+    expect(v?.ops).toEqual([{ op: 'delete', id: 'doe-j' }]);
   });
 });

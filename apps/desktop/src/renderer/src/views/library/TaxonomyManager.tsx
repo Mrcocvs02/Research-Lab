@@ -475,7 +475,7 @@ function NewFamilyForm({ onDone }: { onDone(createdId: string | null): void }) {
 }
 
 /** The vocabulary: health strip, the tree (families, "To sort", Keywords) and "To review" in tabs, the node editor, and the guided cleanup. */
-export function TaxonomyManager({ onBack }: { onBack(): void }) {
+export function TaxonomyManager({ onBack, startCleanup = false }: { onBack(): void; /** Open on the guided cleanup (from the Map's "Tidy the tags"). */ startCleanup?: boolean }) {
   const { t } = useTranslation();
   const { model, loaded, error, apply, view } = useTaxonomy();
   const { fail } = useNotify();
@@ -489,7 +489,7 @@ export function TaxonomyManager({ onBack }: { onBack(): void }) {
   const [tab, setTab] = useState<'tree' | 'review'>('tree');
   const [filter, setFilter] = useState<ReviewFilter | null>(null);
   const [only, setOnly] = useState<Set<string> | null>(null);
-  const [cleanup, setCleanup] = useState<{ step: number | null } | null>(null);
+  const [cleanup, setCleanup] = useState<{ step: number | null } | null>(startCleanup ? { step: null } : null);
   const queryId = useId();
   const { data: review } = useTagReview();
 

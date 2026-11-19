@@ -26,6 +26,23 @@ export interface LibraryView {
 
 const views = new WeakMap<object, LibraryView>();
 
+/** The tags of the Keywords family (the family root and everything under it): raw words that never say what two papers share (D-508). */
+export function keywordTagIds(tax: TaxonomyFile | null): Set<string> {
+  const nodes = tax?.nodes ?? [];
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const memo = new Map<string, boolean>();
+  const inKeywords = (id: string, depth = 0): boolean => {
+    const known = memo.get(id);
+    if (known !== undefined) return known;
+    memo.set(id, false); // cycle guard
+    const n = byId.get(id);
+    const r = !!n && depth < 50 && (n.family === 'keywords' || n.parents.some((p) => inKeywords(p, depth + 1)));
+    memo.set(id, r);
+    return r;
+  };
+  return new Set(nodes.filter((n) => inKeywords(n.id)).map((n) => n.id));
+}
+
 export const titleOf = (rec: Pick<DocumentRecord, 'title' | 'path'>): string => rec.title?.trim() || rec.path.slice(rec.path.lastIndexOf('/') + 1);
 
 export async function loadView(rt: LibraryRuntime): Promise<LibraryView> {

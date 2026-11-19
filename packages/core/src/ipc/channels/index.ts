@@ -12,6 +12,7 @@ import { chatChannels, chatEvents } from './chat.js';
 import { citationsChannels, citationsEvents, recommendChannels } from './citations.js';
 import { commandsChannels } from './commands.js';
 import { dialogChannels } from './dialog.js';
+import { discoverChannels } from './discover.js';
 import { documentsChannels } from './documents.js';
 import { exploreChannels, graphChannels, graphEvents } from './graph.js';
 import { exportChannels, exportEvents } from './export.js';
@@ -37,7 +38,9 @@ import { indexChannels, searchChannels } from './search.js';
 import { secretsChannels } from './secrets.js';
 import { settingsChannels } from './settings.js';
 
-export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels, citationsChannels, recommendChannels, watchChannels, graphChannels, exploreChannels, exportChannels, mcpChannels, backupChannels, maintenanceChannels, bibChannels, readerToolsChannels, resourcesChannels, importIdChannels, resumeChannels, literatureChannels);
+export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels, citationsChannels, recommendChannels, watchChannels, graphChannels, exploreChannels, exportChannels, mcpChannels, backupChannels, maintenanceChannels, bibChannels, readerToolsChannels, resourcesChannels, importIdChannels, resumeChannels, literatureChannels,
+  discoverChannels,
+);
 
 export const events = mergeRegistries(aiEvents, annotationsEvents, appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, watchEvents, graphEvents, exportEvents, mcpEvents, backupEvents);
 
@@ -58,6 +61,7 @@ export { projectDetailSchema, projectSummarySchema, projectMemberViewSchema, rea
 export { noteViewSchema, noteListItemSchema, type NoteView } from './notes.js';
 export { annotationColorSchema, annotationInputSchema, externalItemSchema, pdfReasonSchema, pdfStateSchema, type AnnotationInput, type ExternalItem, type PdfReason, type PdfState } from './annotations.js';
 export { CROP_BASE64_MAX, explainResultSchema, type ExplainResult } from './readertools.js';
+export { DISCOVER_LIMITS, DISCOVER_SUMMARY_CHOICES, discoverReasonSchema, discoverRunSchema, discoverSummarySchema, type DiscoverOutcome, type DiscoverCandidate, type DiscoverKind, type DiscoverReason, type DiscoverRun, type DiscoverRunSummary, type DiscoverSummary } from './discover.js';
 export { LITERATURE_KEYS, LITERATURE_MAX_DOCS, TEMPLATE_LIMITS, type LiteratureKey, type LiteratureNote } from './literature.js';
 export { thumbItemSchema } from './thumbs.js';
 export { aiAccountSchema, aiAuthSchema, aiPreviewSchema, aiSendViewSchema, aiStatusSchema, type AiAccount, type AiTokenUsage, aiTokenUsageSchema } from './ai.js';

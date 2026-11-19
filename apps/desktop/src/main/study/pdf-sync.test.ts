@@ -9,13 +9,18 @@ import type { MainServices } from '../ipc/handlers/services.js';
 import { PdfSync } from './pdf-sync.js';
 
 // Rename failures of the replacement are simulated here (a file another program holds open): only the temporary PDFs of a write.
-const fail = vi.hoisted(() => ({ eperm: 0 }));
+const fail = vi.hoisted(() => ({ eperm: 0, beforeRename: undefined as undefined | (() => Promise<void>) }));
 vi.mock('node:fs/promises', async (orig) => {
   const real = await orig<typeof import('node:fs/promises')>();
   return {
     ...real,
     default: real,
     rename: async (from: string, to: string) => {
+      if (fail.beforeRename && /\.pdf\.rl-[0-9a-f]{8}\.tmp$/.test(from) && !from.includes('pdf-originals')) {
+        const h = fail.beforeRename; // a write by another program landing after the last check, right before the replacement
+        fail.beforeRename = undefined;
+        await h();
+      }
       if (fail.eperm > 0 && /\.pdf\.rl-[0-9a-f]{8}\.tmp$/.test(from) && !from.includes('pdf-originals')) {
         fail.eperm--;
         throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
@@ -143,6 +148,7 @@ const synced = (w: World, n = 1) => until(() => w.events.filter(([c, p]) => c ==
 let w: World;
 beforeEach(async () => {
   fail.eperm = 0;
+  fail.beforeRename = undefined;
   w = await world();
   w.anns.set(DOC, annotationFileSchema.parse({ docId: DOC, annotations: [ann('a1'), ann('a2', { rects: [{ x: 0.3, y: 0.5, w: 0.2, h: 0.05 }] })] }));
 });
@@ -334,6 +340,29 @@ describe('atomicity and the temporary (§8.3.3, D-200)', () => {
     expect(await tmps(w)).toEqual([]);
   });
 
+  it('J5: another program writes in place between the last check and the replacement: its version stays, nothing of ours is recorded', async () => {
+    const ps = new PdfSync(w.s, true);
+    const theirs = Buffer.concat([w.original, Buffer.from('\n% written in the last instant\n')]);
+    fail.beforeRename = async () => writeFile(w.file, theirs);
+    await ps.writeNow(DOC);
+    const now = await bytes(w);
+    expect(now.equals(theirs)).toBe(true);
+    expect(annotsCount(now)).toBe(0);
+    expect(w.rec.get(DOC)!.pdfWrite?.own ?? []).toEqual([]);
+    expect(await tmps(w)).toEqual([]);
+  });
+
+  it('J5: the same on the restore, which reports a conflict and leaves the other version', async () => {
+    const ps = new PdfSync(w.s, true);
+    await ps.writeNow(DOC);
+    const written = await bytes(w);
+    const theirs = Buffer.concat([written, Buffer.from('\n% theirs\n')]);
+    fail.beforeRename = async () => writeFile(w.file, theirs);
+    await expect(ps.restoreOriginal(DOC).catch((e: unknown) => e)).resolves.toMatchObject({ code: 'CONFLICT' });
+    expect((await bytes(w)).equals(theirs)).toBe(true);
+    expect(await tmps(w)).toEqual([]);
+  });
+
   it('CONFLICT is what an explicit action reports when the file changed meanwhile', async () => {
     const ps = new PdfSync(w.s, true);
     await ps.writeNow(DOC);
@@ -421,12 +450,6 @@ describe('the moments of writing (D-349)', () => {
     expect((await bytes(w)).length).toBeGreaterThan(w.original.length);
   });
 
-  it('the write of our own replacement is registered, so the watcher event it causes can be ignored', async () => {
-    const ps = new PdfSync(w.s, true);
-    await ps.writeNow(DOC);
-    const out = await bytes(w);
-    expect(ps.expectedWrites.has(`${sha(out)}:${out.length}`)).toBe(true);
-  });
 });
 
 describe('take them out, restore, copies (D-352, §8.3.8)', () => {

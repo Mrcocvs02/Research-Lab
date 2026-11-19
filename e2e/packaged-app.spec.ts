@@ -7,6 +7,7 @@ import { chromium, expect, test, type Page } from '@playwright/test';
 import { createFixtureLibrary, removeTree } from '@rl/testkit';
 import { DESKTOP_DIR } from './helpers/launch';
 import { createLibraryViaWizard, ipcData, waitForScan } from './helpers/phase1';
+import { openAdvancedGroup, openSettings } from './helpers/settings';
 import { rows } from './helpers/ui';
 
 /**
@@ -126,8 +127,10 @@ test('the packaged app starts, scans, reads, backs up and rests within the memor
     // The AI section opens without Claude Code installed (the Agent SDK is not in the bundle).
     const status = await ipcData<{ provider: string }>(page, 'ai:status', {});
     expect(status.provider).toBeTruthy();
-    await page.getByTestId('nav-settings').click();
+    // Settings are sections now (design ARCHITETTURA-UI §6): the Claude section, and the executable under Advanced.
+    await openSettings(page, 'claude');
     await expect(page.getByTestId('ai-settings')).toBeVisible({ timeout: 30_000 });
+    await openAdvancedGroup(page, 'claude');
     await expect(page.getByTestId('ai-exe')).toBeVisible();
 
     // The profile was used, the decoy folders (RL_* variables) were not.

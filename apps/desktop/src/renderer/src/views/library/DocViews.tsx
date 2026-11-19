@@ -409,7 +409,7 @@ export function DocViews({ list, view, searching, selection, onSelection, onOpen
       activeId={activeRow ? `doc-${activeRow.docId}` : undefined}
       onKeyDown={onKeyDown}
       testId="search-results"
-      className={view === 'grid' ? 'vl-grid' : 'vl-list'}
+      className={`${view === 'grid' ? 'vl-grid' : 'vl-list'}${selection.ids.size > 0 ? ' has-sel' : ''}`}
       renderItem={(i) => {
         const row = list.rowAt(i);
         return (

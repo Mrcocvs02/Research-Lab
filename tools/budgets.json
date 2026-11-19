@@ -30,7 +30,8 @@
       "TagReview": 16,
       "TagCleanup": 16,
       "TagAiConfirm": 16,
-      "SelectionSummary": 16
+      "SelectionSummary": 16,
+      "VocabularyTree": 16
     }
   },
   "main": {

@@ -19,9 +19,11 @@ import { GroupBy, GroupLabel } from './GroupBy';
 import { applyShares, familyName, nameClusters, TOPIC_FAMILY, useFamilies, useFamily, useFamilyRev, type FamilyShares } from './grouping';
 import { areaNoteNeeded, areaSummary, withUserTints, assignAreaSlots, colorCache, loadAreaMemo, mainArea, saveAreaMemo, shareIn, type AreaDef } from './areaColors';
 import { Segmented } from '../../components/Segmented';
+import { useDocTitle } from '../chat/useLabels';
 import { assignKeyTints, mix, readTheme, type MapTheme } from './colors';
 import { controlPoint, edgeAlpha, edgeWidths, fillTapered, MAX_CURVED, STRAIGHT_ALPHA, straightWidth } from './edges';
-import { MAX_NET_NODES, Network, type EdgeKind, type NetNode, type NodeKind } from './forceSim';
+import { MAX_NET_NODES, Network, type EdgeKind, type NetNode, type NodeKind, type RawEdge, type RawNode } from './forceSim';
+import { capEdges, EVIDENCE_KINDS, RING1, RING1_MAX, RING2_PER_NODE, strongestNew, VICINITY_MAX_NODES } from './vicinityModel';
 import { boundsOf, toScreenX, toScreenY, type Bounds } from './geometry';
 import { clusterText } from './mapModel';
 import { DocCard, HoverCard, useRestingHover } from './HoverCard';
@@ -31,17 +33,13 @@ import { MiniMap } from './MiniMap';
 import { ChipPop, ChromeCtx, copyCanvasImage, HeadMore, MapIllustration, Pill, RowPortal, useHint } from './NetChrome';
 import type { NetCtl } from './NetworkView';
 import { NodeSearch } from './NodeSearch';
-import { bfsPath, rng } from './playful';
 import { useCanvasView } from './useCanvasView';
 import type { ScopeOptions } from './useScopes';
 
 type Kind = RequestOf<Channels, 'graph:neighbors'>['kinds'][number];
 const LinkFinderDialog = lazyView(() => import('../links/LinkFinderDialog').then((m) => ({ default: m.LinkFinderDialog })), ['links']);
-const KINDS: Kind[] = ['similar', 'citations', 'tags', 'folder', 'children', 'documents', 'links'];
-/** What each kind of node can be expanded by. */
-const VALID: Record<NodeKind, Kind[]> = { doc: ['similar', 'citations', 'tags', 'folder', 'links'], folder: ['children', 'documents'], tag: ['documents', 'tags'], entity: [] };
-const DEFAULT_KINDS: Kind[] = ['similar', 'citations', 'tags', 'folder', 'children', 'documents', 'links'];
-const LIMITS = [10, 25, 50, 100, 300] as const;
+/** The neighbourhood is made of papers only and of evidence only (section 19.2.5): no tags, folders, children or documents. */
+const KINDS: Kind[] = ['similar', 'citations', 'links'];
 const NODE_R = 7;
 
 interface EdgeHit {
@@ -63,12 +61,17 @@ export interface NetStart {
 
 interface Props {
   active: boolean;
-  /** The "Network of" chip, drawn first in the row. */
-  modeChip: ReactNode;
-  /** What the node panel needs to expand, collapse, remove and look for a bridge (null: nothing selected). */
+  /** What the node panel needs to look for a bridge and for links (null: nothing selected). */
   onCtl(c: NetCtl | null): void;
+  /** The centre of the neighbourhood (a new `nonce` centres again). */
   start: NetStart | null;
-  scopes: ScopeOptions;
+  /** Centres visited, oldest first, for the crumbs; a click on one centres on it. */
+  crumbs: readonly string[];
+  /** A paper of the neighbourhood was chosen as the new centre. */
+  onCenter(docId: string, label: string): void;
+  /** Shift+click: the path between two papers. */
+  onPath(a: string, b: string): void;
+  scopes?: ScopeOptions;
   /** The document selected elsewhere (the map, a list): can be the start of the network. */
   selectedDoc: string | null;
   selectedDocLabel: string | null;
@@ -96,23 +99,20 @@ const NODE_FILL: Record<NodeKind, keyof MapTheme> = { doc: 'accent', folder: 'mu
  * edges, a card on hover, a path between two nodes, nodes that stay where they are dropped (the pin), the two-step
  * neighbourhood in focus on double click. No graph library, no DOM per node; frames only while something moves.
  */
-export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, selectedDocLabel, onSelectDoc, onStart, onExplore }: Props) {
+export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selectedDoc, selectedDocLabel, onSelectDoc, onStart, onExplore }: Props) {
   const { t } = useTranslation();
   const net = useMemo(() => new Network(), []);
-  const [kinds, setKinds] = useState<Kind[]>(DEFAULT_KINDS);
-  const [limit, setLimit] = useState<number>(25);
+  /** Neighbourhood: how many papers of ring 1 are in, whether ring 2 was asked for. */
+  const [shown, setShown] = useState({ ring1: 0, ring2: false, more: true });
   const [selKey, setSelKey] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hover, setHover] = useRestingHover<{ key: string; x: number; y: number }>();
   const [count, setCount] = useState(0);
   const [busy, setBusy] = useState(false);
-  const expanding = useRef(new Set<string>());
+  const busyRef = useRef(false);
   const [error, setError] = useState<unknown>(null);
-  const [note, setNote] = useState<{ text: string; only?: NetNode } | null>(null);
+  const [note, setNote] = useState<{ text: string } | null>(null);
   const [announce, setAnnounce] = useState('');
-  const [pathKeys, setPathKeys] = useState<string[] | null>(null);
-  const [focusKey, setFocusKey] = useState<string | null>(null);
-  const [surprise, setSurprise] = useState<{ a: string; b: string; terms: string[] } | null>(null);
   const [chips, setChips] = useState<Array<{ id: string; label: string; n: number }>>([]);
   const [mini, setMini] = useLocalFlag('rl.mapMini', true);
   /** The topics of the Panorama: the topic of each document (coarsest level), the tint of each topic and its name. */
@@ -138,16 +138,11 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
   const pointer = useRef({ x: 0, y: 0 });
   const [edgeCard, setEdgeCard] = useState<EdgeHit | null>(null);
   const [findFor, setFindFor] = useState<string | null>(null);
-  const refs = useRef({ selKey, cursor, pathKeys, focusKey, surprise, bridgeFrom });
-  refs.current = { selKey, cursor, pathKeys, focusKey, surprise, bridgeFrom };
+  const refs = useRef({ selKey, cursor, bridgeFrom });
+  refs.current = { selKey, cursor, bridgeFrom };
   const theme = useRef<MapTheme | null>(null);
-  const kindsRef = useRef(kinds);
-  kindsRef.current = kinds;
-  const limitRef = useRef(limit);
-  limitRef.current = limit;
   const lastStart = useRef(0);
   const autoTried = useRef(false);
-  const rand = useRef(rng(Date.now() & 0xffff));
   const searchRef = useRef<HTMLInputElement>(null);
   const chrome = useContext(ChromeCtx);
   const nav = useNav();
@@ -194,7 +189,7 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
       const th = theme.current!;
       const sx = (x: number) => toScreenX(v, x, w);
       const sy = (y: number) => toScreenY(v, y, h);
-      const { selKey: sel, cursor: cur, pathKeys: path, focusKey: focus, surprise: sur } = refs.current;
+      const { selKey: sel, cursor: cur } = refs.current;
       const hk = hoverKey.current;
       const nodes = net.nodes;
       const near = new Set<string>();
@@ -202,18 +197,7 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         near.add(hk);
         for (const k of net.neighbors(hk)) near.add(k);
       }
-      let focusSet: Set<string> | null = null;
-      if (focus && nodes.has(focus)) {
-        focusSet = new Set([focus]);
-        for (const a of net.neighbors(focus)) {
-          focusSet.add(a);
-          for (const b of net.neighbors(a)) focusSet.add(b);
-        }
-      }
-      const pathSet = path ? new Set(path) : null;
-      const onPath = new Set<string>();
-      if (path) for (let i = 0; i + 1 < path.length; i++) onPath.add(`${path[i]}|${path[i + 1]}`).add(`${path[i + 1]}|${path[i]}`);
-      const fade = (k: string): number => (focusSet && !focusSet.has(k) ? 0.12 : hk && !near.has(k) ? 0.35 : pathSet && !pathSet.has(k) ? 0.25 : 1);
+      const fade = (k: string): number => (hk && !near.has(k) ? 0.35 : 1);
       // No outlines (D-482): the name of a group is a label at the centroid of its visible nodes (three or more).
       const tp = topics.current;
       const ar = areaRef.current;
@@ -256,21 +240,10 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
       for (const { e, a, b, ax, ay, bx, by } of visible) {
         const style = EDGE_STYLE[e.kind];
         const col = mix(th[style.color] as string, th.muted, 0.35);
-        const dim = hk && a.key !== hk && b.key !== hk ? 0.35 : focusSet && !(focusSet.has(a.key) && focusSet.has(b.key)) ? 0.12 : 1;
-        if (onPath.has(`${a.key}|${b.key}`)) {
-          ctx.globalAlpha = 1;
-          ctx.strokeStyle = th.accent;
-          ctx.lineWidth = 3.5;
-          const c = controlPoint(ax, ay, bx, by);
-          ctx.beginPath();
-          ctx.moveTo(ax, ay);
-          ctx.quadraticCurveTo(c.x, c.y, bx, by);
-          ctx.stroke();
-          continue;
-        }
+        const dim = hk && a.key !== hk && b.key !== hk ? 0.35 : 1;
         const we = e.kind === 'contains' || e.kind === 'tagged' ? 0.3 : e.weight;
         const incident = hk !== null && (a.key === hk || b.key === hk);
-        ctx.globalAlpha = incident ? 0.9 : edgeAlpha(we, dark) * (curved ? 1 : STRAIGHT_ALPHA) * dim * (pathSet ? 0.5 : 1);
+        ctx.globalAlpha = incident ? 0.9 : edgeAlpha(we, dark) * (curved ? 1 : STRAIGHT_ALPHA) * dim;
         if (curved && style.dash.length === 0) {
           ctx.fillStyle = col;
           const wd = edgeWidths(we, e.kind === 'cites');
@@ -286,24 +259,8 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
           ctx.setLineDash([]);
         }
       }
-      if (sur) {
-        const a = nodes.get(sur.a);
-        const b = nodes.get(sur.b);
-        if (a && b) {
-          ctx.globalAlpha = 1;
-          ctx.setLineDash([8, 6]);
-          ctx.strokeStyle = th.accent;
-          ctx.lineWidth = 2.5;
-          const c = controlPoint(sx(a.x), sy(a.y), sx(b.x), sy(b.y), 0.25);
-          ctx.beginPath();
-          ctx.moveTo(sx(a.x), sy(a.y));
-          ctx.quadraticCurveTo(c.x, c.y, sx(b.x), sy(b.y));
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
-      }
       ctx.globalAlpha = 1;
-      // Nodes: circle = document, square = folder, diamond = tag.
+      // Nodes: a circle each (every node is a paper); the centre is ringed.
       const labels: LabelCandidate[] = [];
       const texts: string[] = [];
       ctx.font = '12px system-ui, sans-serif';
@@ -418,22 +375,17 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         nav.navigate({ view: 'discover' });
         return;
       }
-      if (shift && n && refs.current.selKey && refs.current.selKey !== n.key) {
-        const p = bfsPath((k) => net.neighbors(k), refs.current.selKey, n.key);
-        setPathKeys(p);
-        setNote(p ? null : { text: t('network.ent.noPath') });
-        view.requestDraw();
+      const from = refs.current.selKey ?? net.center;
+      if (shift && n && n.kind === 'doc' && from && from !== n.key) {
+        onPath(from.slice(4), n.id);
         return;
       }
-      setPathKeys(null);
-      setFocusKey(null);
-      if (n && n.fixed && n.key === refs.current.selKey) n.fixed = false;
       pick(n);
+      // A click on a neighbour makes it the new centre (the camera flies there, 300 ms).
+      if (n && n.kind === 'doc' && n.key !== net.center) onCenter(n.id, n.label);
     },
-    onDoubleClick(n) {
-      if (!n) return false;
-      focusOn(n);
-      return true;
+    onDoubleClick() {
+      return false;
     },
     bounds: getBounds,
     maxFit: () => 40 / NODE_R,
@@ -467,23 +419,6 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
       setAnnounce(t('network.net.announce', { name: n.label, kind: t(`network.net.${n.kind}Node`), links: net.neighbors(n.key).length }));
     }
     view.requestDraw();
-  }
-
-  /** Double click: the two-step neighbourhood in focus (the rest at 12%), the camera flies onto it; the node is expanded if it was not. */
-  function focusOn(n: NetNode): void {
-    setFocusKey(n.key);
-    pick(n);
-    const ring = [n.key, ...net.neighbors(n.key)].map((k) => net.nodes.get(k)).filter((x): x is NetNode => !!x);
-    if (ring.length > 1) {
-      const b = boundsOf(
-        ring.map((r) => r.x),
-        ring.map((r) => r.y),
-        ring.length,
-      );
-      const { w, h } = view.size.current;
-      view.flyTo((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, Math.min(3, Math.min(w, h) / Math.max(b.maxX - b.minX + 160, b.maxY - b.minY + 160, 1)));
-    }
-    if (!n.expanded) void expand(n);
   }
 
   /** The `linked` edge under the pointer (a hit zone of 6 px). */
@@ -566,50 +501,67 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [famRev]);
 
-  async function expand(n: NetNode): Promise<void> {
-    const valid = kindsRef.current.filter((k) => VALID[n.kind].includes(k));
-    if (valid.length === 0) {
-      setNote({ text: t('network.net.noKinds') });
-      return;
+  /** The neighbours of a paper by evidence only (citations, links of the user, similarity). */
+  async function neighborsOf(n: NetNode, limit: number) {
+    const r = await rl.invoke('graph:neighbors', { node: { kind: 'doc', id: n.id }, kinds: KINDS, limit });
+    for (const e of r.edges) if (e.kind === 'linked' && e.id) linkMeta.current.set(`${e.from}|${e.to}`, { id: e.id, reasons: (e.reasons ?? {}) as LinkReasons });
+    return r;
+  }
+
+  /** Adds the `take` strongest new papers of an answer to ring `ring` around `from`; the edges stay at most 4 per paper (all of the centre's). Returns how many came in. */
+  function absorb(from: NetNode, r: Awaited<ReturnType<typeof neighborsOf>>, take: number, ring: number): number {
+    const edges = r.edges.filter((e) => (EVIDENCE_KINDS as readonly string[]).includes(e.kind)) as RawEdge[];
+    const pick = strongestNew(r.nodes as RawNode[], edges, from.key, new Set(net.nodes.keys()), take);
+    if (pick.nodes.length === 0) return 0;
+    const res = net.expand(from, pick.nodes, pick.edges);
+    for (const raw of pick.nodes) {
+      const nd = net.nodes.get(`${raw.kind}:${raw.id}`);
+      if (nd) nd.ring = ring;
     }
-    if (n.expanded) {
-      setNote({ text: t('network.net.alreadyExpanded') });
-      return;
-    }
-    // One expansion per node at a time (a double click must not ask twice).
-    if (expanding.current.has(n.key)) return;
-    expanding.current.add(n.key);
+    net.setEdges(capEdges(net.edges, net.center));
+    return res.added;
+  }
+
+  /** Runs one step of the neighbourhood: the first ring, more of it (+8, at most 16) or the second ring ("Widen": 3 per paper of ring 1, at most 30 papers). */
+  async function grow(step: 'first' | 'more' | 'widen', centre?: NetNode): Promise<void> {
+    const c = centre ?? (net.center ? net.nodes.get(net.center) : undefined);
+    if (!c || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     setNote(null);
     try {
-      const r = await rl.invoke('graph:neighbors', { node: { kind: n.kind as 'doc' | 'folder' | 'tag', id: n.id }, kinds: valid, limit: limitRef.current });
-      const live = net.nodes.get(n.key);
-      if (!live) return;
-      for (const e of r.edges) if (e.kind === 'linked' && e.id) linkMeta.current.set(`${e.from}|${e.to}`, { id: e.id, reasons: (e.reasons ?? {}) as LinkReasons });
-      const res = net.expand(live, r.nodes, r.edges);
-      if (familyRef.current === TOPIC_FAMILY && r.areas && r.areas.length > 0 && areaRef.current.defs !== r.areas) {
-        const slots = assignAreaSlots(r.areas, loadAreaMemo());
-        saveAreaMemo(slots.memo);
-        areaRef.current.defs = r.areas;
-        areaRef.current.slots = slots.slots;
-        setAreaState({ defs: r.areas, slots: slots.slots });
+      if (step === 'widen') {
+        const ring1 = [...net.nodes.values()].filter((n) => n.ring === 1);
+        const answers = await Promise.all(ring1.map((n) => neighborsOf(n, RING2_PER_NODE + 12).then((r) => ({ n, r }), () => null)));
+        let added = 0;
+        for (const a of answers) {
+          const room = VICINITY_MAX_NODES - net.size;
+          if (!a || room <= 0) continue;
+          added += absorb(a.n, a.r, Math.min(RING2_PER_NODE, room), 2);
+        }
+        setShown((s) => ({ ...s, ring2: true }));
+        if (added === 0) setNote({ text: t('vicinity.nothingNew') });
+        else if (net.size >= VICINITY_MAX_NODES) setNote({ text: t('vicinity.capped', { count: VICINITY_MAX_NODES }) });
+      } else {
+        const have = [...net.nodes.values()].filter((n) => n.ring === 1).length;
+        const r = await neighborsOf(c, step === 'first' ? RING1 : RING1_MAX);
+        const take = step === 'first' ? RING1 : Math.min(RING1, RING1_MAX - have);
+        const added = absorb(c, r, take, 1);
+        setShown((s) => ({ ...s, ring1: have + added, more: have + added < RING1_MAX && added >= take }));
+        if (step === 'first' && added === 0) setNote({ text: t('vicinity.none') });
       }
       if (familyRef.current !== TOPIC_FAMILY) await applyFamily(false);
       else tagTopics();
-      if (res.capped) setNote({ text: t('network.net.capped', { count: res.omitted, limit: MAX_NET_NODES }), only: live });
-      else if (r.hiddenTags) setNote({ text: t('network.net.tagsMore', { count: r.hiddenTags }), only: live });
-      else if (res.added === 0) setNote({ text: t('network.net.nothingNew') });
       syncCount();
       view.requestDraw();
       if (reducedMotion()) for (let i = 0; i < 400 && net.tick(); i++);
-      // After every expansion the view is fitted again, animated (400 ms; at once with reduced motion).
       view.fit(true);
     } catch (e) {
       setError(e);
     } finally {
-      expanding.current.delete(n.key);
-      setBusy(expanding.current.size > 0);
+      busyRef.current = false;
+      setBusy(false);
     }
   }
 
@@ -618,17 +570,26 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
     if (!start || start.nonce === lastStart.current) return;
     lastStart.current = start.nonce;
     net.clear();
-    const seed = net.seed({ kind: start.kind, id: start.id, label: start.label });
+    const seed = net.seed({ kind: 'doc', id: start.id, label: start.label });
+    seed.fixed = true;
+    net.center = seed.key;
     tagTopics();
     setSelKey(seed.key);
     setError(null);
     setNote(null);
-    setPathKeys(null);
-    setFocusKey(null);
-    setSurprise(null);
+    setShown({ ring1: 0, ring2: false, more: true });
     syncCount();
     view.fit();
-    void expand(seed);
+    busyRef.current = false;
+    void grow('first', seed);
+    // The title of the centre (a restored centre comes without one).
+    void rl.invoke('documents:get', { docId: seed.id }).then(
+      (d) => {
+        seed.label = d.title ?? seed.label;
+        view.requestDraw();
+      },
+      () => undefined,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [start?.nonce]);
 
@@ -693,17 +654,8 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
     if (selKey && !net.nodes.has(selKey)) setSelKey(null);
     view.requestDraw();
   };
-  const ctlRef = useRef<{ expand(): void; collapse(): void; remove(): void; bridge(): void; links(): void }>({ expand() {}, collapse() {}, remove() {}, bridge() {}, links() {} });
+  const ctlRef = useRef<{ bridge(): void; links(): void }>({ bridge() {}, links() {} });
   ctlRef.current = {
-    expand: () => selected && void expand(selected),
-    collapse() {
-      if (selected) net.collapse(selected.key);
-      afterChange();
-    },
-    remove() {
-      if (selected) net.remove(selected.key);
-      afterChange();
-    },
     bridge() {
       if (selected?.kind === 'doc') setBridgeFrom(selected.id);
     },
@@ -711,14 +663,21 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
       if (selected?.kind === 'doc') setFindFor(selected.id);
     },
   };
-  const ctlKey = selected && selected.kind === 'doc' ? `${selected.key}|${selected.expanded ? 1 : 0}|${busy ? 1 : 0}` : '';
+  const ctlKey = selected && selected.kind === 'doc' ? selected.key : '';
   useEffect(() => {
     if (!active || !selected || selected.kind !== 'doc') return onCtl(null);
-    onCtl({ expanded: !!selected.expanded, busy, expand: () => ctlRef.current.expand(), collapse: () => ctlRef.current.collapse(), remove: () => ctlRef.current.remove(), bridge: () => ctlRef.current.bridge(), links: () => ctlRef.current.links() });
+    onCtl({ bridge: () => ctlRef.current.bridge(), links: () => ctlRef.current.links() });
     return () => onCtl(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, ctlKey]);
   const hovered = hover ? net.nodes.get(hover.key) : undefined;
+  /** Why a paper is in the neighbourhood: the evidence of its edge to the centre (or to the paper it came from), "cites · similar 0.42". */
+  const why = (() => {
+    if (!hovered) return '';
+    const e = net.edges.filter((x) => x.a === hovered.key || x.b === hovered.key).sort((a, b) => Number((b.a === net.center || b.b === net.center) && true) - Number((a.a === net.center || a.b === net.center) && true) || b.weight - a.weight)[0];
+    if (!e) return '';
+    return e.kind === 'similar' ? t('vicinity.why.similar', { value: e.weight.toFixed(2) }) : t(`vicinity.why.${e.kind === 'cites' ? 'cites' : 'linked'}`);
+  })();
 
   const keyAt = () => {
     const v = view.view.current;
@@ -758,8 +717,9 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         break;
       }
       case 'open':
-        if (n && selKey === n.key) void expand(n);
-        else pick(n ?? null);
+        // Enter on a paper makes it the centre; on the centre it only selects it.
+        pick(n ?? null);
+        if (n && n.kind === 'doc' && n.key !== net.center) onCenter(n.id, n.label);
         break;
       case 'read':
         if (n?.kind === 'doc') onSelectDoc(n.id);
@@ -781,9 +741,6 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         break;
       case 'escape':
         setCursor(null);
-        setPathKeys(null);
-        setFocusKey(null);
-        setSurprise(null);
         view.requestDraw();
         return view.handlers.onKeyDown(e);
       case 'explore':
@@ -792,33 +749,6 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         return;
     }
     e.preventDefault();
-  };
-
-  const toggleKind = (k: Kind) => setKinds((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : KINDS.filter((x) => x === k || cur.includes(x))));
-  /** "Sorprendimi": a pair close in content but far in the topics; both documents join the network and the camera flies to them. */
-  const doSurprise = async () => {
-    try {
-      const r = await rl.invoke('graph:surprising', { limit: 30 });
-      const p = r.pairs[Math.floor(rand.current() * r.pairs.length)];
-      if (!p) return setNote({ text: t('network.ent.noSurprise') });
-      const a = net.seed({ kind: 'doc', id: p.a, label: untitled });
-      const b = net.seed({ kind: 'doc', id: p.b, label: untitled });
-      setSurprise({ a: a.key, b: b.key, terms: p.terms });
-      syncCount();
-      for (const n of [a, b]) {
-        void rl.invoke('documents:get', { docId: n.id }).then(
-          (d) => {
-            n.label = d.title ?? n.label;
-            view.requestDraw();
-          },
-          () => undefined,
-        );
-      }
-      view.flyTo((a.x + b.x) / 2, (a.y + b.y) / 2, Math.max(view.view.current.k, 1));
-      view.requestDraw();
-    } catch (e) {
-      setError(e);
-    }
   };
 
   const paintMini = useMemo(
@@ -837,8 +767,6 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
     setSelKey(null);
     setNote(null);
     setError(null);
-    setSurprise(null);
-    setPathKeys(null);
     lastStart.current = start?.nonce ?? 0;
     autoTried.current = true;
     afterChange();
@@ -852,36 +780,26 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         {t('network.bridge.pickSecondShort')}
       </Pill>
     );
-  } else if (surprise) {
-    pill = (
-      <Pill testId="net-surprise-note" onClose={() => setSurprise(null)}>
-        {t('network.net.surprise', { terms: surprise.terms.slice(0, 5).map(safeText).join(', ') || '—' })}
-      </Pill>
-    );
   } else if (note) {
     pill = (
       <Pill testId="net-note" onClose={() => setNote(null)}>
         {note.text}
-        {note.only && (
-          <>
-            {' · '}
-            <button type="button" className="link" onClick={() => onStart({ kind: note.only!.kind, id: note.only!.id, label: note.only!.label })} data-testid="net-only-these">
-              {t('network.net.onlyThese')}
-            </button>
-          </>
-        )}
       </Pill>
     );
   } else if (byArea && areaState && count > 0 && areaNoteNeeded(areaState.defs, docNodes)) {
     pill = <AreaNote testId="net-color-note" defs={areaState.defs} withArea={docNodes.filter((n) => n.ar && n.ar.length > 0).length} total={docNodes.length} onTopics={() => setByArea(false)} />;
   } else if (hint && count > 0) {
-    pill = <Pill testId="net-hint">{t('network.hint')}</Pill>;
+    pill = <Pill testId="net-hint">{t('vicinity.hint')}</Pill>;
   }
 
   return (
     <div className="net-tab graph-tab" data-testid="graph-panel">
       <RowPortal active={active}>
-        {modeChip}
+        <nav className="vic-crumbs" aria-label={t('vicinity.crumbs')} data-testid="map-crumbs">
+          {crumbs.map((id, i) => (
+            <Crumb key={id} docId={id} last={i === crumbs.length - 1} onGo={(label) => onCenter(id, label)} />
+          ))}
+        </nav>
         <NodeSearch
           ref={searchRef}
           testId="net-search"
@@ -902,7 +820,6 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         <ChipPop label={t('network.start')} testId="net-start" width={360}>
           {(close) => (
             <div className="net-pop-body">
-              <div className="net-pop-sec">{t('network.net.startFrom')}</div>
               <button
                 type="button"
                 onClick={() => {
@@ -914,67 +831,6 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
               >
                 {selectedDoc ? t('network.net.fromDocNamed', { title: safeText(selectedDocLabel ?? untitled) }) : t('network.net.fromDoc')}
               </button>
-              <label className="net-field net-pop-row">
-                <span>{t('network.net.fromFolder')}</span>
-                <select
-                  value="__none"
-                  onChange={(e) => {
-                    if (e.target.value !== '__none') {
-                      onStart({ kind: 'folder', id: e.target.value, label: e.target.value === '' ? '/' : (e.target.value.split('/').pop() ?? e.target.value) });
-                      close();
-                    }
-                  }}
-                  data-testid="net-start-folder"
-                >
-                  <option value="__none">{t('network.scope.pick')}</option>
-                  <option value="">/</option>
-                  {scopes.folders.map((f) => (
-                    <option key={f} value={f}>
-                      {safeText(f)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="net-field net-pop-row">
-                <span>{t('network.net.fromTag')}</span>
-                <select
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      onStart({ kind: 'tag', id: e.target.value, label: scopes.tagLabel(e.target.value) });
-                      close();
-                    }
-                  }}
-                  data-testid="net-start-tag"
-                >
-                  <option value="">{t('network.scope.pick')}</option>
-                  {scopes.tags.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {safeText(x.label)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="net-pop-sec">{t('network.net.eachExpansion')}</div>
-              <label className="net-field net-pop-row">
-                <span>{t('network.net.limit')}</span>
-                <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} data-testid="net-limit">
-                  {LIMITS.map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <fieldset className="net-kinds" data-testid="net-kinds">
-                <legend className="visually-hidden">{t('network.net.kinds')}</legend>
-                {KINDS.map((k) => (
-                  <label key={k} className="check-inline">
-                    <input type="checkbox" checked={kinds.includes(k)} onChange={() => toggleKind(k)} data-testid={`net-kind-${k}`} />
-                    {t(`network.net.kind.${k}`)}
-                  </label>
-                ))}
-              </fieldset>
               <div className="net-pop-sec">{t('network.look')}</div>
               <div className="net-field net-pop-row">
                 <span>{t('network.area.colorMode')}</span>
@@ -998,26 +854,13 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
             </div>
           )}
         </ChipPop>
+        <button type="button" onClick={() => void grow('more')} disabled={busy || count === 0 || !shown.more} data-testid="vic-more">
+          {t('vicinity.more', { count: RING1 })}
+        </button>
+        <button type="button" onClick={() => void grow('widen')} disabled={busy || count === 0 || shown.ring2 || shown.ring1 === 0 || net.size >= VICINITY_MAX_NODES} data-testid="vic-widen">
+          {t('vicinity.widen')}
+        </button>
         <span className="map-actions">
-          <button
-            type="button"
-            className="icon-button"
-            title={t('network.play.shuffle')}
-            aria-label={t('network.play.shuffle')}
-            onClick={() => {
-              net.shuffle(rand.current);
-              if (reducedMotion()) for (let i = 0; i < 400 && net.tick(); i++);
-              view.fit(true);
-              view.requestDraw();
-            }}
-            disabled={count === 0}
-            data-testid="net-shuffle"
-          >
-            ✧
-          </button>
-          <button type="button" className="icon-button" title={t('network.play.surprise')} aria-label={t('network.play.surprise')} onClick={() => void doSurprise()} data-testid="net-surprise">
-            ✦
-          </button>
           <button type="button" className="icon-button" title={t('network.fit')} aria-label={t('network.fit')} onClick={() => view.fit(true)} disabled={count === 0} data-testid="net-fit">
             ⤢
           </button>
@@ -1114,11 +957,6 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
           <span className="hint" data-testid="net-count" data-count={count} aria-live="polite">
             {t('network.net.count', { count })}
           </span>
-          <span className="net-key" aria-label={t('network.net.legend')} data-testid="net-legend">
-            <span className="key-doc">{t('network.net.docNode')}</span>
-            <span className="key-folder">{t('network.net.folderNode')}</span>
-            <span className="key-tag">{t('network.net.tagNode')}</span>
-          </span>
         </div>
         </div>
         {hovered && hover && (
@@ -1126,10 +964,12 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
             {hovered.kind === 'doc' ? (
               <DocCard docId={hovered.id} area={areaRef.current.on ? areaSummary(hovered.ar, areaRef.current.defs) : undefined} />
             ) : (
-              <strong className="hc-title">
-                {safeText(hovered.label)}
-                {hovered.count !== undefined && <span className="hint"> ({hovered.count})</span>}
-              </strong>
+              <strong className="hc-title">{safeText(hovered.label)}</strong>
+            )}
+            {why && (
+              <span className="hc-line hint" data-testid="vic-why">
+                {why}
+              </span>
             )}
           </HoverCard>
         )}
@@ -1158,5 +998,19 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         {mini && count > 0 && <MiniMap bounds={getBounds()} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={count} />}
       </div>
     </div>
+  );
+}
+
+/** One crumb of the bar "A › B › C": the title of a centre already visited; the last one is where we are. */
+function Crumb({ docId, last, onGo }: { docId: string; last: boolean; onGo(label: string): void }) {
+  const title = safeText(useDocTitle(docId) ?? '…');
+  return last ? (
+    <span className="vic-crumb" aria-current="location" title={title}>
+      {title}
+    </span>
+  ) : (
+    <button type="button" className="link vic-crumb" onClick={() => onGo(title)} title={title}>
+      {title}
+    </button>
   );
 }

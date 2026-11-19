@@ -30,7 +30,7 @@ const ReaderView = lazyView(() => import('./views/reader/ReaderView').then((m) =
 const SplitReader = lazyView(() => import('./views/reader/SplitReader').then((m) => ({ default: m.SplitReader })), ['doc-projects-reader', 'doc-reader', 'reader']);
 const InboxView = lazyView(() => import('./views/inbox/InboxView').then((m) => ({ default: m.InboxView })), ['inbox']);
 const DiscoverView = lazyView(() => import('./views/discover/DiscoverView').then((m) => ({ default: m.DiscoverView })), ['discover']);
-const NetworkView = lazyView(() => import('./views/network/NetworkView').then((m) => ({ default: m.NetworkView })), ['network']);
+const NetworkView = lazyView(() => import('./views/network/NetworkView').then((m) => ({ default: m.NetworkView })), ['network', 'vicinity']);
 // The welcome card of the first open after the wizard (D-262).
 const WelcomeCard = lazyView(() => import('./views/guide/WelcomeCard').then((m) => ({ default: m.WelcomeCard })), ['guide']);
 const Wizard = lazyView(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })), ['settings-wizard', 'wizard']);

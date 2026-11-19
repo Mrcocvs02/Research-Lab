@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
 import { EmptyState } from '../../components/EmptyState';
+import { Lazy, lazyView } from '../../components/Lazy';
+import { Segmented } from '../../components/Segmented';
 import { ErrorNote } from '../../components/ui';
 import { MapIllustration, RowPortal } from './NetChrome';
 import { errorMessage } from '../../lib/errors';
@@ -10,6 +12,11 @@ import { RlError } from '../../lib/rl-error';
 import { safeText } from '../library/safeText';
 import { DIMS, locKey, parentFromPath, pushBack, type BackEntry, type Dim, type Loc } from './exploreNav';
 import { DocLink } from './SimilarPanel';
+import { EntityNet, type EmptyKind } from './EntityNet';
+import type { EntityMode, EntityNetwork, EntityNode } from './entityTypes';
+import type { ScopeOptions } from './useScopes';
+
+const VocabularyTree = lazyView(() => import('./VocabularyTree').then((m) => ({ default: m.VocabularyTree })), ['network', 'vicinity']);
 
 type Level = ResponseOf<Channels, 'explore:level'> & { key: string };
 type ENode = Level['nodes'][number];
@@ -83,7 +90,7 @@ function Docs({ dim, id, onOpen, selectedDoc }: { dim: Dim; id: string; onOpen(d
   );
 }
 
-interface Props {
+interface ColumnsProps {
   active: boolean;
   onBuild(): void;
   onAddData(): void;
@@ -95,11 +102,11 @@ interface Props {
 }
 
 /**
- * Zoomable exploration of topics, authors and venues: each level lists the children of a node (the taxonomy has free
+ * The columns of Explore: zoomable exploration of topics, authors and venues: each level lists the children of a node (the taxonomy has free
  * depth), the breadcrumb and Back keep the way down, the selection and the scroll position of every level, and a node
  * leads to its documents or, through "Related", to the nodes of another dimension aligned on it (Back returns to the start).
  */
-export function Explore({ active, onAddData, onTags, selectedDoc, onOpenDoc, dimRequest }: Props) {
+function Columns({ active, onAddData, onTags, selectedDoc, onOpenDoc, dimRequest }: ColumnsProps) {
   const { t } = useTranslation();
   const [loc, setLoc] = useState<Loc>({ dim: 'topic', parentId: null, selected: null });
   const [back, setBack] = useState<BackEntry[]>([]);
@@ -374,6 +381,79 @@ export function Explore({ active, onAddData, onTags, selectedDoc, onOpenDoc, dim
         </div>
         {docsOf !== null && !rel && <Docs key={`${loc.dim}|${docsOf}`} dim={loc.dim} id={docsOf} onOpen={onOpenDoc} selectedDoc={selectedDoc} />}
       </div>
+    </div>
+  );
+}
+
+type ExploreMode = 'columns' | 'vocab' | 'authors';
+const EXPLORE_MODES: ExploreMode[] = ['columns', 'vocab', 'authors'];
+
+interface Props extends ColumnsProps {
+  scopes: ScopeOptions;
+  selectedEntityId: string | null;
+  onSelectEntity(node: EntityNode | null, mode: EntityMode): void;
+  onData(d: EntityNetwork | null): void;
+  onEmpty(kind: EmptyKind): void;
+  mapVersion: number;
+  mapReady: boolean;
+  /** "Show on the Map" from the vocabulary: the Map grouped by that family. */
+  onShowInMap(family: string): void;
+}
+
+/**
+ * Explore (section 19.2.7): the columns of today, the Vocabulary (the tree of a family, the only place for the tag hierarchy as a graph)
+ * and the network of the Authors (an advanced view moved here from the Links). A mode that was opened is kept while the others show.
+ */
+export function Explore({ scopes, selectedEntityId, onSelectEntity, onData, onEmpty, mapVersion, mapReady, onShowInMap, ...columns }: Props) {
+  const { t } = useTranslation();
+  const [mode, setMode] = useState<ExploreMode>('columns');
+  const [seen, setSeen] = useState<Set<ExploreMode>>(() => new Set(['columns']));
+  const pick = (m: ExploreMode) => {
+    setMode(m);
+    setSeen((cur) => (cur.has(m) ? cur : new Set(cur).add(m)));
+  };
+  // `L` on the Map asks for a dimension: the authors have their own mode, the topics the columns.
+  const asked = useRef(0);
+  const request = columns.dimRequest;
+  useEffect(() => {
+    if (!request || request.nonce === asked.current) return;
+    asked.current = request.nonce;
+    pick(request.dim === 'author' ? 'authors' : 'columns');
+  }, [request]);
+  useEffect(() => {
+    if (mode === 'authors') return;
+    onSelectEntity(null, 'author');
+    onData(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+  return (
+    <div className="explore-modes" data-testid="explore-modes" data-mode={mode}>
+      <RowPortal active={columns.active}>
+        <span data-testid="explore-mode">
+          <Segmented<ExploreMode>
+            size="sm"
+            label={t('vicinity.explore.mode')}
+            value={mode}
+            onChange={pick}
+            options={EXPLORE_MODES.map((m) => ({ value: m, label: t(`vicinity.explore.${m}`), testId: `explore-mode-${m}` }))}
+          />
+        </span>
+      </RowPortal>
+      <div className="explore-mode-pane" hidden={mode !== 'columns'}>
+        <Columns {...columns} active={columns.active && mode === 'columns'} />
+      </div>
+      {seen.has('vocab') && (
+        <div className="explore-mode-pane" hidden={mode !== 'vocab'}>
+          <Lazy>
+            <VocabularyTree onShowInMap={onShowInMap} />
+          </Lazy>
+        </div>
+      )}
+      {mode === 'authors' && (
+        <div className="explore-mode-pane">
+          <EntityNet active={columns.active} scopes={scopes} selectedId={selectedEntityId} onSelect={(n) => onSelectEntity(n, 'author')} onSelectDoc={columns.onOpenDoc} onExplore={() => pick('columns')} onEmpty={onEmpty} onData={onData} mapVersion={mapVersion} mapReady={mapReady} />
+        </div>
+      )}
     </div>
   );
 }

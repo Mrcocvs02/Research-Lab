@@ -2,9 +2,8 @@
  * The shape of `graph:entityNetwork` (D-387, D-454, §4.21.3), computed by the main process (`packages/graph/src/entity-network.ts`).
  * The contract itself is in `@rl/core`; these are the view's own types, so nothing here imports it.
  */
+/** The contract still serves the three; the view shows the authors only (section 19.2.1): tags and topics are the vocabulary tree of Explore (section 19.2.7). */
 export type EntityMode = 'tag' | 'topic' | 'author';
-export const MODES = ['doc', 'tag', 'topic', 'author'] as const;
-export type NetMode = (typeof MODES)[number];
 
 export interface EntityNode {
   /** Same ids as Explore (`author:<key>`, a taxonomy node id, a cluster id): `explore:related` works from them. */

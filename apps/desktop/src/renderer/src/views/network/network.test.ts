@@ -346,7 +346,7 @@ describe('Explore', () => {
     const row = document.createElement('div');
     document.body.appendChild(row);
     const noop = () => undefined;
-    await mount(createElement(ChromeCtx.Provider, { value: { head: null, row, model: { id: 'model', items: [] } } }, createElement(Explore, { active: true, selectedDoc: null, onOpenDoc: noop, onBuild: noop, onAddData: noop, onTags: noop })), {
+    await mount(createElement(ChromeCtx.Provider, { value: { head: null, row, model: { id: 'model', items: [] } } }, createElement(Explore, { active: true, selectedDoc: null, onOpenDoc: noop, onBuild: noop, onAddData: noop, onTags: noop, scopes: { folders: [], projects: [], tags: [], tagLabel: (id: string) => id }, selectedEntityId: null, onSelectEntity: noop, onData: noop, onEmpty: noop, mapVersion: 0, mapReady: false, onShowInMap: noop })), {
       'explore:level': (p: any) => (p.dimension === 'author' ? nodes['@author'] : nodes[p.parentId ?? '']),
       'explore:documents': () => ({ docIds: [], total: 0 }),
       'explore:related': () => ({ nodes: [{ id: 'author:x', label: 'Author X', kind: 'author', count: 2, hasChildren: false, score: 0.8, path: [{ id: 'author:x', label: 'Author X' }] }] }),

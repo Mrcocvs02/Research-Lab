@@ -39,7 +39,6 @@ type TFn = ReturnType<typeof useTranslation>['t'];
 export type EmptyKind = 'build' | 'tags' | 'review';
 
 interface Props {
-  mode: EntityMode;
   scopes: ScopeOptions;
   /** Entity shown in the side panel (kept highlighted). */
   selectedId: string | null;
@@ -48,7 +47,6 @@ interface Props {
   /** `L`: open Explore on the same dimension. */
   onExplore(): void;
   active: boolean;
-  modeChip: ReactNode;
   onEmpty(kind: EmptyKind): void;
   /** The network that is shown (its nodes feed "Merge with…" and the year range of the card). */
   onData?(d: EntityNetwork | null): void;
@@ -66,8 +64,9 @@ const MAX_DOT = 80;
  * into sub-topics, the "Tu" ring on your own author node, hover card, path, Mescola and Sorprendimi. Data from
  * `fetchEntityNetwork`. Frames only while the simulation or the camera moves.
  */
-export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect, onSelectDoc, onExplore, onEmpty, onData, mapVersion, mapReady }: Props) {
+export function EntityNet({ active, scopes, selectedId, onSelect, onSelectDoc, onExplore, onEmpty, onData, mapVersion, mapReady }: Props) {
   const { t } = useTranslation();
+  const mode = 'author' as const;
   const app = useApp();
   const lib = app.activeLibraryId ?? '';
   const docsVersion = useChangeVersion('documents');
@@ -455,68 +454,17 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
     return t(`network.ent.announce.${mode}`, { name: e.label, count: e.count, links, topic: e.groupLabel ?? '' });
   };
 
-  /** Double click: a tag opens its documents as dots, a topic splits into sub-topics, an author brings its two-step neighbourhood into focus. */
-  async function activate(n: NetNode): Promise<void> {
+  /** Double click: a paper opens, an author brings its two-step neighbourhood into focus. */
+  function activate(n: NetNode): void {
     if (n.kind === 'doc') return onSelectDoc(n.id);
     if (!n.entity) return;
-    if (mode === 'tag') {
-      if (n.expanded) {
-        net.collapse(n.key);
-        setCount(net.size);
-        return view.requestDraw();
-      }
-      try {
-        const r = await rl.invoke('documents:ids', { filters: { tags: [n.id] }, limit: MAX_DOT });
-        const raws: RawNode[] = r.ids.map((id) => ({ kind: 'doc', id, label: '', r: 3.5 }));
-        const edges: RawEdge[] = r.ids.map((id) => ({ from: n.key, to: `doc:${id}`, kind: 'tagged', weight: 0.3 }));
-        const res = net.expand(n, raws, edges);
-        if (res.added < r.total) setNote(t('network.ent.dotsMore', { shown: res.added, total: r.total }));
-        setCount(net.size);
-        view.requestDraw();
-        if (reducedMotion()) settle();
-      } catch (e) {
-        setError(e);
-      }
-    } else if (mode === 'topic') {
-      const from = levelOf.current.get(n.key) ?? level;
-      if (from + 1 >= depth) return void setNote(t('network.ent.lastLevel'));
-      try {
-        let next = levelData.current.get(from + 1);
-        if (!next) {
-          next = await load(from + 1);
-          levelData.current.set(from + 1, next);
-        }
-        const kids = next.nodes.filter((k) => k.group === n.id);
-        if (kids.length === 0) return void setNote(t('network.ent.lastLevel'));
-        const max = maxCount.current;
-        const raws: RawNode[] = kids.map((k) => ({ kind: 'entity', id: k.id, label: k.label, count: k.count, entity: k, group: n.group || undefined, r: nodeRadius(k.count, max) } as RawNode));
-        const ids = new Set(kids.map((k) => k.id));
-        const edges: RawEdge[] = next.edges.filter((e) => ids.has(e.a) && ids.has(e.b)).map((e) => ({ from: `entity:${e.a}`, to: `entity:${e.b}`, kind: 'link', weight: e.w }));
-        for (const e of net.edges) {
-          const other = e.a === n.key ? e.b : e.b === n.key ? e.a : null;
-          if (other) for (const k of kids) edges.push({ from: `entity:${k.id}`, to: other, kind: 'link', weight: e.weight * 0.6 });
-        }
-        const keepTint = colorOf(n, theme.current ?? readTheme(view.canvas.current!, isDarkTheme()));
-        net.replace(n.key, raws, edges);
-        for (const k of kids) {
-          levelOf.current.set(`entity:${k.id}`, from + 1);
-          tintOf.current.set(`entity:${k.id}`, keepTint);
-        }
-        setDrilled((d) => d + 1);
-        setCount(net.size);
-        view.requestDraw();
-      } catch (e) {
-        setError(e);
-      }
-    } else {
-      setFocusKey(n.key);
-      pick(n);
-      const ring = [n.key, ...net.neighbors(n.key)].map((k) => net.nodes.get(k)).filter((x): x is NetNode => !!x);
-      if (ring.length > 1) {
-        const b = boundsOf(ring.map((r) => r.x), ring.map((r) => r.y), ring.length);
-        const { w, h } = view.size.current;
-        view.flyTo((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, Math.min(3, Math.min(w, h) / Math.max(b.maxX - b.minX + 160, b.maxY - b.minY + 160, 1)));
-      }
+    setFocusKey(n.key);
+    pick(n);
+    const ring = [n.key, ...net.neighbors(n.key)].map((k) => net.nodes.get(k)).filter((x): x is NetNode => !!x);
+    if (ring.length > 1) {
+      const b = boundsOf(ring.map((r) => r.x), ring.map((r) => r.y), ring.length);
+      const { w, h } = view.size.current;
+      view.flyTo((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, Math.min(3, Math.min(w, h) / Math.max(b.maxX - b.minX + 160, b.maxY - b.minY + 160, 1)));
     }
   }
 
@@ -555,7 +503,6 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
   const ticket = useRef(0);
   const reqKey = `${mode}|${level}|${minDocs}|${minWeight}|${tagScope}|${years?.join('-') ?? ''}|${docsVersion}|${taxVersion}|${aliasVersion}|${mapVersion}`;
   useEffect(() => {
-    if (mode === 'topic' && !mapReady) return;
     const mine = ++ticket.current;
     setLoading(true);
     setError(null);
@@ -645,7 +592,6 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
 
   /** Entities the network left out (the cap of 800) that match the text: tags from the facets, authors from the facets. */
   async function cutMatches(text: string): Promise<Array<{ id: string; label: string; count: number }>> {
-    if (mode === 'topic') return [];
     const key = `${lib}|${docsVersion}|${taxVersion}`;
     if (facets.current?.key !== key) {
       const f = await rl.invoke('search:facets', { text: '' });
@@ -656,7 +602,7 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
       };
     }
     const present = new Set([...net.nodes.values()].filter((n) => n.kind === 'entity').map((n) => n.id));
-    return missingMatches(mode === 'tag' ? facets.current.tags : facets.current.authors, present, text);
+    return missingMatches(facets.current.authors, present, text);
   }
 
   /** Brings an entity from beyond the cap into view: the network becomes that node with its heaviest neighbours (`focus`). */
@@ -811,7 +757,7 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
     setLowNote(t('network.ent.lowered', { kind: t(`network.ent.kind.${mode}`) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, count, loading]);
-  const emptyKind: EmptyKind | null = loading || error ? null : mode === 'topic' && !mapReady ? 'build' : mode === 'tag' && scopes.tags.length === 0 ? 'tags' : mode === 'author' && data && data.total === 0 && (data.documents ?? 0) > 0 && minDocs <= 1 ? 'review' : null;
+  const emptyKind: EmptyKind | null = loading || error ? null : data && data.total === 0 && (data.documents ?? 0) > 0 && minDocs <= 1 ? 'review' : null;
   const few = !loading && !error && emptyKind === null && data !== null && count < MIN_NODES;
   const kindName = t(`network.ent.kind.${mode}`);
   const rangeYears = data?.yearRange;
@@ -848,7 +794,6 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
   return (
     <div className="net-tab ent-tab" data-testid="entity-panel" data-mode={mode}>
       <RowPortal active={active}>
-        {modeChip}
         <NodeSearch
           ref={searchRef}
           testId="ent-search"
@@ -900,16 +845,7 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
               <span>{t('network.ent.minWeight')}</span>
               <input type="range" min={0} max={0.9} step={0.05} value={minWeight} onChange={(e) => setMinWeight(Number(e.target.value))} data-testid="ent-min-weight" />
             </label>
-            {mode === 'topic' && depth > 1 && (
-              <label className="net-field net-pop-row">
-                <span>{t('network.ent.level')}</span>
-                <input type="range" min={1} max={depth} value={level + 1} onChange={(e) => setLevel(Number(e.target.value) - 1)} data-testid="ent-level" />
-                <span className="hint">
-                  {level + 1}/{depth}
-                </span>
-              </label>
-            )}
-            {mode !== 'tag' && scopes.tags.length > 0 && (
+            {scopes.tags.length > 0 && (
               <label className="net-field net-pop-row">
                 <span>{t('network.scope.tag')}</span>
                 <select value={tagScope} onChange={(e) => setTagScope(e.target.value)} data-testid="ent-tag-scope">
@@ -940,12 +876,10 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
               <span>{t('network.ent.sizeBy')}</span>
               <Segmented<SizeBy> size="sm" label={t('network.ent.sizeBy')} value={sizeBy} onChange={setSizeBy} options={SIZE_BY.map((s) => ({ value: s, label: t(`network.ent.sizeBy_${s}`), testId: `ent-size-${s}` }))} />
             </div>
-            {mode === 'author' && (
-              <label className="check-inline">
-                <input type="checkbox" checked={themes} onChange={(e) => setThemes(e.target.checked)} data-testid="ent-themes-toggle" />
-                {t('network.ent.sharedThemes')}
-              </label>
-            )}
+            <label className="check-inline">
+              <input type="checkbox" checked={themes} onChange={(e) => setThemes(e.target.checked)} data-testid="ent-themes-toggle" />
+              {t('network.ent.sharedThemes')}
+            </label>
           </div>
         </ChipPop>
         <span className="map-actions">

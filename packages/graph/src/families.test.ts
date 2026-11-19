@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FAMILY_TOP, OTHER_CLUSTER, autoMemberships, familyEligibility, familyModel, mainValue, parseFamily, tagMemberships, vocabLinks } from './families.js';
+import { FAMILY_TOP, OTHER_CLUSTER, autoMemberships, familyEligibility, familyModel, mainValue, parseFamily, tagMemberships, valueSpecificity, vocabLinks } from './families.js';
 
 const node = (id: string, extra: { level?: string; parents?: string[]; group?: string } = {}) => ({ id, label: id.toUpperCase(), parents: extra.parents ?? [], level: extra.level, group: extra.group });
 
@@ -142,6 +142,25 @@ describe('familyEligibility', () => {
   it('mainValue breaks ties by id', () => {
     expect(mainValue([{ v: 'b', w: 1 }, { v: 'a', w: 1 }])).toBe('a');
     expect(mainValue([])).toBeNull();
+  });
+  it('the main value is the most specific one when weights tie (a generic value does not win)', () => {
+    // 10 papers: "wide" on all, "narrow" on 3, "mid" on 6; the tie on weight goes to the rarer value.
+    const papers = Array.from({ length: 10 }, (_, i) => [{ v: 'wide', w: 1 }, ...(i < 3 ? [{ v: 'narrow', w: 1 }] : []), ...(i >= 3 && i < 9 ? [{ v: 'mid', w: 1 }] : [])]);
+    const spec = valueSpecificity(papers);
+    expect(spec.get('narrow')!).toBeGreaterThan(spec.get('mid')!);
+    expect(spec.get('wide')).toBe(0.15);
+    expect(mainValue(papers[0]!)).toBe('narrow'.localeCompare('wide') < 0 ? 'narrow' : 'wide');
+    expect(mainValue(papers[0]!, spec)).toBe('narrow');
+    expect(mainValue(papers[5]!, spec)).toBe('mid');
+    expect(mainValue(papers[9]!, spec)).toBe('wide'); // only one value: still chosen
+    // a clearly heavier weight still wins
+    expect(mainValue([{ v: 'wide', w: 1 }, { v: 'narrow', w: 0.2 }], spec)).toBe('narrow');
+    expect(mainValue([{ v: 'wide', w: 1 }, { v: 'mid', w: 0.1 }], spec)).toBe('wide');
+  });
+  it('eligibility counts the specific main values: a 80 % macro and a 60 % one no longer swallow the papers', () => {
+    const papers = Array.from({ length: 20 }, (_, i) => [{ v: 'wide', w: 1 }, ...(i % 5 < 3 ? [{ v: 'mid', w: 1 }] : []), { v: `s${i % 4}`, w: 1 }]);
+    const e = familyEligibility(papers, 20);
+    expect(e.values).toBeGreaterThanOrEqual(4);
   });
 });
 

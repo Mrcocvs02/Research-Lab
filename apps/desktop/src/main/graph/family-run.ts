@@ -1,5 +1,5 @@
 import { visibleGroupTags, type DocumentRecord } from '@rl/core';
-import { autoMemberships, familyEligibility, familyModel, layoutBlocks, mainValue, neighborsOf, parseFamily, tagMemberships, vocabLinks, type AreaModel, type AreaSummary, type Block, type Eligibility, type FamilyNode, type Memberships, type VocabLink } from '@rl/graph';
+import { autoMemberships, familyEligibility, familyModel, layoutBlocks, mainValue, neighborsOf, parseFamily, tagMemberships, valueSpecificity, vocabLinks, type AreaModel, type AreaSummary, type Block, type Eligibility, type FamilyNode, type Memberships, type VocabLink } from '@rl/graph';
 import type { MainServices } from '../ipc/handlers/services.js';
 import { areaModel, weightsOf, withoutKeywords } from './areas-run.js';
 import { readNames } from './family-names-store.js';
@@ -193,10 +193,11 @@ async function blocksOf(s: MainServices, v: Values, recs: DocumentRecord[], aspe
     const i = lm?.index.get(id);
     return i === undefined || !lm ? {} : { x: lm.model.x[i] as number, y: lm.model.y[i] as number };
   };
+  const spec = valueSpecificity(v.docs.values());
   const docs = recs
     .map((r) => {
       const list = v.docs.get(r.id) ?? [];
-      const main = mainValue(list);
+      const main = mainValue(list, spec);
       return { id: r.id, value: main, sub: main === null ? null : v.sub(r.id, main), others: list.filter((e) => e.v !== main).sort((a, b) => b.w - a.w || (a.v < b.v ? -1 : 1)).map((e) => e.v), ...pos(r.id) };
     })
     .sort((a, b) => (a.id < b.id ? -1 : 1));

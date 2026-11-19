@@ -144,10 +144,29 @@ export interface Eligibility {
   values: number;
 }
 
-/** The value with the biggest weight (ties: the smaller id). */
-export function mainValue(list: ReadonlyArray<{ v: string; w: number }>): string | null {
+/** How specific each value is: log(N / papers with the value), N the papers with any value; at least 0.15 so a value on every paper still counts. */
+export function valueSpecificity(shares: Iterable<ReadonlyArray<{ v: string; w: number }>>): Map<string, number> {
+  const count = new Map<string, number>();
+  let n = 0;
+  for (const list of shares) {
+    let any = false;
+    for (const v of new Set(list.filter((e) => e.w > 0).map((e) => e.v))) {
+      count.set(v, (count.get(v) ?? 0) + 1);
+      any = true;
+    }
+    if (any) n++;
+  }
+  return new Map([...count].map(([v, c]) => [v, Math.max(0.15, Math.log(n / c))]));
+}
+
+/**
+ * The main value of a paper: the biggest weight, or with `spec` (D-508) the biggest weight x specificity, so a value on most papers
+ * (a generic macro-area) does not win over a narrower one it ties with. Ties: the smaller id.
+ */
+export function mainValue(list: ReadonlyArray<{ v: string; w: number }>, spec?: ReadonlyMap<string, number>): string | null {
   let best: { v: string; w: number } | null = null;
-  for (const e of list) if (e.w > 0 && (!best || e.w > best.w || (e.w === best.w && e.v < best.v))) best = e;
+  const score = (e: { v: string; w: number }): number => e.w * (spec?.get(e.v) ?? 1);
+  for (const e of list) if (e.w > 0 && (!best || score(e) > score(best) || (score(e) === score(best) && e.v < best.v))) best = e;
   return best?.v ?? null;
 }
 
@@ -156,11 +175,13 @@ export function mainValue(list: ReadonlyArray<{ v: string; w: number }>): string
  * A family of kind `one` is clear by construction; the keywords family never passes. `shares` is the weighted values of each paper (the ones with none may be left out).
  */
 export function familyEligibility(shares: Iterable<ReadonlyArray<{ v: string; w: number }>>, total: number, opts: { one?: boolean; keywords?: boolean } = {}): Eligibility {
+  const all = [...shares];
+  const spec = valueSpecificity(all);
   const main = new Map<string, number>();
   let withValue = 0;
   let clear = 0;
-  for (const list of shares) {
-    const m = mainValue(list);
+  for (const list of all) {
+    const m = mainValue(list, spec);
     if (m === null) continue;
     withValue++;
     main.set(m, (main.get(m) ?? 0) + 1);

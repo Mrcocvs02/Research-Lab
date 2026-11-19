@@ -18,7 +18,7 @@ import { Explore } from './Explore';
 import type { NetStart } from './GraphNet';
 import { LinksPanel } from './LinksPanel';
 import { MapPanel } from './MapPanel';
-import { ChromeCtx, MapIllustration } from './NetChrome';
+import { ChromeCtx, HeadMore, MapIllustration } from './NetChrome';
 import { SimilarPanel, SurprisingList } from './SimilarPanel';
 import { useGraphModel, type Phase } from './useGraphModel';
 import { useScopeOptions } from './useScopes';
@@ -205,6 +205,7 @@ export function NetworkView() {
   return (
     <ChromeCtx.Provider value={{ head, row, model: modelGroup }}>
       <div className="network-page" data-testid="section-network">
+        <HeadMore active={noModel} testId="map-more" groups={[modelGroup]} />
         <header className="net-head">
           <h1>{t('sections.network')}</h1>
           <div className="net-status" data-testid="graph-status" data-state={status?.state ?? 'unknown'} data-pending={status?.pending ?? 0} aria-live="polite">

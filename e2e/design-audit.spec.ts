@@ -934,8 +934,9 @@ async function sectionsTour(a: Audit, ctx: LaunchedApp, lang: 'it' | 'en'): Prom
     await nav(a, 'network');
     await w.waitForTimeout(1000);
     await a.shot('network-first', 1);
-    if (await visibleNow(w.getByTestId('graph-build'))) {
-      await w.getByTestId('graph-build').click();
+    const buildBtn = w.locator('[data-testid="graph-build"], [data-testid="graph-build-empty"]').first();
+    if (await visibleNow(buildBtn)) {
+      await buildBtn.click();
       await w.waitForTimeout(6000);
     }
     await a.shot('network-built', 2);
@@ -1057,6 +1058,7 @@ async function aiTour(a: Audit, lang: 'it' | 'en'): Promise<void> {
   await a.step('labels dialog (network)', async () => {
     await nav(a, 'network');
     await w.waitForTimeout(1000);
+    await w.getByTestId('map-more').click().catch(() => {});
     if (await visibleNow(w.getByTestId('map-label-clusters'))) {
       await w.getByTestId('map-label-clusters').click();
       await w.waitForTimeout(1000);
@@ -2000,6 +2002,7 @@ async function mapFinal(a: Audit, full: boolean): Promise<void> {
     await count(a, 'map-network', '[data-testid="section-network"]', 'canvas');
     await a.shot('map-network-docs', 3);
     for (const m of full ? ['author', 'tag', 'topic'] : ['author']) {
+      await w.getByTestId('net-mode').click().catch(() => {});
       await w.getByTestId(`net-mode-${m}`).click().catch(() => {});
       await expect(w.getByTestId('ent-canvas')).toHaveAttribute('data-loading', 'false', { timeout: 60_000 }).catch(() => {});
       await w.waitForTimeout(3000);
@@ -2011,6 +2014,7 @@ async function mapFinal(a: Audit, full: boolean): Promise<void> {
     return;
   }
   await a.step('map entity detail', async () => {
+    await w.getByTestId('net-mode').click().catch(() => {});
     await w.getByTestId('net-mode-author').click().catch(() => {});
     await w.waitForTimeout(2500);
     const c = await w.getByTestId('ent-canvas').boundingBox();

@@ -238,7 +238,7 @@ export function Explore({ active, onAddData, onTags, selectedDoc, onOpenDoc, dim
             </button>
           ))}
         </div>
-        {topBack && loc.parentId !== null && (
+        {topBack && (
           <button type="button" onClick={goBack} data-testid="explore-back" title={t('network.explore.backTo', { label: topBack.label })}>
             {t('network.explore.back')}
           </button>

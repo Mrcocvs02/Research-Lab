@@ -184,6 +184,9 @@ describe('keyboard walk over the map', () => {
 
   it('lists the points in view cluster by cluster and leaves out the ones off screen', () => {
     const m = prepareMap(resp);
+    // The layout pushes the groups apart; the walk is checked on the original coordinates.
+    m.xs.set([0, 1, 2, 500]);
+    m.ys.set([0, 1, 2, 500]);
     const inView = pointsInView(m, 0, { cx: 1, cy: 1, k: 50 }, 400, 300);
     // Cluster c0 (points 0 and 2), then c1 (point 1); point 3 is far away.
     expect(inView).toEqual([0, 2, 1]);
@@ -227,8 +230,12 @@ describe('NetworkView', () => {
       'graph:map': () => ({ points: [], clusters: [], seed: 5, builtAt: '2026-01-01T10:00:00.000Z', omitted: 0 }),
     });
     expect(screen.getByTestId('graph-empty')).toBeTruthy();
-    fireEvent.change(screen.getByTestId('graph-seed'), { target: { value: '5' } });
-    fireEvent.click(screen.getByTestId('graph-build-empty'));
+    // The seed lives in the dialog of the model options, reached from the one `⋯`.
+    expect(screen.queryByTestId('graph-seed')).toBeNull();
+    fireEvent.click(screen.getByTestId('map-more'));
+    fireEvent.click(await screen.findByTestId('map-options'));
+    fireEvent.change(await screen.findByTestId('graph-seed'), { target: { value: '5' } });
+    fireEvent.click(screen.getByTestId('graph-build-options'));
     await settle();
     expect(callsTo('graph:build')).toEqual([{ seed: 5 }]);
     act(() => emitEvent('graph:progress', { jobId: 'job1', phase: 'similarity', done: 1, total: 4 }));
@@ -247,8 +254,8 @@ describe('NetworkView', () => {
       'graph:status': () => ({ state: 'stale', documents: 4, builtAt: '2026-01-01T10:00:00.000Z', seed: 5, pending: 2, removed: 0 }),
       'graph:map': () => ({ points: [], clusters: [], seed: 5, builtAt: '2026-01-01T10:00:00.000Z', omitted: 0 }),
     });
-    expect(screen.getByTestId('graph-status-text').textContent).toContain('2 documents');
-    expect(screen.getByTestId('graph-build').textContent).toBe('Rebuild');
+    expect(screen.getByTestId('graph-status-text').textContent).toContain('2 new documents');
+    expect(screen.getByTestId('graph-build').textContent).toBe('Update the map');
     expect(callsTo('graph:map').length).toBeGreaterThan(0);
   });
 });
@@ -261,16 +268,18 @@ describe('NetworkView: second-brain export', () => {
         points: [
           { docId: 'a'.repeat(16), x: 0, y: 0, clusters: ['c0'] },
           { docId: 'b'.repeat(16), x: 1, y: 1, clusters: ['c0'] },
+          { docId: 'c'.repeat(16), x: 2, y: 0, clusters: ['c0'] },
         ],
-        clusters: [{ id: 'c0', parent: null, level: 0, size: 2, topTerms: ['alpha', 'beta'], aiLabel: null, centroid: { x: 0.5, y: 0.5 } }],
+        clusters: [{ id: 'c0', parent: null, level: 0, size: 3, topTerms: ['alpha', 'beta'], aiLabel: null, centroid: { x: 0.5, y: 0.5 } }],
         seed: 5,
         builtAt: '2026-01-01T10:00:00.000Z',
         omitted: 0,
       }),
     });
-    const button = await screen.findByTestId('cluster-export');
-    expect(button.getAttribute('aria-label')).toContain('alpha, beta');
-    fireEvent.click(button);
+    const more = await screen.findByTestId('cluster-more');
+    expect(more.getAttribute('aria-label')).toContain('alpha, beta');
+    fireEvent.click(more);
+    fireEvent.click(await screen.findByTestId('cluster-export'));
     expect(JSON.parse(screen.getByTestId('export-probe').textContent!)).toEqual({ clusters: [{ id: 'c0', label: 'alpha, beta' }], name: 'alpha, beta' });
   });
 });
@@ -280,10 +289,10 @@ describe('NetworkView limits and messages', () => {
 
   it('says how many documents were removed since the build, alone or with the changed ones', async () => {
     await mount(createElement(NetworkView), { ...base, 'graph:status': () => ({ state: 'stale', documents: 4, builtAt: '2026-01-01T10:00:00.000Z', seed: 5, pending: 0, removed: 2 }) });
-    expect(screen.getByTestId('graph-status-text').textContent).toContain('2 documents were removed');
+    expect(screen.getByTestId('graph-status-text').textContent).toContain('2 documents removed');
     cleanup();
     await mount(createElement(NetworkView), { ...base, 'graph:status': () => ({ state: 'stale', documents: 4, builtAt: '2026-01-01T10:00:00.000Z', seed: 5, pending: 3, removed: 1 }) });
-    expect(screen.getByTestId('graph-status-text').textContent).toContain('3 documents were added or changed');
+    expect(screen.getByTestId('graph-status-text').textContent).toContain('3 new documents');
     expect(screen.getByTestId('graph-status-text').textContent).toContain('removed: 1');
   });
 
@@ -320,7 +329,7 @@ describe('NetworkView limits and messages', () => {
   it('says when the map leaves documents off', async () => {
     await mount(createElement(NetworkView), {
       'graph:status': () => ({ state: 'ready', documents: 4, builtAt: '2026-01-01T10:00:00.000Z', seed: 5, pending: 0, removed: 0 }),
-      'graph:map': () => ({ points: [{ docId: 'a'.repeat(16), x: 0, y: 0, clusters: [] }], clusters: [], seed: 5, builtAt: '2026-01-01T10:00:00.000Z', omitted: 7 }),
+      'graph:map': () => ({ points: [0, 1, 2].map((i) => ({ docId: String(i).repeat(16), x: i, y: i, clusters: [] })), clusters: [], seed: 5, builtAt: '2026-01-01T10:00:00.000Z', omitted: 7 }),
     });
     await waitFor(() => expect(screen.getByTestId('map-omitted').textContent).toContain('7 more documents are not shown'));
   });

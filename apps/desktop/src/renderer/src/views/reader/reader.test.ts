@@ -552,7 +552,8 @@ describe('ReaderView: study state and underlined flag', () => {
     await waitFor(() => expect(callsTo('documents:update')[0]).toMatchObject({ docId: DOC, patch: { studyState: 'reading' } }));
     await studyMenu();
     await waitFor(() => expect(screen.getByTestId('reader-study-reading').getAttribute('aria-checked')).toBe('true'));
-    fireEvent.click(screen.getByTestId('reader-underlined'));
+    fireEvent.click(screen.getByTestId('reader-panel-info'));
+    fireEvent.click(await screen.findByTestId('reader-underlined'));
     await waitFor(() => expect(callsTo('documents:update')[1]).toMatchObject({ patch: { underlined: false } }));
   });
 });

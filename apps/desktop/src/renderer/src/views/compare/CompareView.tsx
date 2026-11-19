@@ -153,7 +153,7 @@ export function CompareView({ docIds, onClose }: { docIds: string[]; onClose(): 
   const preview = useMemo(() => {
     if (!est) return null;
     const ready = est.cells.ready + est.cells.fromNotes;
-    return t('compare.preview', { ready, toWrite: est.cells.toWrite, requests: est.requests });
+    return t('compare.preview', { ready, toWrite: est.cells.toWrite, count: est.requests });
   }, [est, t]);
 
   return (
@@ -284,7 +284,7 @@ export function CompareView({ docIds, onClose }: { docIds: string[]; onClose(): 
         </table>
       </div>
       {dialog && est && (
-        <AiCostPreview what={t('compare.what', { cells: est.cells.toWrite })} requests={est.requests} estimate={est as CostEstimate} modelLabel={label(est.model)} models={models} model={model || est.model} onModel={setModel} onConfirm={() => void fill(true)} onCancel={() => setDialog(false)} />
+        <AiCostPreview what={t('compare.what', { count: est.cells.toWrite })} requests={est.requests} estimate={est as CostEstimate} modelLabel={label(est.model)} models={models} model={model || est.model} onModel={setModel} onConfirm={() => void fill(true)} onCancel={() => setDialog(false)} />
       )}
       {saveOpen && <SaveDialog onCancel={() => setSaveOpen(false)} onSave={save} title={title} />}
     </div>

@@ -886,6 +886,7 @@ export function ReaderView({ target, onClose, split }: Props) {
             hidden={errorText !== null}
             data-tool={ctx.tool}
             data-away={away ? '' : undefined}
+            data-fit={zoom.fit ? '' : undefined}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -1049,7 +1050,10 @@ export function ReaderView({ target, onClose, split }: Props) {
                   <dd data-testid="reader-info-state">{doc ? t(`study.${doc.study.state}`) : ''}</dd>
                   <dt>{t('doc.underlined')}</dt>
                   <dd>
-                    {doc?.study.underlined.value ? t('reader.info.yes') : t('reader.info.no')}
+                    <label className="reader-info__check">
+                      <input type="checkbox" checked={doc?.study.underlined.value ?? false} disabled={!doc} onChange={(e) => setUnderlined(e.target.checked)} data-testid="reader-underlined" />
+                      {doc?.study.underlined.value ? t('reader.info.yes') : t('reader.info.no')}
+                    </label>
                     {doc?.study.underlined.value && (
                       <span className="hint" data-testid="reader-underlined-origin" data-origin={doc.study.underlined.origin}>
                         {' · '}

@@ -9,6 +9,8 @@ export interface LibraryIntent {
   authors?: string[];
   /** An explicit set of documents (a topic of the model). */
   docIds?: string[];
+  /** Open the vocabulary with the guided cleanup ("Tidy the tags" from the Map, D-508). */
+  cleanup?: boolean;
 }
 
 let pending: LibraryIntent | null = null;

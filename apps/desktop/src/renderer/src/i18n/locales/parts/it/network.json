@@ -348,6 +348,8 @@
       "none": "Mappa non costruita",
       "stale_one": "{{count}} documento nuovo",
       "stale_other": "{{count}} documenti nuovi",
+      "changed_one": "{{count}} documento modificato",
+      "changed_other": "{{count}} documenti modificati",
       "removed_one": "{{count}} documento rimosso",
       "removed_other": "{{count}} documenti rimossi",
       "documents_one": "{{count}} documento",
@@ -374,6 +376,7 @@
       "areaSparse_other": "Solo {{count}} documenti hanno tag: gli altri sono anelli vuoti",
       "areaByTopic": "Colora per argomento",
       "manageTags": "Gestisci tag",
+      "tidyTags": "Riordina i tag",
       "areaIsolate": "Isola l'area {{name}}"
     },
     "edge": {

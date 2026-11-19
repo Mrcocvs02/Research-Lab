@@ -18,6 +18,7 @@ import { RlError } from '../../lib/rl-error';
 import { safeText } from '../library/safeText';
 import { Segmented } from '../../components/Segmented';
 import { AreaLegend, useAreaColors } from './AreaLegend';
+import { setLibraryIntent } from '../../lib/libraryIntent';
 import { clearShare, GroupBy, NameFamilyButton, NameFamilyDialog } from './GroupBy';
 import { buildBlockView, type FamilyResponse } from './blocksDraw';
 import { filterKinds, type EdgeMode, type EvEdge, type EvFilter } from './edges';
@@ -87,6 +88,11 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const [surprise, setSurprise] = useState<{ terms: string[] } | null>(null);
   const rand = useRef(rng(Date.now() & 0xffff));
   const nav = useNav();
+  // "Tidy the tags" opens the guided cleanup of the vocabulary, not the Settings (D-508).
+  const tidyTags = () => {
+    setLibraryIntent({ cleanup: true });
+    nav.navigate({ view: 'library' });
+  };
   // A bridge found in Discover ("Show on the map"): drawn on the canvas until the note is closed.
   const [bridge, setBridge] = useState<BridgePath | null>(() => takeMapBridge());
 
@@ -278,8 +284,8 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
       pill = (
         <Pill testId="map-group-fallback" onClose={() => setTopicNoteSeen(true)}>
           {t('network.blocks.topicNote', { pct: clearShare(offer) })}{' '}
-          <button type="button" className="link" onClick={() => nav.navigate({ view: 'settings' })}>
-            {t('network.area.manageTags')}
+          <button type="button" className="link" onClick={tidyTags}>
+            {t('network.area.tidyTags')}
           </button>
         </Pill>
       );

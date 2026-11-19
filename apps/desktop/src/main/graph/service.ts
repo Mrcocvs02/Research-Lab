@@ -131,15 +131,17 @@ export async function loadModel(s: MainServices, rt: LibraryRuntime): Promise<Lo
 export const modelId = (m: GraphModel): string => `${m.builtAt}:${m.seed}`;
 
 /** Documents that are new or changed since the model, and the model documents that are gone. */
-export function drift(view: LibraryView, m: Pick<GraphModel, 'ids' | 'sigs'>, index: Map<string, number>): { pending: DocumentRecord[]; removed: number } {
+export function drift(view: LibraryView, m: Pick<GraphModel, 'ids' | 'sigs'>, index: Map<string, number>): { pending: DocumentRecord[]; changed: number; removed: number } {
   const pending: DocumentRecord[] = [];
+  let changed = 0;
   for (const r of view.records) {
     const i = index.get(r.id);
     if (i === undefined || m.sigs[i] !== docSig(r)) pending.push(r);
+    if (i !== undefined && m.sigs[i] !== docSig(r)) changed++;
   }
   let removed = 0;
   for (const id of m.ids) if (!view.byId.has(id)) removed++;
-  return { pending, removed };
+  return { pending, changed, removed };
 }
 
 /* ------------------------------------------------ status, build, cancel ------------------------------------------------ */
@@ -179,6 +181,7 @@ export async function status(s: MainServices) {
     builtAt: sum.builtAt,
     seed: sum.seed,
     pending: d.pending.length,
+    changed: d.changed,
     removed: d.removed,
   };
 }

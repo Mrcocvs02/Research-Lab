@@ -20,6 +20,7 @@ import { Explore } from './Explore';
 import type { NetStart } from './GraphNet';
 import { LinksPanel } from './LinksPanel';
 import { MapPanel } from './MapPanel';
+import { staleLine } from './mapStatus';
 import { canBack, canForward, crumbs as crumbsOf, currentNav, emptyNav, pushNav, stepBack, stepForward, type NavStack, type NavState } from './navStack';
 import { ChromeCtx, HeadMore, MapIllustration } from './NetChrome';
 import { PathChain, type Strictness } from './PathChain';
@@ -262,7 +263,7 @@ export function NetworkView() {
   let subtitle = '';
   if (status && !building) {
     if (status.state === 'none') subtitle = t('network.head.none');
-    else if (status.state === 'stale') subtitle = status.pending > 0 ? t('network.head.stale', { count: status.pending }) + (status.removed > 0 ? ` · ${t('network.status.alsoRemoved', { count: status.removed })}` : '') : t('network.head.removed', { count: status.removed });
+    else if (status.state === 'stale') subtitle = staleLine(status, t);
     else {
       subtitle = t('network.head.documents', { count: status.documents });
       if (mapInfo && mapInfo.topics > 0) subtitle += ` · ${t('network.head.topics', { count: mapInfo.topics })}`;

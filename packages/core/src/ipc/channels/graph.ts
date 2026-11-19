@@ -23,6 +23,8 @@ export const graphStatusSchema = z.object({
   seed: z.number().int().nullable(),
   /** Documents added or changed since the build, placed incrementally without a full rebuild. */
   pending: z.number().int().nonnegative(),
+  /** Of `pending`, the documents that were already in the model and have changed since (the rest are new). */
+  changed: z.number().int().nonnegative().optional(),
   /** Documents of the model that are gone from the library since the build. */
   removed: z.number().int().nonnegative(),
 });

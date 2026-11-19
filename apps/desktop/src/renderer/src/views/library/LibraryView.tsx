@@ -62,13 +62,14 @@ function LibraryInner() {
   const text = useSearchText();
 
   const [state, setState] = useState<BrowseState>(() => browseFromIntent(takeLibraryIntent()));
+  const [cleanupFirst] = useState(() => takeLibraryIntent()?.cleanup === true);
   const browse = useMemo<BrowseState>(() => ({ ...state, text }), [state, text]);
   const [view, setView] = useLocalChoice<ViewMode>('rl.libraryView', ['list', 'grid'], 'list');
   const [tab, setTab] = useLocalChoice<PaneTab>('rl.libraryTab', TABS, 'folders');
   const [selection, setSelection] = useState<SelectionState>(emptySelection);
   const [detailOpen, setDetailOpen] = useLocalFlag('rl.detailOpen', false);
   const [navOpen, setNavOpen] = useState(false);
-  const [mode, setMode] = useState<'browse' | 'taxonomy'>('browse');
+  const [mode, setMode] = useState<'browse' | 'taxonomy'>(cleanupFirst ? 'taxonomy' : 'browse');
   const [addOpen, setAddOpen] = useState(false);
   const [showResources, setShowResources] = useState(false);
   const [jobOpen, setJobOpen] = useState(false);
@@ -177,7 +178,7 @@ function LibraryInner() {
 
       {mode === 'taxonomy' ? (
         <Lazy>
-          <TaxonomyManager onBack={() => setMode('browse')} />
+          <TaxonomyManager onBack={() => setMode('browse')} startCleanup={cleanupFirst} />
         </Lazy>
       ) : (
         <>

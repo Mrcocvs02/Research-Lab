@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { COMPARE_BLOCK, comparePrompt, compareSystem, COMPARE_VERSION } from '@rl/ai/synthesis';
 import type { CompareColumn, CompareTable, DocumentRecord } from '@rl/core';
 import { cellOfSection, noteCells, rowLabel, splitCells } from './cells.js';
-import { groupData, groupId, overviewMarkdown } from './groups.js';
+import { groupData, groupId, institutionCounts, overviewMarkdown } from './groups.js';
 import { listTables, parseTable, readTable, removeTable, tableCsv, tableMarkdown, writeTable } from './table-store.js';
 
 const ID = '0123456789abcdef';
@@ -133,5 +133,19 @@ describe('group overview', () => {
     const md = overviewMarkdown({ docs, data: groupData(docs, (x) => x), written: null, keyDoc: new Map(), at: '2026-11-19T10:00:00.000Z', lang: 'en' });
     expect(md).toContain('Synthesis not written');
     expect(md).toContain('lab://doc/0123456789abcdef');
+  });
+  it('counts each institution once per work, most frequent first, and lists them in the overview', () => {
+    const w = (...insts: string[][]) => ({ authorships: insts.map((i) => ({ institutions: i.map((display_name) => ({ display_name })) })) });
+    const inst = institutionCounts([w(['Univ A', 'Lab B'], ['Univ A']), w(['univ a'], []), w(['Lab B']), { authorships: 'bad' }, null]);
+    expect(inst).toEqual([
+      { name: 'Lab B', docs: 2 },
+      { name: 'Univ A', docs: 2 },
+    ]);
+    expect(institutionCounts([w(['Univ A']), w(['Univ A']), w(['Lab B'])])[0]).toEqual({ name: 'Univ A', docs: 2 });
+    const docs = [rec('0123456789abcdef', ['Ada Lovelace'])];
+    const md = overviewMarkdown({ docs, data: { ...groupData(docs, (x) => x), institutions: inst }, written: null, keyDoc: new Map(), at: '2026-11-19T10:00:00.000Z', lang: 'en' });
+    expect(md).toContain('## Institutions (OpenAlex)');
+    expect(md).toContain('- Univ A (2)');
+    expect(overviewMarkdown({ docs, data: groupData(docs, (x) => x), written: null, keyDoc: new Map(), at: '2026-11-19T10:00:00.000Z', lang: 'en' })).not.toContain('Institutions');
   });
 });

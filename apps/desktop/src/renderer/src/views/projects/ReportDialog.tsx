@@ -6,7 +6,8 @@ import { Dialog } from '../../components/Dialog';
 import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
 import { formatTokens, formatUsd } from '../chat/format';
-import { SendPreview } from './SendPreview';
+import { ModelPick, SendPreview } from './SendPreview';
+import { reportFileName } from './schemaModel';
 
 type Preview = ResponseOf<Channels, 'project:reportPreview'>;
 type Audience = (typeof REPORT_AUDIENCES)[number];
@@ -20,14 +21,15 @@ export default function ReportDialog({ projectId, open, onClose, onSaved }: { pr
   const [audience, setAudience] = useState<Audience>('advisor');
   const [parts, setParts] = useState<Part[]>([...REPORT_PARTS]);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [model, setModel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<{ date: string; body: string } | null>(null);
-  const req = { projectId, days, audience, parts };
+  const req = { projectId, days, audience, parts, ...(model ? { model } : {}) };
   useEffect(() => {
     if (open) void rl.invoke('project:reportGet', { projectId, date: open }).then((r) => setDraft({ date: open, body: r.body }), reportError);
   }, [open, projectId, reportError]);
   // Any change of the options makes the preview stale: it is made again on demand.
-  useEffect(() => setPreview(null), [days, audience, parts]);
+  useEffect(() => setPreview(null), [days, audience, parts, model]);
   const togglePart = (p: Part) => setParts((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]));
   const show = async () => {
     setBusy(true);
@@ -48,6 +50,17 @@ export default function ReportDialog({ projectId, open, onClose, onSaved }: { pr
       reportError(e);
     } finally {
       setBusy(false);
+    }
+  };
+  const exportPdf = async () => {
+    if (!draft) return;
+    try {
+      const picked = await rl.invoke('dialog:chooseFolder', { purpose: 'export-destination', title: t('secondBrain.destination.dialogTitle') });
+      if (!picked) return;
+      const r = await rl.invoke('bib:saveText', { destination: picked.path, fileName: reportFileName(draft.date), ext: 'pdf', text: draft.body });
+      info(t('schema.report.exported', { file: r.file }));
+    } catch (e) {
+      reportError(e);
     }
   };
   return (
@@ -83,6 +96,7 @@ export default function ReportDialog({ projectId, open, onClose, onSaved }: { pr
                 ))}
               </select>
             </div>
+            <ModelPick value={model} onChange={setModel} />
             <fieldset className="schema-parts">
               <legend>{t('schema.report.parts')}</legend>
               {REPORT_PARTS.map((p) => (
@@ -102,6 +116,9 @@ export default function ReportDialog({ projectId, open, onClose, onSaved }: { pr
           <>
             <Button onClick={() => void navigator.clipboard.writeText(draft.body).then(() => info(t('schema.report.copied')))} data-testid="report-copy">
               {t('schema.report.copy')}
+            </Button>
+            <Button onClick={() => void exportPdf()} data-testid="report-pdf">
+              {t('schema.report.pdf')}
             </Button>
             <Button
               variant="primary"

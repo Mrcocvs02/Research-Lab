@@ -88,9 +88,11 @@ async function folderOf(s: MainServices, destination: string, fileName: string |
 }
 
 /** The PRISMA diagram (SVG) or its table (Markdown), written as a new file in a folder chosen by the user. */
-export async function saveText(s: MainServices, req: { destination: string; fileName: string; ext: 'svg' | 'md'; text: string }): Promise<{ file: string }> {
+export async function saveText(s: MainServices, req: { destination: string; fileName: string; ext: 'svg' | 'md' | 'pdf'; text: string }): Promise<{ file: string }> {
   const { target, base } = await folderOf(s, req.destination, req.fileName, req.ext, 'prisma');
-  return { file: await writeFree(target, base, req.ext, req.text) };
+  // `pdf`: the text is the Markdown of a report, laid out as a plain PDF (loaded only now).
+  const text = req.ext === 'pdf' ? (await import('../project/pdf.js')).reportPdf(req.text) : req.text;
+  return { file: await writeFree(target, base, req.ext, text) };
 }
 
 /**

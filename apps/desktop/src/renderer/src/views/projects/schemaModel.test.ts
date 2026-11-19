@@ -52,3 +52,11 @@ describe('paragraphs for citation suggestions', () => {
     expect(citeSnippet('k1', 'pandoc')).toBe('[@k1]');
   });
 });
+
+describe('report file name', () => {
+  it('uses the date of the report and refuses anything else', async () => {
+    const { reportFileName } = await import('./schemaModel');
+    expect(reportFileName('2026-11-19')).toBe('report-2026-11-19');
+    expect(reportFileName('../x')).toBe('report-draft');
+  });
+});

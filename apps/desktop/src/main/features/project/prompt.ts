@@ -10,14 +10,17 @@ import { structuredSystem, type Lang } from '@rl/ai/analysis';
  */
 export const REPORT_VERSION = 'project-report-v1';
 export const CITE_VERSION = 'project-cite-v1';
+export const EVIDENCE_VERSION = 'project-evidence-v1';
 
 export const reportSchema = z.object({ markdown: z.string() });
+export const evidenceSchema = z.object({ verdicts: z.array(z.object({ id: z.string(), stance: z.enum(['supports', 'contradicts', 'unrelated']) })) });
 export const citeSchema = z.object({ ranking: z.array(z.object({ id: z.string(), reason: z.string() })) });
 
 /** Characters of context a report may carry (about 6 000 tokens, §17.4.14). */
 export const REPORT_CONTEXT_CHARS = 24_000;
 export const REPORT_OUT_TOKENS = 1500;
 export const CITE_OUT_TOKENS = 300;
+export const EVIDENCE_OUT_TOKENS = 250;
 
 const AUDIENCE = { advisor: 'the thesis advisor, who wants the progress, the results and the open decisions', group: 'a reading group, who wants what was read, what it says and what to discuss', me: 'the researcher themself, as a record of the period' } as const;
 
@@ -53,3 +56,16 @@ export const linkMarkers = (md: string, refs: ReadonlyMap<string, { docId: strin
     const r = refs.get(`R${n}`);
     return r ? ` [${r.title.replace(/[[\]]/g, '')}](lab://doc/${r.docId})` : '';
   });
+
+export function evidenceSystem(language: Lang): string {
+  return structuredSystem({
+    version: EVIDENCE_VERSION,
+    role: 'You help a researcher check a claim against passages found in their library: for each passage you say whether it supports the claim, contradicts it, or is not relevant.',
+    output: 'JSON {"verdicts": [{"id": "<passage id, like C1>", "stance": "supports" | "contradicts" | "unrelated"}]}. One entry per passage given.',
+    rules: ['Judge only from the passage text shown, never from what you remember of the paper.', 'Use "unrelated" when the passage does not bear on the claim or when you are not sure.'],
+    language,
+  });
+}
+
+export const evidencePrompt = (claim: string, passages: ReadonlyArray<{ id: string; meta: string; snippet: string }>): string =>
+  `<<<DATA claim\n${strip(claim)}\nDATA>>>\n${passages.map((c) => `<<<DATA passage ${c.id}\n${strip(c.meta)}\npassage: ${strip(c.snippet)}\nDATA>>>`).join('\n')}\nClassify every passage against the claim.`;

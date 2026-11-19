@@ -6,7 +6,7 @@ import { aiSends, isToolPurpose, monthOf } from '../../ai/usage.js';
 import type { MainServices } from '../../ipc/handlers/services.js';
 import { costDecision } from '../ai/batch.js';
 import { ctxOf } from './index.js';
-import { CITE_OUT_TOKENS, CITE_VERSION, citePrompt, citeSchema, citeSystem, linkMarkers, REPORT_CONTEXT_CHARS, REPORT_OUT_TOKENS, REPORT_VERSION, reportPrompt, reportSchema, reportSystem } from './prompt.js';
+import { CITE_OUT_TOKENS, CITE_VERSION, citePrompt, citeSchema, citeSystem, EVIDENCE_OUT_TOKENS, evidencePrompt, evidenceSchema, evidenceSystem, linkMarkers, REPORT_CONTEXT_CHARS, REPORT_OUT_TOKENS, REPORT_VERSION, reportPrompt, reportSchema, reportSystem } from './prompt.js';
 import { listClaims, readConsent, readOutline } from './store.js';
 
 /**
@@ -229,6 +229,47 @@ export async function citeRun(s: MainServices, req: { projectId: string; text: s
     return [{ docId: c.docId, title: c.rec.title ?? '', authors: c.rec.authors.slice(0, 3), year: c.rec.year ?? null, reason: clip(oneLine(r.reason), 300), page: c.snippet ? c.page : null, key: keyOf(c.rec) }];
   });
   return { items: items.slice(0, 3) };
+}
+
+/* ------------------------------------------------------------ evidence ------------------------------------------------------------ */
+
+/** The passages (not the documents outside the enabled folders, which have no snippet) a claim can be checked against: page and text are both needed. */
+async function passagesFor(s: MainServices, ctx: AiCtx, projectId: string, claimId: string): Promise<{ claim: string; passages: Cand[] }> {
+  const { dataDir } = await ctxOf(s, projectId);
+  const claim = (await listClaims(dataDir, projectId)).find((c) => c.id === claimId);
+  if (!claim) throw new AppError('NOT_FOUND', 'Unknown claim');
+  const passages = (await candidates(s, ctx, projectId, claim.text)).filter((c) => c.page !== null && c.snippet !== '').map((c, i) => ({ ...c, id: `C${i + 1}` }));
+  return { claim: claim.text, passages };
+}
+
+export async function evidencePreview(s: MainServices, req: { projectId: string; claimId: string; model?: string | undefined }) {
+  const ctx = await loadCtx(s);
+  const model = modelOf(ctx, req.model);
+  const { claim, passages } = await passagesFor(s, ctx, req.projectId, req.claimId);
+  const text = passages.length ? evidencePrompt(claim, passages) : '';
+  const k = await costs(ctx, model, text.length + evidenceSystem(ctx.cfg.language).length, EVIDENCE_OUT_TOKENS);
+  return { text, candidates: passages.length, ...k };
+}
+
+/** Never writes a claim: the dialog adds the evidence the user accepts (`project:addEvidence`). */
+export async function evidenceRun(s: MainServices, req: { projectId: string; claimId: string; model?: string | undefined; confirmed: boolean }) {
+  const ctx = await loadCtx(s);
+  const model = modelOf(ctx, req.model);
+  if (!req.confirmed) throw new AppError('CONFLICT', 'The send needs the confirmation of the user', { reason: 'needs-confirmation' });
+  const { claim, passages } = await passagesFor(s, ctx, req.projectId, req.claimId);
+  if (passages.length === 0) return { items: [] };
+  const system = evidenceSystem(ctx.cfg.language);
+  const prompt = evidencePrompt(claim, passages);
+  const k = await costs(ctx, model, system.length + prompt.length, EVIDENCE_OUT_TOKENS);
+  const raw = await send(s, ctx, { purpose: 'project-evidence', model, system, prompt, schema: evidenceSchema, docIds: passages.map((c) => c.docId) }, k, req.confirmed);
+  const seen = new Set<string>();
+  const items = raw.verdicts.flatMap((v) => {
+    const c = passages.find((x) => x.id === v.id);
+    if (!c || c.page === null || v.stance === 'unrelated' || seen.has(c.id)) return [];
+    seen.add(c.id);
+    return [{ docId: c.docId, title: c.rec.title ?? '', page: c.page, stance: v.stance, excerpt: clip(c.snippet, 600) }];
+  });
+  return { items };
 }
 
 export { CITE_VERSION };

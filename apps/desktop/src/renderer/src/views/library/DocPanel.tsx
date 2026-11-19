@@ -19,6 +19,7 @@ import { rl } from '../../lib/rl';
 import { splitLines } from '../../lib/validate';
 import { useDecide, type ReviewField } from '../review/useDecide';
 import { Lazy, lazyView } from '../../components/Lazy';
+import { groupsItem } from './selection/actions/groups';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { NotesSection } from './docpanel/NotesSection';
@@ -34,6 +35,7 @@ import './library.css';
 const CitationsPanel = lazyView(() => import('./docpanel/CitationsSection').then((m) => ({ default: m.CitationsSection })), ['citations']);
 const SimilarPanel = lazyView(() => import('../network/SimilarPanel').then((m) => ({ default: m.SimilarPanel })), ['network']);
 const DocResources = lazyView(() => import('../resources/DocResources'), ['resources']);
+const GroupsDialog = lazyView(() => import('../groups/GroupsDialog').then((m) => ({ default: m.GroupsDialog })), ['groups']);
 const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);
 
 const STUDY: StudyState[] = ['to-read', 'reading', 'read'];
@@ -343,6 +345,7 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
   const venueListId = useId();
   const { openReader } = useReader();
   const [jobOpen, setJobOpen] = useState(false);
+  const [groupsOpen, setGroupsOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreAnchor = useRef<HTMLSpanElement>(null);
@@ -413,7 +416,11 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
     },
     {
       id: 'ai',
-      items: [doc.missing ? { id: 'propose', label: t('doc.propose'), icon: <IconClaude size={16} />, disabled: true, disabledReason: why, onSelect: () => setJobOpen(true) } : { id: 'propose', label: t('doc.propose'), icon: <IconClaude size={16} />, onSelect: () => setJobOpen(true) }],
+      items: [
+        doc.missing ? { id: 'propose', label: t('doc.propose'), icon: <IconClaude size={16} />, disabled: true, disabledReason: why, onSelect: () => setJobOpen(true) } : { id: 'propose', label: t('doc.propose'), icon: <IconClaude size={16} />, onSelect: () => setJobOpen(true) },
+        // The research group of this paper (§17.4.19): the overview of the authors, institutions and co-authors, from the data on this machine.
+        { ...groupsItem(t, [docId], () => setGroupsOpen(true)), id: 'groups', testId: 'doc-groups', icon: <IconClaude size={16} /> },
+      ],
     },
   ];
   const ai = doc.ai;
@@ -617,6 +624,11 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
         />
       </CardSection>
 
+      {groupsOpen && (
+        <Lazy>
+          <GroupsDialog docIds={[docId]} onClose={() => setGroupsOpen(false)} />
+        </Lazy>
+      )}
       {jobOpen && (
         <Lazy>
           <JobDialog docIds={[docId]} onClose={() => setJobOpen(false)} />

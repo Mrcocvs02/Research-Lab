@@ -6,8 +6,8 @@
       "en"
     ],
     "initialJsKB": 396,
-    "totalJsKB": 2170,
-    "totalKB": 2310,
+    "totalJsKB": 2190,
+    "totalKB": 2330,
     "readerResourcesKB": 2760,
     "chunkCapsKB": {
       "NoteRich": 16,
@@ -19,7 +19,8 @@
       "UseAsEvidence": 16,
       "CompareView": 16,
       "GroupsDialog": 16,
-      "CitationsSection": 16
+      "CitationsSection": 16,
+      "EvidenceDialog": 16
     }
   },
   "main": {

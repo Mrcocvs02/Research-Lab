@@ -99,3 +99,6 @@ export function noteParagraphs(notes: string): NoteParagraph[] {
 
 /** What goes on the clipboard for "Copia la chiave": LaTeX or Pandoc. */
 export const citeSnippet = (key: string, style: 'latex' | 'pandoc'): string => (style === 'latex' ? `\\cite{${key}}` : `[@${key}]`);
+
+/** The base name of an exported report: `report-<date>` (the date is already `AAAA-MM-GG`; anything else is dropped). */
+export const reportFileName = (date: string): string => `report-${/^\d{4}-\d{2}-\d{2}$/.test(date) ? date : 'draft'}`;

@@ -142,6 +142,7 @@ test('Map in blocks: group by, blocks, no label collisions, legend outside the c
 
     // 7. Neighbourhood: a double click on a paper of the Map opens it, centred on that paper.
     await window.getByTestId('net-tab-map').click();
+    await expect.poll(async () => inView(await probe(window)).length, { timeout: 15_000 }).toBeGreaterThanOrEqual(3);
     p = await probe(window);
     const third = inView(p)[2] ?? inView(p)[0]!;
     pt = await at(third.id);

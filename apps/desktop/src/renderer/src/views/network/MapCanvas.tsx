@@ -9,7 +9,7 @@ import type { BridgePath } from './BridgePath';
 import { bridgeGeo, bridgeView, drawBridge } from './bridgeLayer';
 import { DocCard, HoverCard, useRestingHover } from './HoverCard';
 import { coreRadius } from './hulls';
-import { areaSummary, shareIn, type AreaDef } from './areaColors';
+import { areaSummary, shareIn, withUserTints, type AreaDef } from './areaColors';
 import { pickLabels, placeTopicLabels, shortLabel, type LabelCandidate, type TopicLabelItem } from './labelsLod';
 import { firstNode, mapAction, nearestInDirection } from './mapKeyboard';
 import { clusterText, nodeRadius, paintPoints, pointsInView, stepPoint, type PointPaint, type PreparedMap } from './mapModel';
@@ -67,6 +67,8 @@ interface Props {
   onBridge?(a: string, b: string): void;
   /** "Find links" of the card's menu (section 18.2). */
   onFindLinks?(docId: string): void;
+  /** "Export" of the card of a topic label (macro-area colours, section 18.3.6). */
+  onTopicExport?(id: string, text: string): void;
   /** Pill, legend: drawn over the canvas (never beside or above it). */
   overlay?: ReactNode;
 }
@@ -106,7 +108,7 @@ function Announce({ docId, topic }: { docId: string; topic: string }) {
  * to the nearest point that way, `]` and `[` walk through the points in view, Enter selects, Shift+Enter reads, `L` opens Explore.
  * React renders only when the hovered or focused point changes, never per frame; nothing runs at rest.
  */
-export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, aiBadge, label, fitKey, handle, tints, areas = null, allow, minimap, bridge = null, onBridge, onFindLinks, overlay }: Props) {
+export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, aiBadge, label, fitKey, handle, tints, areas = null, allow, minimap, bridge = null, onBridge, onFindLinks, onTopicExport, overlay }: Props) {
   const { t } = useTranslation();
   const [hover, setHover, holdHover] = useRestingHover<{ idx: number; x: number; y: number }>(150, 250);
   const [menuFor, setMenuFor] = useState<number | null>(null);
@@ -114,6 +116,10 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
   const secondRef = useRef<number | null>(null);
   secondRef.current = second;
   const moreBtn = useRef<HTMLButtonElement>(null);
+  /** The card of a topic label that was clicked (with colours by macro-area the legend has no topic rows): name and a menu. */
+  const [labelCard, setLabelCard] = useState<{ s: number; x: number; y: number } | null>(null);
+  const [labelMenu, setLabelMenu] = useState(false);
+  const labelBtn = useRef<HTMLButtonElement>(null);
   /** Where the labels of the topics were drawn last (they can be dragged), and the drag in progress. */
   const labelBoxes = useRef<Array<{ s: number; x: number; y: number; w: number }>>([]);
   const drag = useRef<{ kind: 'label'; s: number; wx: number; wy: number } | { kind: 'point'; i: number } | null>(null);
@@ -154,7 +160,8 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
     if (!a) return null;
     const c = paintRef.current;
     if (c && c.map === map && c.areas === a && c.dark === th.dark) return c.paint;
-    const paint = paintPoints(map, a.slots, th.areas);
+    const u = withUserTints(a.defs, a.slots, th.areas, th.bg);
+    const paint = paintPoints(map, u.slots, u.tokens);
     paintRef.current = { map, areas: a, dark: th.dark, paint };
     return paint;
   };
@@ -494,7 +501,11 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
       view.requestDraw();
     },
     onClick(idx) {
-      if (idx !== null && idx <= -2) return;
+      if (idx !== null && idx <= -2) {
+        if (areas && onTopicExport) setLabelCard({ s: -2 - idx, x: lastPointer.current.x, y: lastPointer.current.y });
+        return;
+      }
+      setLabelCard(null);
       const s2 = secondRef.current;
       if (s2 !== null) {
         setSecond(null);
@@ -874,6 +885,32 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
         }}
         groups={[{ id: 'doc', items: [{ id: 'bridge', testId: 'map-card-bridge', label: t('network.bridge.find'), onSelect: () => menuFor !== null && startBridge(menuFor) }, ...(onFindLinks ? [{ id: 'links', testId: 'map-card-links', label: t('network.edge.findLinks'), onSelect: () => menuFor !== null && onFindLinks(map.ids[menuFor]!) }] : [])] }]}
       />
+      {labelCard && (() => {
+        const c = map.levels[level]?.[labelCard.s];
+        if (!c || !onTopicExport) return null;
+        const txt = clusterText(c).text || c.id;
+        return (
+          <>
+            <HoverCard x={labelCard.x} y={labelCard.y} width={view.size.current.w} height={view.size.current.h} testId="map-label-card" live={{ label: t('network.card.topicActions'), onEnter: () => undefined, onLeave: () => undefined }}>
+              <strong className="hc-title">{safeText(txt)}</strong>
+              <span className="hc-line hint">{map.levels[level]![labelCard.s]!.size}</span>
+              <button ref={labelBtn} type="button" className="icon-button hc-more" aria-haspopup="menu" aria-label={t('network.more')} title={t('network.more')} onClick={() => setLabelMenu(true)} data-testid="map-label-more">
+                <span aria-hidden="true">⋯</span>
+              </button>
+            </HoverCard>
+            <Menu
+              anchor={labelBtn}
+              open={labelMenu}
+              label={t('network.card.topicActions')}
+              onClose={() => setLabelMenu(false)}
+              groups={[{ id: 'topic', items: [
+                { id: 'open', testId: 'map-label-open', label: t('network.card.openTopic'), onSelect: () => (openTopic(labelCard.s), setLabelCard(null)) },
+                { id: 'export', testId: 'cluster-export', label: t('secondBrain.clusterButton'), onSelect: () => (onTopicExport(c.id, txt), setLabelCard(null)) },
+              ] }]}
+            />
+          </>
+        );
+      })()}
       {second !== null && <BridgePick docId={map.ids[second]!} onCancel={() => setSecond(null)} />}
       {overlay}
       {minimap && map.n >= 30 && <MiniMap bounds={map.bounds} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={`${level}:${map.n}:${tints.tint.join(',')}:${areas ? 'a' : 't'}`} />}

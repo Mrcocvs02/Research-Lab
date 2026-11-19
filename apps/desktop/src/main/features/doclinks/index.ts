@@ -75,7 +75,32 @@ function mapThreshold(lm: LoadedModel | null): number {
   return normalThreshold(scores);
 }
 
-export async function findLinks(s: MainServices, req: { sourceId: string; targets: Targets; strictness: Strictness }) {
+/** The searches running, by the token the dialog gave them: how far each is, and the way to stop it. */
+const runs = new Map<string, { done: number; total: number; controller: AbortController }>();
+type Track = { done: number; total: number; controller: AbortController };
+
+export const linkProgress = (token: string): { done: number; total: number } => ({ done: runs.get(token)?.done ?? 0, total: runs.get(token)?.total ?? 0 });
+
+export function cancelLinks(token: string): { cancelled: boolean } {
+  const r = runs.get(token);
+  r?.controller.abort();
+  return { cancelled: r !== undefined };
+}
+
+export async function findLinks(s: MainServices, req: { sourceId: string; targets: Targets; strictness: Strictness; token?: string | undefined }) {
+  const track: Track = { done: 0, total: 0, controller: new AbortController() };
+  if (req.token) runs.set(req.token, track);
+  try {
+    return await search(s, req, track);
+  } finally {
+    if (req.token && runs.get(req.token) === track) runs.delete(req.token);
+  }
+}
+
+async function search(s: MainServices, req: { sourceId: string; targets: Targets; strictness: Strictness }, track: Track) {
+  const stop = (): void => {
+    if (track.controller.signal.aborted) throw new AppError('CANCELLED', 'The search was cancelled');
+  };
   const rt = await s.runtime.require();
   const view = await loadView(rt);
   const src = view.byId.get(req.sourceId);
@@ -92,7 +117,10 @@ export async function findLinks(s: MainServices, req: { sourceId: string; target
     else if (dismissed.has(k)) dismissedN++;
     else targets.push(r);
   }
+  track.total = targets.length;
+  stop();
   const lm = await loadModel(s, rt);
+  stop();
   const inModel = lm?.index.has(src.id) === true;
   if (!inModel && targets.length + 1 > NO_MODEL_MAX) throw new AppError('INVALID_REQUEST', 'The graph is needed to search so many documents', { reason: 'needs-graph', limit: NO_MODEL_MAX });
 
@@ -117,6 +145,7 @@ export async function findLinks(s: MainServices, req: { sourceId: string; target
     recs.forEach((r, i) => vecs.set(r.id, a.vectors[i] as SparseVec));
   }
 
+  stop();
   // Citations: keys and direct links, and how many documents share each key.
   const refs = new Map<string, Set<string>>();
   const cites = new Map<string, Set<string>>();
@@ -140,6 +169,7 @@ export async function findLinks(s: MainServices, req: { sourceId: string; target
     citedBy.set(id, matched(f.citedBy));
   }
 
+  stop();
   const roots = new Set((view.tax?.nodes ?? []).filter((n) => n.parents.length === 0).map((n) => n.id));
   const total = Math.max(1, view.records.length);
   const skipTag = (t: string) => roots.has(t) || view.tagCount(t) / total > ROOT_SHARE;
@@ -158,7 +188,17 @@ export async function findLinks(s: MainServices, req: { sourceId: string; target
 
   const threshold = thresholdFor(mapThreshold(lm), req.strictness);
   const sf = feat(src);
-  const scored: Array<{ rec: DocumentRecord; sc: Scored }> = targets.map((r) => ({ rec: r, sc: scorePair(sf, feat(r), ctx) }));
+  const scored: Array<{ rec: DocumentRecord; sc: Scored }> = [];
+  for (const r of targets) {
+    scored.push({ rec: r, sc: scorePair(sf, feat(r), ctx) });
+    track.done = scored.length;
+    // Now and then the loop lets the progress request and a cancel through.
+    if (scored.length % 200 === 0) {
+      await new Promise((resolve) => setImmediate(resolve));
+      stop();
+    }
+  }
+  stop();
   scored.sort((x, y) => y.sc.score - x.sc.score || (x.rec.id < y.rec.id ? -1 : 1));
   const good = scored.filter((x) => passes(x.sc, threshold)).slice(0, MAX_ADDED);
   const chosen = new Set(good.map((x) => x.rec.id));

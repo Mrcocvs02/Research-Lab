@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, RequestOf } from '@rl/core';
 import { Button } from '../../components/Button';
@@ -42,6 +42,9 @@ export function LinkFinderDialog({ docIds, onClose, onShowMap }: { docIds: strin
   const [value, setValue] = useState('');
   const [strictness, setStrictness] = useState<Strictness>('normal');
   const [busy, setBusy] = useState(false);
+  /** The running search: its token (for `progress` and `cancel`) and how far it is. */
+  const token = useRef('');
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [needsGraph, setNeedsGraph] = useState<number | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -73,17 +76,26 @@ export function LinkFinderDialog({ docIds, onClose, onShowMap }: { docIds: strin
     setBusy(true);
     setError(null);
     setNeedsGraph(null);
+    setProgress(null);
+    const mine = crypto.randomUUID();
+    token.current = mine;
+    const poll = setInterval(() => void rl.invoke('doclinks:progress', { token: mine }).then((p) => token.current === mine && setProgress(p), () => undefined), 300);
     try {
-      const r = await rl.invoke('doclinks:find', { sourceId: source, targets, strictness });
+      const r = await rl.invoke('doclinks:find', { sourceId: source, targets, strictness, token: mine });
       setResult({ threshold: r.threshold, scanned: r.scanned, added: r.added as FoundLink[], below: r.below as FoundLink[], skipped: r.skipped });
     } catch (e) {
       const err = RlError.from(e);
-      if (err.details?.['reason'] === 'needs-graph') setNeedsGraph(Number(err.details['limit']) || 500);
+      if (err.code === 'CANCELLED') setResult(null);
+      else if (err.details?.['reason'] === 'needs-graph') setNeedsGraph(Number(err.details['limit']) || 500);
       else setError(e);
     } finally {
+      clearInterval(poll);
+      token.current = '';
+      setProgress(null);
       setBusy(false);
     }
   };
+  const cancel = () => void rl.invoke('doclinks:cancel', { token: token.current }).catch(() => undefined);
   const remove = async (item: FoundLink) => {
     if (!item.id) return;
     try {
@@ -222,6 +234,17 @@ export function LinkFinderDialog({ docIds, onClose, onShowMap }: { docIds: strin
           <Button variant="primary" onClick={() => void run()} busy={busy} disabled={reason !== ''} disabledReason={reason} data-testid="lf-run">
             {busy ? t('links.running') : t('links.run')}
           </Button>
+          {busy && (
+            <>
+              {progress !== null && progress.total > 0 && (
+                <progress className="lf-progress" value={progress.done} max={progress.total} aria-label={t('links.progress', { done: progress.done, total: progress.total })} data-testid="lf-progress" />
+              )}
+              {progress !== null && progress.total > 0 && <span className="hint">{t('links.progress', { done: progress.done, total: progress.total })}</span>}
+              <Button onClick={cancel} data-testid="lf-cancel">
+                {t('links.cancel')}
+              </Button>
+            </>
+          )}
         </div>
         {needsGraph !== null && (
           <p className="hint" data-testid="lf-needs-graph">

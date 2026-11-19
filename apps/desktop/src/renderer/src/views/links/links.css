@@ -9,3 +9,5 @@
 .lf-foot__bridge { margin-left: auto; }
 .lf-row .icon-button { grid-row: 1; grid-column: 3; }
 .lf-row .lf-row__weight { grid-column: 2; }
+.lf-run { display: flex; gap: 8px; align-items: center; }
+.lf-progress { width: 160px; max-width: 40vw; }

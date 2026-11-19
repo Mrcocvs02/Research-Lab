@@ -79,7 +79,7 @@ async function computeNetwork(s: MainServices, req: Req): Promise<EntityNetwork>
   const labels = lm && req.mode === 'topic' ? await readLabels(s, rt, modelId(lm.model)) : {};
   const labelSig = Object.entries(labels).reduce((n, [id, l]) => n + id.length + l.text.length, 0);
   const state = `${view.key}|${lm ? lm.key : '-'}|${aliasKey}|${labelSig}|${(cfg?.excludedFolders ?? []).join('\u0001')}`;
-  const cacheKey = JSON.stringify([req.mode, req.level ?? 0, req.scope ?? null, req.years ?? null, req.minDocs, req.minWeight, req.limit]);
+  const cacheKey = JSON.stringify([req.mode, req.level ?? 0, req.scope ?? null, req.years ?? null, req.minDocs, req.minWeight, req.limit, req.focus ?? null]);
   let cache = caches.get(rt);
   if (!cache) caches.set(rt, (cache = new Map()));
   // Project membership is not part of the library state: a network scoped to a project is always computed.

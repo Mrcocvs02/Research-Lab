@@ -190,7 +190,9 @@
     },
     "card": {
       "topic": "Topic: {{topic}}",
-      "actions": "Document actions"
+      "actions": "Document actions",
+      "topicActions": "Topic actions",
+      "openTopic": "Open the topic"
     },
     "minimap": "Show the minimap",
     "minimapLabel": "Minimap: drag the rectangle to move the view",
@@ -310,6 +312,8 @@
       "sizeBy_equal": "All the same",
       "sharedThemes": "Show shared themes",
       "cutHint": "beyond the limit",
+      "nbhd": "Neighbourhood of {{name}}",
+      "nbhdBack": "Back to the whole network",
       "cutShown": "Shown without its links: it is beyond the {{limit}} nodes the network can carry.",
       "lowered": "Also showing {{kind}} with 1 document."
     },

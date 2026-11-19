@@ -15,6 +15,13 @@ describe('computeAreas (§18.3.4)', () => {
     expect(m.docs.get('e')!.az).toBe(33);
   });
 
+  it('carries the colour the user gave to an area node, when it is a valid #rrggbb', () => {
+    const t = [{ ...n('phys'), color: '#aa3300' }, { ...n('cs'), color: 'red' }, n('optics', ['phys']), n('ml', ['cs'])];
+    const m = computeAreas(t, [d('a', ['optics', 1]), d('b', ['ml', 1])]);
+    expect(m.areas.find((a) => a.id === 'phys')!.color).toBe('#aa3300');
+    expect(m.areas.find((a) => a.id === 'cs')!.color).toBeUndefined();
+  });
+
   it('splits the weight between areas and keeps the top three summing to 100', () => {
     const t = [n('r1'), n('r2'), n('r3'), n('r4'), n('x1', ['r1']), n('x2', ['r2']), n('x3', ['r3']), n('x4', ['r4'])];
     const m = computeAreas(t, [d('a', ['x1', 1], ['x2', 0.5], ['x3', 0.25], ['x4', 0.1]), d('b', ['x1', 1]), d('c', ['x2', 1]), d('e', ['x3', 1]), d('f', ['x4', 1])]);

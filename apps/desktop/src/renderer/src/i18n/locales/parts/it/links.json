@@ -15,6 +15,8 @@
     "wide": "Ampia",
     "thresholdHint": "{{value}} · il peso tipico degli archi della Mappa",
     "run": "Trova collegamenti",
+    "progress": "{{done}} su {{total}}",
+    "cancel": "Annulla",
     "running": "Ricerca in corso…",
     "noTargets": "Scegli dove cercare",
     "noSource": "Scegli un documento di partenza",

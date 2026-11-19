@@ -293,6 +293,28 @@ class TaxonomyBuilder {
   }
 
   /**
+   * Resolves names that no node has exactly to the tags of the vocabulary with the sure rules (D-497): the name is registered as
+   * a name of that tag and, when it is a new spelling, becomes one of its aliases. Run before `addNode` for the names to come.
+   */
+  async prepareNear(names: readonly string[]): Promise<void> {
+    const todo = [...new Set(names.map(clean).filter((n) => n && this.nodeIndex.resolve(n) === undefined))];
+    if (todo.length === 0) return;
+    // Loaded on demand: the detector code stays out of the chunk that holds this importer.
+    const { resolveIncomingLabels } = await import('./organize/tag-resolve.js');
+    const r = resolveIncomingLabels(todo, this.nodes);
+    for (const { id, alias } of r.aliasAdds) {
+      const at = this.nodes.findIndex((n) => n.id === id);
+      const cur = this.nodes[at];
+      if (!cur || cur.aliases.length >= 500 || alias.length > 200) continue;
+      const next = { ...cur, aliases: [...cur.aliases, alias] };
+      this.nodes[at] = next;
+      const made = this.created.nodes.findIndex((n) => n.id === id);
+      if (made >= 0) this.created.nodes[made] = next;
+    }
+    for (const [label, id] of Object.entries(r.matched)) this.nodeIndex.add(label, id);
+  }
+
+  /**
    * Adds a node unless one with the same (normalised) name, alias or original import name exists; returns the id
    * either way. Two different names that share a slug ("C++", "C#") stay two nodes with distinct ids.
    */
@@ -555,6 +577,7 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
           warn(`Tag "${name}" implies unknown tags: ${unresolved.join(', ')}`);
         }
       }
+      await tb.prepareNear(Object.keys(legacyTax.extra ?? {}));
       for (const [name, e] of Object.entries(legacyTax.extra ?? {})) {
         const same = tb.nodeIndex.resolve(name);
         if (same !== undefined) {
@@ -615,6 +638,21 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
       const refreshNodeMap = () => {
         nodeById.clear();
         for (const n of tb.nodes) nodeById.set(n.id, n);
+      };
+
+      // Names the records use that no node has exactly: resolved once to the vocabulary (D-497) instead of an exact match only.
+      await tb.prepareNear(
+        records.flatMap(({ rec }) => {
+          const t = rec.tags ?? {};
+          const xt = Array.isArray((rec as Json)['xt']) ? ((rec as Json)['xt'] as unknown[]) : [];
+          return [...(t.macro ?? []), ...(t.micro ?? []), ...(t.extra ?? []), ...xt].filter((x): x is string => typeof x === 'string');
+        }),
+      );
+
+      const tagOriginOf = (ids: readonly string[]): Record<string, 'import'> | undefined => {
+        const out: Record<string, 'import'> = {};
+        for (const t of ids.slice(0, L.tags)) if (nodeById.get(t)?.origin === 'import') out[t] = 'import';
+        return Object.keys(out).length > 0 ? out : undefined;
       };
 
       const resolveTags = (names: readonly string[], kind: 'macro' | 'micro' | 'extra' | 'manual'): string[] => {
@@ -743,6 +781,8 @@ export function createLegacyImporterImpl(options: LegacyImporterOptions = {}): L
               checkedAt: pubChecked,
             }),
             tags: tagIds.slice(0, L.tags),
+            // Provenance (D-494): tags of nodes the import created are `import`; the others were already in the vocabulary.
+            ...(tagOriginOf(tagIds) ? { tagOrigin: tagOriginOf(tagIds) } : {}),
             ai: compact({
               summary: summary ? legacyAi(summary.slice(0, L.aiText), nowIso) : undefined,
               keywords: keywords.length ? legacyAi(keywords, nowIso) : undefined,

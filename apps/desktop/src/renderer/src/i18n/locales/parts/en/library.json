@@ -67,6 +67,8 @@
     "selSideBySide": "Read side by side",
     "selSideReason": "Select 2 documents",
     "selLinks": "Find links…",
-    "docLinksFind": "Find links…"
+    "docLinksFind": "Find links…",
+    "moreKeywords": "+{{count}} keywords",
+    "hideKeywords": "Hide keywords"
   }
 }

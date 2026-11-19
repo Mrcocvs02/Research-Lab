@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { labelResolver } from './vocab.js';
 import { estimateCostFromModels, activeTagNodes, cleanSuggestion, folderOf, aiVisible, suggestPrompt, suggestSchema, suggestSystem, taxonomyBlock, type SuggestClean, type SuggestField, type SuggestRaw } from '@rl/ai';
 import { AI_LIMITS, AppError, type AiTagScore, type AiJobStatus, type AiMeta, type DocumentId, type DocumentRecord, type ReasoningLevel, type ReviewStatus, type TokenUsage } from '@rl/core';
 import type { z } from 'zod';
@@ -416,7 +417,7 @@ async function suggestOne(a: OneArgs): Promise<void> {
   if (j.controller.signal.aborted) throw new AppError('CANCELLED', 'Cancelled');
   const active = await s.runtime.require().catch(() => null);
   if (!active || active.libraryId !== j.libraryId) throw new AppError('CANCELLED', 'The library changed');
-  const clean = cleanSuggestion(result.value as SuggestRaw, fields, tax);
+  const clean = cleanSuggestion(result.value as SuggestRaw, fields, tax, fields.includes('tags') ? { resolveLabels: await labelResolver(tax) } : {});
   await writeProposals(s, rt, rec.id, clean, { ...result.meta, source: 'job:suggest' }, a.deviceId);
   j.status.done++;
   emit(j, false);

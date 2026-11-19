@@ -73,3 +73,17 @@ export function canCreateTag(model: TaxonomyModel, text: string): boolean {
   const trimmed = text.trim();
   return trimmed.length > 0 && trimmed.length <= 200 && exactNode(model, trimmed) === null;
 }
+
+/** Spelling-insensitive key of a name: no case, accents, spaces or punctuation, and no plural "s" (the sure variants of D-497, kept light for the renderer). */
+const formOf = (s: string): string => fold(s).replace(/[^\p{L}\p{N}]+/gu, '').replace(/(?<=\p{L}{3})s$/u, '');
+
+/** A live tag that the typed text is only a variant of (spelling, case, plural): shown before creating a new tag, "Similar to ... Use it". */
+export function similarTag(model: TaxonomyModel, text: string): { id: string; label: string } | null {
+  const key = formOf(text);
+  if (key.length < 3) return null;
+  for (const n of model.nodes) {
+    if (n.status === 'deprecated' || n.id.startsWith('grp:') || n.family !== undefined) continue;
+    if ([n.label, ...n.aliases].some((a) => formOf(a) === key)) return { id: n.id, label: n.label };
+  }
+  return null;
+}

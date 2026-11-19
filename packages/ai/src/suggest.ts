@@ -20,19 +20,117 @@ export const SUGGEST_LIMITS = {
   nodes: 1500,
 } as const;
 
+/** The part of a node the vocabulary rules need. */
+export interface VocabNode {
+  id: string;
+  parents: readonly string[];
+  status?: string | undefined;
+  family?: 'one' | 'many' | 'keywords' | undefined;
+}
+
+/**
+ * What the AI may tag with (D-493, §19.1.6): the values of the `'one'` and `'many'` families, never a family root, never the
+ * keywords family nor the loose tags ("Da sistemare": roots without a family). A library without any family yet (not
+ * migrated) keeps every node. Pure.
+ */
+export interface Vocabulary {
+  /** False when the taxonomy has no family at all: then every active node is allowed and no family rule applies. */
+  families: boolean;
+  /** Ids that may be proposed as tags. */
+  tags: Set<string>;
+  /** Ids that may be the parent of a new tag: the tags and the roots of the allowed families. */
+  parents: Set<string>;
+  /** Root (family) of a node, first parent each time. */
+  rootOf: Map<string, string>;
+  /** Roots of the `'one'` families. */
+  one: Set<string>;
+}
+
+export function vocabularyOf(nodes: readonly VocabNode[]): Vocabulary {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const rootOf = new Map<string, string>();
+  const root = (id: string): string => {
+    let cur = id;
+    for (let i = 0; i < 20; i++) {
+      const p = byId.get(cur)?.parents.find((x) => byId.has(x));
+      if (p === undefined || p === id) break;
+      cur = p;
+    }
+    return cur;
+  };
+  for (const n of nodes) rootOf.set(n.id, root(n.id));
+  const families = nodes.some((n) => n.family !== undefined);
+  const tags = new Set<string>();
+  const parents = new Set<string>();
+  const one = new Set<string>();
+  for (const n of nodes) {
+    if (n.status !== undefined && n.status !== 'active') continue;
+    if (n.family === 'one') one.add(n.id);
+    if (!families) {
+      tags.add(n.id);
+      parents.add(n.id);
+      continue;
+    }
+    const kind = byId.get(rootOf.get(n.id) as string)?.family;
+    if (kind !== 'one' && kind !== 'many') continue;
+    parents.add(n.id);
+    if (n.family === undefined) tags.add(n.id);
+  }
+  return { families, tags, parents, rootOf, one };
+}
+
+/** The level-1 value an id belongs to inside its family (the child of the root on its first-parent chain); the id itself for a root. */
+export function valueOf(nodes: readonly VocabNode[], id: string): string {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const chain = [id];
+  for (let i = 0; i < 20; i++) {
+    const p = byId.get(chain[chain.length - 1] as string)?.parents.find((x) => byId.has(x));
+    if (p === undefined || chain.includes(p)) break;
+    chain.push(p);
+  }
+  return chain.length >= 2 ? (chain[chain.length - 2] as string) : id;
+}
+
+/**
+ * Keeps, in each `'one'` family, only the branch of the best value: the order of `ids` is the preference (best first). Ids of other
+ * families are untouched. Pure.
+ */
+export function limitOneFamilies(ids: readonly string[], nodes: readonly VocabNode[], voc: Vocabulary): string[] {
+  if (voc.one.size === 0) return [...ids];
+  const kept = new Map<string, string>();
+  const out: string[] = [];
+  for (const id of ids) {
+    const root = voc.rootOf.get(id);
+    if (root === undefined || !voc.one.has(root)) {
+      out.push(id);
+      continue;
+    }
+    const v = valueOf(nodes, id);
+    const have = kept.get(root);
+    if (have === undefined) kept.set(root, v);
+    else if (have !== v) continue;
+    out.push(id);
+  }
+  return out;
+}
+
 /** A taxonomy node as the model sees it. */
 export interface TagNodeView {
   id: string;
   label: string;
-  /** Labels of the ancestors (first parent each time), root first, joined with " > "; '' for a root. */
+  /** Labels of the ancestors (first parent each time), root (the family) first, joined with " › "; '' for a root. */
   path: string;
   aliases: string[];
+  /** Label of the family and, for a family that takes one value, that kind (a rule line is printed once per family). */
+  family?: string;
+  one?: boolean;
 }
 
-/** The active nodes of a taxonomy, with their parent path and aliases. */
+/** The nodes the AI may tag with (the values of the `'one'`/`'many'` families), with their path from the family and aliases. */
 export function activeTagNodes(tax: TaxonomyFile | null): TagNodeView[] {
   if (!tax) return [];
   const byId = new Map(tax.nodes.map((n) => [n.id, n]));
+  const voc = vocabularyOf(tax.nodes);
   const pathOf = (id: string): string => {
     const labels: string[] = [];
     let cur = byId.get(id)?.parents[0];
@@ -42,12 +140,15 @@ export function activeTagNodes(tax: TaxonomyFile | null): TagNodeView[] {
       labels.unshift(n.label);
       cur = n.parents[0];
     }
-    return labels.join(' > ');
+    return labels.join(' › ');
   };
   return tax.nodes
-    .filter((n) => n.status === 'active')
+    .filter((n) => voc.tags.has(n.id))
     .slice(0, SUGGEST_LIMITS.nodes)
-    .map((n) => ({ id: n.id, label: n.label, path: pathOf(n.id), aliases: n.aliases.slice(0, 8) }));
+    .map((n) => {
+      const root = voc.families ? byId.get(voc.rootOf.get(n.id) as string) : undefined;
+      return { id: n.id, label: n.label, path: pathOf(n.id), aliases: n.aliases.slice(0, 8), ...(root ? { family: root.label, one: voc.one.has(root.id) } : {}) };
+    });
 }
 
 const oneLine = (t: string) => t.replace(/[\r\n|]+/g, ' ').replace(/<<<|>>>/g, ' ').trim();
@@ -55,7 +156,8 @@ const oneLine = (t: string) => t.replace(/[\r\n|]+/g, ' ').replace(/<<<|>>>/g, '
 /** The taxonomy as a delimited block: one node per line, `- id | label | parent path | aliases: a, b`. */
 export function taxonomyBlock(nodes: readonly TagNodeView[]): string {
   const lines = nodes.map((n) => `- ${n.id} | ${oneLine(n.label)} | ${oneLine(n.path)} | aliases: ${n.aliases.map(oneLine).join(', ')}`);
-  return `<<<TAXONOMY\n${lines.join('\n')}\nTAXONOMY>>>`;
+  const rules = [...new Set(nodes.filter((n) => n.one && n.family).map((n) => oneLine(n.family as string)))].map((f) => `# at most one value of family ${f}`);
+  return `<<<TAXONOMY\n${[...rules, ...lines].join('\n')}\nTAXONOMY>>>`;
 }
 
 const newTagSchema = z.object({
@@ -93,7 +195,7 @@ export function suggestSystem(fields: readonly SuggestField[], language: 'it' | 
   const rules: string[] = [];
   if (fields.includes('tags'))
     rules.push(
-      `tagIds: ids copied from the TAXONOMY block that describe the document (at most ${SUGGEST_LIMITS.list}, the most specific nodes that apply). Use only ids that appear in the block. newTags: at most ${SUGGEST_LIMITS.newTags} new nodes, ONLY when no node of the block fits; each with a label, parentId (an id of the block, or null), aliases (acronyms and synonyms) and a one-line reason. Otherwise newTags is an empty list.`,
+      `tagIds: ids copied from the TAXONOMY block that describe the document (at most ${SUGGEST_LIMITS.list}, the most specific nodes that apply). Use only ids that appear in the block; for a family marked "at most one value" give at most one value of it. Free keywords are never tags. newTags: at most ${SUGGEST_LIMITS.newTags} new nodes, ONLY when no node of the block fits (never a plural, spelling, acronym or extended form of a node already there); each with a label, parentId (an id of the block, never null), aliases (acronyms and synonyms) and a one-line reason. Otherwise newTags is an empty list.`,
     );
   if (fields.includes('description')) rules.push(`description: what the document is about, at most ${SUGGEST_LIMITS.description} characters, in ${lang}.`);
   if (fields.includes('summary')) rules.push(`summary: a short summary, at most ${SUGGEST_LIMITS.summary} characters, in ${lang}.`);
@@ -147,27 +249,53 @@ export interface SuggestClean {
   synonyms?: string[];
 }
 
+/** `resolveLabels`: label -> id of the existing tag it is a variant of (sure rules; `resolveIncomingLabels` of `@rl/data`, injected by the caller). */
+export interface CleanOptions {
+  resolveLabels?: (labels: readonly string[]) => Record<string, string>;
+}
+
 /** The model's answer made safe: only the requested fields, valid tag ids, capped texts and lists. */
-export function cleanSuggestion(raw: SuggestRaw, fields: readonly SuggestField[], tax: TaxonomyFile | null): SuggestClean {
+export function cleanSuggestion(raw: SuggestRaw, fields: readonly SuggestField[], tax: TaxonomyFile | null, opts: CleanOptions = {}): SuggestClean {
   const out: SuggestClean = {};
   if (fields.includes('tags')) {
     const resolve = tagResolver(tax);
-    const ids = new Set<string>();
-    for (const r of raw.tagIds ?? []) {
-      const id = resolve(r);
-      if (id) ids.add(id);
-    }
-    out.tags = [...ids].slice(0, SUGGEST_LIMITS.list);
-    const known = new Set((tax?.nodes ?? []).flatMap((n) => [n.label, ...n.aliases]).map((x) => x.trim().toLowerCase()));
-    const fresh: AiNewTag[] = [];
+    const nodes = tax?.nodes ?? [];
+    const voc = vocabularyOf(nodes);
+    const ids: string[] = [];
+    const add = (id: string | null) => {
+      if (id && voc.tags.has(id) && !ids.includes(id)) ids.push(id);
+    };
+    for (const r of raw.tagIds ?? []) add(resolve(r));
+    const known = new Map<string, string>();
+    for (const n of nodes) if (n.status !== 'deprecated') for (const x of [n.label, ...n.aliases]) if (!known.has(x.trim().toLowerCase())) known.set(x.trim().toLowerCase(), n.id);
+    const cands: AiNewTag[] = [];
     for (const t of raw.newTags ?? []) {
       const label = clip(t.label.replace(/\s+/g, ' ').trim(), SUGGEST_LIMITS.label);
-      if (!label || known.has(label.toLowerCase()) || fresh.some((f) => f.label.toLowerCase() === label.toLowerCase())) continue;
+      if (!label || cands.some((f) => f.label.toLowerCase() === label.toLowerCase())) continue;
+      const same = known.get(label.toLowerCase());
+      if (same !== undefined) {
+        add(same); // the label is an existing tag: that tag is the proposal, not a new one
+        continue;
+      }
       const parentId = t.parentId ? resolve(t.parentId) : null;
+      // With a vocabulary a new tag needs a parent inside an allowed family (never keywords, never the loose tags).
+      if (voc.families && (parentId === null || !voc.parents.has(parentId))) continue;
       const reason = clip(t.reason.trim(), SUGGEST_LIMITS.reason);
-      fresh.push({ label, parentId, aliases: cleanList(t.aliases, 8, SUGGEST_LIMITS.alias), ...(reason ? { reason } : {}) });
+      cands.push({ label, parentId, aliases: cleanList(t.aliases, 8, SUGGEST_LIMITS.alias), ...(reason ? { reason } : {}) });
+    }
+    // A near-new label (variant of an existing tag by the sure rules) becomes that tag, not a new one.
+    const near = cands.length > 0 && opts.resolveLabels ? opts.resolveLabels(cands.map((c) => c.label)) : {};
+    const fresh: AiNewTag[] = [];
+    for (const c of cands) {
+      const hit = near[c.label];
+      if (hit !== undefined) {
+        add(hit);
+        continue;
+      }
+      fresh.push(c);
       if (fresh.length >= SUGGEST_LIMITS.newTags) break;
     }
+    out.tags = limitOneFamilies(ids, nodes, voc).slice(0, SUGGEST_LIMITS.list);
     out.newTags = fresh;
   }
   if (fields.includes('description')) out.description = clip((raw.description ?? '').trim(), SUGGEST_LIMITS.description);

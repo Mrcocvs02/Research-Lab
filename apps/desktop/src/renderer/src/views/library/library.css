@@ -1241,3 +1241,27 @@ button.page-chip {
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
+
+/* Provenance mark after a tag name (D-494): small, muted; a click confirms the tag. */
+.tag-origin {
+  margin-inline-start: 4px;
+  font-size: 0.75em;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.tag-origin[role='button'] {
+  cursor: pointer;
+}
+.tag-similar {
+  margin: 4px 0 0;
+}
+.card-tags-family {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+}
+.card-tags-family__name {
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}

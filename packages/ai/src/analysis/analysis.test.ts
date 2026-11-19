@@ -70,8 +70,8 @@ describe('cleanAnalysis', () => {
       ['tags'],
       t,
     );
-    expect(c.tags).toEqual(['synthesis', 'circuits', 'quantum', 'physics']);
-    expect(c.scores!.find((s) => s.id === 'physics')!.origin).toBe('ancestor');
+    expect(c.tags).toEqual(['physics', 'synthesis', 'circuits', 'quantum']); // "Physics" as a new tag is the existing tag (D-496)
+    expect(c.scores!.find((s) => s.id === 'quantum')!.origin).toBe('ancestor');
     expect(c.newTags).toEqual([{ label: 'ZX calculus', parentId: 'circuits', aliases: ['ZX'], reason: 'r' }]);
   });
   it('has no count limit', () => {
@@ -170,3 +170,25 @@ describe('literature note', () => {
     expect(fit.trimEnd().endsWith('end')).toBe(true);
   });
 });
+
+describe('cleanAnalysis with families (D-496)', () => {
+  const fam = tax([
+    node('topic', 'Topic', [], { family: 'many' }),
+    node('robotics', 'Robotics', ['topic']),
+    node('method', 'Method', [], { family: 'one' }),
+    node('survey', 'Survey', ['method']),
+    node('experiment', 'Experiment', ['method']),
+    node('kw', 'Keywords', [], { family: 'keywords' }),
+    node('k1', 'Alpha', ['kw']),
+  ]);
+  it('keeps the highest-weight value of a one-value family, drops keywords and family roots', () => {
+    const c = cleanAnalysis({ tags: [{ id: 'survey', weight: 0.5, reason: '' }, { id: 'experiment', weight: 0.9, reason: '' }, { id: 'k1', weight: 0.9, reason: '' }, { id: 'robotics', weight: 0.8, reason: '' }] }, ['tags'], fam);
+    expect(c.tags).toEqual(['experiment', 'robotics']);
+  });
+  it('turns a near-new label into the existing tag', () => {
+    const c = cleanAnalysis({ tags: [], newTags: [{ label: 'Robotic', parentId: 'topic', aliases: [], reason: '', weight: 0.7 }] }, ['tags'], fam, { resolveLabels: () => ({ Robotic: 'robotics' }) });
+    expect(c.tags).toEqual(['robotics']);
+    expect(c.newTags).toEqual([]);
+  });
+});
+

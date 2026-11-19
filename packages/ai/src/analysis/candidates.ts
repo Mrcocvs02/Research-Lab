@@ -1,4 +1,5 @@
 import { ancestorsOf, type GraphNode } from './closure.js';
+import { vocabularyOf } from '../suggest.js';
 import { clip, norm, oneLine, tokenize } from './text.js';
 
 /** A taxonomy node as the candidate retrieval sees it. */
@@ -6,6 +7,14 @@ export interface CandidateNode extends GraphNode {
   label: string;
   aliases: readonly string[];
   definition?: string | undefined;
+  status?: string | undefined;
+  family?: 'one' | 'many' | 'keywords' | undefined;
+}
+
+/** The nodes the AI may tag with: the values of the one/many families (no family roots, keywords or loose tags), §19.1.6. */
+export function vocabularyNodes<N extends CandidateNode>(nodes: readonly N[]): N[] {
+  const voc = vocabularyOf(nodes);
+  return nodes.filter((n) => voc.tags.has(n.id));
 }
 
 export interface Candidate {
@@ -94,11 +103,13 @@ export function candidateBlock(cands: readonly Candidate[], nodes: readonly Cand
       labels.unshift(p.label);
       cur = p.parents[0];
     }
-    return labels.join(' > ');
+    return labels.join(' › ');
   };
   const lines = cands.flatMap((c) => {
     const n = byId.get(c.id);
     return n ? [`- ${n.id} | ${oneLine(n.label)} | ${oneLine(pathOf(n.id))} | ${clip(oneLine(n.definition ?? ''), 160)} | aliases: ${n.aliases.slice(0, 6).map(oneLine).join(', ')}`] : [];
   });
-  return `<<<TAXONOMY\n${lines.join('\n')}\nTAXONOMY>>>`;
+  const voc = vocabularyOf(nodes);
+  const rules = [...new Set(cands.flatMap((c) => (voc.families && voc.one.has(voc.rootOf.get(c.id) ?? '') ? [oneLine(byId.get(voc.rootOf.get(c.id) as string)?.label ?? '')] : [])))].map((f) => `# at most one value of family ${f}`);
+  return `<<<TAXONOMY\n${[...rules, ...lines].join('\n')}\nTAXONOMY>>>`;
 }

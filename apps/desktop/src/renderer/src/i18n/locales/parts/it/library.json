@@ -67,6 +67,8 @@
     "selSideBySide": "Leggi affiancati",
     "selSideReason": "Seleziona 2 documenti",
     "selLinks": "Trova collegamenti…",
-    "docLinksFind": "Trova collegamenti…"
+    "docLinksFind": "Trova collegamenti…",
+    "moreKeywords": "+{{count}} parole chiave",
+    "hideKeywords": "Nascondi le parole chiave"
   }
 }

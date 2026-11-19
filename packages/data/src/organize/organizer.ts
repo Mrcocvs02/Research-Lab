@@ -355,7 +355,9 @@ export class Organizer {
         const recs = await Promise.all(part.map((id) => store.documents.get(id)));
         part.forEach((id, k) => {
           const tags = recs[k]?.tags ?? [];
-          if (canonical(compute(tags)) !== canonical(tags)) todo.push(id);
+          // A tag the user adds again is "confirmed": its provenance mark goes away (D-494), so that counts as a change too.
+          const origin = recs[k]?.tagOrigin;
+          if (canonical(compute(tags)) !== canonical(tags) || (origin !== undefined && [...addSet, ...removeSet].some((t) => t in origin))) todo.push(id);
         });
       }
       if (todo.length === 0) return { changeId: null, changed: 0, unchanged: ids.length, reindex: [] };
@@ -370,9 +372,17 @@ export class Organizer {
         await cs.documents.update(id, (cur) => {
           if (!cur) throw new AppError('NOT_FOUND', 'Unknown document', { docId: id });
           const tags = compute(cur.tags);
-          if (canonical(tags) === canonical(cur.tags)) return cur;
+          // Provenance (D-494): a tag added or removed by the user no longer carries an `ai` / `import` mark.
+          let tagOrigin = cur.tagOrigin;
+          if (tagOrigin && [...addSet, ...removeSet].some((t) => t in tagOrigin!)) {
+            const left = { ...tagOrigin };
+            for (const t of [...addSet, ...removeSet]) delete left[t];
+            tagOrigin = Object.keys(left).length > 0 ? left : undefined;
+          }
+          if (canonical(tags) === canonical(cur.tags) && tagOrigin === cur.tagOrigin) return cur;
           changed++;
-          return { ...cur, tags, updatedAt: now };
+          const { tagOrigin: _old, ...rest } = cur;
+          return { ...rest, tags, ...(tagOrigin ? { tagOrigin } : {}), updatedAt: now };
         });
       });
       this.ctx.invalidate();

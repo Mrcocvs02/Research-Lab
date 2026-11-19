@@ -1687,3 +1687,637 @@ test('design audit wave 2 tour, English', async () => {
   test.setTimeout(30 * 60_000);
   await runW2('en');
 });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Final tour (audit round 6, task Y1): the whole app after every wave, on a synthetic corpus large enough for the Map
+// (authors, years, folders), with the mock AI provider, no network and a SIMULATED Claude Code (RL_E2E_CLAUDE_SIM: the
+// real program and account are never touched). Italian at 1280x800 light, then a matrix of key screens in dark and at
+// 1920x1080; English spot checks in a second test. Run on its own (heavy: one Playwright run at a time):
+//   RL_DESIGN_AUDIT=1 RL_DESIGN_AUDIT_OUT=run8-final npx playwright test -c e2e/playwright.config.ts design-audit -g "final"
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Items of the menus open now (for the 7-item cap of §17.3). */
+async function countMenu(a: Audit, key: string): Promise<void> {
+  a.facts[`menu-${key}`] = await a.page
+    .evaluate(() =>
+      [...document.querySelectorAll('[role=menu], [role=listbox], details[open]')]
+        .filter((m) => (m as HTMLElement).offsetParent !== null)
+        .map((m) =>
+          [...m.querySelectorAll('[role=menuitem], [role=menuitemcheckbox], [role=menuitemradio], [role=option], label')]
+            .filter((e) => (e as HTMLElement).offsetParent !== null)
+            .map((e) => (e.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 40)),
+        ),
+    )
+    .catch((e) => String(e));
+}
+
+async function finalWizard(a: Audit, lang: 'it' | 'en', name: string): Promise<void> {
+  const w = a.page;
+  await expect(w.getByTestId('wizard')).toBeVisible({ timeout: 30_000 });
+  for (let i = 0; i < 12; i++) {
+    const title = ((await w.getByTestId('wizard-step-title').textContent().catch(() => '')) ?? '').trim().slice(0, 24).replace(/[^\p{L}\p{N}]+/gu, '_');
+    if (await visibleNow(w.getByTestId('wizard-ui-language'))) await w.getByTestId('wizard-ui-language').selectOption(lang);
+    await w.waitForTimeout(300);
+    await a.shot(`wizard-${i + 1}-${title}`, i);
+    if ((await visibleNow(w.getByTestId('wizard-choose-folder'))) && !(await visibleNow(w.getByTestId('wizard-folder-chosen')))) {
+      await w.getByTestId('wizard-choose-folder').click();
+      await expect(w.getByTestId('wizard-folder-chosen')).toBeVisible();
+      await a.shot(`wizard-${i + 1}-folder-chosen`, i + 1);
+    }
+    if (await visibleNow(w.getByTestId('wizard-lib-name'))) await w.getByTestId('wizard-lib-name').fill(name);
+    if (await visibleNow(w.getByTestId('wizard-create'))) {
+      await w.getByTestId('wizard-create').click();
+      await w.waitForTimeout(2500);
+      await a.shot('wizard-scan', i + 1);
+      await w.locator('[data-testid="wizard-scan-background"], [data-testid="wizard-scan-open"]:enabled').first().click({ timeout: 120_000 });
+      break;
+    }
+    await w.getByTestId('wizard-next').click();
+  }
+  await expect(w.getByTestId('wizard')).toHaveCount(0, { timeout: 30_000 });
+}
+
+async function openMenu(a: Audit, testId: string, shot: string, clicks: number): Promise<void> {
+  await a.step(shot, async () => {
+    await a.page.getByTestId(testId).first().click();
+    await a.page.waitForTimeout(500);
+    await countMenu(a, shot);
+    await a.shot(shot, clicks);
+    await closeTransient(a);
+  });
+}
+
+async function findRow(a: Audit, title: string): Promise<Locator> {
+  const w = a.page;
+  await nav(a, 'library');
+  const input = w.getByTestId('search-input');
+  await input.fill(title.split(' ').slice(0, 4).join(' '));
+  await input.press('Enter');
+  await w.waitForTimeout(1500);
+  return w.getByTestId('search-result').filter({ hasText: title }).first();
+}
+
+async function clearSearch(a: Audit): Promise<void> {
+  await a.page.getByTestId('search-input').fill('').catch(() => {});
+  await a.page.getByTestId('search-input').press('Enter').catch(() => {});
+  await closeTransient(a);
+}
+
+async function libraryFinal(a: Audit): Promise<void> {
+  const w = a.page;
+  await a.step('library home', async () => {
+    await nav(a, 'library');
+    await w.waitForTimeout(1200);
+    await count(a, 'sidebar', '.app-sidebar');
+    await count(a, 'topbar', '[data-testid="topbar"]');
+    await count(a, 'library-head', '.library-head');
+    await count(a, 'library-filters', '[data-testid="facet-bar"]');
+    await a.shot('library', 0, { focus: 25 });
+  });
+  await openMenu(a, 'add-menu', 'library-add-menu', 1);
+  await openMenu(a, 'library-more', 'library-more-menu', 1);
+  await a.step('library view menu', async () => {
+    await w.getByTestId('view-menu').click();
+    await w.waitForTimeout(400);
+    await a.shot('library-view-menu', 1);
+    await w.getByTestId('view-grid').click().catch(() => {});
+    await w.waitForTimeout(800);
+    await closeTransient(a);
+    await a.shot('library-grid', 2);
+    await w.getByTestId('view-menu').click();
+    await w.getByTestId('view-list').click().catch(() => {});
+    await closeTransient(a);
+  });
+  await a.step('library row hover and selection', async () => {
+    const row = w.getByTestId('search-result').nth(1);
+    await row.hover();
+    await w.waitForTimeout(300);
+    await a.shot('library-row-hover', 0);
+    await row.click();
+    await w.waitForTimeout(400);
+    await count(a, 'library-selection-1', '[data-testid="selection-bar"]');
+    await a.shot('library-selected-1', 1);
+    await w.getByTestId('search-result').nth(2).click({ modifiers: ['Control'] });
+    await w.waitForTimeout(400);
+    await count(a, 'library-selection-2', '[data-testid="selection-bar"]');
+    await a.shot('library-selected-2', 2);
+  });
+  await openMenu(a, 'bulk-claude', 'selection-claude-menu', 3);
+  await openMenu(a, 'selection-more', 'selection-more-menu', 3);
+  await a.step('literature note dialog', async () => {
+    await w.getByTestId('bulk-claude').click();
+    await w.getByTestId('selection-literature').click();
+    await w.waitForTimeout(1200);
+    await a.shot('literature-dialog', 4);
+    await closeTransient(a);
+  });
+  await a.step('compare table', async () => {
+    await w.getByTestId('bulk-claude').click();
+    await w.getByTestId('selection-compare').click();
+    await w.waitForTimeout(1500);
+    await a.shot('compare-open', 4);
+    if (await visibleNow(w.getByTestId('compare-run'))) {
+      await w.getByTestId('compare-run').click();
+      await w.waitForTimeout(1500);
+      await a.shot('compare-run-confirm', 5);
+      const yes = w.locator('.rl-dialog .dialog-foot button.primary, .rl-dialog footer button.primary').last();
+      if (await visibleNow(yes)) await yes.click();
+      await w.waitForTimeout(5000);
+      await count(a, 'compare-view', '[data-testid="compare-view"]', '[data-testid="compare-table"] tbody');
+      await a.shot('compare-table', 6);
+    }
+    await closeTransient(a);
+    await w.getByTestId('compare-close').click().catch(() => {});
+    await w.waitForTimeout(500);
+  });
+  await a.step('export dialog', async () => {
+    await nav(a, 'library');
+    if (!(await visibleNow(w.getByTestId('selection-bar')))) {
+      await w.getByTestId('search-result').nth(1).click();
+      await w.getByTestId('search-result').nth(2).click({ modifiers: ['Control'] });
+    }
+    await w.getByTestId('selection-more').click();
+    await w.getByRole('menuitem', { name: /Esporta|Export/ }).first().click();
+    await w.waitForTimeout(1200);
+    await count(a, 'export-dialog', '[data-testid="export-dialog"]');
+    await a.shot('export-dialog', 4);
+    const fmt = w.getByTestId('export-format');
+    if (await visibleNow(fmt)) {
+      await fmt.scrollIntoViewIfNeeded();
+      await a.shot('export-dialog-format', 4);
+    }
+    await closeTransient(a);
+  });
+  await a.step('document card', async () => {
+    await nav(a, 'library');
+    await w.getByTestId('selection-clear').click().catch(() => {});
+    const row = w.getByTestId('search-result').nth(1);
+    await row.hover();
+    await row.getByTestId('row-detail').click();
+    await w.waitForTimeout(1200);
+    await count(a, 'doc-card', '[data-testid="doc-panel"]');
+    await a.shot('doc-card', 2, { focus: 15 });
+  });
+  await openMenu(a, 'doc-more', 'doc-card-more-menu', 3);
+  await a.step('doc card sections open', async () => {
+    const toggles = w.locator('[data-testid="doc-panel"] .card-section__toggle');
+    const n = await toggles.count();
+    for (let i = 0; i < n; i++) await toggles.nth(i).click().catch(() => {});
+    await w.waitForTimeout(1500);
+    await a.shot('doc-card-sections-open', 2 + n);
+    await w.getByTestId('doc-panel').evaluate((e) => {
+      const sc = [e, ...e.querySelectorAll('*')].find((x) => x.scrollHeight > x.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(x).overflowY)) as HTMLElement | undefined;
+      sc?.scrollTo(0, sc.scrollHeight);
+    });
+    await w.waitForTimeout(400);
+    await a.shot('doc-card-bottom', 2 + n);
+    await w.getByTestId('panel-close').click().catch(() => {});
+  });
+}
+
+async function readerFinal(a: Audit, pdfs: string[], full: boolean): Promise<void> {
+  const w = a.page;
+  await a.step(`reader open ${a.theme} ${a.size}`, async () => {
+    const row = await findRow(a, pdfs[0]!);
+    await row.hover();
+    await row.getByTestId('row-read').click();
+    await expect(w.getByTestId('reader')).toBeVisible();
+    await expect(w.locator('[data-testid="reader-pages-area"] .page[data-page-number="1"] canvas')).toBeVisible({ timeout: 60_000 });
+    await w.waitForTimeout(1500);
+    await count(a, 'reader-bar', '[data-testid="reader-bar"]');
+    a.facts[`reader-geometry-${a.theme}-${a.size}`] = await w.evaluate(readerGeometry);
+    await a.shot('reader', 2);
+  });
+  if (full) {
+    await openMenu(a, 'reader-zoom', 'reader-zoom-menu', 3);
+    await openMenu(a, 'reader-study-menu', 'reader-study-menu', 3);
+    await openMenu(a, 'reader-more', 'reader-more-menu', 3);
+    await openMenu(a, 'ann-color', 'reader-color-menu', 3);
+    await a.step('reader highlight popover', async () => {
+      await w.getByTestId('reader-tool-highlight').click().catch(() => w.keyboard.press('h'));
+      const box = await w.locator('[data-testid="reader-pages-area"] .page[data-page-number="1"]').boundingBox();
+      if (box) {
+        await w.mouse.move(box.x + box.width * 0.15, box.y + box.height * 0.22);
+        await w.mouse.down();
+        await w.mouse.move(box.x + box.width * 0.75, box.y + box.height * 0.22, { steps: 8 });
+        await w.mouse.up();
+      }
+      await w.waitForTimeout(800);
+      await a.shot('reader-after-highlight', 4);
+      const mark = w.getByTestId('annotation-mark').first();
+      if (await visibleNow(mark)) {
+        await w.getByTestId('reader-tool-select').click().catch(() => w.keyboard.press('v'));
+        await mark.click();
+        await w.waitForTimeout(500);
+        await count(a, 'reader-ann-popover', '[data-testid="annotation-bar"]');
+        await a.shot('reader-annotation-popover', 6);
+      }
+      await closeTransient(a);
+    });
+    await a.step('reader side panel', async () => {
+      await w.getByTestId('reader-side').click();
+      await w.waitForTimeout(800);
+      await count(a, 'reader-side-panel', '[data-testid="reader-side-panel"]');
+      await a.shot('reader-panel', 3);
+      await w.getByTestId('reader-tab-notes').click().catch(() => {});
+      await w.waitForTimeout(500);
+      await a.shot('reader-panel-notes', 4);
+      await w.getByTestId('reader-side').click();
+    });
+    await a.step('reader find', async () => {
+      await w.getByTestId('reader-find-toggle').click();
+      await w.getByTestId('reader-find-input').fill('the');
+      await w.waitForTimeout(800);
+      await a.shot('reader-find', 3);
+      await closeTransient(a);
+    });
+    await a.step('reader side by side', async () => {
+      await w.getByTestId('reader-more').click();
+      await w.getByTestId('reader-side-by-side').click();
+      await w.waitForTimeout(800);
+      await a.shot('reader-split-picker', 3);
+      const s = w.getByTestId('reader-split-search');
+      if (await visibleNow(s)) await s.fill(pdfs[1]!.split(' ').slice(0, 3).join(' '));
+      await w.waitForTimeout(1200);
+      await w.getByTestId('reader-split-hit').first().click();
+      await w.waitForTimeout(3500);
+      await count(a, 'reader-split', '[data-testid="reader"]', '[data-testid="reader-pages-area"]');
+      await a.shot('reader-split', 5);
+    });
+  }
+  await a.step(`reader close ${a.theme} ${a.size}`, async () => {
+    await w.getByTestId('reader-close').first().click().catch(() => w.keyboard.press('Escape'));
+    await w.waitForTimeout(600);
+    await clearSearch(a);
+  });
+}
+
+async function reviewFinal(a: Audit, full: boolean): Promise<void> {
+  const w = a.page;
+  if (full)
+    await a.step('review drop a file', async () => {
+      const outside = await mkdtemp(path.join(os.tmpdir(), 'rl-audit-drop-'));
+      const src = path.join(outside, 'download.pdf');
+      await writeSyntheticPdf(src, { title: 'Attenzione sparsa per sequenze lunghe', authors: ['Bo Sample'], year: 2025, body: 'Corpo.', doi: '10.5555/audit.0001' });
+      await ipcData(w, 'inbox:add', { paths: [src] });
+      await expect(w.getByTestId('inbox-badge')).toBeVisible({ timeout: 30_000 });
+    });
+  await a.step(`review arrivals ${a.theme} ${a.size}`, async () => {
+    await nav(a, 'review');
+    await w.waitForTimeout(1500);
+    await count(a, 'review-head', '.rh-head');
+    await count(a, 'review-arrivals', '.rh-panel');
+    await a.shot('review-arrivals', 1);
+  });
+  if (!full) return;
+  await a.step('review proposals', async () => {
+    await w.getByTestId('inbox-tab-proposals').click();
+    await w.waitForTimeout(1500);
+    await count(a, 'review-proposals', '.rh-panel');
+    await a.shot('review-proposals', 2);
+    await w.getByTestId('inbox-tab-arrivals').click();
+  });
+}
+
+async function mapFinal(a: Audit, full: boolean): Promise<void> {
+  const w = a.page;
+  await a.step(`map ${a.theme} ${a.size}`, async () => {
+    await nav(a, 'map');
+    await w.waitForTimeout(1200);
+    if (await visibleNow(w.getByTestId('graph-build-empty'))) {
+      await a.shot('map-empty', 1);
+      await w.getByTestId('graph-build-empty').click();
+    }
+    await expect(w.getByTestId('map-canvas')).toBeVisible({ timeout: 240_000 });
+    await expect(w.getByTestId('graph-status')).not.toHaveAttribute('data-state', 'building', { timeout: 240_000 });
+    await w.waitForTimeout(3500);
+    await count(a, 'map-head', '[data-testid="section-network"]', 'canvas, [data-testid="cluster-legend"]');
+    await a.shot('map', 2, full ? { focus: 20 } : {});
+  });
+  await a.step(`map network ${a.theme} ${a.size}`, async () => {
+    await w.getByTestId('net-tab-network').click();
+    await w.waitForTimeout(3500);
+    await count(a, 'map-network', '[data-testid="section-network"]', 'canvas');
+    await a.shot('map-network-docs', 3);
+    for (const m of full ? ['author', 'tag', 'topic'] : ['author']) {
+      await w.getByTestId(`net-mode-${m}`).click().catch(() => {});
+      await expect(w.getByTestId('ent-canvas')).toHaveAttribute('data-loading', 'false', { timeout: 60_000 }).catch(() => {});
+      await w.waitForTimeout(3000);
+      await a.shot(`map-network-${m}`, 4);
+    }
+  });
+  if (!full) {
+    await w.getByTestId('net-tab-map').click().catch(() => {});
+    return;
+  }
+  await a.step('map entity detail', async () => {
+    await w.getByTestId('net-mode-author').click().catch(() => {});
+    await w.waitForTimeout(2500);
+    const c = await w.getByTestId('ent-canvas').boundingBox();
+    for (const [dx, dy] of [[0, 0], [30, 20], [-40, -30], [60, -40], [-70, 50]]) {
+      if (!c) break;
+      await w.mouse.click(c.x + c.width / 2 + dx!, c.y + c.height / 2 + dy!);
+      await w.waitForTimeout(700);
+      if (await visibleNow(w.getByTestId('entity-detail'))) break;
+    }
+    await a.shot('map-entity-detail', 5);
+  });
+  await a.step('map explore', async () => {
+    await w.getByTestId('net-tab-explore').click();
+    await w.waitForTimeout(2500);
+    await a.shot('map-explore', 2);
+  });
+  await a.step('map surprising', async () => {
+    await w.getByTestId('net-tab-surprising').click();
+    await w.waitForTimeout(2500);
+    await a.shot('map-surprising', 2);
+  });
+  await a.step('map more menu', async () => {
+    await w.getByTestId('net-tab-map').click();
+    await w.waitForTimeout(2500);
+    await w.getByTestId('map-more').click();
+    await w.waitForTimeout(400);
+    await countMenu(a, 'map-more');
+    await a.shot('map-more-menu', 3);
+    await w.getByTestId('map-more').click();
+  });
+  await a.step('map node card and bridge', async () => {
+    const c = await w.getByTestId('map-canvas').boundingBox();
+    for (const [dx, dy] of [[0, 0], [40, 20], [-60, -30], [80, -60], [-100, 50], [120, 90], [-20, 110], [150, -20]]) {
+      if (!c) break;
+      await w.mouse.move(c.x + c.width / 2 + dx!, c.y + c.height / 2 + dy!, { steps: 4 });
+      await w.waitForTimeout(900);
+      if (await visibleNow(w.getByTestId('map-card-more'))) break;
+    }
+    await a.shot('map-node-card', 4);
+    if (await visibleNow(w.getByTestId('map-card-more'))) {
+      await w.getByTestId('map-card-more').click();
+      await w.waitForTimeout(400);
+      await a.shot('map-node-card-more', 5);
+      await w.getByRole('menuitem').first().click().catch(() => {});
+      await w.waitForTimeout(800);
+      await a.shot('map-bridge-pick', 6);
+      for (const [dx, dy] of [[-150, -100], [160, 110], [-200, 120], [210, -120], [-250, 0], [250, 40]]) {
+        if (!c) break;
+        await w.mouse.click(c.x + c.width / 2 + dx!, c.y + c.height / 2 + dy!);
+        await w.waitForTimeout(900);
+        if (await visibleNow(w.getByTestId('map-bridge-note'))) break;
+      }
+      await w.waitForTimeout(1500);
+      await a.shot('map-bridge', 7);
+    }
+    await closeTransient(a);
+  });
+  await a.step('map surprise', async () => {
+    await w.getByTestId('map-bridge-close').click().catch(() => {});
+    await w.getByTestId('map-surprise').click().catch(() => {});
+    await w.waitForTimeout(2500);
+    await a.shot('map-surprise', 3);
+  });
+}
+
+async function discoverFinal(a: Audit, pdfs: string[], full: boolean): Promise<void> {
+  const w = a.page;
+  await a.step(`discover ${a.theme} ${a.size}`, async () => {
+    await nav(a, 'discover');
+    await w.waitForTimeout(1200);
+    await count(a, 'discover', '[data-testid="section-discover"]');
+    await a.shot('discover', 1);
+  });
+  if (!full) return;
+  await openMenu(a, 'discover-new-search', 'discover-new-menu', 2);
+  await openMenu(a, 'discover-more', 'discover-more-menu', 2);
+  await a.step('discover bridge search', async () => {
+    const row = await findRow(a, pdfs[0]!);
+    await row.click();
+    const row2 = await findRow(a, pdfs[1]!);
+    await row2.click({ modifiers: ['Control'] });
+    await w.getByTestId('selection-more').click();
+    await w.waitForTimeout(400);
+    await a.shot('selection-more-two', 4);
+    await w.getByTestId('selection-bridge').click();
+    await expect(w.getByTestId('discover-searches')).toBeVisible({ timeout: 30_000 });
+    await w.waitForTimeout(6000);
+    await a.shot('discover-bridge-run', 5);
+  });
+  await a.step('discover tabs', async () => {
+    const tabs = w.locator('[data-testid="section-discover"] [role=tab]');
+    const n = await tabs.count();
+    for (let i = 1; i < Math.min(n, 4); i++) {
+      await tabs.nth(i).click();
+      await w.waitForTimeout(1200);
+      await a.shot(`discover-tab${i + 1}`, 2);
+    }
+  });
+  await a.step('discover cleanup', async () => {
+    await nav(a, 'library');
+    await clearSearch(a);
+    await w.getByTestId('selection-clear').click().catch(() => {});
+  });
+}
+
+async function projectsFinal(a: Audit, full: boolean): Promise<void> {
+  const w = a.page;
+  if (full) {
+    await a.step('projects empty', async () => {
+      await nav(a, 'projects');
+      await w.waitForTimeout(1000);
+      await a.shot('projects-empty', 1);
+    });
+    await a.step('project create from selection', async () => {
+      await nav(a, 'library');
+      await clearSearch(a);
+      for (let i = 0; i < 5; i++) await w.getByTestId('search-result').nth(i).click({ modifiers: i ? ['Control'] : [] });
+      await w.getByTestId('add-to-project-button').click();
+      await w.waitForTimeout(500);
+      await a.shot('project-add-popover', 3);
+      await w.getByTestId('new-project-name').fill('Capitolo 2 · Metodi');
+      await w.getByTestId('create-project-with-selection').click();
+      await w.waitForTimeout(1200);
+      await w.getByTestId('selection-clear').click().catch(() => {});
+    });
+  }
+  await a.step(`project detail ${a.theme} ${a.size}`, async () => {
+    await nav(a, 'projects');
+    await w.waitForTimeout(800);
+    await count(a, 'projects-list', '[data-testid="section-projects"]');
+    if (full) await a.shot('projects-list', 1);
+    await w.getByTestId('project-open').first().click();
+    await w.waitForTimeout(1500);
+    await count(a, 'project-head', '[data-testid="project-detail"]', '[data-testid="project-members"] table');
+    await a.shot('project', 2);
+  });
+  if (!full) return;
+  await openMenu(a, 'project-more', 'project-more-menu', 3);
+  for (const tab of ['plan', 'notes']) {
+    await a.step(`project tab ${tab}`, async () => {
+      await w.getByTestId(`project-tab-${tab}`).click();
+      await w.waitForTimeout(900);
+      await a.shot(`project-tab-${tab}`, 3);
+    });
+  }
+  await a.step('project schema', async () => {
+    if (await visibleNow(w.getByTestId('notes-write-outline'))) await w.getByTestId('notes-write-outline').click();
+    else await w.getByTestId('project-tab-schema').click();
+    await w.waitForTimeout(1000);
+    await a.shot('project-schema-edit', 4);
+    const q = w.getByTestId('schema-input-questions');
+    if (await visibleNow(q)) {
+      await q.fill('Come cambia la precisione con sequenze lunghe?\nQuale metodo regge meglio il rumore?');
+      await w.getByTestId('schema-input-idea').fill('Le sequenze lunghe richiedono attenzione sparsa.').catch(() => {});
+      await w.getByTestId('schema-save').click();
+      await w.waitForTimeout(1200);
+    }
+    await count(a, 'project-tabs', '[data-testid="project-detail"] [role=tablist]');
+    await a.shot('project-schema', 5);
+  });
+  await a.step('project prisma', async () => {
+    await w.getByTestId('project-more').click();
+    await w.getByTestId('project-prisma').click();
+    await w.waitForTimeout(1500);
+    await a.shot('project-prisma', 4);
+    await closeTransient(a);
+    await w.getByTestId('prisma-close').click().catch(() => {});
+  });
+  await a.step('project export', async () => {
+    await w.getByTestId('project-more').click();
+    await w.getByTestId('project-export').click();
+    await w.waitForTimeout(1200);
+    await a.shot('project-export', 4);
+    const fmt = w.getByTestId('export-format');
+    if (await visibleNow(fmt)) {
+      await fmt.scrollIntoViewIfNeeded();
+      await a.shot('project-export-format', 4);
+    }
+    await closeTransient(a);
+  });
+}
+
+async function settingsFinal(a: Audit, full: boolean): Promise<void> {
+  const w = a.page;
+  const secs = full ? ['general', 'profile', 'library', 'claude', 'backup', 'shortcuts', 'advanced'] : ['claude'];
+  await a.step(`settings open ${a.theme} ${a.size}`, async () => nav(a, 'settings'));
+  for (const s of secs) {
+    await a.step(`settings ${s} ${a.theme} ${a.size}`, async () => {
+      await w.getByTestId(`settings-nav-${s}`).click();
+      await w.waitForTimeout(s === 'claude' ? 2500 : 800);
+      await count(a, `settings-${s}`, `[data-testid="settings-section-${s}"]`);
+      await a.shot(`settings-${s}`, 2);
+    });
+  }
+  if (!full) return;
+  await a.step('settings token cap', async () => {
+    await w.getByTestId('settings-nav-claude').click();
+    await w.waitForTimeout(1200);
+    await w.getByTestId('token-cap-input').scrollIntoViewIfNeeded();
+    await w.waitForTimeout(400);
+    await a.shot('settings-token-cap', 3);
+  });
+}
+
+async function shellFinal(a: Audit): Promise<void> {
+  const w = a.page;
+  await a.step('activity popover', async () => {
+    await nav(a, 'library');
+    await w.getByTestId('scan-status').click();
+    await w.waitForTimeout(600);
+    await a.shot('activity', 1);
+    await closeTransient(a);
+  });
+  await a.step('palette', async () => {
+    await w.getByTestId('palette-open').click();
+    await w.waitForTimeout(600);
+    await a.shot('palette', 1);
+    await closeTransient(a);
+  });
+  await a.step('search menu', async () => {
+    await w.getByTestId('search-input').click();
+    await w.waitForTimeout(600);
+    await a.shot('search-menu', 1);
+    await closeTransient(a);
+  });
+  await a.step('chat panel', async () => {
+    const t = w.getByTestId('chat-toggle');
+    if ((await t.getAttribute('aria-expanded')) !== 'true') await t.click();
+    await w.waitForTimeout(1000);
+    await count(a, 'chat-panel', '[data-testid="chat-panel"]');
+    await a.shot('chat-panel', 1);
+    await t.click().catch(() => closeTransient(a));
+  });
+}
+
+async function runFinal(lang: 'it' | 'en'): Promise<void> {
+  mkdirSync(OUT, { recursive: true });
+  const sim = await mkdtemp(path.join(os.tmpdir(), 'rl-claude-sim-'));
+  mkdirSync(path.join(sim, '.claude'), { recursive: true });
+  writeFileSync(path.join(sim, 'state.json'), JSON.stringify({ loggedIn: true, email: 'first@example.test', orgName: 'Example Org', subscriptionType: 'pro', version: '9.1.2' }));
+  writeFileSync(path.join(sim, '.claude', '.credentials.json'), '{}');
+  const full = lang === 'it';
+  const ctx = await launchApp({ library: { corpus: full ? 220 : 120, options: { language: lang, pdfShare: 0.08, seed: 11 } }, dialogPath: true, offline: true, env: { RL_E2E: '1', RL_E2E_CLAUDE_SIM: sim, RL_AI_PROVIDER: 'mock' } });
+  const a = new Audit(`f${lang}`, ctx);
+  try {
+    a.facts['dpr'] = await ctx.window.evaluate(() => window.devicePixelRatio);
+    await a.setSize(1280, 800);
+    await finalWizard(a, lang, lang === 'it' ? 'La mia tesi' : 'My thesis');
+    const corpus = ctx.library!.corpus!;
+    await waitForScan(ctx.window, corpus.count);
+    await expect(ctx.window.getByTestId('scan-status')).toHaveAttribute('data-state', 'done', { timeout: 300_000 });
+    const pdfs = corpus.files.filter((f) => f.format === 'pdf' && f.pages.length > 1).map((f) => f.title);
+    const top = [...new Set(corpus.dirs.map((d) => d.split('/')[0]!))];
+    await ipcData(ctx.window, 'library:setConfig', { patch: { aiEnabledFolders: top } }).catch(() => {});
+    await ctx.window.waitForTimeout(1500);
+    await a.step('first screen', async () => {
+      await a.shot('first-screen', 0);
+      if (await visibleNow(ctx.window.getByTestId('welcome-dismiss'))) await ctx.window.getByTestId('welcome-dismiss').click();
+    });
+    await libraryFinal(a);
+    await readerFinal(a, pdfs, full);
+    await reviewFinal(a, true);
+    await mapFinal(a, full);
+    await discoverFinal(a, pdfs, full);
+    await projectsFinal(a, true);
+    await settingsFinal(a, full);
+    if (full) await shellFinal(a);
+    const combos: [Theme, number, number][] = full
+      ? [
+          ['dark', 1280, 800],
+          ['light', 1920, 1080],
+          ['dark', 1920, 1080],
+        ]
+      : [];
+    for (const [theme, cw, ch] of combos) {
+      await a.setSize(cw, ch);
+      await a.setTheme(theme);
+      await a.step(`matrix library ${theme} ${cw}`, async () => {
+        await nav(a, 'library');
+        await clearSearch(a);
+        await a.page.waitForTimeout(800);
+        await a.shot('library', 0);
+      });
+      await readerFinal(a, pdfs, false);
+      await reviewFinal(a, false);
+      await mapFinal(a, false);
+      await discoverFinal(a, pdfs, false);
+      await projectsFinal(a, false);
+      await settingsFinal(a, false);
+    }
+    await a.setSize(1280, 800);
+    await a.setTheme('light');
+  } finally {
+    a.flush();
+    await ctx.close();
+    rmSync(sim, { recursive: true, force: true });
+  }
+}
+
+test('design audit final tour, Italian', async () => {
+  test.skip(!ENABLED, 'design audit: set RL_DESIGN_AUDIT=1');
+  test.setTimeout(45 * 60_000);
+  await runFinal('it');
+});
+
+test('design audit final tour, English spot checks', async () => {
+  test.skip(!ENABLED, 'design audit: set RL_DESIGN_AUDIT=1');
+  test.setTimeout(30 * 60_000);
+  await runFinal('en');
+});

@@ -78,10 +78,20 @@ function setup(o: Opts = {}) {
 const input = () => screen.getByTestId('chat-input') as HTMLTextAreaElement;
 const type = (text: string) => fireEvent.change(input(), { target: { value: text } });
 const sendButton = () => screen.getByTestId('chat-send') as HTMLButtonElement;
+/** Picks an entry of the panel's ⋯ menu (new conversation, conversations). */
+async function moreItem(testId: string) {
+  fireEvent.click(screen.getByTestId('chat-more'));
+  fireEvent.click(await screen.findByTestId(testId));
+}
+/** Picks a value of a chip (model, reasoning) from its menu. */
+async function chooseChip(chip: string, id: string) {
+  fireEvent.click(screen.getByTestId(chip));
+  fireEvent.click(await screen.findByTestId(`${chip}-${id}`));
+}
 async function ready() {
   await screen.findByTestId('chat-content');
-  // The app config (models, defaults) has loaded once the model selector has options.
-  await waitFor(() => expect(screen.getByTestId('chat-model').querySelectorAll('option').length).toBeGreaterThan(0));
+  // The app config (models, defaults) has loaded once the model chip shows a name.
+  await waitFor(() => expect(screen.getByTestId('chat-model').textContent).not.toBe(''));
   await waitFor(() => expect(callsTo('ai:status').length).toBeGreaterThan(0));
 }
 async function sendText(text: string) {
@@ -345,10 +355,10 @@ describe('chat: context and the preview before a send', () => {
   it('uses the model and reasoning of the library by default and sends the ones chosen', async () => {
     setup();
     await ready();
-    expect((screen.getByTestId('chat-model') as HTMLSelectElement).value).toBe('claude-haiku-5-5');
-    expect((screen.getByTestId('chat-reasoning') as HTMLSelectElement).value).toBe('low');
-    fireEvent.change(screen.getByTestId('chat-model'), { target: { value: 'claude-opus-5-5' } });
-    fireEvent.change(screen.getByTestId('chat-reasoning'), { target: { value: 'high' } });
+    expect(screen.getByTestId('chat-model').textContent).toContain('Haiku');
+    expect(screen.getByTestId('chat-reasoning').textContent?.toLowerCase()).toContain('low');
+    await chooseChip('chat-model', 'claude-opus-5-5');
+    await chooseChip('chat-reasoning', 'high');
     await sendText('think hard');
     await waitFor(() => expect(callsTo('chat:send')).toHaveLength(1));
     expect(callsTo('chat:send')[0]).toMatchObject({ model: 'claude-opus-5-5', reasoning: 'high' });
@@ -435,7 +445,7 @@ describe('chat: history', () => {
   it('lists the conversations of the library, newest first, and opens one', async () => {
     setup({ tweak: seed });
     await ready();
-    fireEvent.click(screen.getByTestId('chat-history-toggle'));
+    await moreItem('chat-history-toggle');
     const items = await screen.findAllByTestId('history-item');
     expect(items.map((i) => i.getAttribute('data-conversation-id'))).toEqual(['c-new', 'c-old']);
     fireEvent.click(within(items[1]!).getByTestId('history-open'));
@@ -451,7 +461,7 @@ describe('chat: history', () => {
   it('deletes a conversation only after confirmation', async () => {
     const ai = setup({ tweak: seed });
     await ready();
-    fireEvent.click(screen.getByTestId('chat-history-toggle'));
+    await moreItem('chat-history-toggle');
     const items = await screen.findAllByTestId('history-item');
     fireEvent.click(within(items[0]!).getByTestId('history-delete'));
     expect(callsTo('chat:delete')).toHaveLength(0);
@@ -471,7 +481,7 @@ describe('chat: history', () => {
     await ready();
     await sendText('first');
     await waitFor(() => expect(aiTurns()[0]!.textContent).toContain('Hello world'));
-    fireEvent.click(screen.getByTestId('chat-new'));
+    await moreItem('chat-new');
     expect(screen.queryAllByTestId('chat-turn-user')).toHaveLength(0);
     await sendText('second');
     await waitFor(() => expect(callsTo('chat:send')).toHaveLength(2));
@@ -586,7 +596,7 @@ describe('chat: a turn running while the view changes (review 13)', () => {
     });
   };
   const openConv = async (id: string) => {
-    fireEvent.click(screen.getByTestId('chat-history-toggle'));
+    await moreItem('chat-history-toggle');
     const items = await screen.findAllByTestId('history-item');
     fireEvent.click(within(items.find((i) => i.getAttribute('data-conversation-id') === id)!).getByTestId('history-open'));
   };
@@ -605,7 +615,8 @@ describe('chat: a turn running while the view changes (review 13)', () => {
     expect(aiTurns()).toHaveLength(1);
     expect(screen.queryByText(/Part one/)).toBeNull();
     expect(screen.getByTestId('chat-busy-other')).toBeTruthy();
-    expect((screen.getByTestId('chat-new') as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByTestId('chat-more'));
+    expect(((await screen.findByTestId('chat-new')) as HTMLElement).getAttribute('aria-disabled')).toBeNull();
     act(() => ai.emit('conv-1', 'turn-1', { type: 'text-delta', text: 'Part two' }));
     expect(screen.queryByText(/Part two/)).toBeNull();
     // Sending from here is refused with a clear message, nothing is added to the view.
@@ -629,7 +640,7 @@ describe('chat: a turn running while the view changes (review 13)', () => {
     await ready();
     await sendText('first');
     await waitFor(() => expect(callsTo('chat:send')).toHaveLength(1));
-    fireEvent.click(screen.getByTestId('chat-new'));
+    await moreItem('chat-new');
     expect(screen.getByTestId('chat-empty')).toBeTruthy();
     expect(screen.getByTestId('chat-busy-other')).toBeTruthy();
     act(() => ai.emit('conv-1', 'turn-1', { type: 'text-delta', text: 'Hidden' }));
@@ -728,7 +739,7 @@ describe('chat: inline preview after the first confirmation (D-339, D-364)', () 
     setup({ selection: [D1] });
     await ready();
     await confirmFirst();
-    fireEvent.change(screen.getByTestId('chat-model'), { target: { value: 'claude-opus-5-5' } });
+    await chooseChip('chat-model', 'claude-opus-5-5');
     await waitFor(() => expect(screen.getByTestId('chat-inline-preview').getAttribute('data-asks')).toBe('true'));
     await sendText('second');
     await screen.findByTestId('send-preview');
@@ -739,7 +750,7 @@ describe('chat: inline preview after the first confirmation (D-339, D-364)', () 
     setup({ selection: [D1] });
     await ready();
     await confirmFirst();
-    fireEvent.click(screen.getByTestId('chat-new'));
+    await moreItem('chat-new');
     await waitFor(() => expect(screen.queryByTestId('chat-inline-preview')).toBeNull());
     await sendText('again');
     await screen.findByTestId('send-preview');

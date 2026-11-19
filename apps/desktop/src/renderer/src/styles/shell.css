@@ -334,14 +334,22 @@
   overflow: hidden;
   container-type: inline-size;
 }
-.crumbs {
+.topbar .crumbs {
   display: flex;
-  flex: 1 1 0;
+  /* Z6: one line always (a lazy view's own `.crumbs` rule must not wrap them); the search narrows before the crumbs do. */
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
-  min-width: 60px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
   white-space: nowrap;
+}
+.crumbs__sep,
+.crumbs__link {
+  flex: none;
 }
 .crumbs__sep {
   color: var(--text-subtle);
@@ -358,13 +366,15 @@
   text-decoration: underline;
 }
 .crumbs__here {
+  flex: 0 1 auto;
+  min-width: min(160px, 100%);
   overflow: hidden;
   font-weight: 600;
   text-overflow: ellipsis;
 }
 .search-launch {
   display: flex;
-  flex: 0 1 clamp(240px, 30vw, 420px);
+  flex: 0 4 clamp(240px, 30vw, 420px);
   align-items: center;
   gap: 8px;
   min-width: 36px;
@@ -641,9 +651,12 @@
   overflow: hidden;
   color: var(--text-muted);
   font-size: var(--fs-caption);
+  line-height: 16px;
   text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Z15: two lines at most instead of a cut sentence; the whole text is the tooltip. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .chat-body {
   display: flex;

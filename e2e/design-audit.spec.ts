@@ -1029,9 +1029,11 @@ async function aiTour(a: Audit, lang: 'it' | 'en'): Promise<void> {
     }
     await w.waitForTimeout(4000);
     await a.shot('chat-answer', 4);
+    await w.getByTestId('chat-more').click().catch(() => {});
     await w.getByTestId('chat-history-toggle').click().catch(() => {});
     await w.waitForTimeout(400);
     await a.shot('chat-history', 5);
+    await w.getByTestId('chat-more').click().catch(() => {});
     await w.getByTestId('chat-history-toggle').click().catch(() => {});
     await toggle.click();
   });

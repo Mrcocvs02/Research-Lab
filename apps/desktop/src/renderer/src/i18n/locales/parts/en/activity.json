@@ -12,6 +12,15 @@
     "scanSummary": "+{{added}} new · {{changed}} changed · {{missing}} missing",
     "scanRunning": "A scan is already running",
     "needsLibrary": "Open a library first",
-    "seeReport": "See the report"
+    "seeReport": "See the report",
+    "chip": {
+      "progress": "Running {{pct}}%",
+      "scanning": "Running",
+      "ready": "Up to date",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "proposals": "Proposals {{done}}/{{total}}",
+      "citations": "Citations {{done}}/{{total}}"
+    }
   }
 }

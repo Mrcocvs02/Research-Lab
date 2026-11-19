@@ -76,7 +76,8 @@ describe('advanced search dialog', () => {
     fireEvent.click(screen.getByTestId('adv-search-go'));
     await waitFor(() => expect(screen.getByTestId('chat-log').textContent).toContain('Hello world'));
     ai.state.conversations.set('c-chat', { id: 'c-chat', title: 'Plain chat', updatedAt: '2026-11-01T10:00:00.000Z', turns: [] });
-    fireEvent.click(screen.getByTestId('chat-history-toggle'));
+    fireEvent.click(screen.getByTestId('chat-more'));
+    fireEvent.click(await screen.findByTestId('chat-history-toggle'));
     const items = await screen.findAllByTestId('history-item');
     expect(items.map((i) => i.getAttribute('data-mode')).sort()).toEqual(['chat', 'search']);
     expect(screen.getAllByTestId('history-mode-search')).toHaveLength(1);

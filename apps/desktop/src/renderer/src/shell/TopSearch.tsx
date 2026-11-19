@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../components/IconButton';
 import { Kbd } from '../components/Kbd';
@@ -31,6 +32,25 @@ function ago(iso: string, lang: string): string {
   if (min < 60) return rtf.format(-min, 'minute');
   if (min < 1440) return rtf.format(-Math.round(min / 60), 'hour');
   return rtf.format(-Math.round(min / 1440), 'day');
+}
+
+/**
+ * The menu under the search box. The top bar clips its overflow (it must never paint over the Claude panel), so the menu is
+ * drawn on the body at the box's position; clipped inside the bar it showed as an empty strip (Z23).
+ */
+function FloatingMenu({ field, label, children }: { field: RefObject<HTMLDivElement | null>; label: string; children: ReactNode }) {
+  const [box, setBox] = useState<{ top: number; left: number; width: number } | null>(null);
+  useLayoutEffect(() => {
+    const r = field.current?.getBoundingClientRect();
+    if (r) setBox({ top: r.bottom + 4, left: r.left, width: r.width });
+  }, [field]);
+  if (!box) return null;
+  return createPortal(
+    <div className="topsearch__menu" role="menu" aria-label={label} data-testid="search-menu" style={box} onMouseDown={(e) => e.preventDefault()}>
+      {children}
+    </div>,
+    document.body,
+  );
 }
 
 export function TopSearch() {
@@ -114,7 +134,7 @@ export function TopSearch() {
         <Icon name="claude" size={16} />
       </IconButton>
       {(showResume || showAdd) && (
-        <div className="topsearch__menu" role="menu" aria-label={t('resume.menu')} data-testid="search-menu" onMouseDown={(e) => e.preventDefault()}>
+        <FloatingMenu field={fieldRef} label={t('resume.menu')}>
           {showAdd && (
             <button type="button" role="menuitem" data-testid="search-add-id" onClick={() => (requestAdd({ kind: 'id', text: text.trim() }), setSearchText(''))}>
               {t('search.addId', { id: text.trim() })}
@@ -133,7 +153,7 @@ export function TopSearch() {
                 {where(r.page)}
               </button>
             ))}
-        </div>
+        </FloatingMenu>
       )}
       <Popover anchor={fieldRef} open={helpOpen} onClose={() => setHelpOpen(false)} label={t('shell.searchSyntax')} width={360}>
         <div className="topsearch__syntax" data-testid="search-syntax-help">

@@ -90,7 +90,7 @@ describe('Wizard', () => {
 
     await untilStep('Summary');
     expect(screen.getByTestId('wizard-write-to-pdf').getAttribute('aria-checked')).toBe('true');
-    expect(screen.getByTestId('wizard-create-note').textContent).toContain('inside the PDFs');
+    expect(screen.queryByTestId('wizard-create-note')).toBeNull(); // the consent hint already says it
     fireEvent.click(screen.getByTestId('wizard-create'));
 
     // The seventh step: the first scan, seen and not waited for.

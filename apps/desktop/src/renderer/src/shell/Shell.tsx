@@ -123,7 +123,7 @@ export function Shell({ section, onSection, onNewLibrary, reviewDocs = 0, readin
               <h2>{t('chat.title')}</h2>
             </span>
             {app.config && (
-              <span className="chat-head__status" data-testid="status-ai">
+              <span className="chat-head__status" data-testid="status-ai" title={aiCount === 0 ? t('status.aiNone') : t('status.aiFolders', { count: aiCount })}>
                 {aiCount === 0 ? t('status.aiNone') : t('status.aiFolders', { count: aiCount })}
               </span>
             )}

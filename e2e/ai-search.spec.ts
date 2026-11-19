@@ -61,6 +61,7 @@ test('advanced search: estimate, then a streamed answer with cards and chips in 
     await expect(rows(window).first()).toBeVisible();
 
     // The conversation is a search in the history.
+    await window.getByTestId('chat-more').click();
     await window.getByTestId('chat-history-toggle').click();
     await expect(window.getByTestId('history-item').first()).toHaveAttribute('data-mode', 'search', { timeout: 30_000 });
   } finally {

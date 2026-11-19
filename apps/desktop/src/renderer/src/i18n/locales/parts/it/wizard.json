@@ -110,7 +110,7 @@
       "resultFailed_one": "Trovato {{count}} documento · {{failed}} non leggibili (si cercano per nome).",
       "resultFailed_other": "Trovati {{count}} documenti · {{failed}} non leggibili (si cercano per nome).",
       "background": "Puoi chiudere: la scansione continua e la vedi in alto.",
-      "continue": "Continua in background",
+      "continue": "Continua in sottofondo",
       "open": "Apri la libreria",
       "wait": "La scansione non è ancora finita"
     }

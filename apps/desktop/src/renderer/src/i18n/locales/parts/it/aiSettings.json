@@ -76,7 +76,7 @@
       "keyOnly": "Si usa la chiave API salvata",
       "programFound": "Claude Code {{version}}, {{where}}",
       "keyUnused": "È salvata una chiave API, ma in questa modalità non viene usata.",
-      "test": "Prova la connessione · circa 0,001 $",
+      "test": "Prova la connessione · circa {{cost}}",
       "testing": "Prova in corso…",
       "testOk": "✓ Funziona · {{s}} s · {{model}}",
       "testOffline": "Sei offline: la prova non è partita",
@@ -135,6 +135,7 @@
       "tokenHelp": "Ingresso + uscita di tutte le librerie. Sopra il tetto le richieste non partono.",
       "tokenOf": "{{used}} / {{cap}} ({{pct}}%)",
       "tokenUsedNoCap": "{{used}} (nessun tetto)",
+      "tokenCustom": "Personalizzato…",
       "tokenNoCap": "Nessun tetto"
     },
     "claude": {

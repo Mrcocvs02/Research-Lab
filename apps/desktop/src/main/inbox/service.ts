@@ -24,7 +24,7 @@ import {
 } from '@rl/core';
 import { isInside, normalizeRelativePath, resolveInRoot, sha256File } from '@rl/core/node';
 import { applyTaxonomyOps, createTextExtractor, type OrganizerStore } from '@rl/data';
-import { availability, monthUsage, type AiCtx } from '../ai/service.js';
+import { availability, monthUsage, type AiCtx, providerError, capError, assertModel } from '../ai/service.js';
 import { JOB_EXCERPT_CHARS } from '../ai/jobs.js';
 import { trackAbort } from '../ai/abort-registry.js';
 import { assertTokenCap, noteSend } from '../ai/token-cap.js';
@@ -627,7 +627,7 @@ async function tagsPrep(c: Ctx, id: string, folderReq: string | undefined) {
 }
 
 async function previewOf(c: Ctx, id: string, model: string, p: { folder: string; system: string; prompt: string }) {
-  if (!c.cfg.ai.models.some((m) => m.id === model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
+  assertModel(c.cfg, model);
   const est = estimateCostFromModels(c.cfg.ai.models, { model, promptChars: p.system.length + p.prompt.length, expectedOutputTokens: 300 });
   const monthUsd = (await monthUsage(c.rt, monthOf(new Date()))).usd;
   const cap = c.cfg.ai.usageCap.monthlyUsd;
@@ -660,13 +660,13 @@ export async function proposeTags(s: MainServices, aiCtx: AiCtx, req: { id: stri
   const c = await openCtx(s);
   const { cfg } = c;
   const { provider } = aiCtx;
-  if (!cfg.ai.models.some((m) => m.id === req.model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
+  assertModel(cfg, req.model);
   const monthUsd = (await monthUsage(c.rt, monthOf(new Date()))).usd;
   const cap = cfg.ai.usageCap.monthlyUsd;
-  if (cap !== null && monthUsd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached', { monthUsd, capUsd: cap });
+  if (cap !== null && monthUsd >= cap) throw capError(monthUsd, cap);
   await assertTokenCap(s, 0);
   const av = await availability(s, provider);
-  if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
+  if (!av.available || !provider) throw providerError(av);
   const prep = await tagsPrep(c, req.id, req.folder);
   const { preview, est } = await previewOf(c, req.id, req.model, prep);
   if (cap !== null && preview.overCap) throw new AppError('AI_BUDGET_EXCEEDED', 'This send would go over the monthly AI spending cap', { monthUsd, capUsd: cap, estimatedUsd: preview.estimatedUsd });

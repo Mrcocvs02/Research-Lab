@@ -461,6 +461,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
             minimap={mini}
             bridge={bridge}
             onFindLinks={setFindFor}
+            onTopicExport={(id, text) => openExport({ clusters: [{ id, label: text }], name: text })}
             onBridge={(a, b) => {
               setDiscoverIntent({ kind: 'bridge', docIds: [a, b] });
               nav.navigate({ view: 'discover' });

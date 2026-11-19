@@ -58,6 +58,18 @@ describe('author network', () => {
     expect(neri.w).toBeCloseTo(Math.log(2) / Math.log(3), 6);
   });
 
+  it('returns a node beyond the cap with its heaviest neighbours when it is the focus', () => {
+    const plain = buildEntityNetwork(input(d), req('author', { limit: 2 }));
+    expect(plain.nodes.map((x) => x.id)).not.toContain('author:neri l');
+    const f = buildEntityNetwork(input(d), req('author', { limit: 2, focus: 'author:neri l' }));
+    expect(f.nodes).toHaveLength(2);
+    expect(f.nodes[0]!.id).toBe('author:neri l');
+    expect(f.edges.map(edgeKey)).toEqual([expect.stringContaining('author:neri l')]);
+    expect(f.truncated).toBe(true);
+    const unknown = buildEntityNetwork(input(d), req('author', { limit: 2, focus: 'author:nobody' }));
+    expect(unknown.nodes.map((x) => x.id)).toEqual(plain.nodes.map((x) => x.id));
+  });
+
   it('counts consortium authors but gives them no edges', () => {
     const n = buildEntityNetwork(input(d), req('author'));
     const members = new Set(n.nodes.filter((x) => x.label.startsWith('Person')).map((x) => x.id));

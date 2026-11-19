@@ -3,6 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { aiMetaSchema, aiNewTagSchema, documentIdSchema, inboxMetadataSchema, isoDateSchema, itemIdSchema } from '@rl/core';
 import { atomicWriteJson, readJsonFile } from '@rl/core/node';
+import { KeyedQueue } from '../keyed-queue.js';
 
 /**
  * What the inbox keeps for each item, in the LOCAL app data (`<localData>/inbox/<libraryId>.json`), never in the synced
@@ -45,7 +46,7 @@ const fileSchema = z.object({
 export type InboxFile = z.infer<typeof fileSchema>;
 
 const empty = (): InboxFile => ({ version: 1, items: [], cache: {} });
-const chains = new Map<string, Promise<unknown>>();
+const queue = new KeyedQueue();
 
 /** One JSON file per library, read and written one operation at a time, atomically. */
 export class InboxStore {
@@ -79,9 +80,6 @@ export class InboxStore {
       await atomicWriteJson(this.file, draft);
       return out;
     };
-    const prev = chains.get(this.libraryId) ?? Promise.resolve();
-    const next = prev.then(run, run);
-    chains.set(this.libraryId, next.catch(() => undefined));
-    return next;
+    return queue.run(this.libraryId, run);
   }
 }

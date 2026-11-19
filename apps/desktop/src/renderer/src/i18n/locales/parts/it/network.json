@@ -190,7 +190,9 @@
     },
     "card": {
       "topic": "Argomento: {{topic}}",
-      "actions": "Azioni sul documento"
+      "actions": "Azioni sul documento",
+      "topicActions": "Azioni dell'argomento",
+      "openTopic": "Apri l'argomento"
     },
     "minimap": "Mostra la minimappa",
     "minimapLabel": "Minimappa: trascina il rettangolo per spostare la vista",
@@ -310,6 +312,8 @@
       "sizeBy_equal": "Tutti uguali",
       "sharedThemes": "Mostra temi in comune",
       "cutHint": "oltre il limite",
+      "nbhd": "Vicinato di {{name}}",
+      "nbhdBack": "Torna alla rete intera",
       "cutShown": "Mostrato senza i suoi collegamenti: è oltre gli {{limit}} nodi che la rete può contenere.",
       "lowered": "Mostro anche {{kind}} con 1 documento."
     },

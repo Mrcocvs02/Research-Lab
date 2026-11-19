@@ -38,6 +38,8 @@ export interface EntityRequest {
   minDocs: number;
   minWeight: number;
   limit: number;
+  /** An entity id: the result is this node and its heaviest neighbours (up to `limit`), not the biggest nodes. */
+  focus?: string | undefined;
 }
 
 export interface EntityNode {
@@ -155,7 +157,18 @@ export function buildEntityNetwork(input: EntityInput, req: EntityRequest, alias
   };
   const finish = (nodes: EntityNode[], edges: EntityEdge[]): EntityNetwork => {
     const kept = nodes.filter((n) => n.count >= req.minDocs).sort((a, b) => b.count - a.count || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    const top = kept.slice(0, Math.min(req.limit, ENTITY_LIMIT));
+    const cap = Math.min(req.limit, ENTITY_LIMIT);
+    let top = kept.slice(0, cap);
+    const center = req.focus === undefined ? undefined : nodes.find((n) => n.id === req.focus);
+    if (center) {
+      const byId = new Map(kept.map((n) => [n.id, n]));
+      const near = edges
+        .filter((e) => (e.a === center.id || e.b === center.id) && e.w >= req.minWeight)
+        .sort((x, y) => y.w - x.w || (x.a + x.b < y.a + y.b ? -1 : 1))
+        .map((e) => (e.a === center.id ? e.b : e.a))
+        .filter((id) => byId.has(id));
+      top = [center, ...[...new Set(near)].slice(0, cap - 1).map((id) => byId.get(id)!)];
+    }
     const ids = new Set(top.map((n) => n.id));
     return { nodes: top, edges: topEdges(edges.filter((e) => ids.has(e.a) && ids.has(e.b)), req.minWeight), total: kept.length, truncated: kept.length > top.length, ...(yearRange ? { yearRange } : {}), documents: docs.length };
   };

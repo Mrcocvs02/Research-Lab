@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { areaFallback, assignAreaSlots, chromaFactor, colorCache, mainArea, mixAreaColor, OTHER, type AreaDef } from './areaColors';
+import { areaFallback, areaNoteNeeded, assignAreaSlots, userTint, withUserTints, chromaFactor, colorCache, mainArea, mixAreaColor, OTHER, type AreaDef } from './areaColors';
 import { AREA_DARK, AREA_LIGHT, contrast, fromOklch, parseColor, toOklab } from './colors';
 
 const def = (id: string, count: number): AreaDef => ({ id, label: id, count, branches: [] });
@@ -90,5 +90,34 @@ describe('area tokens of palette.css (section 18.3.5)', () => {
     expect(block(":root[data-theme='dark']")).toEqual([...AREA_DARK]);
     for (const c of block(':root {')) expect(contrast(c, '#f6f5f1')).toBeGreaterThanOrEqual(3);
     for (const c of block(":root[data-theme='dark']")) expect(contrast(c, '#121316')).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('user colour of an area node and the colour notes', () => {
+  const tokens = [...AREA_LIGHT];
+  const defs = (color?: string): AreaDef[] => [
+    { id: 'a', label: 'A', count: 5, branches: [], color },
+    { id: 'b', label: 'B', count: 4, branches: [] },
+  ];
+  it('keeps the arguments when no area has a colour and appends a readable token for one that has', () => {
+    const same = withUserTints(defs(), [0, 1], tokens, '#f6f5f1');
+    expect(same.tokens).toBe(tokens);
+    const u = withUserTints(defs('#ffff00'), [0, 1], tokens, '#f6f5f1');
+    expect(u.slots[1]).toBe(1);
+    expect(u.slots[0]).toBe(tokens.length);
+    expect(contrast(u.tokens[u.slots[0]!]!, '#f6f5f1')).toBeGreaterThanOrEqual(3);
+    expect(mixAreaColor([[0, -1, 100]], 100, u.slots, u.tokens)).not.toBeNull();
+  });
+  it('brings a colour into the lightness range of the tints with a chroma of at most 0.16', () => {
+    const c = userTint('#ffffff', tokens, '#f6f5f1');
+    expect(contrast(c, '#f6f5f1')).toBeGreaterThanOrEqual(3);
+  });
+  it('asks for a note when the topics colour the nodes or few nodes have an area, not otherwise', () => {
+    const d = defs();
+    const n = (has: boolean) => ({ ar: has ? [[0, -1, 100]] : undefined });
+    expect(areaNoteNeeded(d, [n(true), n(true), n(false)])).toBe(false);
+    expect(areaNoteNeeded(d, [n(true), ...Array.from({ length: 9 }, () => n(false))])).toBe(true);
+    expect(areaNoteNeeded(d, [n(false), n(false)])).toBe(true);
+    expect(areaNoteNeeded(undefined, [n(true)])).toBe(true);
   });
 });

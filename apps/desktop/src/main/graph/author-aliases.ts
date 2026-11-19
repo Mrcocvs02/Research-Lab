@@ -4,6 +4,7 @@ import { authorAliasesSchema } from '@rl/core';
 import { atomicWriteFile } from '@rl/core/node';
 import type { AuthorAliases } from '@rl/graph';
 import type { LibraryRuntime } from '../library/library-runtime.js';
+import { KeyedQueue } from '../keyed-queue.js';
 
 /**
  * The user's corrections to the authors (D-386, D-454): `<dataDir>/graph/author-aliases.json`, in the synced data folder,
@@ -25,7 +26,7 @@ interface Cached {
 }
 
 const cache = new WeakMap<object, Cached>();
-const tails = new Map<string, Promise<unknown>>();
+const queue = new KeyedQueue();
 
 const fileOf = (rt: Pick<LibraryRuntime, 'store'>): string => path.join(rt.store.dataDir, 'graph', 'author-aliases.json');
 const hasFolder = (rt: Pick<LibraryRuntime, 'store'>): boolean => typeof rt.store?.dataDir === 'string';
@@ -87,8 +88,5 @@ export function editAuthorAliases(rt: LibraryRuntime, edit: AuthorEdit): Promise
     cache.delete(rt);
     return (await readAuthorAliases(rt)).aliases;
   };
-  const prev = tails.get(file) ?? Promise.resolve();
-  const turn = prev.then(run, run);
-  tails.set(file, turn.catch(() => {}));
-  return turn;
+  return queue.run(file, run);
 }

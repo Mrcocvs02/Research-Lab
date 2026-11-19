@@ -2,6 +2,7 @@ import { mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { discoverRunSchema, itemIdSchema, type DiscoverRun, type DiscoverRunSummary } from '@rl/core';
 import { atomicWriteJson } from '@rl/core/node';
+import { KeyedQueue } from '../../keyed-queue.js';
 
 /**
  * `discover/runs/<id>.json` in the data folder (§17.4.17): the parameters, candidates, scores, reasons and state of each one.
@@ -30,17 +31,9 @@ export async function readRun(dataDir: string, id: string): Promise<DiscoverRun 
   }
 }
 
-const chains = new Map<string, Promise<unknown>>();
+const queue = new KeyedQueue();
 /** Runs `fn` after every earlier read-modify-write of the same run (candidates are marked quickly; summaries and re-runs write the whole file). */
-export function serialRun<T>(id: string, fn: () => Promise<T>): Promise<T> {
-  const next = (chains.get(id) ?? Promise.resolve()).then(fn, fn);
-  const tail = next.then(() => undefined, () => undefined);
-  chains.set(id, tail);
-  void tail.then(() => {
-    if (chains.get(id) === tail) chains.delete(id);
-  });
-  return next;
-}
+export const serialRun = <T>(id: string, fn: () => Promise<T>): Promise<T> => queue.run(id, fn);
 
 export async function writeRun(dataDir: string, run: DiscoverRun): Promise<void> {
   await mkdir(dir(dataDir), { recursive: true });

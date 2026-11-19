@@ -8,6 +8,8 @@ export interface AreaNode {
   label: string;
   parents: readonly string[];
   status?: string | undefined;
+  /** The colour the user gave to the node (`#rrggbb`): it wins over the tint of the area (§18.3.4). */
+  color?: string | undefined;
 }
 export interface AreaDoc {
   id: string;
@@ -27,6 +29,8 @@ export interface AreaSummary {
   label: string;
   count: number;
   branches: Array<{ id: string; count: number }>;
+  /** The user's colour of the area node, when it has one. */
+  color?: string;
 }
 export interface AreaModel {
   areas: AreaSummary[];
@@ -152,7 +156,8 @@ export function computeAreas(nodes: readonly AreaNode[], docs: readonly AreaDoc[
   const areas: AreaSummary[] = ordered.map((a) => {
     const bd = [...(branchDocs.get(a) ?? [])].filter(([b]) => b !== '').sort((x, y) => y[1] - x[1] || cmp(x[0], y[0]));
     branchIndex.set(a, new Map(bd.map(([b], i) => [b, i])));
-    return { id: a, label: live.get(a)?.label ?? a, count: areaDocs.get(a)!, branches: bd.map(([id, count]) => ({ id, count })) };
+    const color = live.get(a)?.color;
+    return { id: a, label: live.get(a)?.label ?? a, count: areaDocs.get(a)!, branches: bd.map(([id, count]) => ({ id, count })), ...(color && /^#[0-9a-f]{6}$/i.test(color) ? { color } : {}) };
   });
 
   // 4-5. Shares, purity and centrality of every document.

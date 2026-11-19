@@ -5,10 +5,11 @@ import { AppError, contentHashOf, documentIdSchema, REFS_LIMITS, type DocumentId
 import { atomicWriteJson } from '@rl/core/node';
 import { callStructured } from '../../analysis/call.js';
 import { createToolsHost } from '../../ai/tools-host.js';
-import { availability, loadCtx, monthUsage, type AiCtx } from '../../ai/service.js';
+import { availability, loadCtx, monthUsage, type AiCtx, providerError } from '../../ai/service.js';
 import { aiSends, isToolPurpose, monthOf } from '../../ai/usage.js';
 import type { MainServices } from '../../ipc/handlers/services.js';
 import { costDecision } from '../ai/batch.js';
+import { getRecord } from '../ai/pick.js';
 import { readLiterature } from '../literature/store.js';
 import { cleanGuide, guideFromNote, guidePrompt, guideSchema, guideSystem, GUIDE_APPROX_TOKENS, GUIDE_PAGES, GUIDE_TEXT_CHARS, GUIDE_VERSION } from './prompt.js';
 
@@ -37,12 +38,6 @@ async function readGuide(dataDir: string, docId: string, hash: string): Promise<
   } catch {
     return null;
   }
-}
-
-async function getRecord(ctx: AiCtx, docId: string): Promise<DocumentRecord> {
-  const rec = await ctx.rt.store.documents.get(documentIdSchema.parse(docId) as DocumentId);
-  if (!rec) throw new AppError('NOT_FOUND', 'Unknown document');
-  return rec;
 }
 
 export async function getGuide(s: MainServices, req: { docId: string }) {
@@ -92,7 +87,7 @@ export async function prepareGuide(s: MainServices, req: { docId: string; confir
   if (cap !== null && (await monthUsage(rt, monthOf(new Date()))).usd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached');
   const provider = ctx.provider;
   const av = await availability(s, provider);
-  if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
+  if (!av.available || !provider) throw providerError(av);
   const deviceId = (await s.settings.get()).deviceId;
   const { value: raw } = await callStructured(
     { s, ctx, provider, signal: new AbortController().signal, confirmed: true, deviceId, addUsd: () => {} },

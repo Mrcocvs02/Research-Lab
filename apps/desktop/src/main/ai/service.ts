@@ -57,6 +57,18 @@ export async function monthUsage(rt: LibraryRuntime, month: string): Promise<Usa
   return summariseUsage(entries, month);
 }
 
+/** Refuses a model that is not one of the configured ones. */
+export function assertModel(cfg: { ai: { models: ReadonlyArray<{ id: string }> } }, id: string): void {
+  if (!cfg.ai.models.some((m) => m.id === id)) throw new AppError('INVALID_REQUEST', 'Unknown model');
+}
+
+/** The refusal when Claude cannot be used now (`availability` said so). */
+export const providerError = (av: { reason?: string }): AppError =>
+  new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
+
+/** The refusal when the monthly spending cap is reached. */
+export const capError = (monthUsd: number, cap: number): AppError => new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached', { monthUsd, capUsd: cap });
+
 /** Can Claude be used now? No token is spent. The reason says what is missing. */
 export async function availability(s: MainServices, provider: AiProviderEx | null): Promise<{ available: boolean; auth: AiStatus['auth']; reason?: 'no-access' | 'offline' | 'error' }> {
   if (!provider) return { available: false, auth: 'none', reason: 'error' };
@@ -302,7 +314,7 @@ export async function allowedHistory(rt: LibraryRuntime, cfg: LibraryConfig, tur
 /** Validates and starts a turn; returns at once, the turn streams `chat:event`s. */
 export async function startChatTurn(s: MainServices, input: SendInput): Promise<{ conversationId: string; turnId: string }> {
   const ctx = await loadCtx(s);
-  if (!ctx.cfg.ai.models.some((m) => m.id === input.model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
+  assertModel(ctx.cfg, input.model);
   if (running.size > 0) throw new AppError('CONFLICT', 'Another answer is still being written', { reason: 'turn-running' });
   // The one-turn slot is taken here, with no await between the check and the reservation; every early exit gives it back.
   const turnId = randomUUID();
@@ -333,11 +345,11 @@ async function prepareTurn(s: MainServices, ctx: AiCtx, input: SendInput, turnId
   // 1. Monthly cap, before anything else.
   const monthUsd = (await monthUsage(rt, monthOf(new Date()))).usd;
   const cap = cfg.ai.usageCap.monthlyUsd;
-  if (cap !== null && monthUsd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached', { monthUsd, capUsd: cap });
+  if (cap !== null && monthUsd >= cap) throw capError(monthUsd, cap);
   await assertTokenCap(s, 0);
   // 2. Access: nothing else of the app depends on it.
   const av = await availability(s, provider);
-  if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
+  if (!av.available || !provider) throw providerError(av);
   // 3. Context documents: only from enabled folders. A refusal stops the whole send (nothing partial goes).
   const wasConfirmed = existing?.confirmed === true;
   const { preview, docs } = await computePreview(s, ctx, { purpose: mode === 'search' ? 'search' : 'chat', model: input.model, docIds: input.contextDocIds, promptChars: input.text.length, conversationConfirmed: wasConfirmed });

@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { useLocalFlag } from '../../lib/useLocalFlag';
 import { safeText } from '../library/safeText';
 import { AREA_TINTS } from './colors';
-import { OTHER, type AreaDef } from './areaColors';
+import { useNav } from '../../lib/nav';
+import { OTHER, areaFallback, type AreaDef } from './areaColors';
+import { Pill } from './NetChrome';
 
 /** Whether nodes are coloured by macro-area (true, the default) or by topic (D-483), remembered as a per-viewer convenience. */
 export const useAreaColors = (): [boolean, (v: boolean) => void] => useLocalFlag('rl.map.areaColors', true);
@@ -38,8 +40,8 @@ export function AreaLegend({ defs, slots, without, onLight, onIsolate }: Props) 
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [iso, onIsolate]);
-  const shown = defs.map((d, i) => ({ d, i })).filter(({ i }) => slots[i] !== OTHER);
-  const rest = defs.map((d, i) => ({ d, i })).filter(({ i }) => slots[i] === OTHER);
+  const shown = defs.map((d, i) => ({ d, i })).filter(({ i }) => (slots[i] !== OTHER || !!defs[i]?.color));
+  const rest = defs.map((d, i) => ({ d, i })).filter(({ i }) => (slots[i] === OTHER && !defs[i]?.color));
   const row = (d: AreaDef, i: number, testId: string, color: string) => (
     <li key={d.id}>
       <button
@@ -68,7 +70,7 @@ export function AreaLegend({ defs, slots, without, onLight, onIsolate }: Props) 
   return (
     <ul className="legend area-legend" data-testid="area-legend" aria-label={t('network.area.areaLegend')}>
       <li className="legend-title hint">{t('network.area.areaLegend')}</li>
-      {shown.map(({ d, i }) => row(d, i, 'area-item', token(slots[i]!)))}
+      {shown.map(({ d, i }) => row(d, i, 'area-item', d.color ?? token(slots[i]!)))}
       {rest.length > 0 && (
         <li className="hint legend-more" data-testid="area-other" title={rest.map(({ d }) => safeText(d.label)).join(', ')}>
           <span className="rl-swatch area-dot" style={{ background: token(OTHER) }} aria-hidden="true" /> {t('network.area.areaOther', { count: rest.length })}
@@ -84,5 +86,36 @@ export function AreaLegend({ defs, slots, without, onLight, onIsolate }: Props) 
         <span>{t('network.area.areaKey')}</span>
       </li>
     </ul>
+  );
+}
+
+/**
+ * The note of the colour fallbacks (section 18.3.6) for the views that draw the network: no tag (or one area only) -> the topics colour
+ * the nodes; few nodes with an area -> areas, with the way back to topics. Null when nothing needs saying.
+ */
+export function AreaNote({ testId, defs, withArea, total, onTopics }: { testId: string; defs: readonly AreaDef[] | undefined; withArea: number; total: number; onTopics(): void }) {
+  const { t } = useTranslation();
+  const nav = useNav();
+  const fb = areaFallback(defs, withArea, total);
+  if (fb.use === 'topics') {
+    return (
+      <Pill testId={testId}>
+        {t(fb.reason === 'single' ? 'network.area.areaSingle' : 'network.area.areaNoTags')}
+        {fb.reason !== 'single' && (
+          <button type="button" className="link" onClick={() => nav.navigate({ view: 'settings' })}>
+            {t('network.area.manageTags')}
+          </button>
+        )}
+      </Pill>
+    );
+  }
+  if (fb.sparse === undefined) return null;
+  return (
+    <Pill testId={testId}>
+      {t('network.area.areaSparse', { count: fb.sparse })}
+      <button type="button" className="link" onClick={onTopics}>
+        {t('network.area.areaByTopic')}
+      </button>
+    </Pill>
   );
 }

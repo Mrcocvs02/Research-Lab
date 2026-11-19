@@ -13,6 +13,7 @@ import { getPdfSync } from '../../study/pdf-sync.js';
 import { scheduleRepairJob } from '../../study/repair-job.js';
 import { openPdfHandle, presentPdf } from './doc-files.js';
 import type { MainServices } from './services.js';
+import { KeyedQueue } from '../../keyed-queue.js';
 
 export const readerHandlers = (s: MainServices): DomainHandlers<'reader'> => ({
   'reader:open': async ({ docId }) => {
@@ -41,21 +42,6 @@ export const readerHandlers = (s: MainServices): DomainHandlers<'reader'> => ({
     return { ok: true as const };
   },
 });
-
-/** Runs the tasks of one key one after the other; a failed task does not stop the next. */
-class KeyedQueue {
-  private readonly tails = new Map<string, Promise<unknown>>();
-  run<T>(key: string, task: () => Promise<T>): Promise<T> {
-    const prev = this.tails.get(key) ?? Promise.resolve();
-    const next = prev.then(task, task);
-    const tail = next.catch(() => {});
-    this.tails.set(key, tail);
-    void tail.then(() => {
-      if (this.tails.get(key) === tail) this.tails.delete(key);
-    });
-    return next;
-  }
-}
 
 /** Markdown to a short plain text: no markers, one line. */
 export function plainExcerpt(markdown: string, max: number = STUDY_LIMITS.excerpt): string {

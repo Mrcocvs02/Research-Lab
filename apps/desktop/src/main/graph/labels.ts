@@ -2,7 +2,7 @@ import { folderOf, aiVisible } from '@rl/ai';
 import { AppError, type LibraryConfig, type ReasoningLevel } from '@rl/core';
 import { modelVector, topTermsOf, type GraphModel } from '@rl/graph';
 import { z } from 'zod';
-import { availability, computePreview, loadCtx, monthUsage, type AiPreview } from '../ai/service.js';
+import { availability, computePreview, loadCtx, monthUsage, type AiPreview, providerError, capError, assertModel } from '../ai/service.js';
 import { assertTokenCap, noteSend } from '../ai/token-cap.js';
 import { monthOf, usdOfUsage } from '../ai/usage.js';
 import type { MainServices } from '../ipc/handlers/services.js';
@@ -142,14 +142,14 @@ export async function labelClusters(s: MainServices, req: { clusterIds: string[]
 
 async function sendLabels(s: MainServices, ctx: Awaited<ReturnType<typeof loadCtx>>, req: { clusterIds: string[]; model: string; reasoning: ReasoningLevel; confirmed: boolean }): Promise<{ labelled: number }> {
   const { rt, cfg, provider } = ctx;
-  if (!cfg.ai.models.some((m) => m.id === req.model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
+  assertModel(cfg, req.model);
   // 1. Monthly cap. 2. Access.
   const monthUsd = (await monthUsage(rt, monthOf(new Date()))).usd;
   const cap = cfg.ai.usageCap.monthlyUsd;
-  if (cap !== null && monthUsd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached', { monthUsd, capUsd: cap });
+  if (cap !== null && monthUsd >= cap) throw capError(monthUsd, cap);
   await assertTokenCap(s, 0);
   const av = await availability(s, provider);
-  if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
+  if (!av.available || !provider) throw providerError(av);
   // 3. The documents whose titles go: only those of enabled folders.
   const plan = await prepare(s, rt, cfg, req.clusterIds);
   if (plan.entries.length === 0) throw new AppError('FOLDER_NOT_AI_ENABLED', 'None of the clusters has documents in a folder enabled for AI', { docIds: plan.refused.slice(0, 50) });

@@ -111,3 +111,11 @@ describe('stored links', () => {
     expect((await readLinks(dir)).dismissed).toHaveLength(5);
   });
 });
+
+describe('running searches', () => {
+  it('know nothing about a token that is not running', async () => {
+    const f = await import('./index.js');
+    expect(f.linkProgress('none')).toEqual({ done: 0, total: 0 });
+    expect(f.cancelLinks('none')).toEqual({ cancelled: false });
+  });
+});

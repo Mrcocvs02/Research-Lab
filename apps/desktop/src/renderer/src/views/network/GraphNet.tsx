@@ -14,8 +14,8 @@ import { useLocalFlag } from '../../lib/useLocalFlag';
 import { safeText } from '../library/safeText';
 import { reasonLine, weightBar, type LinkReasons } from '../links/reasons';
 import { reducedMotion } from './camera';
-import { AreaLegend, useAreaColors } from './AreaLegend';
-import { areaSummary, assignAreaSlots, colorCache, loadAreaMemo, mainArea, saveAreaMemo, shareIn, type AreaDef } from './areaColors';
+import { AreaLegend, AreaNote, useAreaColors } from './AreaLegend';
+import { areaNoteNeeded, areaSummary, withUserTints, assignAreaSlots, colorCache, loadAreaMemo, mainArea, saveAreaMemo, shareIn, type AreaDef } from './areaColors';
 import { Segmented } from '../../components/Segmented';
 import { assignKeyTints, mix, readTheme, type MapTheme } from './colors';
 import { controlPoint, edgeAlpha, edgeWidths, fillTapered, MAX_CURVED, STRAIGHT_ALPHA, straightWidth } from './edges';
@@ -223,7 +223,8 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         if (!ar.on) return null;
         const c = areaPaint.current;
         if (c && c.dark === dark && c.slots === ar.slots) return c.fn;
-        const fn = colorCache(ar.slots, th.areas);
+        const u = withUserTints(ar.defs, ar.slots, th.areas, th.bg);
+        const fn = colorCache(u.slots, u.tokens);
         areaPaint.current = { dark, slots: ar.slots, fn };
         return fn;
       })();
@@ -793,6 +794,7 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
     afterChange();
   };
 
+  const docNodes = [...net.nodes.values()].filter((n) => n.kind === 'doc');
   let pill: ReactNode = null;
   if (bridgeFrom) {
     pill = (
@@ -820,6 +822,8 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
         )}
       </Pill>
     );
+  } else if (byArea && areaState && count > 0 && areaNoteNeeded(areaState.defs, docNodes)) {
+    pill = <AreaNote testId="net-color-note" defs={areaState.defs} withArea={docNodes.filter((n) => n.ar && n.ar.length > 0).length} total={docNodes.length} onTopics={() => setByArea(false)} />;
   } else if (hint && count > 0) {
     pill = <Pill testId="net-hint">{t('network.hint')}</Pill>;
   }

@@ -1,7 +1,10 @@
 import { aiVisible, approxTokens, folderOf } from '@rl/ai';
 import { AppError, documentIdSchema, type DocumentId, type DocumentRecord, type Outline } from '@rl/core';
 import { callStructured } from '../../analysis/call.js';
-import { availability, loadCtx, monthUsage, type AiCtx } from '../../ai/service.js';
+import { availability, loadCtx, monthUsage, type AiCtx, providerError } from '../../ai/service.js';
+import { modelOf } from '../ai/pick.js';
+
+export { modelOf };
 import { aiSends, isToolPurpose, monthOf } from '../../ai/usage.js';
 import type { MainServices } from '../../ipc/handlers/services.js';
 import { costDecision } from '../ai/batch.js';
@@ -23,12 +26,6 @@ const startOfLocalDay = (): string => {
 };
 export const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n)}…` : t);
 export const oneLine = (t: string) => t.replace(/\s+/g, ' ').trim();
-
-export const modelOf = (ctx: AiCtx, wanted?: string): string => {
-  const model = wanted ?? ctx.cfg.ai.defaultModel;
-  if (!ctx.cfg.ai.models.some((m) => m.id === model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
-  return model;
-};
 
 /** Tokens and cost of one send; the dialog is always shown (text of the user, D-416). */
 export async function costs(ctx: AiCtx, model: string, chars: number, outTokens: number) {
@@ -59,7 +56,7 @@ export async function send<T>(s: MainServices, ctx: AiCtx, input: { purpose: str
   const cap = cfg.ai.usageCap.monthlyUsd;
   if (cap !== null && (await monthUsage(rt, monthOf(new Date()))).usd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached');
   const av = await availability(s, ctx.provider);
-  if (!av.available || !ctx.provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
+  if (!av.available || !ctx.provider) throw providerError(av);
   const deviceId = (await s.settings.get()).deviceId;
   const { value } = await callStructured({ s, ctx, provider: ctx.provider, signal: new AbortController().signal, confirmed, deviceId, addUsd: () => {} }, { ...input, reasoning: cfg.ai.defaultReasoning, folders: await foldersOf(ctx, input.docIds) });
   return value;

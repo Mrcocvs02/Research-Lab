@@ -129,6 +129,8 @@ export const graphChannels = defineChannels('graph', {
       minDocs: z.number().int().min(1).max(1000).default(2),
       minWeight: z.number().min(0).max(1).default(0),
       limit: z.number().int().min(1).max(GRAPH_LIMITS.entityNodes).default(GRAPH_LIMITS.entityNodes),
+      /** An entity id: the network is that node with its heaviest neighbours, within `limit` ("Go to" for an entity beyond the cap). */
+      focus: z.string().max(1100).optional(),
     }),
     response: z.object({
       nodes: z.array(

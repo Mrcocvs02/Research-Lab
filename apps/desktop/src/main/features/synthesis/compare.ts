@@ -6,7 +6,8 @@ import { COMPARE_BLOCK, COMPARE_PAPER_CHARS, COMPARE_TOKENS, COMPARE_VERSION, cl
 import { AppError, COMPARE_LIMITS, documentIdSchema, itemIdSchema, type CompareCell, type CompareColumn, type CompareRow, type CompareTable, type DocumentId, type DocumentRecord, type LiteratureKey } from '@rl/core';
 import { atomicWriteJson, atomicWriteFile } from '@rl/core/node';
 import { callStructured } from '../../analysis/call.js';
-import { availability, loadCtx, monthUsage, type AiCtx } from '../../ai/service.js';
+import { availability, loadCtx, monthUsage, type AiCtx, providerError } from '../../ai/service.js';
+import { cheapModel } from '../ai/pick.js';
 import { createToolsHost } from '../../ai/tools-host.js';
 import { aiSends, isToolPurpose, monthOf } from '../../ai/usage.js';
 import type { MainServices } from '../../ipc/handlers/services.js';
@@ -27,13 +28,6 @@ const startOfLocalDay = (): string => {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return d.toISOString();
-};
-
-/** The cheap model by default: the configured one whose id says "haiku", else the default. */
-export const cheapModel = (models: ReadonlyArray<{ id: string }>, fallback: string, wanted?: string): string => {
-  const m = wanted ?? models.find((x) => /haiku/i.test(x.id))?.id ?? fallback;
-  if (!models.some((x) => x.id === m)) throw new AppError('INVALID_REQUEST', 'Unknown model');
-  return m;
 };
 
 interface Paper {
@@ -198,7 +192,7 @@ export async function runCompare(s: MainServices, req: { token: string; docIds: 
     const cap = cfg.ai.usageCap.monthlyUsd;
     if (cap !== null && (await monthUsage(rt, monthOf(new Date()))).usd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached');
     const av = await availability(s, ctx.provider);
-    if (!av.available || !ctx.provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
+    if (!av.available || !ctx.provider) throw providerError(av);
   }
   const ctl = new AbortController();
   running.get(req.token)?.abort();

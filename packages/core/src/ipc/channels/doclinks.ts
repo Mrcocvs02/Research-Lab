@@ -23,9 +23,15 @@ export const doclinksChannels = defineChannels('doclinks', {
         z.object({ all: z.literal(true) }),
       ]),
       strictness: z.enum(['strict', 'normal', 'wide']).default('normal'),
+      /** Names the search so that `progress` and `cancel` can find it. */
+      token: z.string().min(1).max(60).optional(),
     }),
     response: z.object({ runId: z.string(), threshold: z.number(), added: items, below: items, scanned: z.number(), skipped: z.object({ dismissed: z.number(), existing: z.number() }) }),
   },
+  /** How many targets were scored so far (0 of 0 until the search knows them). */
+  progress: { request: z.object({ token: z.string().min(1).max(60) }), response: z.object({ done: z.number().int().nonnegative(), total: z.number().int().nonnegative() }) },
+  /** Stops a search: nothing is added (CANCELLED to the caller of `find`). */
+  cancel: { request: z.object({ token: z.string().min(1).max(60) }), response: z.object({ cancelled: z.boolean() }) },
   list: { request: z.object({ docId: documentIdSchema }), response: z.object({ items }) },
   /** `forget` (undo of a search) does not remember the pairs as dismissed. */
   remove: { request: z.object({ ids: z.array(z.string().max(40)).min(1).max(5000), forget: z.boolean().optional() }), response: z.object({ removed: z.number() }) },

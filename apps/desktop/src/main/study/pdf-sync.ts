@@ -31,6 +31,7 @@ import type { PlanAnnot, SyncResult } from '@rl/data/pdf-annot';
 import type { LibraryRuntime } from '../library/library-runtime.js';
 import type { MainServices } from '../ipc/handlers/services.js';
 import { Journal, LockedError, copyOriginal, fingerprint, replaceGuarded, sameFingerprint, tempNameFor, writeTempTruncated, writeTempWithAppend } from './pdf-files.js';
+import { KeyedQueue } from '../keyed-queue.js';
 
 type Plan = Extract<SyncResult, { ok: true }>;
 const PDF_EXT = /\.pdf$/i;
@@ -50,18 +51,6 @@ interface Mem {
   dropped?: { hash: string; n: number };
 }
 
-/** Runs the tasks of one key one after the other; a failed task does not stop the next. */
-class Queue {
-  private readonly tails = new Map<string, Promise<unknown>>();
-  run<T>(key: string, task: () => Promise<T>): Promise<T> {
-    const next = (this.tails.get(key) ?? Promise.resolve()).then(task, task);
-    const tail = next.catch(() => {});
-    this.tails.set(key, tail);
-    void tail.then(() => this.tails.get(key) === tail && this.tails.delete(key));
-    return next;
-  }
-}
-
 interface Job { controller: AbortController; state: 'running' | 'done' | 'cancelled' }
 
 export class PdfSync {
@@ -69,7 +58,7 @@ export class PdfSync {
   private readonly journal: Journal;
   private local: LocalFile | null = null;
   private readonly mem = new Map<string, Mem>();
-  private readonly queue = new Queue();
+  private readonly queue = new KeyedQueue();
   private readonly jobs = new Map<string, Job>();
   /** Hash and size of the files this process is about to put in place: the watcher event of our own replacement is recognised (§8.3.3 step 7). */
 

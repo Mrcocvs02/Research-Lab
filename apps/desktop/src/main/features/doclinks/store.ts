@@ -2,6 +2,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { docLinksFileSchema, type DocLinksFile } from './schema.js';
 import { atomicWriteJson } from '@rl/core/node';
+import { KeyedQueue } from '../../keyed-queue.js';
 
 /**
  * `links/doc-links.json` in the data folder (§18.2): the links between documents and the pairs the user removed. The pair is
@@ -33,7 +34,7 @@ export async function readLinks(dataDir: string): Promise<DocLinksFile> {
   return { ...EMPTY, links: [], dismissed: [] };
 }
 
-const chains = new Map<string, Promise<unknown>>();
+const queue = new KeyedQueue();
 
 /** Reads the file, lets `fn` change it, writes it when `fn` returns true; after every earlier change of the same folder. Resolves with what `fn` returned. */
 export function mutateLinks<T>(dataDir: string, fn: (file: DocLinksFile) => { changed: boolean; value: T }): Promise<T> {
@@ -46,11 +47,5 @@ export function mutateLinks<T>(dataDir: string, fn: (file: DocLinksFile) => { ch
     }
     return out.value;
   };
-  const next = (chains.get(dataDir) ?? Promise.resolve()).then(run, run);
-  const tail = next.then(() => undefined, () => undefined);
-  chains.set(dataDir, tail);
-  void tail.then(() => {
-    if (chains.get(dataDir) === tail) chains.delete(dataDir);
-  });
-  return next;
+  return queue.run(dataDir, run);
 }

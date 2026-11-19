@@ -17,7 +17,7 @@ import type { OrganizerStore } from '@rl/data';
 import { AppError, itemIdSchema, type DocumentRecord, type ReasoningLevel, type TaxonomyFile, type TaxonomyNode } from '@rl/core';
 import type { MainServices } from '../ipc/handlers/services.js';
 import { trackAbort } from '../ai/abort-registry.js';
-import { availability, computePreview, loadCtx, monthUsage } from '../ai/service.js';
+import { availability, computePreview, loadCtx, monthUsage, providerError, capError, assertModel } from '../ai/service.js';
 import { assertTokenCap } from '../ai/token-cap.js';
 import { monthOf } from '../ai/usage.js';
 import { callStructured, strongModel, type Runner } from './call.js';
@@ -94,13 +94,13 @@ const nodeView = (n: TaxonomyNode): CandidateNode => ({ id: n.id, label: n.label
 export async function runTaxonomyJob(s: MainServices, req: { mode: 'build' | 'extend'; model: string; reasoning: ReasoningLevel; confirmed: boolean }): Promise<{ added: number; calls: number }> {
   const ctx = await loadCtx(s);
   const { rt, cfg, provider } = ctx;
-  if (!cfg.ai.models.some((m) => m.id === req.model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
+  assertModel(cfg, req.model);
   const cap = cfg.ai.usageCap.monthlyUsd;
   const monthUsd = (await monthUsage(rt, monthOf(new Date()))).usd;
-  if (cap !== null && monthUsd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached', { monthUsd, capUsd: cap });
+  if (cap !== null && monthUsd >= cap) throw capError(monthUsd, cap);
   await assertTokenCap(s, 0);
   const av = await availability(s, provider);
-  if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
+  if (!av.available || !provider) throw providerError(av);
 
   const all = (await rt.store.documents.list()).filter((d) => !d.missing && aiVisible(d.path, cfg));
   if (all.length === 0) throw new AppError('INVALID_REQUEST', 'No document is in a folder enabled for AI', { reason: 'nothing-to-send' });

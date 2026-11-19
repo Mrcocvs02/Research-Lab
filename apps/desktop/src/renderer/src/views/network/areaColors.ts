@@ -1,4 +1,4 @@
-import { AREA_TINTS, fromOklch, toOklab } from './colors';
+import { AREA_TINTS, fromOklch, readableColor, toOklab } from './colors';
 
 /**
  * Colour of a node by macro-area (D-483, section 18.3.4 step 7). The main process sends integer shares (`ar`) and the
@@ -10,6 +10,8 @@ export interface AreaDef {
   label: string;
   count: number;
   branches: ReadonlyArray<{ id: string; count: number }>;
+  /** The colour the user gave to the area node (`#rrggbb`). */
+  color?: string | undefined;
 }
 /** Up to three triples `[area index, branch index (-1: none), share x 100]`. */
 export type AreaTriples = ReadonlyArray<ReadonlyArray<number>>;
@@ -111,6 +113,35 @@ export function mixAreaColor(ar: AreaTriples | undefined, az: number, slots: rea
   return fromOklch(L, mag < 0.01 ? 0 : k * C, Math.atan2(b, a));
 }
 
+/**
+ * The colour the user chose for an area node, brought into the palette (§18.3.4): lightness within the range of the seven tints of
+ * the theme, chroma at most 0.16, then readable on the background (>= 3:1) or the nearest tint.
+ */
+export function userTint(color: string, tokens: readonly string[], bg: string): string {
+  const tints = tokens.slice(0, AREA_TINTS);
+  const ls = tints.map((c) => toOklab(c)[0]);
+  const [l, a, b] = toOklab(color);
+  const L = Math.min(Math.max(l, Math.min(...ls)), Math.max(...ls));
+  const C = Math.min(Math.hypot(a, b), 0.16);
+  return readableColor(fromOklch(L, C, Math.atan2(b, a)), bg, tints);
+}
+
+/**
+ * The slots and tokens to mix with: an area with a colour of the user takes an extra token (after the nine of the theme) instead of
+ * its tint. Without user colours the arguments come back as they are.
+ */
+export function withUserTints(defs: readonly AreaDef[], slots: readonly number[], tokens: readonly string[], bg: string): { slots: readonly number[]; tokens: readonly string[] } {
+  if (!defs.some((d) => d.color)) return { slots, tokens };
+  const ext = [...tokens];
+  const next = slots.map((s, i) => {
+    const c = defs[i]?.color;
+    if (!c) return s;
+    ext.push(userTint(c, tokens, bg));
+    return ext.length - 1;
+  });
+  return { slots: next, tokens: ext };
+}
+
 /** A cache of the colours of nodes by their shares, valid for one palette and theme (the key is the data itself). */
 export function colorCache(slots: readonly number[], tokens: readonly string[]): (ar: AreaTriples | undefined, az: number | undefined) => string | null {
   const memo = new Map<string, string | null>();
@@ -138,6 +169,12 @@ export function areaFallback(defs: readonly AreaDef[] | undefined, withArea: num
   if (defs.length === 1) return { use: 'topics', reason: 'single' };
   if (total > 0 && withArea / total < 0.2) return { use: 'areas', sparse: withArea };
   return { use: 'areas' };
+}
+
+/** Whether the colour note (fallback to topics, or few nodes with an area) must be shown for these nodes. */
+export function areaNoteNeeded(defs: readonly AreaDef[] | undefined, nodes: ReadonlyArray<{ ar?: AreaTriples | undefined }>): boolean {
+  const f = areaFallback(defs, nodes.filter((n) => n.ar && n.ar.length > 0).length, nodes.length);
+  return f.use === 'topics' || f.sparse !== undefined;
 }
 
 /** "Fisica 70 % · Informatica 30 %": the text of a hover card, from the shares. */

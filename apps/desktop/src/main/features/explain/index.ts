@@ -4,7 +4,7 @@ import { approxTokens, folderOf } from '@rl/ai';
 import { cleanExplain, EXPLAIN_VERSION, explainPrompt, explainSchema, explainSystem } from '@rl/ai/analysis';
 import { AppError, explainResultSchema, itemIdSchema, type ExplainResult, type TokenUsage } from '@rl/core';
 import { atomicWriteJson } from '@rl/core/node';
-import { availability, classifyDocs, loadCtx, monthUsage, type AiCtx } from '../../ai/service.js';
+import { availability, classifyDocs, loadCtx, monthUsage, type AiCtx, providerError, capError, assertModel } from '../../ai/service.js';
 import { assertTokenCap, noteSend } from '../../ai/token-cap.js';
 import { aiSends, isToolPurpose, monthOf, usdOfUsage } from '../../ai/usage.js';
 import type { MainServices } from '../../ipc/handlers/services.js';
@@ -48,7 +48,7 @@ async function plan(s: MainServices, req: ExplainReq): Promise<Plan> {
   const ctx = await loadCtx(s);
   const { rt, cfg } = ctx;
   const model = req.model ?? cfg.ai.defaultModel;
-  if (!cfg.ai.models.some((m) => m.id === model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
+  assertModel(cfg, model);
   const docs = await classifyDocs(rt, cfg, [req.docId]);
   const rec = docs.allowed[0];
   const system = explainSystem(cfg.language, req.detail);
@@ -119,10 +119,10 @@ export async function runExplain(s: MainServices, req: ExplainReq & { confirmed:
   if (est.overDailyCap) throw new AppError('AI_BUDGET_EXCEEDED', 'The daily token cap is reached', { reason: 'daily-cap', todayTokens: est.todayTokens, dailyCap: est.dailyCap });
   const monthUsd = (await monthUsage(rt, monthOf(new Date()))).usd;
   const cap = cfg.ai.usageCap.monthlyUsd;
-  if (cap !== null && monthUsd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached', { monthUsd, capUsd: cap });
+  if (cap !== null && monthUsd >= cap) throw capError(monthUsd, cap);
   await assertTokenCap(s, p.approxTokens);
   const av = await availability(s, provider);
-  if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
+  if (!av.available || !provider) throw providerError(av);
   const deviceId = (await s.settings.get()).deviceId;
   const log = (inputTokens: number, outputTokens: number | undefined, usd: number | null) =>
     rt.store

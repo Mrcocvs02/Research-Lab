@@ -12,8 +12,8 @@ import { isDarkTheme } from '../../lib/theme';
 import { useApp } from '../../state/app-context';
 import { safeText } from '../library/safeText';
 import { migrateAliases, useAliasVersion } from './authorAliases';
-import { AreaLegend, useAreaColors } from './AreaLegend';
-import { areaSummary, assignAreaSlots, colorCache, loadAreaMemo, saveAreaMemo, shareIn, type AreaDef } from './areaColors';
+import { AreaLegend, AreaNote, useAreaColors } from './AreaLegend';
+import { areaNoteNeeded, areaSummary, withUserTints, assignAreaSlots, colorCache, loadAreaMemo, saveAreaMemo, shareIn, type AreaDef } from './areaColors';
 import { assignKeyTints, haloSprite, mix, readableColor, readTheme, type MapTheme } from './colors';
 import { controlPoint, edgeAlpha, edgeWidths, fillTapered, MAX_CURVED, STRAIGHT_ALPHA, straightWidth } from './edges';
 import { authorKey, fetchEntityNetwork } from './entityData';
@@ -89,6 +89,8 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
   const [cursor, setCursor] = useState<string | null>(null);
   const [hover, setHover] = useRestingHover<{ key: string; x: number; y: number }>();
   const [note, setNote] = useState<string | null>(null);
+  /** An entity beyond the cap of 800 was brought in with its heaviest neighbours ("Go to"): the pill offers the whole network again. */
+  const [nbhd, setNbhd] = useState<string | null>(null);
   const [surprise, setSurprise] = useState<Surprise | null>(null);
   const [announce, setAnnounce] = useState('');
   const [mini, setMini] = useLocalFlag('rl.mapMini', true);
@@ -140,7 +142,7 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
     const ad = areaDefsRef.current;
     if (areaOnRef.current && ad) {
       let f = areaFn.current;
-      if (!f || f.dark !== th.dark || f.slots !== ad.slots) areaFn.current = f = { dark: th.dark, slots: ad.slots, fn: colorCache(ad.slots, th.areas) };
+      if (!f || f.dark !== th.dark || f.slots !== ad.slots) areaFn.current = f = { dark: th.dark, slots: ad.slots, fn: (() => { const u = withUserTints(ad.defs, ad.slots, th.areas, th.bg); return colorCache(u.slots, u.tokens); })() };
       const c = f.fn(n.entity?.ar, n.entity?.az) ?? th.areas[8]!;
       tintOf.current.set(n.key, c);
       return c;
@@ -523,9 +525,9 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
     for (let i = 0; i < 400 && net.tick(); i++);
   }
 
-  async function load(lvl: number): Promise<EntityNetwork> {
+  async function load(lvl: number, focus?: string): Promise<EntityNetwork> {
     await migrateAliases(lib);
-    const req = { mode, level: lvl, ...(tagScope ? { scope: { tagId: tagScope } } : {}), ...(years ? { years } : {}), minDocs, minWeight, limit: MAX_NET_NODES };
+    const req = { mode, level: lvl, ...(tagScope ? { scope: { tagId: tagScope } } : {}), ...(years ? { years } : {}), minDocs, minWeight, limit: MAX_NET_NODES, ...(focus ? { focus } : {}) };
     return fetchEntityNetwork(req);
   }
 
@@ -585,6 +587,7 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
   }
 
   function show(d: EntityNetwork, fly = true): void {
+    setNbhd(null);
     setData(d);
     onData?.(d);
     levelOf.current.clear();
@@ -656,14 +659,17 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
     return missingMatches(mode === 'tag' ? facets.current.tags : facets.current.authors, present, text);
   }
 
-  /** Brings an entity from beyond the cap into the network, alone (its links are not known), and flies to it. */
+  /** Brings an entity from beyond the cap into view: the network becomes that node with its heaviest neighbours (`focus`). */
   function addCut(c: { id: string; label: string; count: number }): void {
-    const entity: EntityNode = { id: c.id, label: c.label, count: c.count, years: Array.from({ length: 10 }, () => 0), colorKey: '', group: '' };
-    const n = net.seed({ kind: 'entity', id: c.id, label: c.label, count: c.count, entity, r: nodeRadius(c.count, maxCount.current) });
-    setCount(net.size);
-    setNote(t('network.ent.cutShown', { limit: MAX_NET_NODES }));
-    view.flyTo(n.x, n.y, Math.max(view.view.current.k, 1.6));
-    pick(n);
+    load(level, c.id).then((d) => {
+      show(d, false);
+      setNbhd(c.label);
+      const n = net.nodes.get(`entity:${c.id}`);
+      if (n) {
+        view.flyTo(n.x, n.y, Math.max(view.view.current.k, 1.6));
+        pick(n);
+      }
+    }, setError);
   }
 
   const ascend = () => {
@@ -812,7 +818,16 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
   const filterCount = (years ? 1 : 0) + (minDocs !== 2 ? 1 : 0) + (minWeight > 0 ? 1 : 0) + (level > 0 ? 1 : 0) + (tagScope !== '' ? 1 : 0) + (sizeBy !== 'docs' ? 1 : 0) + (themes ? 1 : 0);
 
   let pill: ReactNode = null;
-  if (surprise) {
+  if (nbhd !== null) {
+    pill = (
+      <Pill testId="ent-nbhd">
+        {t('network.ent.nbhd', { name: safeText(nbhd) })}
+        <button type="button" className="link" onClick={ascend} data-testid="ent-nbhd-back">
+          {t('network.ent.nbhdBack')}
+        </button>
+      </Pill>
+    );
+  } else if (surprise) {
     pill = (
       <Pill testId="ent-surprise-note" onClose={() => setSurprise(null)}>
         {sentence}
@@ -824,6 +839,8 @@ export function EntityNet({ active, modeChip, mode, scopes, selectedId, onSelect
         {note ?? lowNote}
       </Pill>
     );
+  } else if (byArea && areaDefs && data && count > 0 && areaNoteNeeded(areaDefs.defs, data.nodes)) {
+    pill = <AreaNote testId="ent-color-note" defs={areaDefs.defs} withArea={data.nodes.filter((n) => n.ar && n.ar.length > 0).length} total={data.nodes.length} onTopics={() => setByArea(false)} />;
   } else if (hint && count > 0) {
     pill = <Pill testId="ent-hint">{t('network.hint')}</Pill>;
   }

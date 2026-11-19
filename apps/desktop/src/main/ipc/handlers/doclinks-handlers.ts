@@ -6,6 +6,8 @@ const feature = () => import('../../features/doclinks/index.js');
 
 export const doclinksHandlers = (s: MainServices): DomainHandlers<'doclinks'> => ({
   'doclinks:find': async (req) => (await feature()).findLinks(s, req),
+  'doclinks:progress': async ({ token }) => (await feature()).linkProgress(token),
+  'doclinks:cancel': async ({ token }) => (await feature()).cancelLinks(token),
   'doclinks:list': async (req) => (await feature()).listLinks(s, req),
   'doclinks:remove': async (req) => (await feature()).removeLinks(s, req),
   'doclinks:add': async (req) => (await feature()).addLink(s, req),

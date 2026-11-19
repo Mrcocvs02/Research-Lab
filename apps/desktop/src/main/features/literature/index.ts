@@ -6,7 +6,8 @@ import { AppError, documentIdSchema, itemIdSchema, LITERATURE_KEYS, LITERATURE_M
 import { atomicWriteJson } from '@rl/core/node';
 import { callStructured } from '../../analysis/call.js';
 import { createToolsHost } from '../../ai/tools-host.js';
-import { availability, loadCtx, monthUsage, type AiCtx } from '../../ai/service.js';
+import { availability, loadCtx, monthUsage, type AiCtx, providerError, capError } from '../../ai/service.js';
+import { getRecord, modelOf } from '../ai/pick.js';
 import { aiSends, isToolPurpose, monthOf } from '../../ai/usage.js';
 import type { MainServices } from '../../ipc/handlers/services.js';
 import { cacheHash, costDecision } from '../ai/batch.js';
@@ -49,12 +50,6 @@ export function pagesText(pages: ReadonlyArray<{ page: number; text: string }>, 
   return pages.map((p) => `[page ${p.page}]\n${p.text.trim().slice(0, each)}`).join('\n\n');
 }
 
-async function getRecord(ctx: AiCtx, docId: string): Promise<DocumentRecord> {
-  const rec = await ctx.rt.store.documents.get(documentIdSchema.parse(docId) as DocumentId);
-  if (!rec) throw new AppError('NOT_FOUND', 'Unknown document');
-  return rec;
-}
-
 const isEnabled = (ctx: AiCtx, rec: DocumentRecord): boolean => aiVisible(rec.path, ctx.cfg) && !rec.missing;
 
 async function plan(s: MainServices, ctx: AiCtx, docId: string, model: string): Promise<PaperPlan> {
@@ -85,12 +80,6 @@ async function readCache(file: string): Promise<Cached | null> {
     return null;
   }
 }
-
-const modelOf = (ctx: AiCtx, wanted?: string): string => {
-  const model = wanted ?? ctx.cfg.ai.defaultModel;
-  if (!ctx.cfg.ai.models.some((m) => m.id === model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
-  return model;
-};
 
 export async function getLiterature(s: MainServices, req: { docId: string }): Promise<{ note: LiteratureNote | null; folderEnabled: boolean }> {
   const ctx = await loadCtx(s);
@@ -191,10 +180,10 @@ export async function runLiterature(s: MainServices, req: { docId: string; model
     if (est.overDailyCap) throw new AppError('AI_BUDGET_EXCEEDED', 'The daily token cap is reached', { reason: 'daily-cap', todayTokens: est.todayTokens, dailyCap: est.dailyCap });
     const monthUsd = (await monthUsage(rt, monthOf(new Date()))).usd;
     const cap = cfg.ai.usageCap.monthlyUsd;
-    if (cap !== null && monthUsd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached', { monthUsd, capUsd: cap });
+    if (cap !== null && monthUsd >= cap) throw capError(monthUsd, cap);
     const provider = ctx.provider;
     const av = await availability(s, provider);
-    if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
+    if (!av.available || !provider) throw providerError(av);
     const deviceId = (await s.settings.get()).deviceId;
     const { value: raw } = await callStructured(
       { s, ctx, provider, signal: new AbortController().signal, confirmed: req.confirmed, deviceId, addUsd: () => {} },

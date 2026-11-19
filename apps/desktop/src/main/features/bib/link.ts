@@ -6,6 +6,7 @@ import type { MainServices } from '../../ipc/handlers/services.js';
 import type { LibraryRuntime } from '../../library/library-runtime.js';
 import { bibtexFile, GENERATED_LINE } from './bibtex-write.js';
 import { freeKey, newKey } from './keys.js';
+import { KeyedQueue } from '../../keyed-queue.js';
 
 export interface BibStatus {
   linked: boolean;
@@ -20,12 +21,8 @@ const NAME_OK = /^[^<>:"/\\|?*\u0000-\u001f]+$/;
 const validName = (name: string): boolean => /\.bib$/i.test(name) && NAME_OK.test(name) && !RESERVED.test(path.parse(name).name) && !/[. ]$/.test(name.slice(0, -4)) && name.length <= 120;
 const unlinked: BibStatus = { linked: false, file: null, state: 'ok', at: null };
 
-const chains = new Map<string, Promise<unknown>>();
-const serial = <T>(id: string, fn: () => Promise<T>): Promise<T> => {
-  const next = (chains.get(id) ?? Promise.resolve()).then(fn, fn);
-  chains.set(id, next.catch(() => undefined));
-  return next;
-};
+const queue = new KeyedQueue();
+const serial = <T>(id: string, fn: () => Promise<T>): Promise<T> => queue.run(id, fn);
 
 /** Records of `ids`, each with a cite key: a document that has none gets one now, by the library's key schema, and keeps it for good (stable keys). */
 export const withKeys = (rt: LibraryRuntime, ids: readonly string[]): Promise<Array<{ doc: DocumentRecord; key: string }>> => serial(`keys:${rt.libraryId}`, () => assignKeys(rt, ids));

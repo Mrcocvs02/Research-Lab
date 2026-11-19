@@ -12,7 +12,7 @@ button.ms-source { cursor: pointer; }
 .ms-entries li { display: flex; gap: 8px; align-items: baseline; }
 .ms-orphans { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 8px; }
 .ms-orphan { display: flex; align-items: center; gap: 8px; }
-.ms-editor textarea { width: 100%; font-family: var(--font-mono, monospace); }
+.ms-editor textarea { width: 100%; font-family: var(--mono); }
 .ms-chips { display: flex; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
 .ms-assign-list { max-height: 320px; overflow: auto; }
 .ms-assign-list li { padding: 3px 0; }
@@ -27,7 +27,7 @@ button.ms-source { cursor: pointer; }
 .ms-matrix__side.is-gap { background: var(--warning-soft); }
 .ms-matrix__cellbox { position: absolute; top: 0; height: 100%; display: flex; align-items: center; justify-content: center; }
 .ms-cell { width: 28px; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 4px; background: none; color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
-.ms-cell:hover { background: var(--hover, rgba(128, 128, 128, 0.15)); }
+.ms-cell:hover { background: var(--surface-2); }
 .ms-cell:focus-visible { outline: 2px solid var(--accent); }
 .ms-cell[data-state='direct'] { color: var(--accent); }
 .ms-cell[data-state='empty'] { color: var(--text-muted); }

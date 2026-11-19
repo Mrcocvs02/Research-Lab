@@ -1,14 +1,14 @@
 /**
  * Grouping families of the Map (D-489, section 18.3.7). A family is a set of tags of one kind (the topic macro-areas, the nodes of one
  * level such as "method", a taxonomy group hint, an id prefix such as `grp:` for research groups) or the communities found in the
- * network itself ("auto"). Its clusters are the top-level values; the biggest `FAMILY_TOP` are kept, the rest become one "other"
+ * network itself ("auto"). Its clusters are the top-level values; the biggest `FAMILY_TOP` (7, one per palette tint) are kept, the rest become one "other"
  * cluster. The result has the shape of `AreaModel`, so colours, legend and hover cards reuse the macro-area machinery. Pure.
  */
 import { computeAreas, type AreaDoc, type AreaModel, type AreaNode } from './areas.js';
 import { louvain, symmetrize } from './cluster.js';
 import type { Edge } from './types.js';
 
-export const FAMILY_TOP = 8;
+export const FAMILY_TOP = 7;
 /** Id of the cluster that gathers the clusters beyond the biggest eight. */
 export const OTHER_CLUSTER = '__other';
 

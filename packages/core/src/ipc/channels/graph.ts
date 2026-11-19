@@ -30,6 +30,7 @@ export const graphStatusSchema = z.object({
 /** Macro-areas (D-483): `ar` up to 3 triples [area, branch, share x 100], `az` the centrality x 100; `areas` is `{ id, label, count, branches }[]`. Built by the lazy `areas` chunk of the main process. */
 const A = { ar: z.array(z.array(z.number())).optional(), az: z.number().optional() };
 const areas = z.array(z.any()).optional();
+const familyScope = z.object({ folder: relativePathSchema.optional(), projectId: z.string().max(100).optional(), tagId: itemIdSchema.optional() }).optional();
 
 export const clusterViewSchema = z.object({
   id: z.string().max(100),
@@ -128,6 +129,21 @@ export const graphChannels = defineChannels('graph', {
       areas,
       items: z.array(z.object({ id: documentIdSchema, ...A })).max(GRAPH_LIMITS.mapPoints),
     }),
+  },
+  /** The exact text "Dai un nome con Claude" would send for the clusters of the automatic family (top tags and titles of papers in enabled folders); nothing leaves. */
+  previewFamilyNames: {
+    request: z.object({ model: z.string().min(1).max(100).optional(), scope: familyScope }),
+    response: z.object({ text: z.string(), candidates: z.number().int().nonnegative(), model: z.string(), approxTokens: z.number().int().nonnegative(), estimatedUsd: z.number().nonnegative().nullable(), needsDialog: z.boolean(), overDailyCap: z.boolean() }),
+  },
+  /** Claude proposes a short name per cluster; nothing is written, each name is accepted by the user (`graph:acceptFamilyName`). */
+  nameFamily: {
+    request: z.object({ model: z.string().min(1).max(100).optional(), scope: familyScope, confirmed: z.boolean().default(false) }),
+    response: z.object({ items: z.array(z.object({ cluster: z.string().max(100), name: z.string().max(100), current: z.string().max(300) })).max(16) }),
+  },
+  /** Stores (or with null clears) the accepted name of one cluster of the automatic family, locally. */
+  acceptFamilyName: {
+    request: z.object({ cluster: z.string().min(1).max(100), name: z.string().trim().min(1).max(100).nullable(), scope: familyScope }),
+    response: z.object({ ok: z.literal(true) }),
   },
   /**
    * Entity networks of the Map (D-387, D-454): tags (co-occurrence), topics (affinity of the model's clusters at a level)

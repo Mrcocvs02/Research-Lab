@@ -11,6 +11,7 @@ import type { PreparedMap } from './mapModel';
 export const TOPIC_FAMILY = 'topic';
 const KEY = 'rl.map.family';
 const EVENT = 'rl-map-family';
+const NAMES_EVENT = 'rl-map-family-names';
 
 export interface FamilyInfo {
   id: string;
@@ -48,6 +49,22 @@ export function useFamily(): [string, (id: string) => void] {
     window.dispatchEvent(new Event(EVENT));
   }, []);
   return [family, set];
+}
+
+/** Tells the views that the names of the automatic clusters changed (they ask `graph:family` again). */
+export const bumpFamilyNames = (): void => {
+  window.dispatchEvent(new Event(NAMES_EVENT));
+};
+
+/** A counter that grows each time `bumpFamilyNames` is called. */
+export function useFamilyRev(): number {
+  const [rev, setRev] = useState(0);
+  useEffect(() => {
+    const on = () => setRev((r) => r + 1);
+    window.addEventListener(NAMES_EVENT, on);
+    return () => window.removeEventListener(NAMES_EVENT, on);
+  }, []);
+  return rev;
 }
 
 /** The families the library offers (always at least the topic), for the chooser. */

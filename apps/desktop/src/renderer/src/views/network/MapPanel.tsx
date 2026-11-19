@@ -19,7 +19,7 @@ import { safeText } from '../library/safeText';
 import { Segmented } from '../../components/Segmented';
 import { AreaLegend, useAreaColors } from './AreaLegend';
 import { GroupBy, GroupLabel } from './GroupBy';
-import { familyName, nameClusters, TOPIC_FAMILY, useFamilies, useFamily, withFamilyShares, type FamilyShares } from './grouping';
+import { familyName, nameClusters, TOPIC_FAMILY, useFamilies, useFamily, useFamilyRev, withFamilyShares, type FamilyShares } from './grouping';
 import { areaFallback, assignAreaSlots, loadAreaMemo, saveAreaMemo } from './areaColors';
 import { adjacencyOf, assignTints, type TintMemo } from './colors';
 import { rng } from './playful';
@@ -114,6 +114,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
 
   const [byArea, setByArea] = useAreaColors();
   const families = useFamilies(scope, usable);
+  const famRev = useFamilyRev();
   useEffect(() => {
     if (!grouped || !rawMap) return;
     let live = true;
@@ -124,7 +125,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     return () => {
       live = false;
     };
-  }, [grouped, family, rawMap, scope, t]);
+  }, [grouped, family, rawMap, scope, t, famRev]);
   // Colour by macro-area (D-483): with no area, one area, or colouring switched off, the topics colour the points.
   const fallback = useMemo(() => (map ? areaFallback(map.areas, map.withArea, map.n) : { use: 'topics' as const, reason: 'none' as const }), [map]);
   const areaSlots = useMemo(() => {
@@ -381,7 +382,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
                 ]}
               />
             </div>
-            <GroupBy families={families} />
+            <GroupBy families={families} scope={scope} />
             <label className="net-field net-pop-row">
               <span>{t('network.colorBy')}</span>
               <select value={lvl} onChange={(e) => setLevel(Number(e.target.value))} disabled={depth === 0} data-testid="map-level">

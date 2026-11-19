@@ -773,7 +773,7 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
             const own = [...net.nodes.values()].filter((n) => n.kind === 'entity' && n.label.toLowerCase().includes(f)).sort((a, b) => (b.count ?? 0) - (a.count ?? 0)).map((n) => ({ id: n.key, label: n.label, hint: String(n.count ?? '') }));
             if (!data?.truncated || own.length >= 8) return own;
             const cut = await cutMatches(q).catch(() => []);
-            return [...own, ...cut.map((c) => ({ id: `cut:${JSON.stringify(c)}`, label: c.label, hint: `${c.count} · ${t('network.ent.cutHint')}` }))];
+            return [...own, ...cut.map((c) => ({ id: `cut:${JSON.stringify(c)}`, label: c.label, hint: `${c.count} Â· ${t('network.ent.cutHint')}` }))];
           }}
           onPick={(it) => {
             if (it.id.startsWith('cut:')) return addCut(JSON.parse(it.id.slice(4)));

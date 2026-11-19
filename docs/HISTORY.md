@@ -10,8 +10,8 @@ Sintesi per fasi e onde; i dettagli stanno in git, `DECISIONS.md` e `STATUS.md`.
 - **Fase 1, onda 1.1:** scanner incrementale, estrattore (pdfjs-dist, fflate), osservatore; indice FTS5 con pagine; runtime nel main con worker; vista di ricerca; corpus sintetico da 1000 documenti.
 
 ## 2026-11-16
-- **Fase 1, revisione:** il security trova 4 bloccanti da documenti ostili (worker senza watchdog, ReDoS su DOI e docx/pptx, zip bomb); corretti in tre rami e ricontrollati.
-- **Crash del PC** durante la suite e2e in parallelo con prove "bomba" del security: introdotti controllo della memoria (`tools/mem-guard.mjs`, `tools/mem-sample.mjs`), test pesanti dietro `RL_HEAVY_TESTS`, regola "uno alla volta".
+- **Fase 1, revisione:** il security trova 4 bloccanti da documenti ostili (worker senza watchdog, ReDoS su DOI e docx/pptx, archivi che si gonfiano); corretti in tre rami e ricontrollati.
+- **Crash del PC** durante la suite e2e in parallelo con prove pesanti del security: introdotti controllo della memoria (`tools/mem-guard.mjs`, `tools/mem-sample.mjs`), test pesanti dietro `RL_HEAVY_TESTS`, regola "uno alla volta".
 - **GitHub:** storia riscritta senza righe `Co-Authored-By`, agganciata al commit iniziale del repository remoto e pubblicata; da qui push a ogni passo. Tag `phase-1`.
 - Nuove regole dell'utente: subagent Haiku per compiti molto semplici; app il più leggera possibile; finestre dei test e2e fuori schermo (nascoste del tutto rallentavano i test di 10 volte).
 - **Fase 2:** contratti (tassonomia, cronologia, progetti, modifica e apertura documenti, albero cartelle); backend con annulla/ripeti e progetti archiviabili; interfaccia di navigazione (elenco/griglia virtualizzati, filtri, tag in blocco, gestione tassonomia, scheda documento, cronologia, progetti con piano di lettura); ordinamento per dimensione, filtri lato server, cache invalidata.

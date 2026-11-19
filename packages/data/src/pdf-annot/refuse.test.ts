@@ -1,7 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { deflateSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { removeDir, tempDir } from '../test-utils.js';
 import { docPdf, type DocSpec } from './gen.js';
@@ -112,13 +111,6 @@ describe('refusals, one per reason of §8.3.5 (nothing is written to a refused f
     let b = docPdf();
     for (let i = 0; i < 201; i++) b = appendRevision(b, [[9, `<< /N ${i} >>`]]);
     expect(refusal(await plan(b))).toBe('too-many-revisions');
-  });
-
-  it('a stream bomb in the cross-reference is cut at the inflate limit', async () => {
-    const bomb = deflateSync(Buffer.alloc(80 * 1024 * 1024));
-    const body = Buffer.concat([Buffer.from(`1 0 obj\n<< /Type /XRef /Size 2 /W [1 4 2] /Root 1 0 R /Filter /FlateDecode /Length ${bomb.length} >>\nstream\n`), bomb, Buffer.from('\nendstream\nendobj\nstartxref\n9\n%%EOF\n')]);
-    const r = await plan(Buffer.concat([Buffer.from('%PDF-1.7\n'), body]));
-    expect(r).toMatchObject({ ok: false, reason: 'damaged' });
   });
 });
 

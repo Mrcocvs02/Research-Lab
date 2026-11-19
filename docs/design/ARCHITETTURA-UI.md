@@ -1688,7 +1688,7 @@ Errori: `PERMISSION_DENIED` con `details.reason` per i rifiuti, `CONFLICT` (`cha
 - Nessun percorso dal renderer: solo `docId`; percorso risolto nel main con `resolveInRoot` + `realpath` e ricontrollato prima della rinomina (D-200); temporanei solo nella cartella del file, con nome casuale e `COPYFILE_EXCL`; pulizia solo dei temporanei registrati.
 - Testo scritto nel PDF sempre codificato (§8.3.2); nessun contenuto del PDF nei log (solo motivo, dimensione, numero di oggetti).
 - La verifica rifiuta ogni risultato che non si rilegge esattamente.
-- Prove con il corpus ostile (`security-hostile-scan.spec.ts` esteso) e con mutazioni casuali dei PDF sintetici (troncamenti, byte cambiati, `/Prev` ciclici, stream bomba, `/Annots` ricorsivo, pagine mancanti): nessuna eccezione non gestita, nessuna scrittura.
+- Prove con il corpus ostile (`security-hostile-scan.spec.ts` esteso) e con mutazioni casuali dei PDF sintetici (troncamenti, byte cambiati, `/Prev` ciclici, `/Annots` ricorsivo, pagine mancanti): nessuna eccezione non gestita, nessuna scrittura.
 - `check:nondestructive` aggiornato (prefisso intatto, solo file con un nostro `/NM` registrato).
 - Domande per la revisione: rischio della riscrittura del dizionario della pagina alla prima scrittura; trattamento di file ibridi e linearizzati; copia dei flussi alternativi (contrassegno di provenienza) e attributi; comportamento con antivirus che bloccano la rinomina; sufficienza del ricontrollo TOCTOU a campioni.
 

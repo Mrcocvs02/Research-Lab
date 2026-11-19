@@ -14,7 +14,7 @@ import './settings.css';
 
 // Each of the big sections loads, with its own strings, when it is opened (and not before).
 const ClaudeSection = lazyView(() => import('./ClaudeSection').then((m) => ({ default: m.ClaudeSection })), ['aiSettings']);
-const AdvancedSection = lazyView(() => import('./AdvancedSection').then((m) => ({ default: m.AdvancedSection })), ['aiSettings']);
+const AdvancedSection = lazyView(() => import('./AdvancedSection').then((m) => ({ default: m.AdvancedSection })), ['aiSettings', 'settings']);
 const BackupSection = lazyView(() => import('./BackupSection').then((m) => ({ default: m.BackupSection })), ['backup']);
 const ShortcutsSection = lazyView(() => import('./ShortcutsSection').then((m) => ({ default: m.ShortcutsSection })), ['shortcuts']);
 

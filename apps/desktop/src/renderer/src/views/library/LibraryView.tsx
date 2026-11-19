@@ -35,7 +35,7 @@ const TaxonomyManager = lazyView(() => import('./TaxonomyManager').then((m) => (
 const LiteratureDialog = lazyView(() => import('../literature/LiteratureNote').then((m) => ({ default: m.LiteratureDialog })), ['literature', 'reader']);
 const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);
 const ResourcesPane = lazyView(() => import('../resources/ResourcesPane'), ['resources', 'library']);
-const AddToProject = lazyView(() => import('./AddToProject').then((m) => ({ default: m.AddToProject })), ['addToProject']);
+const AddToProject = lazyView(() => import('./AddToProject').then((m) => ({ default: m.AddToProject })), ['addToProject', 'projects']);
 
 type PaneTab = 'folders' | 'tags';
 const TABS: PaneTab[] = ['folders', 'tags'];

@@ -183,6 +183,25 @@
       "tokens": "Circa {{tokens}} token in ingresso",
       "noPrice": "costo non stimato",
       "cost": "costo stimato {{usd}}"
+    },
+    "tool": {
+      "search_library": "Ricerca nella libreria",
+      "get_document": "Apertura di un documento",
+      "read_pages": "Lettura di pagine",
+      "list_notes": "Elenco delle note",
+      "read_note": "Lettura di una nota",
+      "write_ai_field": "Proposta di un campo",
+      "failed": "Non è riuscito.",
+      "details": "Dettagli tecnici",
+      "aDoc": "un documento",
+      "result": {
+        "search_library": "Documenti trovati: {{count}}",
+        "get_document": "Ha aperto «{{doc}}»",
+        "read_pages": "Ha letto delle pagine di «{{doc}}»",
+        "list_notes": "Ha elencato le note di «{{doc}}»",
+        "read_note": "Ha letto una nota di «{{doc}}»",
+        "write_ai_field": "Ha scritto una proposta per «{{doc}}»: la decidi in Da rivedere."
+      }
     }
   },
   "status": {
@@ -408,7 +427,31 @@
   },
   "reader": {
     "annotationsLimit": "Questo documento ha già il massimo di evidenziazioni possibile ({{limit}}).",
-    "annotationsSize": "Le evidenziazioni di questo documento occupano troppo spazio per aggiungerne altre. Eliminane qualcuna prima."
+    "annotationsSize": "Le evidenziazioni di questo documento occupano troppo spazio per aggiungerne altre. Eliminane qualcuna prima.",
+    "cost": {
+      "title": "Inviare a Claude?",
+      "titleFor": "{{name}}: inviare a Claude?",
+      "ready": "Già pronto, 0 invii",
+      "inButton": "≈ {{tokens}} token · {{model}}",
+      "today": "Oggi: {{pct}} % del tetto usato",
+      "requests_one": "{{count}} richiesta",
+      "requests_other": "{{count}} richieste",
+      "tokens": "≈ {{tokens}} token",
+      "noPrice": "nessun prezzo per questo modello",
+      "usd": "≈ {{usd}}",
+      "first": "È la prima volta che il testo di questa cartella va a Claude.",
+      "over": "Questo invio supera {{threshold}} token, la tua soglia per chiedere prima.",
+      "cap": "Il limite del giorno è raggiunto: non si invia nulla. Scegli meno testo o un modello più economico.",
+      "send": "Invia a {{model}}",
+      "model": "Modello"
+    },
+    "colors": {
+      "yellow": "Giallo",
+      "green": "Verde",
+      "blue": "Blu",
+      "pink": "Rosa",
+      "orange": "Arancione"
+    }
   },
   "inbox": {
     "badge_one": "{{count}} file nella posta in arrivo",
@@ -467,7 +510,16 @@
     "idle": "Nessuna attività",
     "attention_one": "{{count}} da guardare",
     "attention_other": "{{count}} da guardare",
-    "see": "Vedi in Attività"
+    "see": "Vedi in Attività",
+    "chip": {
+      "progress": "In corso {{pct}} %",
+      "scanning": "In corso",
+      "ready": "Aggiornata",
+      "failed": "Non riuscita",
+      "cancelled": "Annullata",
+      "proposals": "Proposte {{done}}/{{total}}",
+      "citations": "Citazioni {{done}}/{{total}}"
+    }
   },
   "resume": {
     "banner": "Il lettore si è chiuso mentre leggevi {{title}}{{where}}.",

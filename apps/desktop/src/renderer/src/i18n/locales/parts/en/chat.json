@@ -26,25 +26,6 @@
     "usageCap": "This month: {{used}} of {{cap}}",
     "reasoningChip": "Reasoning: {{level}}",
     "sendTip": "Send · Enter; new line · Shift+Enter",
-    "tool": {
-      "search_library": "Library search",
-      "get_document": "Opening a document",
-      "read_pages": "Reading pages",
-      "list_notes": "Listing notes",
-      "read_note": "Reading a note",
-      "write_ai_field": "Proposing a field",
-      "failed": "It did not work.",
-      "details": "Technical details",
-      "aDoc": "a document",
-      "result": {
-        "search_library": "Documents found: {{count}}",
-        "get_document": "Opened “{{doc}}”",
-        "read_pages": "Read pages of “{{doc}}”",
-        "list_notes": "Listed the notes of “{{doc}}”",
-        "read_note": "Read a note of “{{doc}}”",
-        "write_ai_field": "Wrote a proposal for “{{doc}}”: you decide it in To review."
-      }
-    },
     "inline": {
       "withDocs_one": "Will be sent: the question + {{count}} document",
       "withDocs_other": "Will be sent: the question + {{count}} documents",

@@ -6,7 +6,7 @@ import { Button } from '../../components/Button';
 import { Dialog } from '../../components/Dialog';
 import { IconChevronDown, IconMore } from '../../components/icons';
 import { IconButton } from '../../components/IconButton';
-import { Lazy, lazyRetry, lazyView } from '../../components/Lazy';
+import { Lazy, lazyView } from '../../components/Lazy';
 import { Menu, type MenuGroups } from '../../components/Menu';
 import { Tabs, tabIds } from '../../components/Tabs';
 import { useCitationJob } from '../../lib/citationJobs';
@@ -30,7 +30,7 @@ const TABS: DiscoverTab[] = ['readnext', 'new', 'published'];
 const WITH_SEARCHES: DiscoverTab[] = ['searches', ...TABS];
 
 // The sources editor is loaded when someone opens it.
-const Sources = lazyRetry(() => import('./Sources').then((m) => ({ default: m.Sources })));
+const Sources = lazyView(() => import('./Sources').then((m) => ({ default: m.Sources })), ['discover']);
 // The searches (feature 41, 42) and the dialog that asks for one load when first used; the cost dialog needs the reader strings.
 const Searches = lazyView(() => import('./Searches').then((m) => ({ default: m.Searches })), ['discover', 'reader']);
 const NewSearchDialog = lazyView(() => import('./NewSearchDialog').then((m) => ({ default: m.NewSearchDialog })), ['discover']);

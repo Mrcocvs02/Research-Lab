@@ -35,7 +35,7 @@ const STATES: StudyState[] = ['to-read', 'reading', 'read'];
 
 // The Markdown renderer is loaded when the preview is first shown; the add-documents dialog when it is first asked for.
 const Markdown = lazyRetry(() => import('../../lib/markdown').then((m) => ({ default: m.Markdown })));
-const AddDocuments = lazyRetry(() => import('./AddDocumentsDialog'));
+const AddDocuments = lazyView(() => import('./AddDocumentsDialog'), ['projects']);
 // The Schema tab, the report and the citation suggestions: three lazy chunks, loaded when first shown (X7).
 const SchemaTab = lazyView(() => import('./SchemaTab'), ['projects']);
 const ReportDialog = lazyView(() => import('./ReportDialog'), ['projects']);

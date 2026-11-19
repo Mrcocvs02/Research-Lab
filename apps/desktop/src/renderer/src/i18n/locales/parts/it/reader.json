@@ -43,13 +43,6 @@
       "underline": "Sottolinea",
       "area": "Ritaglio"
     },
-    "colors": {
-      "yellow": "Giallo",
-      "green": "Verde",
-      "blue": "Blu",
-      "pink": "Rosa",
-      "orange": "Arancione"
-    },
     "ann": {
       "newLabel": "Evidenzia o sottolinea il testo selezionato",
       "editLabel": "Modifica questa annotazione",
@@ -265,23 +258,6 @@
       "cropNoText": "Scrivi una didascalia per spiegare questo ritaglio",
       "whatSelection": "Il testo selezionato e il paragrafo intorno.",
       "whatCrop": "La didascalia del ritaglio, il testo al suo interno e quello intorno."
-    },
-    "cost": {
-      "title": "Inviare a Claude?",
-      "titleFor": "{{name}}: inviare a Claude?",
-      "ready": "Già pronto, 0 invii",
-      "inButton": "≈ {{tokens}} token · {{model}}",
-      "today": "Oggi: {{pct}} % del tetto usato",
-      "requests_one": "{{count}} richiesta",
-      "requests_other": "{{count}} richieste",
-      "tokens": "≈ {{tokens}} token",
-      "noPrice": "nessun prezzo per questo modello",
-      "usd": "≈ {{usd}}",
-      "first": "È la prima volta che il testo di questa cartella va a Claude.",
-      "over": "Questo invio supera {{threshold}} token, la tua soglia per chiedere prima.",
-      "cap": "Il limite del giorno è raggiunto: non si invia nulla. Scegli meno testo o un modello più economico.",
-      "send": "Invia a {{model}}",
-      "model": "Modello"
     },
     "colorMeaning": {
       "tip": "{{color}}: {{meaning}}",

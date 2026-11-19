@@ -254,8 +254,25 @@ export function Wizard({ onFinished, onCancel }: Props) {
 
   if (phase === 'scanning') {
     return (
-      <WizardFrame title={t('wizard.steps.scan')} headingRef={headingRef} progress={{ current: steps.length + 1, total: steps.length + 1 }}>
-        <FirstScan status={scan} onOpen={() => createdId && onFinished(createdId)} />
+      <WizardFrame
+        title={t('wizard.steps.scan')}
+        headingRef={headingRef}
+        progress={{ current: steps.length + 1, total: steps.length + 1 }}
+        footer={
+          <div className="wizard-foot">
+            <span className="wizard-foot__spacer" />
+            {!scanEnded(scan) && (
+              <Button onClick={() => createdId && onFinished(createdId)} data-testid="wizard-scan-background">
+                {t('wizard.scan.continue')}
+              </Button>
+            )}
+            <Button variant="primary" onClick={() => createdId && onFinished(createdId)} disabled={!scanEnded(scan)} disabledReason={t('wizard.scan.wait')} data-testid="wizard-scan-open">
+              {t('wizard.scan.open')}
+            </Button>
+          </div>
+        }
+      >
+        <FirstScan status={scan} />
       </WizardFrame>
     );
   }
@@ -290,9 +307,11 @@ export function Wizard({ onFinished, onCancel }: Props) {
               {t('wizard.skip')}
             </Button>
           )}
-          <Button onClick={back} disabled={stepIndex === 0 || phase === 'creating'} data-testid="wizard-back">
-            {t('wizard.back')}
-          </Button>
+          {stepIndex > 0 && (
+            <Button onClick={back} disabled={phase === 'creating'} data-testid="wizard-back">
+              {t('wizard.back')}
+            </Button>
+          )}
           {isLast ? (
             <Button variant="primary" onClick={() => void create()} disabled={phase === 'creating'} busy={phase === 'creating'} data-testid="wizard-create">
               {phase === 'creating' ? t('wizard.creating') : t('wizard.create')}
@@ -409,7 +428,9 @@ export function Wizard({ onFinished, onCancel }: Props) {
             <dt>{t('library.name')}</dt>
             <dd>{libName.trim()}</dd>
             <dt>{t('wizard.summary.folder')}</dt>
-            <dd className="path">{root?.path}</dd>
+            <dd className="path" title={root?.path}>
+              {root ? abbreviatePath(root.path) : ''}
+            </dd>
             <dt>{t('library.language')}</dt>
             <dd>{t(`languages.${docLanguage}`)}</dd>
             <dt>{t('wizard.summary.import')}</dt>
@@ -423,9 +444,12 @@ export function Wizard({ onFinished, onCancel }: Props) {
             <Switch checked={writeToPdf} onChange={setWriteToPdf} label={t('wizard.summary.writeToPdf')} data-testid="wizard-write-to-pdf" />
             <p className="hint">{t('wizard.summary.writeToPdfHint')}</p>
           </div>
-          <p className="wizard-createnote" data-testid="wizard-create-note">
-            {writeToPdf ? t('wizard.summary.willWrite') : t('wizard.summary.appOnly')}
-          </p>
+          {/* The consent hint above already says what the PDFs get; only the "off" case needs its own line. */}
+          {!writeToPdf && (
+            <p className="wizard-createnote" data-testid="wizard-create-note">
+              {t('wizard.summary.appOnly')}
+            </p>
+          )}
         </>
       )}
 
@@ -474,16 +498,22 @@ export function abbreviatePath(p: string): string {
   return `${lead}…/${parts.slice(-2).join('/')}`;
 }
 
+const scanEnded = (status: ScanStatus | null): boolean => status !== null && (status.state === 'done' || status.state === 'failed' || status.state === 'cancelled');
+
 const SCAN_PHASES = ['walking', 'hashing', 'extracting', 'indexing'] as const;
 
 /** The last step: the first scan with what it is doing, and the two ways out (4.9). */
-function FirstScan({ status, onOpen }: { status: ScanStatus | null; onOpen(): void }) {
+function FirstScan({ status }: { status: ScanStatus | null }) {
   const { t } = useTranslation();
-  const ended = status !== null && (status.state === 'done' || status.state === 'failed' || status.state === 'cancelled');
+  const ended = scanEnded(status);
   const current = status?.state === 'running' && status.phase ? SCAN_PHASES.indexOf(status.phase) : ended ? SCAN_PHASES.length : 0;
   const count = (p: (typeof SCAN_PHASES)[number]): string => {
     if (!status) return '';
-    if (p === 'walking') return status.seen > 0 ? t('wizard.scan.files', { count: status.seen }) : '';
+    if (p === 'walking') {
+      // While the next step shows "180 / 220", this one shows the same total, not the count so far.
+      const n = status.phase === 'hashing' ? (status.total ?? status.seen) : status.seen;
+      return n > 0 ? t('wizard.scan.files', { count: n }) : '';
+    }
     if (p === 'hashing') return status.phase === 'hashing' && status.total !== undefined ? `${status.seen} / ${status.total}` : '';
     if (p === 'extracting') return status.phase === 'extracting' && status.total !== undefined ? `${status.processed} / ${status.total}` : '';
     return '';
@@ -514,17 +544,6 @@ function FirstScan({ status, onOpen }: { status: ScanStatus | null; onOpen(): vo
       )}
       {status?.state === 'failed' && <ErrorNote testId="wizard-scan-failed">{t('scan.failed')}</ErrorNote>}
       <p className="hint">{t('wizard.scan.background')}</p>
-      <div className="wizard-foot">
-        <span className="wizard-foot__spacer" />
-        {!ended && (
-          <Button onClick={onOpen} data-testid="wizard-scan-background">
-            {t('wizard.scan.continue')}
-          </Button>
-        )}
-        <Button variant="primary" onClick={onOpen} disabled={!ended} disabledReason={t('wizard.scan.wait')} data-testid="wizard-scan-open">
-          {t('wizard.scan.open')}
-        </Button>
-      </div>
     </div>
   );
 }

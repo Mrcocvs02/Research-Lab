@@ -52,6 +52,8 @@ interface Props {
   onRead?(docId: string): void;
   /** `L`: open Explore. */
   onExplore?(): void;
+  /** Double click or Enter on a paper: its neighbourhood. */
+  onVicinity?(docId: string): void;
   aiBadge: string;
   label: string;
   /** Changes when the view must be fitted again (another scope). */
@@ -120,7 +122,7 @@ function Announce({ docId, topic }: { docId: string; topic: string }) {
  * to the nearest point that way, `]` and `[` walk through the points in view, Enter selects, Shift+Enter reads, `L` opens Explore.
  * React renders only when the hovered or focused point changes, never per frame; nothing runs at rest.
  */
-function FreeCanvas({ map, level, selected, onSelect, onRead, onExplore, aiBadge, label, fitKey, handle, tints, areas = null, allow, minimap, bridge = null, onBridge, onFindLinks, onTopicExport, overlay, evidence, minimapSlot }: Props) {
+function FreeCanvas({ map, level, selected, onSelect, onRead, onExplore, onVicinity, aiBadge, label, fitKey, handle, tints, areas = null, allow, minimap, bridge = null, onBridge, onFindLinks, onTopicExport, overlay, evidence, minimapSlot }: Props) {
   const { t } = useTranslation();
   const [hover, setHover, holdHover] = useRestingHover<{ idx: number; x: number; y: number }>(150, 250);
   const [menuFor, setMenuFor] = useState<number | null>(null);
@@ -701,6 +703,7 @@ function FreeCanvas({ map, level, selected, onSelect, onRead, onExplore, aiBadge
       case 'open':
         if (cursor.current < 0) return;
         onSelect(map.ids[cursor.current]!);
+        onVicinity?.(map.ids[cursor.current]!);
         break;
       case 'read':
         if (cursor.current >= 0) onRead?.(map.ids[cursor.current]!);
@@ -929,7 +932,7 @@ function papersInView(bv: BlockView, v: View, w: number, h: number): number[] {
  * The Map in blocks (D-498): one block per value of the family, each paper in its cell with its title, evidence edges only for the selected or
  * hovered paper (or the strongest, bundled between blocks). The same camera, card and keyboard as the free layout; nothing runs at rest.
  */
-function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, onSelect, onRead, onExplore, label, fitKey, handle, allow, minimap, minimapSlot, onBridge, onFindLinks }: Props & { blocks: BlocksProp }) {
+function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, onSelect, onRead, onExplore, onVicinity, label, fitKey, handle, allow, minimap, minimapSlot, onBridge, onFindLinks }: Props & { blocks: BlocksProp }) {
   const { t } = useTranslation();
   const bv = blocks.view;
   const [hover, setHover, holdHover] = useRestingHover<{ idx: number; x: number; y: number }>(150, 250);
@@ -967,6 +970,7 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
   const stateRef = useRef({ adj, central, strong, neighbors, edgeMode, bv, selected });
   stateRef.current = { adj, central, strong, neighbors, edgeMode, bv, selected };
   const focusLit = useRef(false);
+  const probeOut = useRef<{ labels: unknown[]; names: unknown[]; edges: EvEdge[]; bundles: number } | null>(null);
 
   const view = useCanvasView<number>({
     draw(ctx, w, h, v) {
@@ -985,6 +989,7 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
       const hoverId = hoverIdx.current >= 0 ? st.bv.ids[hoverIdx.current]! : null;
       const shown = st.edgeMode === 'strong' ? st.strong : { single: selectEdges(st.edgeMode, st.adj, [st.selected, hoverId]), bundles: [] };
       const out = drawBlocks({ ctx, w, h, v, bv: st.bv, th, hover: hoverIdx.current, sel: selRef.current, cursor: cursor.current, lit: lit.current, edges: shown.single, bundles: shown.bundles, forced: st.neighbors, central: st.central, allow: allowRef.current, fly: flyRef.current, redraw: () => view.requestDraw() });
+      probeOut.current = { labels: out.labels, names: out.names, edges: shown.single, bundles: shown.bundles.length };
       const sig = `${out.labels.length}`;
       if (ctx.canvas.dataset['labels'] !== sig) ctx.canvas.dataset['labels'] = sig;
       ctx.canvas.dataset['drawn'] = String(st.bv.ids.length);
@@ -1055,6 +1060,10 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
       onSelect(idx !== null && idx >= 0 ? bv.ids[idx]! : null);
     },
     onDoubleClick(idx) {
+      if (idx !== null && idx >= 0 && onVicinity) {
+        onVicinity(bv.ids[idx]!);
+        return true;
+      }
       if (idx === null || idx > -2) return false;
       flyToBlock(-2 - idx);
       return true;
@@ -1151,6 +1160,7 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
       case 'open':
         if (cursor.current < 0) return;
         onSelect(bv.ids[cursor.current]!);
+        onVicinity?.(bv.ids[cursor.current]!);
         break;
       case 'read':
         if (cursor.current >= 0) onRead?.(bv.ids[cursor.current]!);
@@ -1245,6 +1255,34 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
     },
     [bv],
   );
+
+  // e2e runs only (RL_E2E=1, see the preload): what the tests measure on the canvas, in screen pixels of the page.
+  useEffect(() => {
+    if (!window.rlE2E) return;
+    const rect = (el: Element | null) => {
+      const r = el?.getBoundingClientRect();
+      return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null;
+    };
+    window.__rlMapProbe = () => {
+      const v = view.view.current;
+      const { w, h } = view.size.current;
+      const cv = view.canvas.current;
+      const nodes = bv.ids.map((id, i) => ({ id, x: toScreenX(v, dotX(bv, i), w), y: toScreenY(v, dotY(bv, i), h), block: bv.blocks[bv.block[i]!]?.id ?? '' }));
+      const out = probeOut.current;
+      return {
+        nodes,
+        labels: out?.labels ?? [],
+        names: out?.names ?? [],
+        edges: (out?.edges ?? []).map((e) => ({ a: e.a, b: e.b, e: e.e, kinds: e.kinds })),
+        bundles: out?.bundles ?? 0,
+        view: { ...v, w, h },
+        frame: { canvas: rect(cv), side: rect(document.querySelector('[data-testid="map-side"]')), strip: rect(document.querySelector('[data-testid="map-strip"]')) },
+      };
+    };
+    return () => {
+      delete window.__rlMapProbe;
+    };
+  }, [bv, view]);
 
   const hoverBlock = hover ? (bv.blocks[bv.block[hover.idx]!]?.label ?? '') : '';
   return (

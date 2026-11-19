@@ -27,6 +27,8 @@ export interface RuntimeConfig {
   claudeSimDir: string | null;
   /** Tests: keep the window hidden (still rendered, not throttled) so test runs do not pop up on screen. */
   hiddenWindow: boolean;
+  /** Tests (RL_E2E=1, development run only): the renderer gets the e2e probes (`window.__rlMapProbe`). */
+  e2e: boolean;
   /**
    * Tests: the machine counts as offline (`isOnline()` false) — the e2e offline switch cuts the session's network,
    * which `net.isOnline()` does not see.
@@ -68,7 +70,7 @@ export function resolveRuntimeConfig(env: NodeJS.ProcessEnv, isPackaged: boolean
   const present = HOOK_VARIABLES.filter((k) => env[k] !== undefined && env[k] !== '');
   if (isPackaged) {
     if (present.length) warnings.push(`Ignored development/test variables in the installed app: ${present.join(', ')}`);
-    return { userDataDir: null, localDataDir: null, dialogPath: null, exportDialogPath: null, backupDialogPath: null, bibDialogPath: null, metadataFile: null, netFixturesFile: null, claudeSimDir: null, hiddenWindow: false, offline: false, aiProvider: null, rendererDevUrl: null, warnings };
+    return { userDataDir: null, localDataDir: null, dialogPath: null, exportDialogPath: null, backupDialogPath: null, bibDialogPath: null, metadataFile: null, netFixturesFile: null, claudeSimDir: null, hiddenWindow: false, e2e: false, offline: false, aiProvider: null, rendererDevUrl: null, warnings };
   }
   const rendererDevUrl = parseDevServerUrl(env.ELECTRON_RENDERER_URL);
   if (env.ELECTRON_RENDERER_URL && !rendererDevUrl) {
@@ -87,6 +89,7 @@ export function resolveRuntimeConfig(env: NodeJS.ProcessEnv, isPackaged: boolean
     netFixturesFile: env.RL_E2E === '1' ? absolute(env.RL_E2E_NET_FIXTURES) : null,
     claudeSimDir: env.RL_E2E === '1' ? absolute(env.RL_E2E_CLAUDE_SIM) : null,
     hiddenWindow: env.RL_E2E_HIDDEN === '1',
+    e2e: env.RL_E2E === '1',
     offline: env.RL_E2E_OFFLINE === '1',
     aiProvider: env.RL_AI_PROVIDER === 'mock' ? 'mock' : null,
     rendererDevUrl,
@@ -94,7 +97,7 @@ export function resolveRuntimeConfig(env: NodeJS.ProcessEnv, isPackaged: boolean
   };
 }
 
-let current: RuntimeConfig = { userDataDir: null, localDataDir: null, dialogPath: null, exportDialogPath: null, backupDialogPath: null, bibDialogPath: null, metadataFile: null, netFixturesFile: null, claudeSimDir: null, hiddenWindow: false, offline: false, aiProvider: null, rendererDevUrl: null, warnings: [] };
+let current: RuntimeConfig = { userDataDir: null, localDataDir: null, dialogPath: null, exportDialogPath: null, backupDialogPath: null, bibDialogPath: null, metadataFile: null, netFixturesFile: null, claudeSimDir: null, hiddenWindow: false, e2e: false, offline: false, aiProvider: null, rendererDevUrl: null, warnings: [] };
 
 /** Called once, first thing in the main entry point. */
 export function configureRuntime(config: RuntimeConfig): RuntimeConfig {

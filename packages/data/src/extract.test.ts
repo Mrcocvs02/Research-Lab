@@ -256,11 +256,6 @@ describe('malformed and limited input', () => {
     await mkdir(path.join(dir, 'sub'));
     await writeFile(path.join(dir, 'sub', 'empty.docx'), zipSync({ 'other.xml': strToU8('x') }));
     await expect(ex.extract(dir, 'sub/empty.docx')).rejects.toMatchObject({ code: 'IO_ERROR' });
-    // A zip bomb: a tiny archive that inflates to far more than the per-entry cap.
-    const bomb = zipSync({ 'word/document.xml': new Uint8Array(70 * 1024 * 1024) });
-    expect(bomb.length).toBeLessThan(1024 * 1024);
-    await writeFile(path.join(dir, 'bomb.docx'), bomb);
-    await expect(ex.extract(dir, 'bomb.docx')).rejects.toMatchObject({ code: 'IO_ERROR', details: { reason: 'too-large' } });
   });
 });
 

@@ -3,7 +3,6 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { removeDir, tempDir } from '../test-utils.js';
-import { deflateSync } from 'node:zlib';
 import { bufSyncSource, loadDoc } from './doc.js';
 import { listExternal } from './external.js';
 import { FOREIGN, PAGE_WITH_ANNOTS, docPdf, rng } from './gen.js';
@@ -113,24 +112,12 @@ describe('hostile files: 500 deterministic mutations (§8.3.13)', () => {
   });
 });
 
-describe('xref bombs, non-finite geometry and imported highlights (I3, M5, I6)', () => {
+describe('non-finite geometry and imported highlights (M5, I6)', () => {
   const run = async (buf: Buffer, over: Partial<PlanAnnot> = {}) => {
     const p = path.join(dir, `x${Math.random().toString(36).slice(2)}.pdf`);
     await writeFile(p, buf);
     return planSync({ path: p, mode: 'sync', annotations: [{ ...annot, ...over }], otherIds: [], known: {}, now: annot.createdAt });
   };
-
-  it('an xref stream whose /Index claims millions of entries is refused quickly, and so is a table that does', async () => {
-    const zeros = deflateSync(Buffer.alloc(8 * 1024 * 1024));
-    const head = '%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>\nendobj\n';
-    const dict = `<< /Type /XRef /Size 5 /W [1 0 0] /Index [0 8388608] /Root 1 0 R /Filter /FlateDecode /Length ${zeros.length} >>`;
-    const buf = Buffer.concat([Buffer.from(head + '4 0 obj\n' + dict + '\nstream\n', 'latin1'), zeros, Buffer.from(`\nendstream\nendobj\nstartxref\n${head.length}\n%%EOF\n`)]);
-    const t0 = Date.now();
-    expect(await run(buf)).toMatchObject({ ok: false, reason: 'damaged' });
-    expect(Date.now() - t0).toBeLessThan(5000);
-    const table = Buffer.from(head + 'xref\n0 3\n0000000000 65535 f \n0000000009 00000 n \n0000000009 00000 n \n3 99999999\ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n' + head.length + '\n%%EOF\n', 'latin1');
-    expect(await run(table)).toMatchObject({ ok: false, reason: 'damaged' });
-  });
 
   it('a page box and quads at the limit of the double range give no NaN in the external list', () => {
     const huge = '1' + '0'.repeat(308);

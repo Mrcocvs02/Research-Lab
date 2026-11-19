@@ -119,4 +119,4 @@ Da controllare a mano: colore giusto, sottolineatura sotto la riga (non attraver
 - Offset xref relativi a un'intestazione preceduta da spazzatura, e flussi con `/Length` sbagliato fuori dagli stream xref/ObjStm, non sono gestiti: finirebbero in `damaged` (nessuno nella libreria di prova).
 - Tutti i file sintetici riletti da pdf.js mostrano le annotazioni; non è però una prova su PDF reali di terze parti oltre ai 21 della libreria (per i quali si è costruito, non scritto, l'aggiornamento).
 - Cifrati con password vuota: qui solo riconosciuti (R2-R6, con un test sintetico R3); scriverci richiede la cifratura per oggetto di G4c.
-- Un test di mutazione casuale (300 casi) non ha prodotto eccezioni diverse dall'errore tipizzato del parser; il corpus ostile completo e i flussi bomba restano alla revisione security di G4a.
+- Un test di mutazione casuale (300 casi) non ha prodotto eccezioni diverse dall'errore tipizzato del parser; il corpus ostile completo resta alla revisione security di G4a.

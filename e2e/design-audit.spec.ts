@@ -2003,21 +2003,23 @@ async function mapFinal(a: Audit, full: boolean): Promise<void> {
     await w.waitForTimeout(3500);
     await count(a, 'map-network', '[data-testid="section-network"]', 'canvas');
     await a.shot('map-network-docs', 3);
-    for (const m of full ? ['author', 'tag', 'topic'] : ['author']) {
-      await w.getByTestId('net-mode').click().catch(() => {});
-      await w.getByTestId(`net-mode-${m}`).click().catch(() => {});
-      await expect(w.getByTestId('ent-canvas')).toHaveAttribute('data-loading', 'false', { timeout: 60_000 }).catch(() => {});
-      await w.waitForTimeout(3000);
-      await a.shot(`map-network-${m}`, 4);
-    }
+    // The networks of tags and topics are gone (the vocabulary is a tree in Explore); the authors' network is an Explore view.
+    await w.getByTestId('net-tab-explore').click();
+    await w.getByTestId('explore-mode-vocab').click().catch(() => {});
+    await w.waitForTimeout(2000);
+    await a.shot('map-vocabulary', 4);
+    await w.getByTestId('explore-mode-authors').click().catch(() => {});
+    await expect(w.getByTestId('ent-canvas')).toHaveAttribute('data-loading', 'false', { timeout: 60_000 }).catch(() => {});
+    await w.waitForTimeout(3000);
+    await a.shot('map-network-author', 4);
   });
   if (!full) {
     await w.getByTestId('net-tab-map').click().catch(() => {});
     return;
   }
   await a.step('map entity detail', async () => {
-    await w.getByTestId('net-mode').click().catch(() => {});
-    await w.getByTestId('net-mode-author').click().catch(() => {});
+    await w.getByTestId('net-tab-explore').click().catch(() => {});
+    await w.getByTestId('explore-mode-authors').click().catch(() => {});
     await w.waitForTimeout(2500);
     const c = await w.getByTestId('ent-canvas').boundingBox();
     for (const [dx, dy] of [[0, 0], [30, 20], [-40, -30], [60, -40], [-70, 50]]) {

@@ -224,12 +224,13 @@ test('bulk tags follow the selected ids and the selection survives a refresh; En
     await openCard(window);
     const bulk = window.getByTestId('bulk-panel');
     await pickTag(window, bulk.getByTestId('bulk-tag-input'), 'First topic', true);
-    await expect(bulk.getByTestId('bulk-tag')).toHaveCount(1);
+    await expect(bulk.getByTestId('sel-tag-all')).toHaveCount(1);
     // the change reloaded the list: the selection and the counter are still the whole result
     await expect(window.getByTestId('selection-count')).toHaveText(new RegExp(`${total} selected`));
     await pickTag(window, bulk.getByTestId('bulk-tag-input'), 'Second topic', true);
-    await expect(bulk.getByTestId('bulk-tag')).toHaveCount(2);
-    for (const item of await bulk.getByTestId('bulk-tag').all()) await expect(item).toContainText(`on ${total} of ${total}`);
+    // The summary lists what the whole selection has in common: both tags are on every selected document, none is only on some.
+    await expect(bulk.getByTestId('sel-tag-all')).toHaveCount(2);
+    await expect(bulk.getByTestId('sel-tags-some')).toHaveCount(0);
     await expect(window.getByTestId('selection-count')).toHaveText(new RegExp(`${total} selected`));
 
     // Focus by id: a title change elsewhere moves the first row to the end; Enter still opens the focused document.

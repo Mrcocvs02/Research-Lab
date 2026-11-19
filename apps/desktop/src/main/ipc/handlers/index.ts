@@ -5,6 +5,7 @@
 import type { Channels, HandlerMap } from '@rl/core';
 import { appHandlers, dialogHandlers, importHandlers, libraryHandlers, secretsHandlers, settingsHandlers } from './core-handlers.js';
 import { documentsHandlers } from './documents-handlers.js';
+import { tagReviewHandlers } from './tag-review-handlers.js';
 import { historyHandlers, organizeDocumentsHandlers, projectsHandlers, taxonomyHandlers } from './organize-handlers.js';
 import { indexHandlers, scanHandlers } from './scan-handlers.js';
 import { searchHandlers } from './search-handlers.js';
@@ -46,6 +47,7 @@ export function buildHandlers(s: MainServices): HandlerMap<Channels> {
     ...searchHandlers(s),
     ...documentsHandlers(s),
     ...taxonomyHandlers(s),
+    ...tagReviewHandlers(s),
     ...historyHandlers(s),
     ...projectsHandlers(s),
     ...organizeDocumentsHandlers(s),

@@ -104,9 +104,14 @@ export function restoreDocument(cur: DocumentRecord, entries: readonly ChangeEnt
   for (const e of entries) {
     if (e.target.id !== undefined && e.target.id !== cur.id) throw invalidEntry('a document', { id: cur.id });
     if (e.action === 'tags.update') {
-      checkKeys(obj(e.before), new Set(['tags']), 'a document');
+      checkKeys(obj(e.before), new Set(['tags', 'tagOrigin']), 'a document');
       if (!sameSet(next['tags'], obj(e.after)['tags'])) throw conflict('The tags of a document', { id: cur.id });
       next['tags'] = obj(e.before)['tags'];
+      // The provenance of the tags (D-494) goes back with them; null = no provenance recorded.
+      if ('tagOrigin' in obj(e.before)) {
+        if (obj(e.before)['tagOrigin'] === null) delete next['tagOrigin'];
+        else next['tagOrigin'] = obj(e.before)['tagOrigin'];
+      }
     } else if (e.action === 'ai.review') {
       const before = obj(obj(e.before)['ai']);
       const after = obj(obj(e.after)['ai']);
@@ -208,6 +213,20 @@ export function restoreTaxonomy(cur: TaxonomyFile, entries: readonly ChangeEntry
         }
       }
     }
+  }
+  const order = entries.map((e) => obj(e.before)['nodeOrder']).find((o) => Array.isArray(o)) as unknown[] | undefined;
+  if (order) {
+    const pos = new Map(order.map((id, i) => [id, i] as const));
+    const idx = new Map(next.nodes.map((n, i) => [n.id, i] as const));
+    next.nodes = [...next.nodes].sort((a, b) => (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity) || (idx.get(a.id) as number) - (idx.get(b.id) as number));
+  }
+  for (const e of entries) {
+    const afterD = obj(e.after)['distinct'];
+    if (afterD === undefined) continue;
+    if (canonical(cur.distinct ?? []) !== canonical(afterD)) throw conflict('The taxonomy', { field: 'distinct' });
+    const old = obj(e.before)['distinct'];
+    if (Array.isArray(old) && old.length > 0) next.distinct = old as never;
+    else delete next.distinct;
   }
   if (!taxonomyFileSchema.safeParse(next).success) throw invalidEntry('the taxonomy');
 

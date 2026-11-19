@@ -5,13 +5,16 @@ import { isoDateSchema, itemIdSchema, legacySchema, schemaVersionSchema } from '
  * Upper bounds of a taxonomy file (the file is synced and untrusted). Texts and per-node lists match what the
  * `taxonomy:apply` channel accepts; the totals are far above any real library.
  */
-export const TAXONOMY_FILE_LIMITS = { nodes: 50_000, types: 2_000, venues: 20_000, label: 200, aliases: 500, links: 200, mergedFrom: 5_000, group: 100 } as const;
+export const TAXONOMY_FILE_LIMITS = { nodes: 50_000, types: 2_000, venues: 20_000, label: 200, aliases: 500, links: 200, mergedFrom: 5_000, group: 100, distinct: 5_000 } as const;
 const L = TAXONOMY_FILE_LIMITS;
 const labelText = z.string().min(1).max(L.label);
 const aliasList = z.array(z.string().max(L.label)).max(L.aliases);
 
 export const taxonomyNodeStatusSchema = z.enum(['active', 'candidate', 'deprecated']);
 export const taxonomyOriginSchema = z.enum(['user', 'ai', 'import']);
+/** Kind of a family root (D-493): several values per paper, at most one, or the flat keywords family. */
+export const taxonomyFamilySchema = z.enum(['one', 'many', 'keywords']);
+export type TaxonomyFamily = z.infer<typeof taxonomyFamilySchema>;
 
 /**
  * A taxonomy node. Levels are free: depth is defined by `parents` only
@@ -37,6 +40,8 @@ export const taxonomyNodeSchema = z.object({
   mergedFrom: z.array(itemIdSchema).max(L.mergedFrom).optional(),
   /** Free grouping hint (e.g. imported "macro" | "micro" | "extra:<group>"). Not semantic. */
   group: z.string().max(L.group).optional(),
+  /** Only on a root: this node is a family of the controlled vocabulary (D-493). */
+  family: taxonomyFamilySchema.optional(),
   createdAt: isoDateSchema.optional(),
   legacy: legacySchema.optional(),
 });
@@ -64,6 +69,8 @@ export const taxonomyFileSchema = z.object({
   nodes: z.array(taxonomyNodeSchema).max(L.nodes).default([]),
   documentTypes: z.array(documentTypeSchema).max(L.types).default([]),
   venues: z.array(venueSchema).max(L.venues).default([]),
+  /** Pairs of nodes the user said are not the same (unordered; never proposed again as duplicates). */
+  distinct: z.array(z.object({ a: itemIdSchema, b: itemIdSchema })).max(L.distinct).optional(),
   legacy: legacySchema.optional(),
 });
 export type TaxonomyFile = z.infer<typeof taxonomyFileSchema>;

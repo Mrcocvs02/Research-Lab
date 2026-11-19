@@ -19,6 +19,10 @@ interface Props {
   onCopyBib?: (() => void) | undefined;
   /** Tooltip of the link entry: what it is linked to and when it was updated. */
   bibTitle?: string | undefined;
+  /** "With Claude ✦" (X7): the report of the period (`reportDisabled` says why it cannot be made) and citation suggestions. Project page only. */
+  onReport?: (() => void) | undefined;
+  reportDisabled?: string | undefined;
+  onCite?: (() => void) | undefined;
   size?: 'sm' | 'md';
 }
 
@@ -26,7 +30,7 @@ interface Props {
  * The menu of a project (1.1, D-412): "Export…" (second brain and bibliography), then Rename and Archive. Later waves add their
  * entries here (link a .bib file, Claude's report, comparison table, citation suggestions) up to seven in three groups.
  */
-export function ProjectMoreMenu({ archived, testId, label, onExport, onRename, onToggleArchive, onLinkBib, onCopyBib, bibTitle, size = 'md' }: Props) {
+export function ProjectMoreMenu({ archived, testId, label, onExport, onRename, onToggleArchive, onLinkBib, onCopyBib, bibTitle, onReport, reportDisabled, onCite, size = 'md' }: Props) {
   const { t } = useTranslation();
   const anchor = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
@@ -42,11 +46,26 @@ export function ProjectMoreMenu({ archived, testId, label, onExport, onRename, o
           ],
         }
       : null;
+  const claudeGroup: MenuGroup | null =
+    onRename && onReport && onCite
+      ? {
+          id: 'claude',
+          label: t('schema.withClaude'),
+          items: [
+            reportDisabled
+              ? { id: 'report', testId: 'project-report', label: t('schema.report.menu'), disabled: true, disabledReason: reportDisabled, onSelect: onReport }
+              : { id: 'report', testId: 'project-report', label: t('schema.report.menu'), onSelect: onReport },
+            { id: 'cite', testId: 'project-cite', label: t('schema.cite.menu'), onSelect: onCite },
+          ],
+        }
+      : null;
   const manage: MenuGroup | null = onRename ? { id: 'manage', items: [{ id: 'rename', testId: 'project-rename', label: t('projects.rename'), onSelect: onRename }, archive] } : null;
   const groups: MenuGroups = manage
-    ? bibGroup
-      ? [exportGroup, bibGroup, manage]
-      : [exportGroup, manage]
+    ? claudeGroup
+      ? [{ ...exportGroup, items: [...exportGroup.items, ...(bibGroup?.items ?? [])] }, claudeGroup, manage]
+      : bibGroup
+        ? [exportGroup, bibGroup, manage]
+        : [exportGroup, manage]
     : [{ id: 'project', items: [archive, { id: 'export', testId: 'project-export', label: t('secondBrain.button'), onSelect: onExport }] }];
   return (
     <>

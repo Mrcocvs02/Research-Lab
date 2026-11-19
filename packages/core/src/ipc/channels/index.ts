@@ -23,6 +23,7 @@ import { historyChannels } from './history.js';
 import { mcpChannels, mcpEvents } from './mcp.js';
 import { libraryChannels, libraryEvents } from './library.js';
 import { literatureChannels } from './literature.js';
+import { projectSchemaChannels } from './project.js';
 import { maintenanceChannels } from './maintenance.js';
 import { notesChannels } from './notes.js';
 import { projectsChannels } from './projects.js';
@@ -47,6 +48,7 @@ export const channels = mergeRegistries(appChannels, settingsChannels, libraryCh
   compareChannels,
   groupsChannels,
   citectxChannels,
+  projectSchemaChannels,
 );
 
 export const events = mergeRegistries(aiEvents, annotationsEvents, appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, watchEvents, graphEvents, exportEvents, mcpEvents, backupEvents);
@@ -68,6 +70,7 @@ export { projectDetailSchema, projectSummarySchema, projectMemberViewSchema, rea
 export { noteViewSchema, noteListItemSchema, type NoteView } from './notes.js';
 export { annotationColorSchema, annotationInputSchema, externalItemSchema, pdfReasonSchema, pdfStateSchema, type AnnotationInput, type ExternalItem, type PdfReason, type PdfState } from './annotations.js';
 export { CROP_BASE64_MAX, explainResultSchema, type ExplainResult } from './readertools.js';
+export { OUTLINE_LIMITS, REPORT_AUDIENCES, REPORT_PARTS, claimSchema, evidenceSchema, outlineSchema, type Claim, type Evidence, type Outline } from './project.js';
 export { DISCOVER_LIMITS, DISCOVER_SUMMARY_CHOICES, discoverReasonSchema, discoverRunSchema, discoverSummarySchema, type DiscoverOutcome, type DiscoverCandidate, type DiscoverKind, type DiscoverReason, type DiscoverRun, type DiscoverRunSummary, type DiscoverSummary } from './discover.js';
 export { LITERATURE_KEYS, LITERATURE_MAX_DOCS, TEMPLATE_LIMITS, type LiteratureKey, type LiteratureNote } from './literature.js';
 export { thumbItemSchema } from './thumbs.js';

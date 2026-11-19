@@ -1,7 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Lazy, lazyRetry, lazyView } from '../../components/Lazy';
 import { useTranslation } from 'react-i18next';
-import type { ProjectDetail, StudyState } from '@rl/core';
+import type { Channels, ProjectDetail, ResponseOf, StudyState } from '@rl/core';
 import { Button } from '../../components/Button';
 import { Chip } from '../../components/Chip';
 import { Dialog } from '../../components/Dialog';
@@ -28,13 +28,18 @@ import { toRequestItems, type PlanItemView } from './readingPlan';
 import './projects.css';
 import '../notes/notes.css';
 
-/** At most four tabs (D-411); Schema joins them in a later wave, once the project has one. */
-type Tab = 'members' | 'plan' | 'notes';
+/** At most four tabs (D-411): Schema appears once the project has a research outline or a claim (§17.4.13). */
+type Tab = 'members' | 'plan' | 'notes' | 'schema';
+type SchemaInfo = ResponseOf<Channels, 'project:schema'>;
 const STATES: StudyState[] = ['to-read', 'reading', 'read'];
 
 // The Markdown renderer is loaded when the preview is first shown; the add-documents dialog when it is first asked for.
 const Markdown = lazyRetry(() => import('../../lib/markdown').then((m) => ({ default: m.Markdown })));
 const AddDocuments = lazyRetry(() => import('./AddDocumentsDialog'));
+// The Schema tab, the report and the citation suggestions: three lazy chunks, loaded when first shown (X7).
+const SchemaTab = lazyView(() => import('./SchemaTab'), ['projects']);
+const ReportDialog = lazyView(() => import('./ReportDialog'), ['projects']);
+const CiteDialog = lazyView(() => import('./CiteDialog'), ['projects']);
 const LinkBibDialog = lazyView(() => import('../import/LinkBibDialog'), ['import']);
 
 /** Notes in Markdown: a plain text box, a preview next to it (rendered without any raw HTML), saved on demand or on leaving the box. */
@@ -167,6 +172,10 @@ export function ProjectDetailView({ id }: { id: string }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [schema, setSchema] = useState<SchemaInfo | null>(null);
+  /** The Schema tab was asked for ("Write it now") before there is an outline to show. */
+  const [schemaOpen, setSchemaOpen] = useState(false);
+  const [dialog, setDialog] = useState<{ kind: 'report'; open?: string } | { kind: 'cite' } | null>(null);
   const detailRef = useRef<ProjectDetail | null>(null);
   /** The ref is what writes read their revision from; it moves with the state, never back to an older render. */
   const setDetail = useCallback((d: ProjectDetail) => {
@@ -205,6 +214,15 @@ export function ProjectDetailView({ id }: { id: string }) {
       },
       (e: unknown) => alive && setError(e),
     );
+    return () => {
+      alive = false;
+    };
+  }, [id, pushed]);
+
+  // The research outline, claims and reports of the project (nothing leaves the machine).
+  useEffect(() => {
+    let alive = true;
+    rl.invoke('project:schema', { projectId: id }).then((r) => alive && setSchema(r), () => alive && setSchema(null));
     return () => {
       alive = false;
     };
@@ -296,7 +314,9 @@ export function ProjectDetailView({ id }: { id: string }) {
     { id: 'members', label: t('projects.tabs.members') },
     { id: 'plan', label: t('projects.tabs.plan') },
     { id: 'notes', label: t('projects.tabs.notes') },
+    ...(schemaOpen || (schema && (schema.outline !== null || schema.claims.length > 0)) ? [{ id: 'schema', label: t('schema.tab') }] : []),
   ];
+  const hasOutline = !!schema?.outline && schema.outline.idea.trim() !== '';
   const addButton = (variant: 'primary' | 'secondary', testId: string) => (
     <Button variant={variant} icon={<IconPlus size={16} />} disabled={archived} disabledReason={t('projects.archivedNoAdd')} onClick={() => setAdding(true)} data-testid={testId}>
       {t('projects.addDocs')}
@@ -320,7 +340,7 @@ export function ProjectDetailView({ id }: { id: string }) {
         }
       >
         {addButton('primary', 'project-add-docs')}
-        <ProjectMoreMenu archived={archived} testId="project-more" label={t('projects.more')} onExport={() => openExport({ projectId: id, name: p.name })} onRename={() => setRenaming(true)} onToggleArchive={() => void toggleArchive()} onLinkBib={() => setLinking(true)} onCopyBib={() => void copyBib()} bibTitle={bib?.linked ? t('projects.bib.linkedTo', { file: bib.file, time: new Date(bib.at ?? 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }) : undefined} />
+        <ProjectMoreMenu archived={archived} testId="project-more" label={t('projects.more')} onExport={() => openExport({ projectId: id, name: p.name })} onRename={() => setRenaming(true)} onReport={() => setDialog({ kind: 'report' })} reportDisabled={hasOutline ? undefined : t('schema.report.needOutline')} onCite={() => setDialog({ kind: 'cite' })} onToggleArchive={() => void toggleArchive()} onLinkBib={() => setLinking(true)} onCopyBib={() => void copyBib()} bibTitle={bib?.linked ? t('projects.bib.linkedTo', { file: bib.file, time: new Date(bib.at ?? 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }) : undefined} />
       </ViewHead>
       <BibBanner projectId={id} status={bib} />
       {linking && (
@@ -429,10 +449,51 @@ export function ProjectDetailView({ id }: { id: string }) {
             )}
           </div>
         )}
-        {tab === 'notes' && <NotesEditor detail={detail} onSave={async (notes) => void (await update({ notes }))} />}
+        {tab === 'notes' && (
+          <>
+            {schema && schema.outline === null && (
+              <div className="callout schema-invite" data-testid="notes-outline-invite">
+                <p>{t('schema.invite')}</p>
+                <Button size="sm" onClick={() => (setSchemaOpen(true), setTab('schema'))} data-testid="notes-write-outline">
+                  {t('schema.writeNow')}
+                </Button>
+              </div>
+            )}
+            <NotesEditor detail={detail} onSave={async (notes) => void (await update({ notes }))} />
+            {schema && schema.reports.length > 0 && (
+              <section className="schema-reports" data-testid="project-reports">
+                <h3>{t('schema.report.list')}</h3>
+                <ul>
+                  {schema.reports.map((r) => (
+                    <li key={r.date}>
+                      <button type="button" className="link" onClick={() => setDialog({ kind: 'report', open: r.date })} data-testid="report-open">
+                        {r.date} · {safeText(r.title)}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </>
+        )}
+        {tab === 'schema' && schema && (
+          <Lazy>
+            <SchemaTab projectId={id} info={schema} titles={new Map(detail.members.map((m) => [m.docId, m.title ?? m.docId]))} onChanged={() => setPushed((n) => n + 1)} />
+          </Lazy>
+        )}
         {tab === 'plan' && <ReadingPlanPanel detail={detail} onChange={(items) => void savePlan(items)} onStudyState={(docId, state) => void setDocState(docId, state)} />}
       </div>
 
+      {dialog?.kind === 'report' && (
+        <Lazy>
+          <ReportDialog projectId={id} {...(dialog.open ? { open: dialog.open } : {})} onClose={() => setDialog(null)} onSaved={() => setPushed((n) => n + 1)} />
+        </Lazy>
+      )}
+      {dialog?.kind === 'cite' && (
+        <Lazy>
+          <CiteDialog projectId={id} notes={p.notes} outline={schema?.outline ?? null} onClose={() => setDialog(null)} onAssigned={() => setPushed((n) => n + 1)} />
+        </Lazy>
+      )}
       {renaming && <RenameDialog project={p} onSave={update} onClose={() => setRenaming(false)} />}
       {adding && (
         <Lazy>

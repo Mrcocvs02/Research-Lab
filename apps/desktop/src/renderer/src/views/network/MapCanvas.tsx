@@ -65,6 +65,8 @@ interface Props {
   bridge?: BridgePath | null;
   /** "Find a bridge" between two documents of the map (opens Discover). */
   onBridge?(a: string, b: string): void;
+  /** "Find links" of the card's menu (section 18.2). */
+  onFindLinks?(docId: string): void;
   /** Pill, legend: drawn over the canvas (never beside or above it). */
   overlay?: ReactNode;
 }
@@ -104,7 +106,7 @@ function Announce({ docId, topic }: { docId: string; topic: string }) {
  * to the nearest point that way, `]` and `[` walk through the points in view, Enter selects, Shift+Enter reads, `L` opens Explore.
  * React renders only when the hovered or focused point changes, never per frame; nothing runs at rest.
  */
-export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, aiBadge, label, fitKey, handle, tints, areas = null, allow, minimap, bridge = null, onBridge, overlay }: Props) {
+export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, aiBadge, label, fitKey, handle, tints, areas = null, allow, minimap, bridge = null, onBridge, onFindLinks, overlay }: Props) {
   const { t } = useTranslation();
   const [hover, setHover, holdHover] = useRestingHover<{ idx: number; x: number; y: number }>(150, 250);
   const [menuFor, setMenuFor] = useState<number | null>(null);
@@ -870,7 +872,7 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
           setMenuFor(null);
           holdHover(false);
         }}
-        groups={[{ id: 'doc', items: [{ id: 'bridge', testId: 'map-card-bridge', label: t('network.bridge.find'), onSelect: () => menuFor !== null && startBridge(menuFor) }] }]}
+        groups={[{ id: 'doc', items: [{ id: 'bridge', testId: 'map-card-bridge', label: t('network.bridge.find'), onSelect: () => menuFor !== null && startBridge(menuFor) }, ...(onFindLinks ? [{ id: 'links', testId: 'map-card-links', label: t('network.edge.findLinks'), onSelect: () => menuFor !== null && onFindLinks(map.ids[menuFor]!) }] : [])] }]}
       />
       {second !== null && <BridgePick docId={map.ids[second]!} onCancel={() => setSecond(null)} />}
       {overlay}

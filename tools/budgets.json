@@ -23,7 +23,9 @@
       "EvidenceDialog": 16,
       "ManuscriptView": 16,
       "ManuscriptMatrix": 16,
-      "AssignDialog": 16
+      "AssignDialog": 16,
+      "LinkFinderDialog": 16,
+      "DocLinks": 16
     }
   },
   "main": {

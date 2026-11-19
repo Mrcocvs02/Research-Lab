@@ -30,6 +30,7 @@ import type { ScopeOptions } from './useScopes';
 import type { GraphStatus } from './useGraphModel';
 
 const LabelsDialog = lazyView(() => import('./LabelsDialog').then((m) => ({ default: m.LabelsDialog })), ['network']);
+const LinkFinderDialog = lazyView(() => import('../links/LinkFinderDialog').then((m) => ({ default: m.LinkFinderDialog })), ['links']);
 
 type ScopeKind = 'all' | 'folder' | 'project' | 'tag';
 type MapScope = NonNullable<RequestOf<Channels, 'graph:map'>['scope']>;
@@ -62,6 +63,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
+  const [findFor, setFindFor] = useState<string | null>(null);
   const handle = useRef<MapHandle>(null);
   const ticket = useRef(0);
   const memo = useRef(new Map<number, TintMemo[]>());
@@ -458,6 +460,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
             allow={tl.only ?? allow}
             minimap={mini}
             bridge={bridge}
+            onFindLinks={setFindFor}
             onBridge={(a, b) => {
               setDiscoverIntent({ kind: 'bridge', docIds: [a, b] });
               nav.navigate({ view: 'discover' });
@@ -482,6 +485,11 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
         onClose={() => setLegendFor(null)}
         groups={[{ id: 'cluster', items: [{ id: 'export', testId: 'cluster-export', label: t('secondBrain.clusterButton'), onSelect: () => legendFor && openExport({ clusters: [{ id: legendFor.id, label: legendFor.text }], name: legendFor.text }) }] }]}
       />
+      {findFor && (
+        <Lazy>
+          <LinkFinderDialog docIds={[findFor]} onClose={() => setFindFor(null)} />
+        </Lazy>
+      )}
       {labelsOpen && map && (
         <Lazy>
           <LabelsDialog

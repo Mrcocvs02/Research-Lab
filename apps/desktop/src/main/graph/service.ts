@@ -362,8 +362,10 @@ interface OutNode {
 interface OutEdge {
   from: string;
   to: string;
-  kind: 'similar' | 'cites' | 'tagged' | 'contains';
+  kind: 'similar' | 'cites' | 'tagged' | 'contains' | 'linked';
   weight: number;
+  id?: string;
+  reasons?: Record<string, unknown>;
 }
 
 /** Node key used by edges: a folder and a tag may share the same id string. */
@@ -407,6 +409,14 @@ export async function neighbors(
           addNode(docNode(other));
           edges.push({ from: key('doc', outgoing ? id : other.id), to: key('doc', outgoing ? other.id : id), kind: 'cites', weight: 1 });
         }
+      }
+    }
+    if (has('links')) {
+      for (const l of (await (await import('../features/doclinks/index.js')).linksOfDoc(s, id, view)).slice(0, req.limit)) {
+        const other = view.byId.get(l.docId);
+        if (!other) continue;
+        addNode(docNode(other));
+        edges.push({ from: key('doc', id), to: key('doc', other.id), kind: 'linked', weight: l.weight, id: l.id, reasons: l.reasons });
       }
     }
     if (has('tags')) {

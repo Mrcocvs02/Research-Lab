@@ -2,6 +2,7 @@ import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from
 import { useTranslation } from 'react-i18next';
 import type { Channels, RequestOf } from '@rl/core';
 import { EmptyState } from '../../components/EmptyState';
+import { Lazy, lazyView } from '../../components/Lazy';
 import { useNav } from '../../lib/nav';
 import { setDiscoverIntent } from '../../lib/discoverIntent';
 import { useNotify } from '../../lib/notify';
@@ -11,6 +12,7 @@ import { rl } from '../../lib/rl';
 import { isDarkTheme } from '../../lib/theme';
 import { useLocalFlag } from '../../lib/useLocalFlag';
 import { safeText } from '../library/safeText';
+import { reasonLine, weightBar, type LinkReasons } from '../links/reasons';
 import { reducedMotion } from './camera';
 import { AreaLegend, useAreaColors } from './AreaLegend';
 import { areaSummary, assignAreaSlots, colorCache, loadAreaMemo, mainArea, saveAreaMemo, shareIn, type AreaDef } from './areaColors';
@@ -32,12 +34,22 @@ import { useCanvasView } from './useCanvasView';
 import type { ScopeOptions } from './useScopes';
 
 type Kind = RequestOf<Channels, 'graph:neighbors'>['kinds'][number];
-const KINDS: Kind[] = ['similar', 'citations', 'tags', 'folder', 'children', 'documents'];
+const LinkFinderDialog = lazyView(() => import('../links/LinkFinderDialog').then((m) => ({ default: m.LinkFinderDialog })), ['links']);
+const KINDS: Kind[] = ['similar', 'citations', 'tags', 'folder', 'children', 'documents', 'links'];
 /** What each kind of node can be expanded by. */
-const VALID: Record<NodeKind, Kind[]> = { doc: ['similar', 'citations', 'tags', 'folder'], folder: ['children', 'documents'], tag: ['documents', 'tags'], entity: [] };
-const DEFAULT_KINDS: Kind[] = ['similar', 'citations', 'tags', 'folder', 'children', 'documents'];
+const VALID: Record<NodeKind, Kind[]> = { doc: ['similar', 'citations', 'tags', 'folder', 'links'], folder: ['children', 'documents'], tag: ['documents', 'tags'], entity: [] };
+const DEFAULT_KINDS: Kind[] = ['similar', 'citations', 'tags', 'folder', 'children', 'documents', 'links'];
 const LIMITS = [10, 25, 50, 100, 300] as const;
 const NODE_R = 7;
+
+interface EdgeHit {
+  a: string;
+  b: string;
+  kind: EdgeKind;
+  weight: number;
+  x: number;
+  y: number;
+}
 
 export interface NetStart {
   kind: NodeKind;
@@ -67,6 +79,7 @@ interface Props {
 const EDGE_STYLE: Record<EdgeKind, { dash: number[]; color: keyof MapTheme }> = {
   similar: { dash: [], color: 'accent' },
   cites: { dash: [], color: 'text' },
+  linked: { dash: [], color: 'accent' },
   tagged: { dash: [2, 3], color: 'muted' },
   contains: { dash: [], color: 'muted' },
   link: { dash: [], color: 'muted' },
@@ -111,6 +124,11 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
   const litAreaRef = useRef<number | null>(null);
   const isoAreaRef = useRef<number | null>(null);
   const [bridgeFrom, setBridgeFrom] = useState<string | null>(null);
+  /** The links drawn (`linked` edges, section 18.2) by their two node keys, and the card of the edge that was clicked. */
+  const linkMeta = useRef(new Map<string, { id: string; reasons: LinkReasons }>());
+  const pointer = useRef({ x: 0, y: 0 });
+  const [edgeCard, setEdgeCard] = useState<EdgeHit | null>(null);
+  const [findFor, setFindFor] = useState<string | null>(null);
   const refs = useRef({ selKey, cursor, pathKeys, focusKey, surprise, bridgeFrom });
   refs.current = { selKey, cursor, pathKeys, focusKey, surprise, bridgeFrom };
   const theme = useRef<MapTheme | null>(null);
@@ -366,6 +384,7 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
       return best;
     },
     onHover(n, px, py) {
+      pointer.current = { x: px, y: py };
       const key = n?.key ?? null;
       if (key === hoverKey.current) return;
       hoverKey.current = key;
@@ -374,6 +393,14 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
     },
     onClick(n, shift) {
       dismissHint();
+      if (!n) {
+        const hit = edgeAt(pointer.current.x, pointer.current.y);
+        if (hit) {
+          setEdgeCard(hit);
+          return;
+        }
+      }
+      setEdgeCard(null);
       if (refs.current.bridgeFrom && n && n.kind === 'doc' && `doc:${refs.current.bridgeFrom}` !== n.key) {
         setDiscoverIntent({ kind: 'bridge', docIds: [refs.current.bridgeFrom, n.id] });
         setBridgeFrom(null);
@@ -448,6 +475,48 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
     if (!n.expanded) void expand(n);
   }
 
+  /** The `linked` edge under the pointer (a hit zone of 6 px). */
+  function edgeAt(px: number, py: number): EdgeHit | null {
+    const v = view.view.current;
+    const { w, h } = view.size.current;
+    let best: EdgeHit | null = null;
+    let bestD = 36;
+    for (const e of net.edges) {
+      if (e.kind !== 'linked') continue;
+      const a = net.nodes.get(e.a);
+      const b = net.nodes.get(e.b);
+      if (!a || !b) continue;
+      const ax = toScreenX(v, a.x, w);
+      const ay = toScreenY(v, a.y, h);
+      const dx = toScreenX(v, b.x, w) - ax;
+      const dy = toScreenY(v, b.y, h) - ay;
+      const len2 = dx * dx + dy * dy || 1;
+      const u = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+      const d = (ax + u * dx - px) ** 2 + (ay + u * dy - py) ** 2;
+      if (d <= bestD) {
+        bestD = d;
+        best = { a: e.a, b: e.b, kind: e.kind, weight: e.weight, x: px, y: py };
+      }
+    }
+    return best;
+  }
+
+  const metaOf = (c: { a: string; b: string }) => linkMeta.current.get(`${c.a}|${c.b}`) ?? linkMeta.current.get(`${c.b}|${c.a}`);
+
+  async function removeLink(card: EdgeHit): Promise<void> {
+    const meta = metaOf(card);
+    if (!meta) return;
+    try {
+      await rl.invoke('doclinks:remove', { ids: [meta.id] });
+      net.edges = net.edges.filter((e) => !(e.kind === 'linked' && ((e.a === card.a && e.b === card.b) || (e.a === card.b && e.b === card.a))));
+      net.version++;
+      setEdgeCard(null);
+      view.requestDraw();
+    } catch (e) {
+      setError(e);
+    }
+  }
+
   async function expand(n: NetNode): Promise<void> {
     const valid = kindsRef.current.filter((k) => VALID[n.kind].includes(k));
     if (valid.length === 0) {
@@ -468,6 +537,7 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
       const r = await rl.invoke('graph:neighbors', { node: { kind: n.kind as 'doc' | 'folder' | 'tag', id: n.id }, kinds: valid, limit: limitRef.current });
       const live = net.nodes.get(n.key);
       if (!live) return;
+      for (const e of r.edges) if (e.kind === 'linked' && e.id) linkMeta.current.set(`${e.from}|${e.to}`, { id: e.id, reasons: (e.reasons ?? {}) as LinkReasons });
       const res = net.expand(live, r.nodes, r.edges);
       if (r.areas && r.areas.length > 0 && areaRef.current.defs !== r.areas) {
         const slots = assignAreaSlots(r.areas, loadAreaMemo());
@@ -572,7 +642,7 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
     if (selKey && !net.nodes.has(selKey)) setSelKey(null);
     view.requestDraw();
   };
-  const ctlRef = useRef<{ expand(): void; collapse(): void; remove(): void; bridge(): void }>({ expand() {}, collapse() {}, remove() {}, bridge() {} });
+  const ctlRef = useRef<{ expand(): void; collapse(): void; remove(): void; bridge(): void; links(): void }>({ expand() {}, collapse() {}, remove() {}, bridge() {}, links() {} });
   ctlRef.current = {
     expand: () => selected && void expand(selected),
     collapse() {
@@ -586,11 +656,14 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
     bridge() {
       if (selected?.kind === 'doc') setBridgeFrom(selected.id);
     },
+    links() {
+      if (selected?.kind === 'doc') setFindFor(selected.id);
+    },
   };
   const ctlKey = selected && selected.kind === 'doc' ? `${selected.key}|${selected.expanded ? 1 : 0}|${busy ? 1 : 0}` : '';
   useEffect(() => {
     if (!active || !selected || selected.kind !== 'doc') return onCtl(null);
-    onCtl({ expanded: !!selected.expanded, busy, expand: () => ctlRef.current.expand(), collapse: () => ctlRef.current.collapse(), remove: () => ctlRef.current.remove(), bridge: () => ctlRef.current.bridge() });
+    onCtl({ expanded: !!selected.expanded, busy, expand: () => ctlRef.current.expand(), collapse: () => ctlRef.current.collapse(), remove: () => ctlRef.current.remove(), bridge: () => ctlRef.current.bridge(), links: () => ctlRef.current.links() });
     return () => onCtl(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, ctlKey]);
@@ -999,6 +1072,28 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
               </strong>
             )}
           </HoverCard>
+        )}
+        {edgeCard && (
+          <div className="net-edge-card" style={{ left: Math.min(edgeCard.x + 8, Math.max(0, view.size.current.w - 260)), top: Math.min(edgeCard.y + 8, Math.max(0, view.size.current.h - 120)) }} role="dialog" aria-label={t('network.edge.title')} data-testid="net-edge-card">
+            <strong>{t(`network.edge.kind.${edgeCard.kind}`)}</strong>
+            <span className="hint">{reasonLine(metaOf(edgeCard)?.reasons, (part, o = {}) => t(`network.edge.reason.${part}`, o), safeText)}</span>
+            <span>
+              {weightBar(edgeCard.weight)} {t('network.edge.weight', { value: edgeCard.weight.toFixed(2) })}
+            </span>
+            {edgeCard.kind === 'linked' && (
+              <button type="button" onClick={() => void removeLink(edgeCard)} data-testid="net-edge-remove">
+                {t('network.edge.remove')}
+              </button>
+            )}
+            <button type="button" className="icon-button" aria-label={t('common.close')} onClick={() => setEdgeCard(null)}>
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+        )}
+        {findFor && (
+          <Lazy>
+            <LinkFinderDialog docIds={[findFor]} onClose={() => setFindFor(null)} onShowMap={(id, label) => onStart({ kind: 'doc', id, label: label || untitled })} />
+          </Lazy>
         )}
         {mini && count > 0 && <MiniMap bounds={getBounds()} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={count} />}
       </div>

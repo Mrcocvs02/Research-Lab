@@ -203,3 +203,36 @@ export class QuadTree {
     return this.count;
   }
 }
+
+/**
+ * Collision pass between points (§4.22): two points closer than `dmin` are pushed apart (half each); `passes` times, the tree is
+ * rebuilt every pass. Changes the arrays in place. The caller skips it above 5000 points.
+ */
+export function collidePoints(xs: Float32Array, ys: Float32Array, n: number, dmin: number, passes = 2): void {
+  if (n < 2 || dmin <= 0) return;
+  const tree = new QuadTree();
+  for (let pass = 0; pass < passes; pass++) {
+    tree.build(xs, ys, n);
+    for (let i = 0; i < n; i++) {
+      const x = xs[i]!;
+      const y = ys[i]!;
+      tree.query(x - dmin, y - dmin, x + dmin, y + dmin, (j) => {
+        if (j <= i) return;
+        let dx = xs[j]! - xs[i]!;
+        let dy = ys[j]! - ys[i]!;
+        let d = Math.hypot(dx, dy);
+        if (d >= dmin) return;
+        if (d < 1e-9) {
+          dx = Math.cos(i * 2.4 + j);
+          dy = Math.sin(i * 2.4 + j);
+          d = 1;
+        }
+        const push = (dmin - Math.min(d, dmin)) / 2 / d;
+        xs[i]! -= dx * push;
+        ys[i]! -= dy * push;
+        xs[j]! += dx * push;
+        ys[j]! += dy * push;
+      });
+    }
+  }
+}

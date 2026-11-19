@@ -121,3 +121,90 @@ export function inPolygon(x: number, y: number, poly: ReadonlyArray<Pt>): boolea
   }
   return inside;
 }
+
+/** The 80th percentile of the distances of the points to their centroid: the radius of the core of a group (the far ones do not count). */
+export function coreRadius(xs: ArrayLike<number>, ys: ArrayLike<number>, idx: ArrayLike<number>, from: number, to: number): { cx: number; cy: number; r: number } {
+  const m = to - from;
+  if (m <= 0) return { cx: 0, cy: 0, r: 0 };
+  let cx = 0;
+  let cy = 0;
+  for (let j = from; j < to; j++) {
+    cx += xs[idx[j]!]!;
+    cy += ys[idx[j]!]!;
+  }
+  cx /= m;
+  cy /= m;
+  const d = new Float64Array(m);
+  for (let j = from; j < to; j++) d[j - from] = Math.hypot(xs[idx[j]!]! - cx, ys[idx[j]!]! - cy);
+  d.sort();
+  return { cx, cy, r: d[Math.min(m - 1, Math.floor(0.8 * (m - 1)))]! };
+}
+
+/** The hull of the core of a group (points within the 80th percentile distance): the far points never inflate it. */
+export function coreHull(xs: ArrayLike<number>, ys: ArrayLike<number>, idx: ArrayLike<number>, from: number, to: number): Pt[] {
+  if (to - from <= 4) return hullOfIndices(xs, ys, idx, from, to);
+  const { cx, cy, r } = coreRadius(xs, ys, idx, from, to);
+  const pts: Pt[] = [];
+  for (let j = from; j < to; j++) {
+    const x = xs[idx[j]!]!;
+    const y = ys[idx[j]!]!;
+    if (Math.hypot(x - cx, y - cy) <= r + 1e-9) pts.push([x, y]);
+  }
+  return convexHull(pts);
+}
+
+/**
+ * Pushes the groups apart (§4.22): every group is a circle (centroid, core radius); 60 steps of repulsion keep a gap between
+ * circles and move the points of a group rigidly. `gap` in world units. Done once per layout; the arrays are changed in place.
+ */
+export function separateClusters(xs: Float32Array, ys: Float32Array, order: ArrayLike<number>, starts: ArrayLike<number>, groups: number, gap: number, steps = 60): void {
+  if (groups < 2 || groups > 600) return;
+  const c = Array.from({ length: groups }, (_, s) => coreRadius(xs, ys, order, starts[s]!, starts[s + 1]!));
+  const ox = new Float64Array(groups);
+  const oy = new Float64Array(groups);
+  const live = c.map((g, s) => starts[s + 1]! > starts[s]! && g.r >= 0);
+  for (let step = 0; step < steps; step++) {
+    let moved = false;
+    for (let a = 0; a < groups; a++) {
+      if (!live[a]) continue;
+      for (let b = a + 1; b < groups; b++) {
+        if (!live[b]) continue;
+        let dx = c[b]!.cx + ox[b]! - (c[a]!.cx + ox[a]!);
+        let dy = c[b]!.cy + oy[b]! - (c[a]!.cy + oy[a]!);
+        let d = Math.hypot(dx, dy);
+        const need = c[a]!.r + c[b]!.r + gap;
+        if (d >= need) continue;
+        if (d < 1e-9) {
+          dx = Math.cos(a * 2.4 + b);
+          dy = Math.sin(a * 2.4 + b);
+          d = 1;
+        }
+        // The smaller group moves more: the big ones keep the layout.
+        const wa = c[b]!.r + 1;
+        const wb = c[a]!.r + 1;
+        const push = (need - d) / d / (wa + wb);
+        ox[a]! -= dx * push * wa;
+        oy[a]! -= dy * push * wa;
+        ox[b]! += dx * push * wb;
+        oy[b]! += dy * push * wb;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  for (let s = 0; s < groups; s++) {
+    if (ox[s] === 0 && oy[s] === 0) continue;
+    for (let j = starts[s]!; j < starts[s + 1]!; j++) {
+      xs[order[j]!]! += ox[s]!;
+      ys[order[j]!]! += oy[s]!;
+    }
+  }
+}
+
+/** Which groups are filled at rest (§4.22): not touching another core and among the `max` biggest. `circles` are the cores in world units. */
+export function restingFill(circles: ReadonlyArray<{ cx: number; cy: number; r: number }>, sizes: ReadonlyArray<number>, max = 8): boolean[] {
+  const ok = circles.map((a, i) => circles.every((b, j) => i === j || Math.hypot(a.cx - b.cx, a.cy - b.cy) >= a.r + b.r));
+  const top = [...sizes.keys()].sort((a, b) => sizes[b]! - sizes[a]! || a - b).slice(0, max);
+  const set = new Set(top);
+  return ok.map((v, i) => v && set.has(i));
+}

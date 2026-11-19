@@ -1,7 +1,8 @@
 import type { Channels, ResponseOf } from '@rl/core';
 import type { TintGroup } from './colors';
 import { boundsOf, PointGrid, toScreenX, toScreenY, type Bounds, type View } from './geometry';
-import { hullOfIndices, type Pt } from './hulls';
+import { coreHull, coreRadius, restingFill, separateClusters, type Pt } from './hulls';
+import { collidePoints } from './quadtree';
 
 export type MapResponse = ResponseOf<Channels, 'graph:map'>;
 export type ClusterView = MapResponse['clusters'][number];
@@ -108,6 +109,14 @@ export function prepareMap(r: MapResponse): PreparedMap {
     });
     relaxSmall(xs, ys, n, cx, cy);
   }
+  // Groups that do not overlap (ง4.22): once per layout, in the coarsest level; then a light collision pass between points.
+  const g0 = groups[0];
+  if (g0 && n > 3) {
+    const b0 = boundsOf(xs, ys, n);
+    const unit = Math.max(b0.maxX - b0.minX, b0.maxY - b0.minY, 1e-6) / 800;
+    separateClusters(xs, ys, g0.order, g0.starts, levels[0]!.length, 24 * unit);
+    if (n <= 5000) collidePoints(xs, ys, n, (n <= 300 ? 14 : n <= 1500 ? 9 : 6) * unit);
+  }
   const bounds = boundsOf(xs, ys, n);
   return { n, ids, xs, ys, bounds, grid: new PointGrid(xs, ys, n, bounds), indexOf, levels, clusterById, groups, seed: r.seed, builtAt: r.builtAt, omitted: r.omitted };
 }
@@ -139,12 +148,12 @@ export function stepPoint(list: readonly number[], current: number, forward: boo
   return list[(at + (forward ? 1 : list.length - 1)) % list.length]!;
 }
 
-/** World hull of every cluster of a level (index = cluster), plus one for the points without a cluster at the end (empty). */
+/** World hull of the CORE (80% closest points) of every cluster of a level (index = cluster): the far points never inflate it. */
 export function clusterHulls(map: PreparedMap, level: number): Pt[][] {
   const g = map.groups[level];
   const clusters = map.levels[level] ?? [];
   if (!g) return [];
-  return clusters.map((_, s) => hullOfIndices(map.xs, map.ys, g.order, g.starts[s]!, g.starts[s + 1]!));
+  return clusters.map((_, s) => coreHull(map.xs, map.ys, g.order, g.starts[s]!, g.starts[s + 1]!));
 }
 
 /** Centre and radius (the farthest point) of every cluster of a level: what the adjacency of the hulls is computed from. */
@@ -178,3 +187,15 @@ export function tintGroups(map: PreparedMap, level: number): TintGroup[] {
     return { id: c.id, docs, key: c.topTerms.slice(0, 3).join(' ') };
   });
 }
+
+/** Core circles (centroid, 80th percentile radius) of the clusters of a level and which of them are filled at rest (ง4.22). */
+export function restingHulls(map: PreparedMap, level: number): { circles: Array<{ cx: number; cy: number; r: number }>; fill: boolean[] } {
+  const g = map.groups[level];
+  const clusters = map.levels[level] ?? [];
+  if (!g) return { circles: [], fill: [] };
+  const circles = clusters.map((_, s) => coreRadius(map.xs, map.ys, g.order, g.starts[s]!, g.starts[s + 1]!));
+  return { circles, fill: restingFill(circles, clusters.map((c) => c.size), 8) };
+}
+
+/** Radius (screen px, 3 to 6) of a node by its weight `c` against the biggest `cmax` (ยง4.22). */
+export const nodeRadius = (c: number, cmax: number): number => 3 + 3 * Math.sqrt(Math.max(c, 0) / Math.max(cmax, 1));

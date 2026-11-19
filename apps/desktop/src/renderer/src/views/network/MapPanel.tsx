@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, RequestOf } from '@rl/core';
 import { EmptyState } from '../../components/EmptyState';
+import { Menu } from '../../components/Menu';
 import { Lazy, lazyView } from '../../components/Lazy';
 import { ErrorNote } from '../../components/ui';
+import { useNotify } from '../../lib/notify';
 import { errorMessage } from '../../lib/errors';
 import { useAiUi } from '../../lib/aiUi';
 import { setDiscoverIntent } from '../../lib/discoverIntent';
@@ -18,6 +20,7 @@ import { adjacencyOf, assignTints, type TintMemo } from './colors';
 import { rng } from './playful';
 import { MapCanvas, type MapHandle } from './MapCanvas';
 import { clusterCircles, clusterText, prepareMap, tintGroups, type PreparedMap } from './mapModel';
+import { ChipPop, copyCanvasImage, HeadMore, MapIllustration, Pill, RowPortal, useHint, ChromeCtx } from './NetChrome';
 import { NodeSearch } from './NodeSearch';
 import { useTimeline } from './timeline';
 import type { ScopeOptions } from './useScopes';
@@ -29,6 +32,7 @@ type ScopeKind = 'all' | 'folder' | 'project' | 'tag';
 type MapScope = NonNullable<RequestOf<Channels, 'graph:map'>['scope']>;
 
 interface Props {
+  active: boolean;
   status: GraphStatus;
   mapVersion: number;
   scopes: ScopeOptions;
@@ -38,10 +42,11 @@ interface Props {
   onRead?(docId: string): void;
   onExplore?(): void;
   onBuild?(): void;
+  onInfo?(i: { topics: number } | null): void;
 }
 
 /** The map tab: scope, level, the canvas, the legend of clusters and the labels by Claude. */
-export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMapChanged, onRead, onExplore, onBuild }: Props) {
+export function MapPanel({ active, status, mapVersion, scopes, selected, onSelect, onMapChanged, onRead, onExplore, onBuild, onInfo }: Props) {
   const { t } = useTranslation();
   const { openExport } = useAiUi();
   const [kind, setKind] = useState<ScopeKind>('all');
@@ -137,196 +142,288 @@ export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMap
   }, [years, yearBounds]);
 
   const scopeValues = kind === 'folder' ? scopes.folders.map((f) => ({ id: f, label: f || '/' })) : kind === 'project' ? scopes.projects.map((p) => ({ id: p.id, label: p.name })) : kind === 'tag' ? scopes.tags : [];
+  const chrome = useContext(ChromeCtx);
+  const { info } = useNotify();
+  const [hint, dismissHint] = useHint(active && !!map && map.n >= 3);
+  const [legendFor, setLegendFor] = useState<{ id: string; text: string } | null>(null);
+  const legendAnchor = useRef<HTMLElement | null>(null);
+  const topics = map?.levels[0]?.length ?? 0;
+  useEffect(() => {
+    onInfo?.(map ? { topics } : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, topics]);
 
+  const yearsActive = !!years && !!yearBounds && (years[0] > yearBounds[0] || years[1] < yearBounds[1]);
+  const filterCount = (kind !== 'all' ? 1 : 0) + (yearsActive ? 1 : 0);
+  const tooFew = !!map && map.n < 3;
+  const runSurprise = () => {
+    rl.invoke('graph:surprising', { limit: 30 }).then(
+      (r) => {
+        const p = r.pairs[Math.floor(rand.current() * r.pairs.length)];
+        if (!p) return setSurprise({ terms: [] });
+        handle.current?.surprise(p.a, p.b);
+        setSurprise({ terms: p.terms });
+      },
+      (e: unknown) => setError(e),
+    );
+  };
+
+  // One pill at a time: the choice of a bridge, the bridge, the surprise, the filters, the cap, the first-use hint.
+  const shownCount = allow && map ? [...allow].filter((id) => map.indexOf.has(id)).length : 0;
+  let pill: React.ReactNode = null;
+  if (map && !tooFew) {
+    if (bridge) {
+      pill = (
+        <Pill testId="map-bridge-note" onClose={() => setBridge(null)}>
+          {t('network.bridge.note', { a: safeText(bridge.nodes[0].title), b: safeText(bridge.nodes[2].title) })}
+        </Pill>
+      );
+    } else if (surprise) {
+      pill = (
+        <Pill
+          testId="map-surprise-note"
+          onClose={() => {
+            handle.current?.clearSurprise();
+            setSurprise(null);
+          }}
+        >
+          {surprise.terms.length > 0 ? t('network.net.surprise', { terms: surprise.terms.slice(0, 5).map(safeText).join(', ') }) : t('network.ent.noSurprise')}
+        </Pill>
+      );
+    } else if (tl.active) {
+      pill = (
+        <Pill testId="map-timeline-label">
+          {t('network.timeline.label')}
+          {tl.withoutYear > 0 ? ` · ${t('network.timeline.noYear')}: ${tl.withoutYear}` : ''}
+        </Pill>
+      );
+    } else if (filterCount > 0) {
+      pill = <Pill testId="map-filters-note">{allow ? t('network.mapFiltered', { from: map.n, to: shownCount }) : t('network.scope.active')}</Pill>;
+    } else if (map.omitted > 0) {
+      pill = <Pill testId="map-omitted">{t('network.mapOmitted', { count: map.omitted, shown: map.n })}</Pill>;
+    } else if (hint) {
+      pill = <Pill testId="map-hint">{t('network.hint')}</Pill>;
+    }
+  }
+
+  const levels = map?.levels ?? [];
+  const legend =
+    map && !tooFew ? (
+      <ul className="legend" data-testid="cluster-legend" aria-label={t('network.legend')}>
+        {clusters.slice(0, 8).map((c, i) => {
+          const txt = clusterText(c);
+          const name = safeText(txt.text || c.id);
+          return (
+            <li key={c.id}>
+              <button type="button" className="legend-item" title={name} onClick={() => handle.current?.focusCluster(c.id)} onMouseEnter={() => handle.current?.light(c.id)} onMouseLeave={() => handle.current?.light(null)} onFocus={() => handle.current?.light(c.id)} onBlur={() => handle.current?.light(null)} data-testid="cluster-item" data-cluster={c.id} data-ai={txt.ai ? 'true' : 'false'}>
+                <span className="rl-swatch" style={{ background: `var(--cat-${(tints.tint[i] ?? 0) + 1})` }} aria-hidden="true" />
+                <span className="legend-text">{name}</span>
+                {txt.ai && <span className="ai-badge">{t('ai.badge')}</span>}
+                <span className="hint">{c.size}</span>
+              </button>
+              <button
+                type="button"
+                className="link legend-export"
+                aria-haspopup="menu"
+                aria-label={t('secondBrain.clusterAria', { name })}
+                title={t('network.more')}
+                onClick={(e) => {
+                  legendAnchor.current = e.currentTarget;
+                  setLegendFor({ id: c.id, text: txt.text || c.id });
+                }}
+                data-testid="cluster-more"
+              >
+                <span aria-hidden="true">⋯</span>
+              </button>
+            </li>
+          );
+        })}
+        {clusters.length > 8 && <li className="hint legend-more">{t('network.moreClusters', { count: clusters.length - 8 })}</li>}
+      </ul>
+    ) : null;
+
+  const noMapReason = t('network.noMapTitle');
   return (
     <div className="net-tab map-tab" data-testid="map-panel">
-      <div className="net-toolbar">
-        <label className="net-field">
-          <span>{t('network.scope.label')}</span>
-          <select
-            value={kind}
-            onChange={(e) => {
-              setKind(e.target.value as ScopeKind);
-              setValue('');
-            }}
-            data-testid="map-scope-kind"
-          >
-            <option value="all">{t('network.scope.all')}</option>
-            <option value="folder">{t('network.scope.folder')}</option>
-            <option value="project">{t('network.scope.project')}</option>
-            <option value="tag">{t('network.scope.tag')}</option>
-          </select>
-        </label>
-        {kind !== 'all' && (
-          <label className="net-field">
-            <span className="visually-hidden">{t(`network.scope.${kind}`)}</span>
-            <select value={value} onChange={(e) => setValue(e.target.value)} data-testid="map-scope-value">
-              <option value="">{t('network.scope.pick')}</option>
-              {scopeValues.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {safeText(o.label)}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label className="net-field">
-          <span>{t('network.colorBy')}</span>
-          <select value={lvl} onChange={(e) => setLevel(Number(e.target.value))} disabled={depth === 0} data-testid="map-level">
-            {Array.from({ length: depth }, (_, l) => (
-              <option key={l} value={l}>
-                {t('network.level', { level: l + 1 })}
-              </option>
-            ))}
-          </select>
-        </label>
+      <RowPortal active={active}>
         <NodeSearch
           testId="map-search"
           label={t('network.search.go')}
           placeholder={t('network.search.goDoc')}
-          suggest={async (q) => (await rl.invoke('search:query', { text: q, limit: 8 })).hits.filter((h) => map?.indexOf.has(h.docId)).map((h) => ({ id: h.docId, label: h.title ?? h.docId.slice(0, 8), hint: h.year ? String(h.year) : undefined }))}
+          suggest={async (q) => (await rl.invoke('search:query', { text: q, limit: 8 })).hits.filter((h) => map?.indexOf.has(h.docId)).map((h) => ({ id: h.docId, label: h.title ?? t('network.untitled'), hint: h.year ? String(h.year) : undefined }))}
           onPick={(it) => {
             handle.current?.flyToDoc(it.id);
             onSelect(it.id);
           }}
         />
-        {yearBounds && (
-          <span className="net-field ent-years" data-testid="map-years">
-            <span>{t('network.ent.years')}</span>
-            <input type="range" aria-label={t('network.ent.yearFrom')} min={yearBounds[0]} max={yearBounds[1]} value={years?.[0] ?? yearBounds[0]} onChange={(e) => setYears([Math.min(Number(e.target.value), years?.[1] ?? yearBounds[1]), years?.[1] ?? yearBounds[1]])} data-testid="map-year-from" />
-            <input type="range" aria-label={t('network.ent.yearTo')} min={yearBounds[0]} max={yearBounds[1]} value={years?.[1] ?? yearBounds[1]} onChange={(e) => setYears([years?.[0] ?? yearBounds[0], Math.max(Number(e.target.value), years?.[0] ?? yearBounds[0])])} data-testid="map-year-to" />
-            <span className="hint">
-              {years?.[0] ?? yearBounds[0]}–{years?.[1] ?? yearBounds[1]}
-            </span>
-          </span>
-        )}
-        <button type="button" onClick={() => setLabelsOpen(true)} disabled={!map || depth === 0} data-testid="map-label-clusters">
-          {t('network.labels.open')}
-        </button>
+        <ChipPop label={t('network.filters')} testId="map-filters" count={filterCount} width={340}>
+          <div className="net-pop-body">
+            <label className="net-field net-pop-row">
+              <span>{t('network.scope.label')}</span>
+              <select
+                value={kind}
+                onChange={(e) => {
+                  setKind(e.target.value as ScopeKind);
+                  setValue('');
+                }}
+                data-testid="map-scope-kind"
+              >
+                <option value="all">{t('network.scope.all')}</option>
+                <option value="folder">{t('network.scope.folder')}</option>
+                <option value="project">{t('network.scope.project')}</option>
+                <option value="tag">{t('network.scope.tag')}</option>
+              </select>
+            </label>
+            {kind !== 'all' && (
+              <label className="net-field net-pop-row">
+                <span className="visually-hidden">{t(`network.scope.${kind}`)}</span>
+                <select value={value} onChange={(e) => setValue(e.target.value)} data-testid="map-scope-value">
+                  <option value="">{t('network.scope.pick')}</option>
+                  {scopeValues.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {safeText(o.label)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {yearBounds && (
+              <div className="net-field net-pop-row ent-years" data-testid="map-years">
+                <span>{t('network.ent.years')}</span>
+                <input type="range" aria-label={t('network.ent.yearFrom')} min={yearBounds[0]} max={yearBounds[1]} value={years?.[0] ?? yearBounds[0]} onChange={(e) => setYears([Math.min(Number(e.target.value), years?.[1] ?? yearBounds[1]), years?.[1] ?? yearBounds[1]])} data-testid="map-year-from" />
+                <input type="range" aria-label={t('network.ent.yearTo')} min={yearBounds[0]} max={yearBounds[1]} value={years?.[1] ?? yearBounds[1]} onChange={(e) => setYears([years?.[0] ?? yearBounds[0], Math.max(Number(e.target.value), years?.[0] ?? yearBounds[0])])} data-testid="map-year-to" />
+                <span className="hint">
+                  {years?.[0] ?? yearBounds[0]}–{years?.[1] ?? yearBounds[1]}
+                </span>
+              </div>
+            )}
+            <div className="net-pop-sec">{t('network.look')}</div>
+            <label className="net-field net-pop-row">
+              <span>{t('network.colorBy')}</span>
+              <select value={lvl} onChange={(e) => setLevel(Number(e.target.value))} disabled={depth === 0} data-testid="map-level">
+                {Array.from({ length: depth }, (_, l) => (
+                  <option key={l} value={l}>
+                    {t('network.level', { level: l + 1 })}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </ChipPop>
         <span className="map-actions">
-          <button type="button" className="icon-button" title={t('network.play.shuffle')} aria-label={t('network.play.shuffle')} onClick={() => handle.current?.shuffle()} disabled={!map} data-testid="map-shuffle">
+          <button type="button" className="icon-button" title={t('network.play.shuffle')} aria-label={t('network.play.shuffle')} onClick={() => handle.current?.shuffle()} disabled={!map || tooFew} data-testid="map-shuffle">
             ✧
           </button>
-          <button
-            type="button"
-            className="icon-button"
-            title={t('network.play.surprise')}
-            aria-label={t('network.play.surprise')}
-            disabled={!map}
-            data-testid="map-surprise"
-            onClick={() => {
-              rl.invoke('graph:surprising', { limit: 30 }).then(
-                (r) => {
-                  const p = r.pairs[Math.floor(rand.current() * r.pairs.length)];
-                  if (!p) return setSurprise({ terms: [] });
-                  handle.current?.surprise(p.a, p.b);
-                  setSurprise({ terms: p.terms });
-                },
-                (e: unknown) => setError(e),
-              );
-            }}
-          >
+          <button type="button" className="icon-button" title={t('network.play.surprise')} aria-label={t('network.play.surprise')} disabled={!map || tooFew} data-testid="map-surprise" onClick={runSurprise}>
             ✦
           </button>
-          <button type="button" className="icon-button" title={t('network.fit')} aria-label={t('network.fit')} onClick={() => handle.current?.fit()} disabled={!map} data-testid="map-fit">
+          <button type="button" className="icon-button" title={t('network.fit')} aria-label={t('network.fit')} onClick={() => handle.current?.fit()} disabled={!map || tooFew} data-testid="map-fit">
             ⤢
           </button>
-          <details className="map-more">
-            <summary aria-label={t('network.more')} title={t('network.more')} data-testid="map-more">
-              ⋯
-            </summary>
-            <div className="map-more-body">
-              <label className="check-inline">
-                <input type="checkbox" checked={tl.active} onChange={tl.toggle} disabled={!map} data-testid="map-timeline-toggle" />
-                {t('network.timeline.byYear')}
-              </label>
-              <label className="check-inline">
-                <input type="checkbox" checked={mini} onChange={(e) => setMini(e.target.checked)} data-testid="map-minimap-toggle" />
-                {t('network.minimap')}
-              </label>
-            </div>
-          </details>
         </span>
-        {map && (
-          <span className="hint" data-testid="map-info" data-seed={map.seed} data-shown={allow ? allow.size : map.n}>
-            {allow ? t('network.mapFiltered', { from: map.n, to: [...allow].filter((id) => map.indexOf.has(id)).length }) : t('network.mapInfo', { count: map.n, seed: map.seed })}
-          </span>
-        )}
-      </div>
+      </RowPortal>
+      <HeadMore
+        active={active}
+        testId="map-more"
+        groups={[
+          chrome.model,
+          {
+            id: 'view',
+            items: [
+              map ? { id: 'timeline', label: t('network.timeline.byYear'), icon: <span>{tl.active ? '☑' : '☐'}</span>, testId: 'map-timeline-toggle', onSelect: tl.toggle } : { id: 'timeline', label: t('network.timeline.byYear'), testId: 'map-timeline-toggle', onSelect: () => undefined, disabled: true, disabledReason: noMapReason },
+              { id: 'minimap', label: t('network.minimap'), icon: <span>{mini ? '☑' : '☐'}</span>, testId: 'map-minimap-toggle', onSelect: () => setMini(!mini) },
+            ],
+          },
+          {
+            id: 'out',
+            items: [
+              {
+                id: 'image',
+                label: t('network.copyImage'),
+                testId: 'map-image',
+                onSelect: () => void copyCanvasImage(handle.current?.canvas() ?? null).then((ok) => info(ok ? t('network.imageCopied') : t('network.imageFailed'))),
+              },
+              map && depth > 0 ? { id: 'labels', label: `✦ ${t('network.labels.open')}`, testId: 'map-label-clusters', onSelect: () => setLabelsOpen(true) } : { id: 'labels', label: `✦ ${t('network.labels.open')}`, testId: 'map-label-clusters', onSelect: () => undefined, disabled: true, disabledReason: noMapReason },
+            ],
+          },
+        ]}
+      />
+      <span className="visually-hidden" data-testid="map-info" data-seed={map?.seed ?? ''} data-shown={allow ? allow.size : (map?.n ?? 0)} />
       {error ? <ErrorNote testId="map-error">{errorMessage(error, t)}</ErrorNote> : null}
       {!map && !loading && !error && (
-        <EmptyState icon={<span>◌</span>} title={t('network.noMapTitle')} action={onBuild ? <button type="button" className="primary" onClick={onBuild} data-testid="map-empty-build">{t('network.build')}</button> : undefined}>
+        <EmptyState icon={<MapIllustration />} title={t('network.noMapTitle')} action={onBuild ? <button type="button" className="primary" onClick={onBuild} data-testid="map-empty-build">{t('network.build')}</button> : undefined}>
           <span data-testid="map-empty">{t('network.noMap')}</span>
         </EmptyState>
       )}
-      {surprise && (
-        <p className="surprise-note" role="status" data-testid="map-surprise-note">
-          {surprise.terms.length > 0 ? t('network.net.surprise', { terms: surprise.terms.slice(0, 5).map(safeText).join(', ') }) : t('network.ent.noSurprise')}{' '}
-          <button
-            type="button"
-            className="link"
-            onClick={() => {
-              handle.current?.clearSurprise();
-              setSurprise(null);
-            }}
-          >
-            {t('common.close')}
-          </button>
-        </p>
+      {map && map.n === 0 && kind !== 'all' && (
+        <EmptyState
+          icon={<MapIllustration />}
+          title={t('network.noPointsTitle')}
+          action={
+            <button
+              type="button"
+              onClick={() => {
+                setKind('all');
+                setValue('');
+              }}
+              data-testid="map-clear-scope"
+            >
+              {t('network.clearScope')}
+            </button>
+          }
+        >
+          <span data-testid="map-no-points">{t('network.noPoints')}</span>
+        </EmptyState>
       )}
-      {tl.active && (
-        <p className="hint" role="status" data-testid="map-timeline-label">
-          {t('network.timeline.label')}
-          {tl.withoutYear > 0 ? ` · ${t('network.timeline.noYear')}: ${tl.withoutYear}` : ''}
-        </p>
+      {map && tooFew && !(map.n === 0 && kind !== 'all') && (
+        <EmptyState icon={<MapIllustration />} title={t('network.fewTitle')} action={<button type="button" className="primary" onClick={() => nav.navigate({ view: 'library' })} data-testid="map-few-add">{t('network.addPdf')}</button>}>
+          <span data-testid="map-few">{t('network.fewDocs')}</span>
+        </EmptyState>
       )}
-      {bridge && (
-        <p className="surprise-note" role="status" data-testid="map-bridge-note">
-          {t('network.bridge.note', { a: safeText(bridge.nodes[0].title), b: safeText(bridge.nodes[2].title) })}{' '}
-          <button type="button" className="link" onClick={() => setBridge(null)} data-testid="map-bridge-close">
-            {t('common.close')}
-          </button>
-        </p>
-      )}
-      {map && map.omitted > 0 && (
-        <p className="hint" role="status" data-testid="map-omitted">
-          {t('network.mapOmitted', { count: map.omitted, shown: map.n })}
-        </p>
-      )}
-      {map && map.n === 0 && <p className="hint" data-testid="map-no-points">{t('network.noPoints')}</p>}
-      {map && map.n > 0 && map.n < 3 && (
-        <p className="hint" role="status" data-testid="map-few">
-          {t('network.fewDocs')}
-        </p>
-      )}
-      {map && (
+      {map && !tooFew && (
         <div className="map-body">
-          <MapCanvas map={tl.map ?? map} level={lvl} selected={selected} onSelect={onSelect} onRead={onRead} onExplore={onExplore} tints={tints} allow={tl.only ?? allow} minimap={mini} bridge={bridge} onBridge={(a, b) => { setDiscoverIntent({ kind: 'bridge', docIds: [a, b] }); nav.navigate({ view: 'discover' }); }} aiBadge={t('ai.badge')} label={t('network.mapLabel')} fitKey={mapKey} handle={handle} />
-          <ul className="legend" data-testid="cluster-legend" aria-label={t('network.legend')}>
-            {clusters.slice(0, 60).map((c, i) => {
-              const txt = clusterText(c);
-              return (
-                <li key={c.id}>
-                  <button type="button" className="legend-item" onClick={() => handle.current?.focusCluster(c.id)} data-testid="cluster-item" data-cluster={c.id} data-ai={txt.ai ? 'true' : 'false'}>
-                    <span className="rl-swatch" style={{ background: `var(--cat-${(tints.tint[i] ?? 0) + 1})` }} aria-hidden="true" />
-                    <span className="legend-text">{safeText(txt.text || c.id)}</span>
-                    {txt.ai && <span className="ai-badge">{t('ai.badge')}</span>}
-                    <span className="hint">{c.size}</span>
-                  </button>
-                  <button type="button" className="link legend-export" onClick={() => openExport({ clusters: [{ id: c.id, label: txt.text || c.id }], name: txt.text })} aria-label={t('secondBrain.clusterAria', { name: safeText(txt.text || c.id) })} data-testid="cluster-export">
-                    {t('secondBrain.clusterButton')}
-                  </button>
-                </li>
-              );
-            })}
-            {clusters.length > 60 && <li className="hint">{t('network.moreClusters', { count: clusters.length - 60 })}</li>}
-          </ul>
+          <MapCanvas
+            map={tl.map ?? map}
+            level={lvl}
+            selected={selected}
+            onSelect={(id) => {
+              dismissHint();
+              onSelect(id);
+            }}
+            onRead={onRead}
+            onExplore={onExplore}
+            tints={tints}
+            allow={tl.only ?? allow}
+            minimap={mini}
+            bridge={bridge}
+            onBridge={(a, b) => {
+              setDiscoverIntent({ kind: 'bridge', docIds: [a, b] });
+              nav.navigate({ view: 'discover' });
+            }}
+            aiBadge={t('ai.badge')}
+            label={t('network.mapLabel')}
+            fitKey={mapKey}
+            handle={handle}
+            overlay={
+              <>
+                {pill}
+                {legend}
+              </>
+            }
+          />
         </div>
       )}
+      <Menu
+        anchor={legendAnchor}
+        open={legendFor !== null}
+        label={t('network.more')}
+        onClose={() => setLegendFor(null)}
+        groups={[{ id: 'cluster', items: [{ id: 'export', testId: 'cluster-export', label: t('secondBrain.clusterButton'), onSelect: () => legendFor && openExport({ clusters: [{ id: legendFor.id, label: legendFor.text }], name: legendFor.text }) }] }]}
+      />
       {labelsOpen && map && (
         <Lazy>
           <LabelsDialog
-            levels={map.levels}
+            levels={levels}
             level={lvl}
             onClose={() => setLabelsOpen(false)}
             onDone={() => {

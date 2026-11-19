@@ -182,8 +182,9 @@ async function main(): Promise<void> {
     // Test hook: canned answers instead of the network (development run with RL_E2E=1 only).
     fetch: runtime.netFixturesFile ? fixtureFetch(runtime.netFixturesFile) : (input, init) => net.fetch(input as string, init as never) as Promise<Response>,
     metadataFile: runtime.metadataFile,
-    // Writing into the PDFs is off (D-354); tests of the writer turn it on in a development run only.
-    pdfWriteEnabled: PDF_WRITE_ENABLED || (!app.isPackaged && process.env['RL_E2E'] === '1' && process.env['RL_E2E_PDF_WRITE'] === '1'),
+    // Writing into the PDFs is on (D-473). An e2e development run keeps it off unless the spec asks for it (RL_E2E_PDF_WRITE=1),
+    // so specs that check the library is untouched stay valid.
+    pdfWriteEnabled: !app.isPackaged && process.env['RL_E2E'] === '1' ? process.env['RL_E2E_PDF_WRITE'] === '1' : PDF_WRITE_ENABLED,
     // Test hook: a simulated Claude Code instead of the real program and account (development run with RL_E2E=1 only).
     ...(runtime.claudeSimDir ? { claudeIo: simulatedClaudeIo(runtime.claudeSimDir) } : {}),
     // The graph worker thread (build, similarity on the fly): started by the first call, closed when idle.

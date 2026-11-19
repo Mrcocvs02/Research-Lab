@@ -1001,3 +1001,25 @@ Oggetto: ramo `ver14` (= `main` a a2ec88c), app compilata guidata con uno script
 ### Limiti
 
 Una sola libreria reale piccola; il corpus di 300 lavori non è stato rifatto qui. Il percorso nell'interfaccia (Maiusc+clic) non è stato provato fino in fondo dallo script: `graph:path` trova una catena di 2 passi per una coppia su tre e "Nessun percorso" per le altre a soglia normale. Il richiamo dei concetti è contato a mano su ~18 concetti ricostruiti dai nomi. Le correzioni dei pacchetti sono state provate nell'app con alias temporanei (tolti); typecheck con alias temporanei, test unitari toccati (405), check:budget e check:generality verdi.
+
+### Seconda verifica (dopo D-508, 20/11)
+
+Stesso percorso su una nuova copia (cartella reale e cartella dati), con l'app compilata con le correzioni W11-W19; correzioni nuove in D-509.
+
+**Verdetto.** Sulla libreria reale la rete ora è **chiara e utile per muoversi tra i lavori**: Mappa in 3 blocchi con nomi di temi (13 · 8 · 4), tutti i 25 titoli leggibili a 1280 e 1920 senza collisioni, archi solo del selezionato (2-3) o Forti (grado 2), Vicinato a stella con la legenda in una striscia fuori dalla tela, Vocabolario pulito. Topic resta non idonea (52 % dei lavori in un blocco chiaro, da 48): la Mappa usa Automatica, i cui blocchi coincidono di fatto con i temi.
+
+| Misura | Prima verifica | Ora | Obiettivo |
+| --- | --- | --- | --- |
+| Fusioni sicure · probabili spuntate · sbagliate | 3 · 6 · 0 | 3 · 7 · 0 | 0 sbagliate |
+| Concetti doppi risolti (fusioni + metadati) | ~9 di ~18 | ~10 fusi + 2 come metadati (12 di ~18); 0 doppioni nelle famiglie | ≥ 90 % |
+| Tag di autore riconosciuti come metadati | 0 di ~40 | 40 di 40, nessun falso (D-509) | — |
+| Tag dopo il riordino | 205 | 164 (128 parole chiave, 27 usati nelle famiglie) | — |
+| Singoletti nelle famiglie · gemelli · Da sistemare · stili | 25 % · 1 · 0 · 1 | 26 % (7 di 27) · 1 · 0 · 1 | ≤ 25 % · 0 · 0 · 1 |
+| Proposte · un passo | 0,61 s · ≤ 1,5 s | 1,07 s · ≤ 1,5 s | ≤ 1 s · ≤ 2 s |
+| Topic: lavori in un blocco chiaro | 48 % | 52 % (36 % prima di D-509: la macro generica rientrava fra le aree) | ≥ 80 % |
+| Titoli 1280 · 1920 · collisioni | 25 · 25 · 0 | 25 · 25 · 0 (4 su 25 a 1280 prima di D-509) | 25 · 25 · 0 |
+| Archi: selezionato · Forti | ≤ 4 · 2 | ≤ 3 · 2 | ≤ 5 · ≤ 2 |
+| Vicinato: legenda sopra la tela · nodi · Allarga | sì · 9 · 24 | no (striscia) · 9 · 23 | nessun riquadro |
+| Barra a 1280 · 1440 (eccedenza) | fuori schermo | 0 px · 0 px (44 e 71 px prima di D-509) | 0 |
+
+**Ancora aperti.** (a) Topic sotto l'80 %: con 10 valori di livello 1 e lavori a cavallo di 2-3 temi, la soglia di quota 0,6 non basta su 20 lavori; da decidere con l'utente se ridurre i valori (unire le macro-aree piccole) o tenere Automatica come vista abituale. (b) Le varianti non fuse (sigle minuscole ambigue, aggettivo e sostantivo della stessa parola) finiscono in Parole chiave invece di essere unite: per la Mappa è indifferente, per la ricerca meno. (c) Proposte iniziali a 1,07 s, poco sopra il tetto di 1 s. (d) La striscia della legenda del Vicinato scorre in orizzontale a 1440 px e il conteggio finisce tagliato.

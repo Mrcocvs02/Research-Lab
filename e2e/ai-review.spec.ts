@@ -50,7 +50,9 @@ test('bulk AI job with estimate and confirmation, review with partial accept, un
     await rows(window).first().click();
     await window.getByTestId('search-results').press('Control+a');
     await expect(window.getByTestId('selection-count')).toHaveText(new RegExp(`${total} selected`));
-    await window.getByTestId('bulk-ai-propose').click();
+    // Proponi... lives in the selection bar's Claude menu (ARCHITETTURA-UI section 4.2, B3).
+    await window.getByTestId('bulk-claude').click();
+    await window.getByTestId('selection-propose').click();
     const dialog = window.getByTestId('job-dialog');
     await expect(dialog).toBeVisible({ timeout: 30_000 });
     await expect(dialog.getByTestId('job-field-tags')).toBeChecked();

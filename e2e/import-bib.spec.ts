@@ -59,7 +59,7 @@ test('import a BibTeX file and keep a project linked to a .bib file', async ({},
     await expect(window.getByTestId('import-result')).toContainText('Updated 1 documents');
     await expect(window.getByTestId('import-not-imported')).toContainText('An entry without any file');
 
-    const docs = await ipcData<{ items: Array<{ docId: string; path: string }> }>(window, 'documents:list', { limit: 500 });
+    const docs = await ipcData<{ items: Array<{ docId: string; path: string }> }>(window, 'documents:list', { limit: 200 });
     const docId = docs.items.find((d) => d.path === first.relPath)!.docId;
     const view = await ipcData<{ citeKey?: string; tags: string[] }>(window, 'documents:get', { docId });
     expect(view.citeKey).toBe('imported2024first');

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { LaunchedApp } from './helpers/launch';
-import { clickRow, openSyntheticLibrary, rows } from './helpers/ui';
+import { clickRow, openSyntheticLibrary, pickSort, rows } from './helpers/ui';
 
 /**
  * Phase 2 criterion, projects half (checklist point 9): a project gathers documents from different folders and
@@ -22,7 +22,7 @@ test('project from the library selection, members, notes, reading plan, archive 
     const third = titled.find((f) => f !== first && f !== other)!;
 
     // Select two documents in the library and create a project from them.
-    await window.getByTestId('search-sort').selectOption('title');
+    await pickSort(window, 'title');
     await clickRow(window, first.title!);
     await clickRow(window, other.title!, ['Control']);
     await expect(window.getByTestId('selection-count')).toHaveText(/2 selected/);
@@ -46,7 +46,9 @@ test('project from the library selection, members, notes, reading plan, archive 
     await window.getByTestId('crumbs').getByRole('button', { name: 'Projects' }).click();
     await expect(window.getByTestId('project-row')).toHaveCount(2);
     await window.getByTestId('nav-library').click();
+    // The selection bar (and Project in it) appears from two documents on (section 4.2, B3): the third and the first go to the second project.
     await clickRow(window, third.title!);
+    await clickRow(window, first.title!, ['Control']);
     await window.getByTestId('add-to-project-button').click();
     await window.getByTestId('pick-project').filter({ hasText: 'Side project' }).click();
 

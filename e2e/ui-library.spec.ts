@@ -2,15 +2,11 @@ import { expect, test } from '@playwright/test';
 import type { LaunchedApp } from './helpers/launch';
 import { ipc, ipcData } from './helpers/phase1';
 import type { Page } from '@playwright/test';
-import { backToList, clickRow, createTagInManager, openSyntheticLibrary, pickTag, rowByTitle, rows, unfoldNode } from './helpers/ui';
+import { backToList, clickRow, createTagInManager, openSyntheticLibrary, pickSort, pickTag, rowByTitle, rows, unfoldNode } from './helpers/ui';
 
 /** The View popover (list or grid, sort order) opens from the header; it stays open until a click outside. */
 async function viewMenu(window: Page) {
   if (!(await window.getByTestId('search-sort').isVisible())) await window.getByTestId('view-menu').click();
-}
-async function pickSort(window: Page, value: string) {
-  await viewMenu(window);
-  await pickSort(window, value);
 }
 async function pickView(window: Page, mode: 'list' | 'grid') {
   await viewMenu(window);
@@ -290,6 +286,8 @@ test('document card: editable fields, study state, extracted values apart, AI ar
     await panel.getByTestId('field-doi').blur();
     await panel.getByTestId('field-arxiv').fill('2101.00001');
     await panel.getByTestId('field-arxiv').blur();
+    // The description is in the closed Notes section of the card (section 4.14).
+    if (!(await panel.getByTestId('field-description').isVisible())) await panel.getByTestId('doc-notes').locator('.card-section__toggle').click();
     await panel.getByTestId('field-description').fill('My own short description.');
     await panel.getByTestId('field-description').blur();
     await panel.getByTestId('study-reading').click();
@@ -305,7 +303,8 @@ test('document card: editable fields, study state, extracted values apart, AI ar
     await expect(ai.locator('input, textarea, select')).toHaveCount(0);
 
     // Reload the card from the main process: the values were stored.
-    await window.getByTestId('selection-clear').click();
+    // A single document has no selection bar: Escape in the list clears the selection, and the row is chosen again.
+    await window.getByTestId('search-results').press('Escape');
     await rows(window).filter({ hasText: 'A title chosen by the user' }).click();
     await openCard(window);
     await editData(window);
@@ -415,8 +414,20 @@ test('crowding and layout at 1024x700: top bar 9, header 4, filters 8, selection
     const opened = await openSyntheticLibrary(testInfo, 'papers');
     ctx = opened.ctx;
     const { window } = opened;
-    await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setContentSize(1024, 700));
-    await expect.poll(() => window.evaluate(() => `${globalThis.innerWidth}x${globalThis.innerHeight}`)).toBe('1024x700');
+    // Some window managers add a frame to the requested content size: measure the viewport and correct by the difference.
+    const resize = async (w: number, h: number) => {
+      let [rw, rh] = [w, h];
+      for (let i = 0; i < 5; i++) {
+        await ctx!.app.evaluate(({ BrowserWindow }, [cw, ch]) => BrowserWindow.getAllWindows()[0]!.setContentSize(cw!, ch!), [rw, rh]);
+        await window.waitForTimeout(400);
+        const [iw, ih] = await window.evaluate(() => [globalThis.innerWidth, globalThis.innerHeight] as const);
+        if (iw === w && ih === h) return;
+        [rw, rh] = [rw + w - iw, rh + h - ih];
+      }
+    };
+    await resize(1024, 700);
+    // A display scale can round the content size by a pixel: the layout under test is the one at about 1024x700.
+    await expect.poll(() => window.evaluate(() => `${Math.abs(globalThis.innerWidth - 1024) <= 2 ? 1024 : globalThis.innerWidth}x${Math.abs(globalThis.innerHeight - 700) <= 2 ? 700 : globalThis.innerHeight}`)).toBe('1024x700');
     const visible = (root: ReturnType<Page['getByTestId']>) => root.locator('button:visible, input:visible, select:visible, [role="button"]:visible');
 
     // Top bar (17.3: 9 controls): back, forward, search box with its (?) and Claude buttons, Undo, History, Commands, Activity.
@@ -427,8 +438,8 @@ test('crowding and layout at 1024x700: top bar 9, header 4, filters 8, selection
     // The Library has no search box of its own and no second "Ask Claude" button.
     await expect(window.getByTestId('section-library').getByTestId('search-input')).toHaveCount(0);
 
-    // Header: View, + Add PDF, the menu, the card toggle.
-    await expect(visible(window.locator('.library-head'))).toHaveCount(4);
+    // Header: View, + Add PDF with its split arrow (one split button, section 17.1 table), the menu, the card toggle.
+    await expect(visible(window.locator('.library-head'))).toHaveCount(5);
     // The row of filters: 6 facet chips, the Resources facet and "Show missing files" (Clear appears with a filter).
     await expect(visible(window.getByTestId('facet-bar'))).toHaveCount(8);
     // At least seven rows are visible without scrolling.

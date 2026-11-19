@@ -62,7 +62,7 @@ test('add from a DOI without a file, then resources: a link and a folder', async
     const entry = window.getByTestId('resource-row').filter({ hasText: RECORD.title });
     await expect(entry).toHaveCount(1);
     await expect(entry).toContainText('No file');
-    expect((await ipcData<{ items: unknown[] }>(window, 'documents:list', { limit: 500 })).items).toHaveLength(total);
+    expect((await ipcData<{ items: unknown[] }>(window, 'documents:list', { limit: 200 })).items).toHaveLength(total);
     // Adding the same DOI again says it is already there.
     await window.getByTestId('add-menu').click();
     await window.getByTestId('add-menu-id').click();

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { launchApp, type LaunchedApp } from './helpers/launch';
 import { createLibraryViaWizard, idOf, ipcData, searchHits, skipUnlessChannels, waitForScan } from './helpers/phase1';
-import { clickRow } from './helpers/ui';
+import { clickRow, pickSort } from './helpers/ui';
 
 /**
  * Phase 5 criteria, with the network replaced by `RL_E2E_NET_FIXTURES` (OpenAlex answers built from the synthetic
@@ -14,7 +14,7 @@ import { clickRow } from './helpers/ui';
  */
 const CHANNELS = ['citations:get', 'citations:refresh', 'recommend:readNext', 'watch:checkPublished', 'watch:applyPublished'];
 const OA = 'https://api.openalex.org';
-const LINK = 'id,doi,title,publication_year,authorships,primary_location';
+const LINK = 'id,doi,title,publication_year,authorships,primary_location,locations';
 const MISSING = { doi: '10.9999/rl-e2e.missing.900', title: 'Missing Foundations of Synthetic Testing' };
 const PUBLISHED = { doi: '10.7777/rl-e2e.journal.303', venue: 'Journal of Synthetic Results' };
 
@@ -74,8 +74,7 @@ test('references in library and missing, explained read-next, published preprint
     const [idA, idB, idC] = [await idFor(a.title!), await idFor(b.title!), await idFor(c.title!)];
 
     // 1. A sample paper: references in the library and missing.
-    await window.getByTestId('view-menu').click();
-    await window.getByTestId('search-sort').selectOption('title');
+    await pickSort(window, 'title');
     await clickRow(window, a.title!);
     if (!(await window.getByTestId('detail-pane').isVisible())) await window.getByTestId('detail-toggle').click();
     await expect(window.getByTestId('doc-panel')).toBeVisible();

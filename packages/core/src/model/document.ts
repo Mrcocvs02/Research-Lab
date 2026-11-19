@@ -184,6 +184,8 @@ export const documentRecordSchema = z.object({
 
   /** User-owned tags: taxonomy node ids. */
   tags: z.array(itemIdSchema).max(L.tags).default([]),
+  /** Where a tag came from when it was not typed by the user (D-494); an absent key = by hand. */
+  tagOrigin: z.record(itemIdSchema, z.enum(['ai', 'import'])).optional(),
   /** Research groups (institutions) of the paper, derived from OpenAlex (D-488): they become tags `grp:<name>`, apart from `tags`. */
   groups: z.array(z.string().trim().min(1).max(L.author)).max(20).optional(),
   /** Groups of `groups` the user hid: a hidden group is no tag, and a refresh of `groups` does not bring it back. */

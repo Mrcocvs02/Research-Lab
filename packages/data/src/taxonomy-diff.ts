@@ -42,6 +42,13 @@ export function diffTaxonomy(before: TaxonomyFile, after: TaxonomyFile): { befor
       changed = true;
     }
   }
+  // A removed node comes back at its old place on undo: the order of the nodes before is kept.
+  if (out.after['nodes'] && Object.values(out.after['nodes'] as Snap).some((v) => v === null)) out.before['nodeOrder'] = before.nodes.map((n) => n.id);
+  if (JSON.stringify(before.distinct ?? []) !== JSON.stringify(after.distinct ?? [])) {
+    out.before['distinct'] = before.distinct ?? [];
+    out.after['distinct'] = after.distinct ?? [];
+    changed = true;
+  }
   if (JSON.stringify(before.legacy ?? null) !== JSON.stringify(after.legacy ?? null)) {
     out.before['legacy'] = before.legacy ?? null;
     out.after['legacy'] = after.legacy ?? null;

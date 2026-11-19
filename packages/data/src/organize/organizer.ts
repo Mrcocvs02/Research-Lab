@@ -14,6 +14,7 @@ import { clip, inChunks, toInfo, type DocInfo, type OrgCtx, type OrganizerStore 
 import { HistoryService, type HistoryItem, type HistoryResult } from './history.js';
 import { ProjectService, type ProjectResult } from './projects.js';
 import { applyTaxonomyOps } from './taxonomy-ops.js';
+import type { DocEdit, Written } from './taxonomy-ops-ext.js';
 import { affectedNodeIds, buildTaxonomyView, docsWithAnyTag } from './taxonomy-view.js';
 
 export type { DocInfo, OrganizerStore } from './common.js';
@@ -168,52 +169,58 @@ export class Organizer {
     return buildTaxonomyView(await this.d.store.readTaxonomy(), await this.docInfos());
   }
 
-  applyTaxonomy(ops: readonly TaxonomyOp[], expectedRevision?: number): Promise<{ taxonomy: TaxonomyView; changeId: string; created: Array<{ index: number; id: string }>; documentsChanged: number } & Touched> {
+  applyTaxonomy(ops: readonly TaxonomyOp[], expectedRevision?: number, extra?: { docEdits?: readonly DocEdit[]; summary?: string }): Promise<{ taxonomy: TaxonomyView; changeId: string; created: Array<{ index: number; id: string }>; documentsChanged: number } & Touched> {
     return this.run(async () => {
       const store = this.d.store;
       const before = await store.readTaxonomy();
       if (expectedRevision !== undefined && before.revision !== expectedRevision) throw new RevisionConflictError('taxonomy', expectedRevision, before.revision);
       const infos = await this.docInfos(true);
+      const { opsExt, applyDocEdit, editDocument, revertDocument, logOf } = await import('./taxonomy-ops-ext.js');
+      // Document edits that go with the operations (tags removed or added, venue or status filled): the usage that
+      // `delete` checks is the one after them.
+      const editBy = new Map<string, DocEdit[]>();
+      for (const e of extra?.docEdits ?? []) (editBy.get(e.docId) ?? editBy.set(e.docId, []).get(e.docId) ?? []).push(e);
       const usage = new Map<string, number>();
-      for (const d of infos) for (const t of new Set(d.tags)) usage.set(t, (usage.get(t) ?? 0) + 1);
-      const { taxonomy: next, created, redirects } = applyTaxonomyOps(before, ops, usage, this.ctx.now().toISOString());
+      for (const d of infos) {
+        const tags = (editBy.get(d.id) ?? []).reduce<readonly string[]>((cur, e) => applyDocEdit({ tags: cur }, e).tags, d.tags);
+        for (const t of new Set(tags)) usage.set(t, (usage.get(t) ?? 0) + 1);
+      }
+      const { taxonomy: next, created, redirects } = applyTaxonomyOps(before, ops, usage, this.ctx.now().toISOString(), opsExt);
 
       const changeId = this.ctx.newChangeId();
-      const cs = store.withChange({ changeId, summary: describeOps(before, ops) });
+      const cs = store.withChange({ changeId, summary: extra?.summary ? clip(extra.summary) : describeOps(before, ops) });
       const resolve = (t: string): string => {
         let x = t;
         for (let i = 0; i < 1000 && redirects.has(x); i++) x = redirects.get(x) as string;
         return x;
       };
-      const retag = infos.filter((d) => d.tags.some((t) => redirects.has(t)));
+      const retag = infos.filter((d) => editBy.has(d.id) || d.tags.some((t) => redirects.has(t)));
       const now = this.ctx.now().toISOString();
       // Documents first, the taxonomy last (an interruption in between leaves documents on the surviving node), and
       // all or nothing: the document writes are not credited to the change yet (the plain store; its entries carry
       // no change id and are not part of any undoable change). If the taxonomy cannot be written (somebody else changed
       // it) or a document cannot be written, the documents already changed go back to their tags, and only when the
       // whole operation succeeded are the document changes logged as part of this change.
-      const written = new Map<string, { from: string[]; to: string[] }>();
+      const written = new Map<string, Written>();
       try {
         await inChunks(retag, 8, async (d) => {
           await store.documents.update(d.id, (cur) => {
             if (!cur) throw new AppError('NOT_FOUND', 'Unknown document', { docId: d.id });
-            const tags = [...new Set(cur.tags.map(resolve))];
-            written.set(d.id, { from: cur.tags, to: tags });
-            return { ...cur, tags, updatedAt: now };
+            const r = editDocument(cur, editBy.get(d.id) ?? [], resolve, now);
+            written.set(d.id, r.w);
+            return r.next;
           });
         });
         await cs.writeTaxonomy(next, { expectedRevision: before.revision });
       } catch (e) {
         await inChunks([...written], 8, async ([id, w]) => {
-          await store.documents
-            .update(id, (cur) => (cur && canonical(cur.tags) === canonical(w.to) ? { ...cur, tags: w.from, updatedAt: now } : (cur as DocumentRecord)))
-            .catch(() => undefined);
+          await store.documents.update(id, (cur) => (cur ? revertDocument(cur, w, now) : (cur as unknown as DocumentRecord))).catch(() => undefined);
         });
         this.ctx.invalidate();
         throw e;
       }
       for (const [id, w] of written) {
-        await cs.appendLog({ type: 'change', at: now, deviceId: this.ctx.deviceId, actor: 'user', target: { kind: 'document', id }, action: 'tags.update', before: { tags: w.from }, after: { tags: w.to } });
+        for (const l of logOf(w)) await cs.appendLog({ type: 'change', at: now, deviceId: this.ctx.deviceId, actor: 'user', target: { kind: 'document', id }, ...l });
       }
       this.ctx.invalidate();
 

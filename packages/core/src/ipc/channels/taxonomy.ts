@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { documentTypeSchema, taxonomyNodeSchema, venueSchema } from '../../model/taxonomy.js';
+import { documentTypeSchema, taxonomyFamilySchema, taxonomyNodeSchema, venueSchema } from '../../model/taxonomy.js';
 import { itemIdSchema } from '../../common.js';
 import { defineChannels } from '../registry.js';
 
@@ -48,6 +48,10 @@ export const taxonomyOpSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('setGroup'), id: itemIdSchema, group: z.string().trim().min(1).max(100).nullable() }),
   /** Documents tagged `from` get `into`; `from` disappears and its label and aliases become aliases of `into`. */
   z.object({ op: z.literal('merge'), from: itemIdSchema, into: itemIdSchema }),
+  /** Makes a root a family (or clears it with `null`); at most one `keywords` family. */
+  z.object({ op: z.literal('setFamily'), id: itemIdSchema, family: taxonomyFamilySchema.nullable() }),
+  z.object({ op: z.literal('markDistinct'), a: itemIdSchema, b: itemIdSchema }),
+  z.object({ op: z.literal('unmarkDistinct'), a: itemIdSchema, b: itemIdSchema }),
   z.object({ op: z.literal('deprecate'), id: itemIdSchema }),
   z.object({ op: z.literal('restore'), id: itemIdSchema }),
   /** Only a node that no document uses and no other node refers to. */

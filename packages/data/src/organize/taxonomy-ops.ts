@@ -1,6 +1,13 @@
 import { AppError, itemIdSchema, type TaxonomyFile, type TaxonomyNode, type TaxonomyOp } from '@rl/core';
 import { normalizeName, slugify } from '../normalize.js';
 
+/** What the vocabulary extension adds to a batch (families, distinct pairs, depth limits); see `taxonomy-ops-ext.ts`. */
+export interface OpsExt {
+  apply(tax: TaxonomyFile, op: TaxonomyOp, index: number): void;
+  afterMove(tax: TaxonomyFile, moved: TaxonomyNode, index: number): void;
+  afterMerge(tax: TaxonomyFile, from: string, into: string): void;
+}
+
 export interface OpsResult {
   taxonomy: TaxonomyFile;
   /** Id given to each `create` / `addType` / `addVenue` (`index` = position in the batch). */
@@ -9,8 +16,8 @@ export interface OpsResult {
   redirects: Map<string, string>;
 }
 
-const bad = (index: number, message: string, details?: Record<string, unknown>) => new AppError('INVALID_REQUEST', `Operation ${index + 1}: ${message}`, { index, ...details });
-const missing = (index: number, id: string) => new AppError('NOT_FOUND', `Operation ${index + 1}: unknown node`, { index, id });
+export const bad = (index: number, message: string, details?: Record<string, unknown>) => new AppError('INVALID_REQUEST', `Operation ${index + 1}: ${message}`, { index, ...details });
+export const missing = (index: number, id: string) => new AppError('NOT_FOUND', `Operation ${index + 1}: unknown node`, { index, id });
 
 const uniq = <T>(xs: readonly T[]): T[] => [...new Set(xs)];
 
@@ -102,7 +109,7 @@ function withAliases(label: string, aliases: readonly string[], extra: readonly 
  * any invalid operation throws and the caller keeps the original. `usage` = documents that carry each node directly
  * (needed by `delete`, "only when unused").
  */
-export function applyTaxonomyOps(input: TaxonomyFile, ops: readonly TaxonomyOp[], usage: ReadonlyMap<string, number>, now: string): OpsResult {
+export function applyTaxonomyOps(input: TaxonomyFile, ops: readonly TaxonomyOp[], usage: ReadonlyMap<string, number>, now: string, ext?: OpsExt): OpsResult {
   const tax: TaxonomyFile = structuredClone(input);
   const used = new Map(usage);
   const created: OpsResult['created'] = [];
@@ -158,6 +165,7 @@ export function applyTaxonomyOps(input: TaxonomyFile, ops: readonly TaxonomyOp[]
         const n = node(i, op.id);
         n.parents = existing(i, op.parents, op.id);
         assertAcyclic(tax.nodes, 'parents', i);
+        ext?.afterMove(tax, n, i);
         break;
       }
       case 'setAliases': {
@@ -196,6 +204,7 @@ export function applyTaxonomyOps(input: TaxonomyFile, ops: readonly TaxonomyOp[]
           if (n.parents.includes(from.id)) n.parents = uniq(n.parents.map((p) => (p === from.id ? into.id : p))).filter((p) => p !== n.id);
           if (n.implies.includes(from.id)) n.implies = uniq(n.implies.map((p) => (p === from.id ? into.id : p))).filter((p) => p !== n.id);
         }
+        ext?.afterMerge(tax, from.id, into.id);
         used.set(into.id, (used.get(into.id) ?? 0) + (used.get(from.id) ?? 0));
         used.delete(from.id);
         for (const [k, v] of redirects) if (v === from.id) redirects.set(k, into.id);
@@ -205,6 +214,13 @@ export function applyTaxonomyOps(input: TaxonomyFile, ops: readonly TaxonomyOp[]
         assertAcyclic(tax.nodes, 'implies', i);
         break;
       }
+      case 'setFamily':
+      case 'markDistinct':
+      case 'unmarkDistinct':
+        // Family and distinct-pair operations live in the lazy extension (`taxonomy-ops-ext`), loaded by the organizer.
+        if (!ext) throw bad(i, 'this operation needs the vocabulary extension', { reason: 'no-extension' });
+        ext.apply(tax, op, i);
+        break;
       case 'deprecate': {
         node(i, op.id).status = 'deprecated';
         break;

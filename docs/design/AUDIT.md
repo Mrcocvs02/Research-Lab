@@ -850,3 +850,96 @@ Regola pratica: ogni famiglia con 3-8 valori e un valore per lavoro su almeno l'
 - **"✦ Proponi i tag di una famiglia…"**: il percorso delle proposte di tag dell'AI con un vincolo (una famiglia, 3-8 valori, uno per lavoro), con anteprima e accettazione come oggi.
 - **Da Automatica a famiglia**: "Salva questi cluster come famiglia" (crea i nodi e mette i tag, annullabile).
 - In Collegamenti, tag ordinati per utilità e con tetto (R9). In Trova collegamenti i tag radice restano esclusi dal segnale dei tag: giusto per le parole chiave radice di questa libreria, da rivedere se le famiglie nuove saranno radici senza figli.
+
+## Diagnosi rete e libreria (post 1.0)
+
+Oggetto: `main` a `v1.0.0` (ramo `diag2`), app compilata guidata con uno script Playwright `_electron` fuori dal repository (finestra nascosta, fotogrammi guidati da un timer perché la finestra nascosta non ne produce), rete tagliata, nessuna chiamata all'AI. Dati: **copia** temporanea di una cartella reale di 21 PDF con la copia della cartella dati della libreria (tag, tassonomia e documenti veri; 25 documenti nel modello, 4 fuori dalla cartella). Schermate della Mappa (Panorama, Collegamenti in tutti i modi, Esplora) per ogni famiglia di "Raggruppa per", a 1280×800 e 1920×1080, chiaro e scuro; griglia della libreria e multi-selezione. Misure prese dalla rete viva (nodi e archi letti dall'oggetto della simulazione, etichette registrate da `fillText` nell'ultimo fotogramma, riquadri sovrapposti alla tela). Qui solo numeri aggregati e schemi generici: nessun titolo, nome, tag o percorso. Copie, schermate e dati temporanei cancellati alla fine.
+
+**Verdetto.** L'utente ha ragione su tutti e quattro i punti, e le cause sono strutturali, non di rifinitura: (1) "Rete di: Tag" disegna 364 archi fra 84 tag con 11 incroci per arco, perché lega tag che co-occorrono anche su **un solo** lavoro e perché il vocabolario è pieno di doppioni e di parole chiave che viaggiano in blocco; (2) "Raggruppa per" non produce gruppi visibili (le famiglie offerte non sono a un valore per lavoro e la forza di gruppo è debole) e la Mappa mescola lavori con nodi di altro tipo (tag, cartelle); (3) la scheda della griglia ha la forma sbagliata e una regola CSS tardiva la centra: la miniatura è un francobollo e **il titolo è tagliato ai due lati in 20 schede su 25**; (4) la multi-selezione mostra l'**unione** dei tag (87 righe per 5 lavori, nessuna comune a tutti), non quello che i lavori hanno in comune.
+
+### Numeri
+
+| Misura | Valore |
+| --- | --- |
+| Documenti | 25 nel modello (21 PDF della cartella + 4 altri), 5 senza tag |
+| Tag | 220 nella tassonomia, 214 usati; per lavoro 0-80 (mediana 5); 126 su un solo lavoro (59 %) |
+| Famiglie offerte da "Raggruppa per" | Topic (20 lavori, **22 aree**), 2 famiglie da suggerimento di gruppo (10 e 5 lavori), Automatica (25 lavori, 4 cluster) |
+| Quota dell'area principale per lavoro | Topic: mediana 50 %, 19/20 lavori in più aree · famiglia 1: **34 %**, 9/10 in più cluster · famiglia 2: un solo cluster · Automatica: 100 %, 0 in più cluster |
+| Panorama | 25 punti, 4 cluster di posizione (10 · 8 · 4 · 3); inviluppi = 25 % del riquadro dei punti; distanza dal vicino mediana 11 % dell'estensione; **0 etichette di lavoro**, 4 etichette di cluster (terne di termini) |
+| Rete di: Documenti (avvio) | 18 nodi (17 lavori + 1 cartella), 20 archi (16 simili, 3 citazioni, 1 contiene); a 1280 2 nodi fuori tela; titoli tagliati a 32 caratteri (mediana dei titoli 57) |
+| Un'espansione di un lavoro (25 lavori, tipi predefiniti, limite 25) | aggiunge mediana 21 nodi: 14 archi "simili" (peso mediano **0,063**, p10 0,036), 0-8 citazioni, 0-8 rombi di tag, 1 cartella; fino a 72 tag nascosti dietro "+N" |
+| Dopo la seconda espansione | 28 nodi di **3 tipi** (19 lavori, 8 tag, 1 cartella), 53 archi di **4 tipi** (33 simili, 10 citazioni, 8 tag, 2 contiene); riquadri sopra la tela 31-41 %, **11-14 nodi coperti** |
+| Rete di: Tag (predefinito, almeno 2 lavori) | 84 nodi, 364 archi (+4 "implica"), densità 0,10, grado mediano 9 (max 19); **11 incroci per arco**; 24 etichette su 84 nodi (29 %) a 1280, 33 a 1920; 84 archi poggiano su **un solo lavoro in comune**, 47 hanno peso 1 |
+| Rete di: Tag con "almeno 1 lavoro" | 210 nodi, 778 archi, componente gigante di 145 nodi |
+| Rete di: Argomenti | 3 nodi e 3 archi (l'intestazione dice 4 argomenti) |
+| Rete di: Autori | 15 nodi, 42 archi (densità 0,40), 33 archi su un solo lavoro in comune |
+| Riquadri sopra la tela (legenda, conteggio, minimappa) | 1280: 16-20 % della tela · 1920: 3-9 % |
+| Griglia della libreria | 1280: 2 colonne di schede 344×184 (rapporto 1,87, orizzontale) · 1920: 5 colonne 261×184 (1,42); miniatura **54×76 px** = 6-9 % della scheda; bitmap 287×407 mostrata al 19 % del suo lato |
+| Titoli nelle schede | 14 px/650, 2 righe; **tagliati a sinistra e a destra** in 7/9 schede misurate a 1280 e 20/25 a 1920; contenuto più largo della scheda di 119-383 px |
+| Multi-selezione (pannello) | 2 lavori: 8 righe di tag · 5 lavori: **87 righe**, 0 comuni a tutti, pannello alto 3064 px (quasi 4 schermate) |
+
+### Qualità dei tag (richiesta dell'utente)
+
+| Misura | Valore |
+| --- | --- |
+| Totale | 220 nodi (214 usati, 6 mai usati); per lavoro min 0 · mediana 5 · max 80; 5 lavori senza tag |
+| Singoletti | 126 tag su un solo lavoro (59 %), 13 su due; 1 solo tag su metà dei lavori o più |
+| Per gruppo di suggerimento | macro: 7 usati, 2-3 per lavoro, nessun singoletto · micro: 21 usati, mediana 2 per lavoro, 7 singoletti · **parole chiave ("extra")**: 186 tag (87 %), 119 singoletti, fino a 71 su un lavoro, 422 assegnazioni su 521 (81 %) |
+| Gerarchia | profondità massima **1**; 23 tag con un genitore, **18 con più genitori**; 197 radici, solo 8 con figli; 7 con "implica", 33 con alias; nessun `level` né colore |
+| Stile dei nomi | 147 in `parola_parola`, 39 in minuscolo con spazi, 26 con iniziale maiuscola, 8 "Nome (SIGLA)": quattro convenzioni insieme |
+| Provenienza | tutti i 220 nodi importati dal vecchio indice; 20 lavori con registro "fonte: contenuto, confidenza alta, origine sconosciuta"; **nessuna distinzione conservata fra tag dell'AI e tag messi a mano**, nessun tag messo a mano nell'app; parole chiave AI dell'app su 15 lavori (campo separato, non tag) |
+| Quasi-doppioni (rilevatore a regole, rivisti a mano) | 56 coppie candidate su 78 tag: 4 di maiuscole, separatore o plurale (es. `concetto` ↔ `concetti`, `2x` ↔ `2-x`) tutte vere; 14 sigla ↔ forma estesa (es. `ABC` ↔ `alfa_beta_gamma`), 12 vere; 4 "refusi" (1 vero: grafia britannica e americana); 34 di inclusione (es. `X` ↔ `X_metodi`, `Y` ↔ `Y_di_Z`): ~10 sinonimi, ~24 coppie più generale/più specifico **senza** legame di genitore |
+| Concetti duplicati | circa **16 concetti scritti in 2-5 forme** (il peggiore: 5 tag per una sola sigla, fra sigla, plurale, forma estesa e due grafie), cioè ~24 tag ridondanti; 2 concetti sono metadati (rivista, stato di preprint) usati come tag, ciascuno in 2-3 forme |
+| Sempre insieme | 13 gruppi, **66 tag** con esattamente gli stessi lavori (≥ 2), il più grande di 11: sono blocchi di parole chiave copiati sugli stessi lavori |
+| Taglio dei 30 tag | 8 lavori hanno più di 30 tag: per le coppie la rete tiene i primi 30 **in ordine di id**, cioè a caso |
+
+**Quanto pesa ciascun difetto sul gomitolo** (rete dei tag rifatta fuori dall'app con le stesse regole: 88 nodi e 369 archi contro 84 e 364 dell'app; 1170 coppie prima del tetto di 8 archi per nodo):
+
+| Intervento sulla rete di oggi (88 nodi, 369 archi) | Nodi | Archi | Note |
+| --- | --- | --- | --- |
+| Archi che toccano una parola chiave "extra" | — | **333 (90 %)** | il grosso del gomitolo |
+| Togliere le parole chiave, tenere macro e micro | 21 | 73 | densità 0,35: piccola e leggibile |
+| Unire quasi-doppioni e tag sempre insieme | 39 | 189 | −49 % di archi, peso 1 da 50 a 1 |
+| Archi su un solo lavoro in comune | — | 85 (23 %) | rumore puro con 25 lavori |
+| Archi di peso 1 (tag gemelli) | — | 50 (14 %) | spariscono unendo i gemelli |
+| Togliere il tag su metà dei lavori | 87 | 379 | non aiuta: il problema non sono gli hub |
+| Soglia "almeno 3 lavori" | 75 | 400 | non aiuta: il tetto per nodo riempie di nuovo |
+
+### Risultati
+
+| Id | Gravità | Dove | Problema | Causa | Evidenza |
+| --- | --- | --- | --- | --- | --- |
+| N1 | **bloccante** | Collegamenti, Rete di: Tag | Gomitolo: non si capisce nulla, tutto collegato | `tagNetwork` (`packages/graph/src/entity-network.ts`) lega ogni coppia di tag sullo stesso lavoro con il coseno degli insiemi di lavori: con 25 lavori un solo lavoro in comune basta (peso fino a 1); `topEdges` tiene 8 archi per nodo "se uno dei due capi lo vuole" (grado misurato fino a 19); `minWeight` 0; tetto di 30 tag per lavoro in ordine di id; nessuna distinzione fra macro, micro e parole chiave | 84 nodi, 364 archi, 11 incroci per arco, 90 % degli archi su parole chiave, 23 % su un solo lavoro |
+| N2 | **bloccante** | Mappa, tutte le viste | Con "Raggruppa per" l'utente vuole vedere **lavori** raggruppati, non nodi di famiglie o di tag | La famiglia cambia solo colore e una debole attrazione (`GROUP_PULL` 0,012, `CLUSTER_PULL` pesata dalle quote); in Collegamenti la rete mescola lavori, rombi di tag e quadrati di cartella; "Rete di: Tag/Argomenti" mostra solo nodi di entità | Rete dei documenti dopo due espansioni: 3 tipi di nodo, 4 tipi di arco; raggruppata per famiglia 1 la rete si stringe (riquadro dal 64 al 24 % della tela) ma non si separa: un solo grumo grigio |
+| N3 | **bloccante** | "Raggruppa per" | Famiglie che non raggruppano | `listFamilies` offre ogni suggerimento di gruppo `extra:` e "Topic" senza controllare che siano a un valore per lavoro: la famiglia 1 ha 8 cluster su 10 lavori con quota principale 34 % (tutti "altro"/tenui), la famiglia 2 un cluster solo, Topic 22 aree per 20 lavori | Solo Automatica (4 cluster, 100 % a un cluster, coincide con le posizioni) dà gruppi netti |
+| N4 | importante | Panorama | I lavori sono punti anonimi; colori e posizioni dicono cose diverse | Nessuna etichetta di lavoro a nessuno zoom iniziale; la posizione viene dai cluster di testo (4), il colore dalle macro-aree (22, legenda "Altre 15 aree"); con una famiglia attiva i cluster prendono il nome dell'area maggioritaria, spesso "altro" | 0 titoli visibili; a 1920 la vista non si reinquadra dopo il ridimensionamento (punti in circa un decimo della tela) |
+| N5 | importante | Collegamenti, Documenti | La rete dei lavori è una stella di archi deboli | Gli archi "simili" non hanno soglia: si disegnano i 25 vicini più vicini qualunque sia il peso (mediana 0,063); citazioni, link, tag e cartella sono tutti accesi di serie (`DEFAULT_KINDS`) | 14 archi simili per espansione, 4 tipi di arco dopo due espansioni |
+| N6 | importante | Tutta la Mappa a 1280 | Riquadri sopra la tela | Legenda (240 px, alta fino a 400), conteggio, minimappa e note sono assoluti sopra la tela e l'inquadratura non ne tiene conto (R10 ancora aperto) | 16-20 % della tela coperta; 11-14 nodi su 28 sotto un riquadro dopo due espansioni |
+| N7 | minore | Rete di: Argomenti | 3 nodi (4 nell'intestazione): vista quasi vuota a questa scala | un solo livello di cluster | — |
+| L1 | **bloccante** | Libreria, griglia | Titoli tagliati ai due lati | In `library.css` la regola `.doc { align-items: center }` (riga ~834) viene dopo `.doc-card { align-items: stretch }` (riga ~383) e la vince: la scheda diventa una colonna centrata; `.doc-sub .doc-tags { flex: none; flex-wrap: nowrap }` allarga il contenuto alla riga dei tag, che resta centrato e tagliato da `overflow: hidden` | 20/25 schede a 1920, 7/9 a 1280; contenuto 119-383 px più largo della scheda |
+| L2 | **bloccante** | Libreria, griglia | Miniatura "lontana", rimpicciolita | `.doc-thumb { height: 76px }` e `object-fit: contain` in una scheda orizzontale (`ROW_HEIGHT.card` 188, `CARD_MIN_WIDTH` 236): la pagina A4 (1:1,41) entra in 54×76 px; la bitmap è disegnata a 240 px di larghezza CSS (`THUMB_CSS_WIDTH`) e mostrata al 19 % | 6-9 % dell'area della scheda; a 1280 due colonne di schede larghe 344 px con la miniatura al centro e ai lati vuoto |
+| L3 | importante | Libreria, griglia | Al passaggio i pulsanti Leggi/Scheda/⋯ coprono la miniatura e lo stato | `.doc-side` assoluto in alto a destra sopra la miniatura | schermata della selezione |
+| L4 | importante | Multi-selezione | Mostra le informazioni di ogni lavoro invece di quelle comuni | `BulkTagEditor` elenca l'**unione** dei tag diretti e impliciti, ordinata per conteggio, con "su k di N" e "Togli…" per riga; nessun campo comune (autori, anno, rivista, cartella, stato) | 5 lavori: 87 righe, 0 su tutti, 3064 px |
+| T1 | **bloccante** (a monte di N1) | Tag | Vocabolario sporco | import automatico dal vecchio indice di parole chiave per lavoro, senza unificazione né gerarchia; l'app non conserva la provenienza e non segnala doppioni | 59 % singoletti, ~16 concetti in 2-5 forme, 66 tag gemelli, profondità 1, 4 stili di nome |
+
+### Direzione per il ridisegno
+
+**Rete: cosa mostrare di serie.**
+1. Una sola vista principale "Lavori": **ogni nodo è un lavoro**, sempre, in tutte le famiglie di "Raggruppa per". Niente nodi di tag, cartella o famiglia nella vista di serie; tag e cartelle diventano filtri o chip del lavoro selezionato. "Rete di: Tag/Argomenti/Autori" esce dalla barra principale (in "Esplora", o come vista avanzata), mai la prima cosa che si vede.
+2. **Raggruppare senza nodi di famiglia**: ogni valore della famiglia è un'isola (regione con contorno morbido e nome grande sopra, colore del valore); i lavori si dispongono **dentro** l'isola del valore principale (posizione = famiglia, non solo una spinta), vicini per somiglianza all'interno; isola "senza valore" a parte e più piccola. Un lavoro con più valori sta nell'isola principale con piccoli punti colorati degli altri valori; al passaggio si accendono le altre isole. Disposizione delle isole: impacchettamento di cerchi o griglia proporzionale al numero di lavori, stabile fra le famiglie (le isole si spostano, i lavori volano). Etichetta di ogni lavoro: titolo breve (prime 4-6 parole, ~28 caratteri), visibile per tutti fino a ~40 lavori in vista, poi per i più centrali di ogni isola con la griglia anti-collisione già presente.
+3. **Archi nascosti di serie.** Si vedono solo per il lavoro selezionato o al passaggio: i 3-5 vicini più forti, con soglia **relativa alla libreria** (peso ≥ 75° percentile dei pesi della libreria, mai il solo 0,06 di oggi). Un tipo di arco alla volta con un interruttore (Citazioni / Somiglianza / Link miei), citazioni e link prima perché espliciti. Fra isole diverse: un solo arco aggregato fra le isole (spessore = numero di coppie, solo se ≥ 2), mai le singole linee.
+4. **Famiglie offerte solo se raggruppano**: una famiglia entra nel menu se almeno il 60-80 % dei lavori ha un valore principale con quota ≥ 60 % e se ha 2-12 valori; altrimenti grigia con il motivo ("quasi ogni lavoro ha molti valori"). Le parole chiave (`extra:`) non sono famiglie. Automatica resta e va proposta come predefinita quando Topic non passa la prova.
+5. **Panorama** = la stessa vista "Lavori" senza famiglia (isole = cluster di testo); il colore segue la stessa partizione della posizione, oppure è spento. Reinquadrare a ogni ridimensionamento. Legenda richiudibile e fuori dalla tela (colonna a lato a ≥ 1440, in alto ripiegata a 1280), mai sopra i nodi; la minimappa solo oltre ~150 nodi.
+
+**Se resta una rete dei tag** (vista avanzata): solo tag di famiglie (macro e micro) o con almeno max(2, 10 % dei lavori); arco solo con ≥ 2 lavori in comune e misura che sconta il caso (lift o PMI, non il coseno) sopra soglia; scheletro: albero di copertura massimo più al massimo 2 archi forti per nodo; quasi-doppioni e tag gemelli fusi in un nodo; tetto 30-40 nodi con "+N"; il tetto di 30 tag per lavoro per peso e diffusione, non per id. Stima su questi dati: da 84 nodi e 364 archi a circa 20-40 nodi e 40-80 archi.
+
+**Tag (a monte).** Pulizia assistita nella gestione dei tag: proposte di fusione per maiuscole, separatori, plurali, sigle ↔ forme estese, grafie e tag sempre insieme (con anteprima e annullamento; alias al tag tenuto); proposta di genitore per le coppie generale/specifico; un solo stile di nome; segnare la provenienza (AI, mano, import) e mostrarla; i metadati (rivista, stato) non come tag. Le parole chiave restano per la ricerca, non per la Mappa.
+
+**Libreria.**
+- Correggere L1 nella regola giusta: la scheda è colonna con `align-items: stretch` (specificità sopra `.doc`), `.doc-main` con `width: 100%`/`min-width: 0`, riga dei tag che va a capo o si taglia con "+N" dentro la scheda; titolo allineato a sinistra, 2-3 righe, 14-15 px.
+- Scheda **verticale**: rapporto vicino a 0,75-0,8 (es. 200-220 × 270-290); in alto la miniatura a tutta larghezza, ritagliata alla **parte alta della pagina** (`object-fit: cover; object-position: top`, area 4:3 ≈ 45 % superiore di una A4, dove stanno titolo e autori), così la pagina si legge invece di essere rimpicciolita; sotto titolo, autori · anno, al massimo 2 chip. Bitmap già sufficiente (240 px CSS); `ROW_HEIGHT.card` e `CARD_MIN_WIDTH` da rifare insieme. Azioni al passaggio in una barra in basso sulla miniatura, non sopra lo stato. Copertine non A4 (slide, poster): `contain` su fondo neutro.
+- **Multi-selezione = solo ciò che è comune**: intestazione "N lavori"; campi mostrati solo se uguali in tutti (rivista, tipo, cartella comune più profonda, autori comuni a tutti), altrimenti un riassunto (anni "2017-2025", "3 da leggere · 2 letti"); tag "in tutti" come chip modificabili; "in alcuni (k)" ripiegato, con conteggio e al massimo 10 visibili; impliciti nascosti; azioni di massa invariate. Mai un elenco per lavoro.
+
+### Limiti
+
+Una sola libreria reale piccola (25 lavori, 1 livello di cluster): soglie e famiglie vanno riprovate su librerie da centinaia di lavori (corpus sintetico del repository). La rete dei tag "senza parole chiave" e "con doppioni uniti" è una ricostruzione fuori dall'app con le stesse regole (scarto di 4 nodi e 5 archi rispetto all'app). Il rilevatore di quasi-doppioni è a regole e rivisto a mano: le coppie di inclusione sono candidate, non decisioni. L'espansione a più passi è stata misurata su due passi.

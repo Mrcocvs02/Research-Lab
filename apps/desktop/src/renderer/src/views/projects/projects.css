@@ -335,3 +335,31 @@
   align-items: center;
   gap: var(--space-2);
 }
+
+/* Plan: documents still to add are rows with a "+", not underlined links; questions of the Schema are sentence case. */
+.plan-add-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+}
+.plan-add-row:hover {
+  background: var(--surface-2);
+}
+.plan-add-row__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.schema-question h3 {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}

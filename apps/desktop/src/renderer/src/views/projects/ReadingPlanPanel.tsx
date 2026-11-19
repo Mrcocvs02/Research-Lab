@@ -134,8 +134,9 @@ export function ReadingPlanPanel({ detail, onChange, onStudyState }: Props) {
           <ul className="plain-list">
             {addable.slice(0, 50).map((m) => (
               <li key={m.docId}>
-                <button type="button" className="link" onClick={() => onChange(appendMembers(items, [m]))} data-testid="plan-add-one">
-                  {t('plan.addOne', { title: safeText(m.title ?? m.docId) })}
+                <button type="button" className="plan-add-row" onClick={() => onChange(appendMembers(items, [m]))} aria-label={t('plan.addOne', { title: safeText(m.title ?? m.docId) })} data-testid="plan-add-one">
+                  <span aria-hidden="true">+</span>
+                  <span className="plan-add-row__title">{safeText(m.title ?? m.docId)}</span>
                 </button>
               </li>
             ))}

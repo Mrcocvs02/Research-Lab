@@ -6,7 +6,10 @@ import { separateClusters } from './hulls';
 import { collidePoints } from './quadtree';
 
 export type MapResponse = ResponseOf<Channels, 'graph:map'>;
-export type ClusterView = MapResponse['clusters'][number];
+export type ClusterView = MapResponse['clusters'][number] & {
+  /** Name of the grouping family's area that holds most of the cluster (D-491): the one name used on the canvas while a family is on. */
+  famLabel?: string | undefined;
+};
 
 /** The map in flat typed arrays (no object per point) with a spatial grid and, per level, the points grouped by cluster. */
 export interface PreparedMap {
@@ -138,6 +141,7 @@ export function prepareMap(r: MapResponse): PreparedMap {
 
 /** The text a cluster is shown with: Claude's label when there is one, else its most characteristic terms. */
 export function clusterText(c: ClusterView, terms = 3): { text: string; ai: boolean } {
+  if (c.famLabel) return { text: c.famLabel, ai: false };
   if (c.aiLabel) return { text: c.aiLabel.text, ai: true };
   return { text: c.topTerms.slice(0, terms).join(', '), ai: false };
 }

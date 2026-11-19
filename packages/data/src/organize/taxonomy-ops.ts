@@ -177,6 +177,12 @@ export function applyTaxonomyOps(input: TaxonomyFile, ops: readonly TaxonomyOp[]
         else n.color = op.color;
         break;
       }
+      case 'setGroup': {
+        const n = node(i, op.id);
+        if (op.group === null) delete n.group;
+        else n.group = op.group;
+        break;
+      }
       case 'merge': {
         if (op.from === op.into) throw bad(i, 'cannot merge a node into itself', { id: op.from });
         const from = node(i, op.from);

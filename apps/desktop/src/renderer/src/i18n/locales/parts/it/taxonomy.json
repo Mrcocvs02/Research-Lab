@@ -61,6 +61,14 @@
     "sectionName": "Nome e colore",
     "sectionAliases": "Nomi alternativi",
     "sectionRelations": "Relazioni",
-    "sectionMerge": "Unisci e ritira"
+    "sectionMerge": "Unisci e ritira",
+    "families": "Famiglie (per la Mappa)",
+    "familiesHint": "Una famiglia raggruppa tag dello stesso tipo, come Metodo o Sistema. \"Raggruppa per\" della Mappa le elenca. Per mettere un tag sotto un altro, imposta il suo genitore nell’editor del tag.",
+    "familyRename": "Rinomina",
+    "familyEmpty": "Ancora nessun tag",
+    "familyRemove": "Togli {{name}} dalla famiglia",
+    "familyAdd": "Aggiungi un tag a {{family}}",
+    "familyAddPlaceholder": "Aggiungi un tag…",
+    "familyNew": "Nome della nuova famiglia"
   }
 }

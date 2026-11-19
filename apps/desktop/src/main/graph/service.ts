@@ -9,6 +9,7 @@ import { createGraphEngine, type BuildProgress, type GraphEngine, type GraphStor
 import { GRAPH_PAGES, GRAPH_TEXT_CHARS, docSig, folderOfPath, toGraphDoc } from './inputs.js';
 import { readMeta } from './model-meta.js';
 import { graphPaths } from './paths.js';
+import { TOP_TAGS, topTags } from './tag-top.js';
 import { loadView, titleOf, type LibraryView } from './view.js';
 
 /** Seed of the first build (a rebuild keeps the seed of the model it replaces unless one is given). */
@@ -376,7 +377,7 @@ const folderLabel = (f: string) => (f === '' ? '/' : f.slice(f.lastIndexOf('/') 
 export async function neighbors(
   s: MainServices,
   req: { node: { kind: NodeKind; id: string }; kinds: string[]; limit: number },
-): Promise<{ nodes: OutNode[]; edges: OutEdge[]; areas?: AreaSummary[] }> {
+): Promise<{ nodes: OutNode[]; edges: OutEdge[]; areas?: AreaSummary[]; hiddenTags?: number }> {
   const rt = await s.runtime.require();
   const view = await loadView(rt);
   const nodes = new Map<string, OutNode>();
@@ -385,6 +386,7 @@ export async function neighbors(
   const docNode = (r: DocumentRecord): OutNode => ({ kind: 'doc', id: r.id, label: titleOf(r) });
   const has = (k: string) => req.kinds.includes(k);
   const { id } = req.node;
+  let hiddenTags = 0;
   const tagNode = (t: string): OutNode => ({ kind: 'tag', id: t, label: view.lookup.tagLabel(t) ?? t, count: view.tagCount(t) });
 
   if (req.node.kind === 'doc') {
@@ -420,7 +422,9 @@ export async function neighbors(
       }
     }
     if (has('tags')) {
-      for (const t of rec.tags.slice(0, req.limit)) {
+      const top = topTags((await import('./areas-run.js')).weightsOf(rec), (t) => view.tagCount(t), Math.min(req.limit, TOP_TAGS));
+      hiddenTags = top.hidden;
+      for (const t of top.shown) {
         addNode(tagNode(t));
         edges.push({ from: key('doc', id), to: key('tag', t), kind: 'tagged', weight: 1 });
       }
@@ -481,5 +485,5 @@ export async function neighbors(
       }
     }
   }
-  return (await import('./areas-run.js')).withNeighborAreas(s, view, { nodes: [...nodes.values()], edges });
+  return (await import('./areas-run.js')).withNeighborAreas(s, view, { nodes: [...nodes.values()], edges, ...(hiddenTags > 0 ? { hiddenTags } : {}) });
 }

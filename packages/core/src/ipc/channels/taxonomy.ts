@@ -44,6 +44,8 @@ export const taxonomyOpSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('setImplies'), id: itemIdSchema, implies: idList }),
   /** `null` removes the colour. */
   z.object({ op: z.literal('setColor'), id: itemIdSchema, color: color.nullable() }),
+  /** Sets or clears the free grouping hint; `extra:<Name>` puts the tag in the family <Name> of the Map (D-491). */
+  z.object({ op: z.literal('setGroup'), id: itemIdSchema, group: z.string().trim().min(1).max(100).nullable() }),
   /** Documents tagged `from` get `into`; `from` disappears and its label and aliases become aliases of `into`. */
   z.object({ op: z.literal('merge'), from: itemIdSchema, into: itemIdSchema }),
   z.object({ op: z.literal('deprecate'), id: itemIdSchema }),

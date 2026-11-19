@@ -598,6 +598,7 @@ export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, 
       if (familyRef.current !== TOPIC_FAMILY) await applyFamily(false);
       else tagTopics();
       if (res.capped) setNote({ text: t('network.net.capped', { count: res.omitted, limit: MAX_NET_NODES }), only: live });
+      else if (r.hiddenTags) setNote({ text: t('network.net.tagsMore', { count: r.hiddenTags }), only: live });
       else if (res.added === 0) setNote({ text: t('network.net.nothingNew') });
       syncCount();
       view.requestDraw();

@@ -29,7 +29,12 @@ describe('colour by macro-area (section 18.3.4-18.3.6)', () => {
   it('keeps the tint of a node fully inside one area and fades one between areas', () => {
     expect(mixAreaColor([[0, -1, 100]], 100, slots, tokens)).toBe(tokens[0]);
     const mixed = mixAreaColor([[0, 0, 50], [1, 0, 50]], 100, slots, tokens)!;
-    expect(chromaFactor([[0, 0, 50], [1, 0, 50]], 100)).toBeCloseTo(0.2 + 0.8 * 0 * 1, 6);
+    expect(chromaFactor([[0, 0, 50], [1, 0, 50]], 100)).toBeCloseTo(0.3, 6);
+    // A dominant area (76 / 24) stays clearly coloured (D-491): more than half of the full chroma, and its hue is the dominant tint's.
+    expect(chromaFactor([[0, 0, 76], [1, 0, 24]], 100)).toBeGreaterThan(0.7);
+    const dom = toOklab(mixAreaColor([[0, 0, 76], [1, 0, 24]], 100, slots, tokens)!);
+    const t0 = toOklab(tokens[0]!);
+    expect(Math.abs(Math.atan2(dom[2], dom[1]) - Math.atan2(t0[2], t0[1]))).toBeLessThan(0.6);
     const [, a, b] = toOklab(mixed);
     expect(Math.hypot(a, b)).toBeLessThan(0.06);
     const weak = mixAreaColor([[0, -1, 100]], 0, slots, tokens)!;

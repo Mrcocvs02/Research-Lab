@@ -61,6 +61,14 @@
     "sectionName": "Name and colour",
     "sectionAliases": "Alternative names",
     "sectionRelations": "Relations",
-    "sectionMerge": "Merge and retire"
+    "sectionMerge": "Merge and retire",
+    "families": "Families (for the Map)",
+    "familiesHint": "A family groups tags of one kind, such as Method or System. The Map \"Group by\" lists them. To nest a tag under another, set its parent in the tag editor.",
+    "familyRename": "Rename",
+    "familyEmpty": "No tags yet",
+    "familyRemove": "Remove {{name}} from the family",
+    "familyAdd": "Add a tag to {{family}}",
+    "familyAddPlaceholder": "Add a tag…",
+    "familyNew": "New family name"
   }
 }

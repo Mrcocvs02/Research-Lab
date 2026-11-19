@@ -87,3 +87,22 @@ describe('layoutBlocks', () => {
     expect(layoutBlocks({ docs: [], labels: new Map(), aspect: 1 }).blocks).toEqual([]);
   });
 });
+
+describe('blocks on a wide canvas (D-509)', () => {
+  const bbox = (out: ReturnType<typeof layoutBlocks>) => ({ w: Math.max(...out.blocks.map((b) => b.x + b.w)), h: Math.max(...out.blocks.map((b) => b.y + b.h)) });
+  it('takes more columns when that fills a wide canvas better, without overlaps', () => {
+    const docs = mk(25, (i) => (i < 13 ? 'a' : i < 21 ? 'b' : 'c'));
+    const wide = layoutBlocks({ docs, labels: new Map(), aspect: 2.1 });
+    // Square blocks (2 columns for 13 papers) stacked in two shelves were taller than wide; now the layout leans to the canvas.
+    expect(wide.blocks[0]!.w).toBeGreaterThanOrEqual(3 * CELL_W);
+    expect(bbox(wide).w / bbox(wide).h).toBeGreaterThan(1.4);
+    for (const [i, a] of wide.blocks.entries()) for (const b of wide.blocks.slice(i + 1)) expect(overlap(a, b)).toBe(false);
+    expect(new Set([...wide.cells.values()].map(([x, y]) => `${x},${y}`)).size).toBe(25);
+    expect(wide.blocks[0]!.w % CELL_W).toBe(0);
+    expect(CELL_H).toBeGreaterThan(0);
+  });
+  it('is deterministic', () => {
+    const docs = mk(40, (i) => `v${i % 4}`);
+    expect(JSON.stringify(layoutBlocks({ docs, labels: new Map(), aspect: 2.4 }).blocks)).toBe(JSON.stringify(layoutBlocks({ docs, labels: new Map(), aspect: 2.4 }).blocks));
+  });
+});

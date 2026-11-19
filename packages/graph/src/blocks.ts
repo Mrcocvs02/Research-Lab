@@ -92,6 +92,8 @@ interface Group {
 }
 
 /** Blocks, cells and the block of each paper. The values beyond the 12th biggest go to "Other"; papers with no value to the last block. */
+const COLUMN_FACTORS = [1, 1.5, 2, 3] as const;
+
 export function layoutBlocks(input: BlockInput): BlockLayout {
   const count = new Map<string, number>();
   for (const d of input.docs) if (d.value !== null) count.set(d.value, (count.get(d.value) ?? 0) + 1);
@@ -107,11 +109,30 @@ export function layoutBlocks(input: BlockInput): BlockLayout {
   }
   const order = [...ranked.slice(0, MAX_VALUES), OTHER_BLOCK, NO_VALUE_BLOCK].filter((id) => members.has(id));
 
+  const aspect = input.aspect > 0 && Number.isFinite(input.aspect) ? input.aspect : 1.6;
+  // The blocks are near-square; on a wide canvas they may take more columns (factor 1, 1.5, 2, 3) when the whole layout then fills
+  // the canvas better: with 25 papers in 3 blocks at 1280 x 800 the square blocks used a third of the width and the cells fell under
+  // the width where every title is drawn (D-509). The smallest factor wins a tie, so the layout stays deterministic.
+  let best: { fit: number; out: BlockLayout } | null = null;
+  for (const factor of COLUMN_FACTORS) {
+    const out = pack(factor);
+    let w = 0;
+    let h = 0;
+    for (const b of out.blocks) {
+      w = Math.max(w, b.x + b.w);
+      h = Math.max(h, b.y + b.h);
+    }
+    const fit = Math.min(aspect / Math.max(1, w), 1 / Math.max(1, h));
+    if (!best || fit > best.fit * 1.0001) best = { fit, out };
+  }
+  return best!.out;
+
+  function pack(factor: number): BlockLayout {
   // Size of each block (cells in rows; sub-area headers when there are enough papers and sub-areas).
   const shapes = order.map((id) => {
     const docs = members.get(id)!;
     const n = docs.length;
-    const cols = Math.max(1, Math.round(Math.sqrt(0.36 * n)));
+    const cols = Math.max(1, Math.min(n, Math.round(Math.sqrt(0.36 * n * factor))));
     const subCount = new Map<string, number>();
     for (const d of docs) if (d.sub) subCount.set(d.sub, (subCount.get(d.sub) ?? 0) + 1);
     const subs = [...subCount].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1] || cmp(a[0], b[0])).map(([s]) => s);
@@ -135,7 +156,6 @@ export function layoutBlocks(input: BlockInput): BlockLayout {
 
   // Shelf packing in order, the width aimed at sqrt(total area x aspect of the canvas).
   const area = shapes.reduce((s, b) => s + (b.w + BLOCK_GAP) * (b.h + BLOCK_GAP), 0);
-  const aspect = input.aspect > 0 && Number.isFinite(input.aspect) ? input.aspect : 1.6;
   const target = Math.max(Math.sqrt(area * aspect), ...shapes.map((b) => b.w));
   const blocks: Block[] = [];
   const cells = new Map<string, [number, number]>();
@@ -169,4 +189,5 @@ export function layoutBlocks(input: BlockInput): BlockLayout {
     shelf = Math.max(shelf, b.h);
   }
   return { blocks, cells, blockOf };
+  }
 }

@@ -531,10 +531,12 @@ function authorKeysOf(docs: readonly ReviewDoc[]): Map<string, Set<string>> {
     for (const a of d.authors ?? []) {
       const comma = a.indexOf(',');
       const words = a.trim().split(/\s+/);
-      const surname = comma >= 0 ? a.slice(0, comma) : (words.at(-1) ?? '');
-      const given = comma >= 0 ? a.slice(comma + 1) : words.slice(0, -1).join(' ');
+      // "Surname I. J." (initials after the surname, as many metadata sources write it): the surname comes first (D-509).
+      const initialsLast = comma < 0 && words.length >= 2 && words.slice(1).every((w) => /^(\p{L}\.?)(-?\p{L}\.?){0,2}$/u.test(w) && (w.includes('.') || /^\p{Lu}{1,2}$/u.test(w)));
+      const surname = comma >= 0 ? a.slice(0, comma) : initialsLast ? (words[0] ?? '') : (words.at(-1) ?? '');
+      const given = comma >= 0 ? a.slice(comma + 1) : initialsLast ? words.slice(1).join(' ') : words.slice(0, -1).join(' ');
       const s = tokensOf(surname).join('');
-      const initials = tokensOf(given).map((t) => t.charAt(0));
+      const initials = tokensOf(given.replace(/-/g, ' ')).map((t) => t.charAt(0));
       if (s.length < 2 || initials.length === 0) continue;
       keys.add(`${s} ${initials[0]}`);
       keys.add(`${s} ${initials.join('')}`);
@@ -546,10 +548,19 @@ function authorKeysOf(docs: readonly ReviewDoc[]): Map<string, Set<string>> {
 
 /** The label of a tag that spells an author ("surname_j", "j surname") when most documents carrying it list that author (D-508). */
 function authorTag(ix: Index, n: ReviewNode, keys: ReadonlyMap<string, ReadonlySet<string>>): string | null {
+  // A surname (one or more words, "mendes-santos") with its initials before or after it ("cao_l_w", "j_doe") (D-509).
   const t = tokensOf(n.label);
-  if (keys.size === 0 || t.length !== 2) return null;
-  const [first, second] = t as [string, string];
-  const cand = first.length <= 2 && second.length > 2 ? `${second} ${first}` : second.length <= 2 && first.length > 2 ? `${first} ${second}` : null;
+  if (keys.size === 0 || t.length < 2 || t.length > 5 || t.some((x) => /\d/.test(x))) return null;
+  const isInit = (x: string): boolean => x.length === 1;
+  let cut = 0;
+  while (cut < t.length && isInit(t[cut] as string)) cut++;
+  let end = t.length;
+  while (end > cut && isInit(t[end - 1] as string)) end--;
+  const lead = t.slice(0, cut);
+  const trail = t.slice(end);
+  const name = t.slice(cut, end);
+  const inits = lead.length > 0 && trail.length === 0 ? lead : trail.length > 0 && lead.length === 0 ? trail : null;
+  const cand = inits && name.length > 0 && name.every((x) => !isInit(x)) ? `${name.join('')} ${inits.join('')}` : null;
   const carrying = [...(ix.docsOf.get(n.id) ?? [])];
   if (cand === null || carrying.length === 0) return null;
   const hit = carrying.filter((i) => keys.get(ix.docIds[i] as string)?.has(cand)).length;

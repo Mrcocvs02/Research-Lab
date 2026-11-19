@@ -10,6 +10,7 @@ import { Popover } from '../../components/Popover';
 import { useAiUi } from '../../lib/aiUi';
 import { useCitationJob } from '../../lib/citationJobs';
 import { useNotify } from '../../lib/notify';
+import { useReader } from '../../lib/reader';
 import { rl } from '../../lib/rl';
 import type { DocRow } from './useDocumentList';
 
@@ -36,6 +37,7 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
   const { openExport, setChatOpen } = useAiUi();
   const citationJob = useCitationJob();
   const { info, reportError } = useNotify();
+  const { openReader } = useReader();
   const tagAnchor = useRef<HTMLSpanElement>(null);
   const claudeAnchor = useRef<HTMLSpanElement>(null);
   const moreAnchor = useRef<HTMLSpanElement>(null);
@@ -54,6 +56,11 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
     },
   ];
   const tooMany = ids.length > OPEN_MANY_MAX;
+  // "Read side by side" (feature 3): exactly two documents, otherwise disabled with the reason.
+  const side =
+    ids.length === 2
+      ? { id: 'side', testId: 'selection-side-by-side', label: t('library.selSideBySide'), onSelect: () => openReader(ids[0]!, undefined, { beside: ids[1]! }) }
+      : { id: 'side', testId: 'selection-side-by-side', label: t('library.selSideBySide'), disabled: true as const, disabledReason: t('library.selSideReason'), onSelect: () => {} };
   const more: MenuGroups = [
     {
       id: 'more',
@@ -61,6 +68,7 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
         citationJob.busy
           ? { id: 'citations', label: t('citations.bulk'), disabled: true, disabledReason: t('citations.alreadyRunning'), onSelect: () => {} }
           : { id: 'citations', label: t('citations.bulk'), onSelect: () => void citationJob.start(ids) },
+        side,
         { id: 'export', label: t('secondBrain.button'), onSelect: () => openExport({ docIds: ids }) },
         {
           id: 'bibtex',

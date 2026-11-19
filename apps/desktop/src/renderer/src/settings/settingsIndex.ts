@@ -70,6 +70,7 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   e('claudeExe', 'advanced', 'claude', ['ai.claudeCodePath'], 'claude'),
   e('claudeModels', 'advanced', 'claude', ['ai.models', 'ai.models.prices'], 'claude'),
   e('batchConfirm', 'advanced', 'claude', ['ai.usageCap.confirmBatchAboveUsd'], 'claude'),
+  e('experimental', 'advanced', 'experimental', [], 'experimental'),
   e('mcpEnable', 'advanced', 'mcp', ['mcp.enabled'], 'mcp'),
   e('mcpWrite', 'advanced', 'mcp', ['mcp.writeEnabled'], 'mcp'),
   e('mcpPort', 'advanced', 'mcp', ['mcp.port'], 'mcp'),
@@ -87,7 +88,7 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
 ];
 
 /** 6.2 rows with no control by design (internal or environment): they are not in the index. */
-export const HIDDEN_ROWS = ['firstRunDone', 'RL_* variables', 'rl.libraryView', 'rl.libraryTab', 'rl.chatOpen', 'rl.readerSide', 'rl.paletteRecent', 'rl.detailOpen', 'rl.readerTool'] as const;
+export const HIDDEN_ROWS = ['firstRunDone', 'RL_* variables', 'rl.libraryView', 'rl.libraryTab', 'rl.chatOpen', 'rl.readerSide', 'rl.paletteRecent', 'rl.detailOpen', 'rl.readerTool', 'rl.experimental', 'rl.readerGuide', 'rl.guideKept.*'] as const;
 
 /** 6.2 rows whose controls belong to a later task: none left (the PDF annotations group of the library section, G4a). */
 export const PENDING_ROWS: readonly string[] = [];

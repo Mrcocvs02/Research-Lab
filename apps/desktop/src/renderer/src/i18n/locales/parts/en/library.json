@@ -56,5 +56,7 @@
     "copiedBib": "BibTeX references copied to the clipboard ({{count}}).",
     "facetResources": "Resources",
     "facetResourcesHint": "Show resources (code, data, web pages, notebooks, folders) instead of documents"
-  }
+  },
+  "selSideBySide": "Read side by side",
+  "selSideReason": "Select 2 documents"
 }

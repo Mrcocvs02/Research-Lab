@@ -287,5 +287,49 @@
       "menu": "Filtra per significato"
     },
     "listCrop": "Ritaglio, pagina {{page}}"
+  },
+  "unsplit": "Chiudi l'affiancamento",
+  "split": {
+    "narrow": "Finestra stretta: i due paper si alternano (Ctrl+Tab).",
+    "tabs": "I due paper",
+    "divider": "Divisore tra i due paper",
+    "swap": "Scambia i due paper",
+    "link": "Scorrimento legato",
+    "panelOff": "Il pannello delle note è chiuso con due paper aperti",
+    "pickTitle": "Affianca un altro paper",
+    "pickSearch": "Cerca un paper per titolo, autore o testo",
+    "pickNone": "Nessun paper che il lettore possa aprire."
+  },
+  "cite": {
+    "label": "Riferimento",
+    "inLibrary": "in libreria",
+    "open": "Apri",
+    "later": "Leggi dopo",
+    "import": "Importa",
+    "added": "Aggiunto alla libreria.",
+    "skipped": "Era già in libreria.",
+    "textOnly": "Si conosce solo il testo della bibliografia."
+  },
+  "guide": {
+    "title": "Guida ✦",
+    "off": "Spegni la guida",
+    "notPrepared": "Guida ✦ non ancora preparata",
+    "prepare": "Prepara (≈ {{tokens}} token)",
+    "working": "Guida ✦: in preparazione…",
+    "failed": "Guida ✦: non si è potuta leggere.",
+    "disabled": "Guida ✦: la cartella di questo paper non è abilitata all’invio del testo.",
+    "none": "Guida ✦: nessun passaggio sicuro.",
+    "markLabel": "Passaggio guida ✦: {{kind}}",
+    "kinds": {
+      "contribution": "contributo",
+      "method": "metodo",
+      "result": "risultato",
+      "limit": "limite"
+    },
+    "page": "p. {{page}}",
+    "keep": "Tieni",
+    "askTitle": "Preparare la guida?",
+    "askBody": "Il testo di questo paper (≈ {{tokens}} token) viene inviato una sola volta a Claude, il modello piccolo, per scegliere i passaggi da leggere per primi. Non si invia altro.",
+    "go": "Prepara"
   }
 }

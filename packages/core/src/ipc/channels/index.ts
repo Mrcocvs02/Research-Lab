@@ -27,6 +27,7 @@ import { notesChannels } from './notes.js';
 import { projectsChannels } from './projects.js';
 import { readerChannels } from './reader.js';
 import { readerToolsChannels } from './readertools.js';
+import { guidesChannels, refsChannels } from './refs.js';
 import { importIdChannels, resourcesChannels, resumeChannels } from './resources.js';
 import { reviewChannels } from './review.js';
 import { taxonomyChannels } from './taxonomy.js';
@@ -37,7 +38,9 @@ import { indexChannels, searchChannels } from './search.js';
 import { secretsChannels } from './secrets.js';
 import { settingsChannels } from './settings.js';
 
-export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels, citationsChannels, recommendChannels, watchChannels, graphChannels, exploreChannels, exportChannels, mcpChannels, backupChannels, maintenanceChannels, bibChannels, readerToolsChannels, resourcesChannels, importIdChannels, resumeChannels, literatureChannels);
+export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels, citationsChannels, recommendChannels, watchChannels, graphChannels, exploreChannels, exportChannels, mcpChannels, backupChannels, maintenanceChannels, bibChannels, readerToolsChannels, resourcesChannels, importIdChannels, resumeChannels, literatureChannels,
+  refsChannels,
+  guidesChannels);
 
 export const events = mergeRegistries(aiEvents, annotationsEvents, appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, watchEvents, graphEvents, exportEvents, mcpEvents, backupEvents);
 
@@ -73,3 +76,4 @@ export { mcpLogItemSchema, mcpStatusSchema, mcpToolNameSchema, MCP_LIMITS, MCP_T
 export { backupInfoSchema, backupJobStatusSchema, backupManifestSchema, backupPreviewSchema, backupResultSchema, backupSettingsSchema, BACKUP_FORMAT_VERSION, BACKUP_LIMITS, type BackupInfo, type BackupJobStatus, type BackupManifest, type BackupSettings } from './backup.js';
 export { maintenanceTargetSchema, MAINTENANCE_TARGETS } from './maintenance.js';
 export { RESOURCE_KINDS, type ResourceKind, type ResourceView, type ImportIdItem, type ImportIdAddResult, type ImportIdState, type ResumeInfo } from './resources.js';
+export { REFS_LIMITS, type GuidePassage, type RefEntry } from './refs.js';

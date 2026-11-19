@@ -1,0 +1,108 @@
+/* Two papers side by side (feature 3): the focus side has a 2 px accent border; below 1280 px the panes alternate as tabs. */
+.split {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  position: relative;
+}
+.split__pane {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  border: 2px solid transparent;
+  box-sizing: border-box;
+}
+.split__pane[data-focus] {
+  border-color: var(--accent);
+}
+.split__pane .reader {
+  flex: 1 1 auto;
+}
+.split[data-narrow] {
+  flex-direction: column;
+}
+.split[data-narrow] .split__pane {
+  flex: 1 1 0;
+  border-color: transparent;
+}
+.split[data-narrow] .split__pane[data-hidden] {
+  position: absolute;
+  inset: 0;
+  top: 36px;
+  visibility: hidden;
+  pointer-events: none;
+}
+.split__tabs {
+  flex: 0 0 36px;
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  padding: 0 var(--sp-3);
+  border-bottom: 1px solid var(--border);
+}
+.split__tabs .rl-tab {
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.split__divider {
+  flex: 0 0 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  background: var(--surface-2);
+  border-inline: 1px solid var(--border);
+  cursor: col-resize;
+  touch-action: none;
+}
+.split__divider:focus-visible {
+  outline: 2px solid var(--focus);
+}
+.split__btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.split__btn[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.split__btn:hover {
+  background: var(--surface-3);
+}
+.split-picker {
+  display: grid;
+  gap: var(--sp-3);
+  padding-top: var(--sp-3);
+  min-width: 360px;
+}
+.split-picker__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow: auto;
+}
+.split-picker__list li {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.split-picker__list li.is-on {
+  background: var(--accent-soft);
+}

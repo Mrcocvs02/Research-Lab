@@ -26,6 +26,8 @@ const Settings = lazyView(() => import('./settings/Settings').then((m) => ({ def
 const ProjectsView = lazyView(() => import('./views/projects/ProjectsView').then((m) => ({ default: m.ProjectsView })), ['doc-projects-reader', 'projects']);
 // The reader (and pdf.js with it) loads the first time a document is opened in it.
 const ReaderView = lazyView(() => import('./views/reader/ReaderView').then((m) => ({ default: m.ReaderView })), ['doc-projects-reader', 'doc-reader', 'reader']);
+// Two papers side by side (feature 3) load their own chunk the first time they are asked for.
+const SplitReader = lazyView(() => import('./views/reader/SplitReader').then((m) => ({ default: m.SplitReader })), ['doc-projects-reader', 'doc-reader', 'reader']);
 const InboxView = lazyView(() => import('./views/inbox/InboxView').then((m) => ({ default: m.InboxView })), ['inbox']);
 const DiscoverView = lazyView(() => import('./views/discover/DiscoverView').then((m) => ({ default: m.DiscoverView })), ['discover']);
 const NetworkView = lazyView(() => import('./views/network/NetworkView').then((m) => ({ default: m.NetworkView })), ['network']);
@@ -210,7 +212,11 @@ function Root() {
         </Lazy>
         {readerOpen && reader.target && (
           <Lazy>
-            <ReaderView key={reader.target.docId} target={reader.target} onClose={() => navigate({ view: 'library' })} />
+            {reader.target.beside ? (
+              <SplitReader key={`${reader.target.docId}+${reader.target.beside}`} target={reader.target} onClose={() => navigate({ view: 'library' })} />
+            ) : (
+              <ReaderView key={reader.target.docId} target={reader.target} onClose={() => navigate({ view: 'library' })} />
+            )}
           </Lazy>
         )}
       </Shell>

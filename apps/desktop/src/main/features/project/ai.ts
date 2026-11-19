@@ -1,4 +1,4 @@
-import { aiVisible, approxTokens } from '@rl/ai';
+import { aiVisible, approxTokens, folderOf } from '@rl/ai';
 import { AppError, documentIdSchema, type DocumentId, type DocumentRecord, type Outline } from '@rl/core';
 import { callStructured } from '../../analysis/call.js';
 import { availability, loadCtx, monthUsage, type AiCtx } from '../../ai/service.js';
@@ -7,7 +7,7 @@ import type { MainServices } from '../../ipc/handlers/services.js';
 import { costDecision } from '../ai/batch.js';
 import { ctxOf } from './index.js';
 import { CITE_OUT_TOKENS, CITE_VERSION, citePrompt, citeSchema, citeSystem, linkMarkers, REPORT_CONTEXT_CHARS, REPORT_OUT_TOKENS, REPORT_VERSION, reportPrompt, reportSchema, reportSystem } from './prompt.js';
-import { listClaims, readConsent, readOutline, writeReport } from './store.js';
+import { listClaims, readConsent, readOutline } from './store.js';
 
 /**
  * The two things of the Schema tab that talk to Claude (X7): the report of a period (D-400) and the citation suggestions for
@@ -43,7 +43,17 @@ async function costs(ctx: AiCtx, model: string, chars: number, outTokens: number
   return { model, approxTokens: tokens, estimatedUsd: est?.usd ?? null, needsDialog: true, overDailyCap: d.overDailyCap };
 }
 
-async function send<T>(s: MainServices, ctx: AiCtx, input: { purpose: string; model: string; system: string; prompt: string; schema: import('zod').ZodType<T>; docIds: string[] }, tokens: { overDailyCap: boolean }): Promise<T> {
+/** The folders of the documents that leave, so the log and the first-send check see them. */
+async function foldersOf(ctx: AiCtx, docIds: string[]): Promise<string[]> {
+  const out = new Set<string>();
+  for (const id of docIds) {
+    const rec = await ctx.rt.store.documents.get(id as DocumentId);
+    if (rec) out.add(folderOf(rec.path));
+  }
+  return [...out];
+}
+
+async function send<T>(s: MainServices, ctx: AiCtx, input: { purpose: string; model: string; system: string; prompt: string; schema: import('zod').ZodType<T>; docIds: string[] }, tokens: { overDailyCap: boolean }, confirmed: boolean): Promise<T> {
   const { rt, cfg } = ctx;
   if (tokens.overDailyCap) throw new AppError('AI_BUDGET_EXCEEDED', 'The daily token cap is reached', { reason: 'daily-cap' });
   const cap = cfg.ai.usageCap.monthlyUsd;
@@ -51,7 +61,7 @@ async function send<T>(s: MainServices, ctx: AiCtx, input: { purpose: string; mo
   const av = await availability(s, ctx.provider);
   if (!av.available || !ctx.provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
   const deviceId = (await s.settings.get()).deviceId;
-  const { value } = await callStructured({ s, ctx, provider: ctx.provider, signal: new AbortController().signal, confirmed: true, deviceId, addUsd: () => {} }, { ...input, reasoning: cfg.ai.defaultReasoning, folders: [] });
+  const { value } = await callStructured({ s, ctx, provider: ctx.provider, signal: new AbortController().signal, confirmed, deviceId, addUsd: () => {} }, { ...input, reasoning: cfg.ai.defaultReasoning, folders: await foldersOf(ctx, input.docIds) });
   return value;
 }
 
@@ -142,11 +152,10 @@ export async function reportRun(s: MainServices, req: Req & { confirmed: boolean
   const system = reportSystem(ctx.cfg.language, req.audience);
   const prompt = reportPrompt(c.text);
   const k = await costs(ctx, model, system.length + prompt.length, REPORT_OUT_TOKENS);
-  const raw = await send(s, ctx, { purpose: 'project-report', model, system, prompt, schema: reportSchema, docIds: c.docIds }, k);
+  const raw = await send(s, ctx, { purpose: 'project-report', model, system, prompt, schema: reportSchema, docIds: c.docIds }, k, req.confirmed);
   const date = new Date().toISOString().slice(0, 10);
   const body = `${linkMarkers(raw.markdown.trim().slice(0, 30_000), c.refs)}\n\n<!-- ✦ ${REPORT_VERSION} · ${model} -->`;
-  await writeReport(dataDir, req.projectId, date, body);
-  s.emit('library:changed', { kind: 'projects', ids: [req.projectId] });
+  // Nothing is written here: the user's confirmation in the dialog (`project:reportSave`) writes the file (I1).
   return { date, body };
 }
 
@@ -211,7 +220,7 @@ export async function citeRun(s: MainServices, req: { projectId: string; text: s
   const system = citeSystem(ctx.cfg.language);
   const prompt = citePrompt(req.text, cands);
   const k = await costs(ctx, model, system.length + prompt.length, CITE_OUT_TOKENS);
-  const raw = await send(s, ctx, { purpose: 'project-cite', model, system, prompt, schema: citeSchema, docIds: cands.map((c) => c.docId) }, k);
+  const raw = await send(s, ctx, { purpose: 'project-cite', model, system, prompt, schema: citeSchema, docIds: cands.map((c) => c.docId) }, k, req.confirmed);
   const seen = new Set<string>();
   const items = raw.ranking.flatMap((r) => {
     const c = cands.find((x) => x.id === r.id);

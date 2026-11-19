@@ -65,6 +65,8 @@ interface Plan {
   readyCount: number;
   notEnabled: number;
   blocks: Block[];
+  /** Papers without extractable text (scans), by column: nothing is sent for them, the cell is "not found" (I3). */
+  noText: Map<string, Paper[]>;
   total: number;
 }
 
@@ -90,20 +92,26 @@ async function plan(s: MainServices, ctx: AiCtx, req: { docIds: string[]; column
   const { fromNotes, ready: readyCount, notEnabled } = split.count;
   const lang = ctx.cfg.language;
   const host = createToolsHost({ s, rt: ctx.rt, provider: ctx.cfg.ai.provider, model, confirmed: false });
-  const texts = new Map<string, { text: string; last: number }>();
+  const texts = new Map<string, { text: string; last: number; empty: boolean }>();
   const textOf = async (p: Paper) => {
     let t = texts.get(p.rec.id);
     if (!t) {
       const pages = await host.pageTexts(p.rec, Array.from({ length: 60 }, (_, i) => i + 1));
       const each = Math.max(300, Math.floor(COMPARE_PAPER_CHARS / Math.max(1, pages.length)));
-      t = { text: pages.map((x) => `[page ${x.page}]\n${x.text.trim().slice(0, each)}`).join('\n\n').slice(0, COMPARE_PAPER_CHARS * 2), last: pages.reduce((m, x) => Math.max(m, x.page), 0) };
+      t = { text: pages.map((x) => `[page ${x.page}]\n${x.text.trim().slice(0, each)}`).join('\n\n').slice(0, COMPARE_PAPER_CHARS * 2), last: pages.reduce((m, x) => Math.max(m, x.page), 0), empty: pages.every((x) => x.text.trim() === '') };
       texts.set(p.rec.id, t);
     }
     return t;
   };
   const blocks: Block[] = [];
+  const noText = new Map<string, Paper[]>();
   for (const col of req.columns) {
-    for (const group of chunk(missing.get(col.id) ?? [], COMPARE_BLOCK)) {
+    const withText: Paper[] = [];
+    for (const p of missing.get(col.id) ?? []) {
+      if ((await textOf(p)).empty) noText.set(col.id, [...(noText.get(col.id) ?? []), p]);
+      else withText.push(p);
+    }
+    for (const group of chunk(withText, COMPARE_BLOCK)) {
       const items: Array<{ key: string; title: string; text: string }> = [];
       const maxPage = new Map<string, number>();
       const keys = new Map<string, string>();
@@ -115,12 +123,12 @@ async function plan(s: MainServices, ctx: AiCtx, req: { docIds: string[]; column
       }
       const system = compareSystem(lang, col);
       const prompt = comparePrompt(col.name, items);
-      const hash = cacheHash([COMPARE_VERSION, model, lang, col.name, col.key, items.map((x) => x.text)]);
+      const hash = cacheHash([COMPARE_VERSION, model, lang, col.name, col.key, group.map((x) => x.rec.id), items.map((x) => x.text)]);
       const cacheFile = path.join(s.localDataDir, 'cache', 'compare', itemIdSchema.parse(ctx.rt.libraryId), `${hash}.json`);
       blocks.push({ column: col, papers: group, system, prompt, maxPage, keyOf: keys, cacheFile, cached: await readCache(cacheFile), approx: approxTokens(system.length + prompt.length) });
     }
   }
-  return { papers, ready, fromNotes, readyCount, notEnabled, blocks, total: papers.length * req.columns.length };
+  return { papers, ready, fromNotes, readyCount, notEnabled, blocks, noText, total: papers.length * req.columns.length };
 }
 
 async function readCache(file: string): Promise<Block['cached']> {
@@ -139,9 +147,13 @@ async function readCache(file: string): Promise<Block['cached']> {
 
 export async function estimateCompare(s: MainServices, req: { docIds: string[]; columns: CompareColumn[]; existing?: CompareRow[] | undefined; model?: string | undefined }) {
   const ctx = await loadCtx(s);
+  const model = cheapModel(ctx.cfg.ai.models, ctx.cfg.ai.defaultModel, req.model);
+  return estimateFrom(ctx, await plan(s, ctx, req, model), model);
+}
+
+/** The estimate of a plan already made: a run reuses its own plan instead of extracting the texts twice (M4). */
+async function estimateFrom(ctx: AiCtx, p: Plan, model: string) {
   const { rt, cfg } = ctx;
-  const model = cheapModel(cfg.ai.models, cfg.ai.defaultModel, req.model);
-  const p = await plan(s, ctx, req, model);
   const toSend = p.blocks.filter((b) => b.cached === null);
   const approx = toSend.reduce((n, b) => n + b.approx, 0);
   const cellsToWrite = p.blocks.reduce((n, b) => n + b.papers.length, 0);
@@ -172,10 +184,11 @@ export async function estimateCompare(s: MainServices, req: { docIds: string[]; 
 }
 
 export async function runCompare(s: MainServices, req: { token: string; docIds: string[]; columns: CompareColumn[]; existing?: CompareRow[] | undefined; model?: string | undefined; confirmed: boolean }) {
-  const est = await estimateCompare(s, req);
   const ctx = await loadCtx(s);
   const { rt, cfg } = ctx;
-  const p = await plan(s, ctx, req, est.model);
+  const model = cheapModel(cfg.ai.models, cfg.ai.defaultModel, req.model);
+  const p = await plan(s, ctx, req, model);
+  const est = await estimateFrom(ctx, p, model);
   const rows: CompareRow[] = p.papers.map((x) => ({ docId: x.rec.id, label: x.label, cells: p.ready.get(x.rec.id) ?? {} }));
   const byId = new Map(rows.map((r) => [r.docId, r]));
   const toSend = p.blocks.filter((b) => b.cached === null);
@@ -198,7 +211,7 @@ export async function runCompare(s: MainServices, req: { token: string; docIds: 
       if (!answer) {
         if (ctl.signal.aborted) throw new AppError('CANCELLED', 'Cancelled');
         const { value } = await callStructured(
-          { s, ctx, provider: ctx.provider!, signal: ctl.signal, confirmed: true, deviceId, addUsd: () => {} },
+          { s, ctx, provider: ctx.provider!, signal: ctl.signal, confirmed: req.confirmed, deviceId, addUsd: () => {} },
           { purpose: 'compare', model: est.model, reasoning: cfg.ai.defaultReasoning, system: b.system, prompt: b.prompt, schema: compareAnswerSchema, docIds: b.papers.map((x) => x.rec.id), folders: [...new Set(b.papers.map((x) => x.folder))] },
         );
         const clean = cleanCompare(value, b.maxPage);
@@ -214,6 +227,7 @@ export async function runCompare(s: MainServices, req: { token: string; docIds: 
         if (cell.source === 'claude') written++;
       }
     }
+    for (const [colId, list] of p.noText) for (const x of list) byId.get(x.rec.id)!.cells[colId] = { text: '', pages: [], source: 'none', ai: false, why: 'not-found' };
   } finally {
     if (running.get(req.token) === ctl) running.delete(req.token);
   }

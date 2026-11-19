@@ -357,3 +357,12 @@ describe('jobs: failures, cost, stale runtime', () => {
     expect(calls).toBe(1);
   });
 });
+
+describe('analysisCallsOf (I4)', () => {
+  it('counts the note calls with the stronger model plus the analysis call, or only the latter with a note', async () => {
+    const { analysisCallsOf } = await import('./jobs.js');
+    expect(analysisCallsOf({ chars: 90_000, calls: 5 }, null, 1000)).toMatchObject({ strongChars: 90_000, strongCalls: 5, chosenCalls: 1 });
+    expect(analysisCallsOf(null, 4000, 1000)).toEqual({ strongChars: 0, strongCalls: 0, chosenChars: 5000, chosenCalls: 1 });
+    expect(analysisCallsOf(null, null, 1000).chosenCalls).toBe(0);
+  });
+});

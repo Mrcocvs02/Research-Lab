@@ -122,15 +122,19 @@ export async function runTaxonomyJob(s: MainServices, req: { mode: 'build' | 'ex
     for (let i = 0; i < items.length && calls < BATCH_CALLS_MAX; i += per) {
       if (t.controller.signal.aborted) throw new AppError('CANCELLED', 'Cancelled');
       const tax = await rt.store.readTaxonomy();
-      const live = tax.nodes.filter((n) => n.status !== 'deprecated');
-      const mode = req.mode === 'build' && live.length === 0 ? 'build' : 'extend';
-      const batch = all.slice(i, i + per);
-      const { value } = await callStructured(runner, {
+      const nodesLive = tax.nodes.filter((n) => n.status !== 'deprecated');
+      const mode = req.mode === 'build' && nodesLive.length === 0 ? 'build' : 'extend';
+      // The folder gate and the configuration are read again for each batch: a folder disabled during a long build sends nothing more (M5).
+      const live = await rt.store.readConfig();
+      const idx = all.slice(i, i + per).map((d, k) => [d, i + k] as const).filter(([d]) => aiVisible(d.path, live));
+      if (idx.length === 0) continue;
+      const batch = idx.map(([d]) => d);
+      const { value } = await callStructured({ ...runner, ctx: { ...ctx, cfg: live } }, {
         purpose: 'job:taxonomy',
         model,
         reasoning: req.reasoning,
-        system: taxonomySystem(mode, cfg.language),
-        prompt: taxonomyPrompt(items.slice(i, i + per), mode === 'extend' ? existingTaxonomyBlock(live.slice(0, 1500).map(nodeView)) : null),
+        system: taxonomySystem(mode, live.language),
+        prompt: taxonomyPrompt(idx.map(([, k]) => items[k]!), mode === 'extend' ? existingTaxonomyBlock(nodesLive.slice(0, 1500).map(nodeView)) : null),
         schema: taxonomySchema,
         docIds: batch.map((d) => d.id),
         folders: [...new Set(batch.map((d) => folderOf(d.path)))],

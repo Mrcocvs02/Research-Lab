@@ -21,8 +21,19 @@ export async function readNote(dataDir: string, docId: string): Promise<string |
   if (!f) return null;
   const raw = await readFile(f, 'utf8').catch(() => null);
   if (raw === null) return null;
+  // The poor note made from the abstract (no model, folder not enabled) is not a summary of the document: the analysis does not derive from it (I2).
+  if (/^abstractOnly:\s*true\s*$/m.test(FM.exec(raw)?.[1] ?? '')) return null;
   const body = raw.replace(FM, '').trim();
   return body.length > 0 ? body : null;
+}
+
+/** True when the user approved the note of this document: such a note is never replaced by a new generation (I2). */
+export async function isApprovedNote(dataDir: string, docId: string): Promise<boolean> {
+  const f = fileOf(dataDir, docId);
+  if (!f) return false;
+  const raw = await readFile(f, 'utf8').catch(() => null);
+  const head = raw === null ? '' : (FM.exec(raw)?.[1] ?? '');
+  return /^review:\s*approved\s*$/m.test(head) && !/^abstractOnly:\s*true\s*$/m.test(head);
 }
 
 /** Writes `literature/<docId>.md` in the data folder (atomic). The note is AI output: `ai: true`, `review: proposed`. */

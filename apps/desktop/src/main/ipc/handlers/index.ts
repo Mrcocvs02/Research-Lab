@@ -28,6 +28,7 @@ import { discoverHandlers } from './discover-handlers.js';
 import { projectSchemaHandlers } from './project-handlers.js';
 import { cropsHandlers, explainHandlers, linksHandlers, literatureHandlers, templatesHandlers } from './readertools-handlers.js';
 import { guidesHandlers, refsHandlers } from './refs-handlers.js';
+import { citectxHandlers, compareHandlers, groupsHandlers } from './synthesis-handlers.js';
 
 export type { MainServices } from './services.js';
 
@@ -79,5 +80,8 @@ export function buildHandlers(s: MainServices): HandlerMap<Channels> {
     ...discoverHandlers(s),
     ...refsHandlers(s),
     ...guidesHandlers(s),
+    ...compareHandlers(s),
+    ...groupsHandlers(s),
+    ...citectxHandlers(s),
   };
 }

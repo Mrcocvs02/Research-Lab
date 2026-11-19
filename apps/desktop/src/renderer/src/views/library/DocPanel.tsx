@@ -31,7 +31,7 @@ import type { DocRow } from './useDocumentList';
 import { useTaxonomy } from './useTaxonomy';
 import './library.css';
 
-const CitationsPanel = lazyView(() => import('../citations/CitationsPanel').then((m) => ({ default: m.CitationsPanel })), ['citations']);
+const CitationsPanel = lazyView(() => import('./docpanel/CitationsSection').then((m) => ({ default: m.CitationsSection })), ['citations']);
 const SimilarPanel = lazyView(() => import('../network/SimilarPanel').then((m) => ({ default: m.SimilarPanel })), ['network']);
 const DocResources = lazyView(() => import('../resources/DocResources'), ['resources']);
 const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);

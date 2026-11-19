@@ -4,7 +4,7 @@ import { Button } from '../../components/Button';
 import { IconButton } from '../../components/IconButton';
 import { IconChevronDown, IconMore } from '../../components/icons';
 import { IconClaude } from '../../components/icons-shell';
-import { Lazy } from '../../components/Lazy';
+import { Lazy, lazyView } from '../../components/Lazy';
 import { Menu, type MenuGroups } from '../../components/Menu';
 import { Popover } from '../../components/Popover';
 import { useAiUi } from '../../lib/aiUi';
@@ -14,8 +14,15 @@ import { useNotify } from '../../lib/notify';
 import { useReader } from '../../lib/reader';
 import { rl } from '../../lib/rl';
 import { bridgeItem } from './selection/actions/bridge';
+import { compareItem } from './selection/actions/compare';
 import { extendItem } from './selection/actions/extend';
+import { groupsItem } from './selection/actions/groups';
+import { timelineItem } from './selection/actions/timeline';
 import type { DocRow } from './useDocumentList';
+
+// The comparison table and the group overview load their own chunk (and strings) the first time they are asked for.
+const CompareView = lazyView(() => import('../compare/CompareView').then((m) => ({ default: m.CompareView })), ['compare']);
+const GroupsDialog = lazyView(() => import('../groups/GroupsDialog').then((m) => ({ default: m.GroupsDialog })), ['groups']);
 
 /** Several default-program windows at once are too many: the menu entry waits for a smaller selection. */
 export const OPEN_MANY_MAX = 5;
@@ -48,6 +55,8 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
   const [tagOpen, setTagOpen] = useState(false);
   const [claudeOpen, setClaudeOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [groupsOpen, setGroupsOpen] = useState(false);
 
   const claude: MenuGroups = [
     {
@@ -55,6 +64,8 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
       items: [
         { id: 'propose', label: t('jobs.propose'), icon: <IconClaude size={16} />, onSelect: onPropose },
         { id: 'literature', label: t('library.selLiterature'), icon: <IconClaude size={16} />, testId: 'selection-literature', onSelect: onLiterature },
+        { ...compareItem(t, ids, () => setCompareOpen(true)), icon: <IconClaude size={16} /> },
+        { ...groupsItem(t, ids, () => setGroupsOpen(true)), icon: <IconClaude size={16} /> },
         { id: 'ask', label: t('library.askClaude'), icon: <IconClaude size={16} />, onSelect: () => setChatOpen(true) },
       ],
     },
@@ -72,9 +83,6 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
         citationJob.busy
           ? { id: 'citations', label: t('citations.bulk'), disabled: true, disabledReason: t('citations.alreadyRunning'), onSelect: () => {} }
           : { id: 'citations', label: t('citations.bulk'), onSelect: () => void citationJob.start(ids) },
-        extendItem(t, ids, () => navigate({ view: 'discover' })),
-        bridgeItem(t, ids, () => navigate({ view: 'discover' })),
-        side,
         { id: 'export', label: t('secondBrain.button'), onSelect: () => openExport({ docIds: ids }) },
         {
           id: 'bibtex',
@@ -97,6 +105,8 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
             },
       ],
     },
+    { id: 'read', items: [side, timelineItem(t, ids, () => navigate({ view: 'map' }))] },
+    { id: 'discover', items: [extendItem(t, ids, () => navigate({ view: 'discover' })), bridgeItem(t, ids, () => navigate({ view: 'discover' }))] },
   ];
 
   return (
@@ -133,6 +143,16 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
       </IconButton>
       </span>
       <Menu anchor={moreAnchor} open={moreOpen} onClose={() => setMoreOpen(false)} groups={more} label={t('library.rowMore')} width={280} />
+      {compareOpen && (
+        <Lazy>
+          <CompareView docIds={ids} onClose={() => setCompareOpen(false)} />
+        </Lazy>
+      )}
+      {groupsOpen && (
+        <Lazy>
+          <GroupsDialog docIds={ids} onClose={() => setGroupsOpen(false)} />
+        </Lazy>
+      )}
       <Button size="sm" variant="ghost" onClick={onClear} data-testid="selection-clear">
         {t('docs.clearSelection')}
       </Button>

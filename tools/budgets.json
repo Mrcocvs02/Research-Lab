@@ -16,7 +16,10 @@
       "SchemaTab": 16,
       "ReportDialog": 16,
       "CiteDialog": 16,
-      "UseAsEvidence": 16
+      "UseAsEvidence": 16,
+      "CompareView": 16,
+      "GroupsDialog": 16,
+      "CitationsSection": 16
     }
   },
   "main": {

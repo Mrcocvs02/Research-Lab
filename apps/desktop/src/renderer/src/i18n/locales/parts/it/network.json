@@ -286,6 +286,11 @@
       "find": "Trova un ponte…",
       "pickSecond": "Fai clic sul secondo documento per un ponte con «{{title}}»",
       "note": "Ponte: {{a}} ⇢ lavoro ⇢ {{b}}"
+    },
+    "timeline": {
+      "byYear": "Disponi per anno",
+      "label": "Per anno · Esc per uscire",
+      "noYear": "Senza anno"
     }
   }
 }

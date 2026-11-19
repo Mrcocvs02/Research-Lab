@@ -13,6 +13,12 @@
     "citedBy": "Citato da ({{count}} elencati)",
     "emptyRefs": "Nessun riferimento salvato.",
     "emptyCitedBy": "Nessuna opera citante salvata.",
-    "notFound": "Nessuna fonte online conosce questa opera, oppure manca un DOI, un id arXiv o un titolo utilizzabile per cercarla."
+    "notFound": "Nessuna fonte online conosce questa opera, oppure manca un DOI, un id arXiv o un titolo utilizzabile per cercarla.",
+    "ctx": {
+      "filter": "Con il contesto",
+      "empty": "Nessun lavoro citante in libreria ha una frase da mostrare.",
+      "page": "p. {{page}}",
+      "open": "Apri il lavoro citante a pagina {{page}}"
+    }
   }
 }

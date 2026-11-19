@@ -1,0 +1,23 @@
+{
+  "groups": {
+    "title": "Panoramica dei gruppi di ricerca",
+    "what_one": "Una panoramica di autori, coautori, temi e lavori principali di {{count}} documento.",
+    "what_other": "Una panoramica di autori, coautori, temi e lavori principali di {{count}} documenti.",
+    "notEnabled_one": "{{count}} documento è in una cartella non abilitata a Claude: compare solo nei dati.",
+    "notEnabled_other": "{{count}} documenti sono in cartelle non abilitate a Claude: compaiono solo nei dati.",
+    "limit": "Il limite del giorno è raggiunto. Riprova più tardi o scrivi solo i dati.",
+    "overview": "Panoramica",
+    "updated": "Aggiornata il {{date}}",
+    "written": "temi scritti da Claude",
+    "notWritten": "temi non scritti",
+    "none": "Ancora nessuna panoramica per questi documenti.",
+    "dataOnly": "Solo i dati",
+    "write": "Scrivi la panoramica ✦",
+    "update": "Aggiorna ✦",
+    "noFolder": "Nessun documento della selezione è in una cartella abilitata a Claude",
+    "sendWhat_one": "Titolo, autori, anno, tag e descrizione di {{count}} documento.",
+    "sendWhat_other": "Titolo, autori, anno, tag e descrizione di {{count}} documenti.",
+    "done": "Panoramica scritta",
+    "doneData": "Panoramica salvata senza i temi"
+  }
+}

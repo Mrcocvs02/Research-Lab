@@ -58,7 +58,12 @@
     "facetResourcesHint": "Mostra le risorse (codice, dati, pagine web, notebook, cartelle) invece dei documenti",
     "selExtend": "Estendi la bibliografia…",
     "selBridge": "Trova un ponte",
-    "selBridgeNeeds": "Seleziona 2 documenti"
+    "selBridgeNeeds": "Seleziona 2 documenti",
+    "selCompare": "Tabella di confronto…",
+    "selCompareNeeds": "Seleziona da 2 a {{max}} documenti",
+    "selGroups": "Panoramica dei gruppi di ricerca…",
+    "selGroupsNeeds": "Seleziona al massimo {{max}} documenti",
+    "selTimeline": "Linea del tempo"
   },
   "selSideBySide": "Leggi affiancati",
   "selSideReason": "Seleziona 2 documenti"

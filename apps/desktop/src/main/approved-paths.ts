@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 /** What the user picked a path for. An approval is valid for that purpose only. */
-export type ApprovalPurpose = 'library-root' | 'legacy-index' | 'export-destination' | 'taxonomy-file' | 'backup-destination' | 'backup-file' | 'bib-source' | 'resource-file' | 'resource-folder';
+export type ApprovalPurpose = 'library-root' | 'legacy-index' | 'export-destination' | 'taxonomy-file' | 'backup-destination' | 'backup-file' | 'bib-source' | 'resource-file' | 'resource-folder' | 'manuscript-file';
 
 export interface ApprovedPathsOptions {
   /** Path semantics to use (default: the running platform). Lets tests cover Windows rules anywhere. */

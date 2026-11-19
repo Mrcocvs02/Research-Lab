@@ -44,6 +44,40 @@ export const reportRequestSchema = z.object({
   model: z.string().min(1).max(100).optional(),
 });
 
+/** Limits of the manuscript of a project (§18.1): sections read from a file or written in the app, and what is assigned to them. */
+export const MANUSCRIPT_LIMITS = { sections: 500, title: 200, assignments: 20000, refs: 200 } as const;
+const sectionIdSchema = z.string().regex(/^[a-z0-9]{1,24}$/);
+/** What can be assigned to a section: a paper, a highlight, a note, a literature note or a claim. */
+export const manuscriptRefSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('doc'), docId: documentIdSchema }),
+  z.object({ kind: z.literal('ann'), docId: documentIdSchema, annId: itemIdSchema, page: z.number().int().positive() }),
+  z.object({ kind: z.literal('note'), docId: documentIdSchema, page: z.number().int().positive().optional() }),
+  z.object({ kind: z.literal('litnote'), docId: documentIdSchema }),
+  z.object({ kind: z.literal('claim'), claimId: itemIdSchema }),
+]);
+export type ManuscriptRef = z.infer<typeof manuscriptRefSchema>;
+const readSchema = z.object({ files: z.number().int().nonnegative(), total: z.number().int().nonnegative() });
+/** `projects/<id>/manuscript.json`: the sections (written here or read from a file) and what is assigned to each. */
+export const manuscriptSchema = z.object({
+  schemaVersion: z.literal(1),
+  source: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('app') }),
+    z.object({ kind: z.literal('file'), name: z.string().max(260), ext: z.enum(['md', 'tex', 'docx']), size: z.number().nonnegative(), mtimeMs: z.number().nonnegative(), headingsHash: z.string().max(64), read: readSchema.optional() }),
+  ]),
+  sections: z.array(z.object({ id: sectionIdSchema, title: z.string().max(MANUSCRIPT_LIMITS.title), level: z.number().int().min(1).max(4), order: z.number().int().nonnegative(), gone: z.literal(true).optional() })).max(MANUSCRIPT_LIMITS.sections),
+  assignments: z.array(z.object({ sectionId: sectionIdSchema, ref: manuscriptRefSchema, origin: z.enum(['user', 'ai']), at: isoDateSchema })).max(MANUSCRIPT_LIMITS.assignments),
+});
+export type Manuscript = z.infer<typeof manuscriptSchema>;
+const manuscriptState = z.object({
+  manuscript: manuscriptSchema.nullable(),
+  /** State of the linked file; null when the sections are written in the app or there is no manuscript. */
+  file: z.object({ state: z.enum(['ok', 'missing', 'unreadable']), name: z.string(), read: readSchema, reason: z.string().optional() }).nullable(),
+  /** Set when the file was read again because it had changed. */
+  changes: z.object({ added: z.number().int().nonnegative(), renamed: z.number().int().nonnegative(), removed: z.number().int().nonnegative() }).optional(),
+  /** The file dialog was closed without a choice. */
+  cancelled: z.boolean().optional(),
+});
+
 const projectId = z.object({ projectId: itemIdSchema });
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const evidenceItemSchema = z.object({
@@ -104,4 +138,21 @@ export const projectSchemaChannels = defineChannels('project', {
   evidenceRun: { request: projectId.extend({ claimId: itemIdSchema, model: z.string().min(1).max(100).optional(), confirmed: z.boolean().default(false) }), response: z.object({ items: z.array(evidenceItemSchema).max(10) }) },
   /** An accepted suggestion: the paper becomes a source of the question in the outline. */
   assignCitation: { request: projectId.extend({ questionId: questionIdSchema, docId: documentIdSchema }), response: z.object({ outline: outlineSchema }) },
+  /** The manuscript of the project; a linked file that changed since the last read is read again here (sections realigned, nothing lost). */
+  manuscript: { request: projectId, response: manuscriptState },
+  /** Writes the sections in the app, links a file (the dialog opens in main; the file is only read) or unlinks the manuscript (deletes `manuscript.json`; the interface confirms first). */
+  setManuscript: {
+    request: projectId.extend({
+      source: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('app'), sections: z.array(z.object({ id: sectionIdSchema.optional(), title: z.string().trim().min(1).max(MANUSCRIPT_LIMITS.title), level: z.number().int().min(1).max(4) })).max(MANUSCRIPT_LIMITS.sections) }),
+        z.object({ kind: z.literal('file'), title: z.string().max(200).optional() }),
+        z.object({ kind: z.literal('none') }),
+      ]),
+    }),
+    response: manuscriptState,
+  },
+  /** Adds (`on`) or removes references to a section. */
+  assign: { request: projectId.extend({ sectionId: sectionIdSchema, refs: z.array(manuscriptRefSchema).min(1).max(MANUSCRIPT_LIMITS.refs), on: z.boolean(), origin: z.enum(['user', 'ai']).default('user') }), response: z.object({ manuscript: manuscriptSchema }) },
+  /** Moves every assignment of a section to another one, or removes them (`to` null); a vanished section left empty goes away. */
+  moveAssignments: { request: projectId.extend({ from: sectionIdSchema, to: sectionIdSchema.nullable() }), response: z.object({ manuscript: manuscriptSchema }) },
 });

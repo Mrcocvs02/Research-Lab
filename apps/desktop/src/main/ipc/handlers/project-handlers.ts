@@ -3,6 +3,7 @@ import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
 
 const feature = () => import('../../features/project/index.js');
+const manuscript = () => import('../../features/manuscript/index.js');
 const ai = () => import('../../features/project/ai.js');
 
 export const projectSchemaHandlers = (s: MainServices): DomainHandlers<'project'> => ({
@@ -15,6 +16,10 @@ export const projectSchemaHandlers = (s: MainServices): DomainHandlers<'project'
   'project:reportSave': async (req) => (await feature()).saveReport(s, req),
   'project:consent': async (req) => (await feature()).setConsent(s, req),
   'project:assignCitation': async (req) => (await feature()).assignCitation(s, req),
+  'project:manuscript': async (req) => (await manuscript()).getManuscript(s, req),
+  'project:setManuscript': async (req) => (await manuscript()).setManuscript(s, req),
+  'project:assign': async (req) => (await manuscript()).assign(s, req),
+  'project:moveAssignments': async (req) => (await manuscript()).moveAssignments(s, req),
   'project:reportPreview': async (req) => (await ai()).reportPreview(s, req),
   'project:reportRun': async (req) => (await ai()).reportRun(s, req),
   'project:citePreview': async (req) => (await ai()).citePreview(s, req),

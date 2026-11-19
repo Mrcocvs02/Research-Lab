@@ -22,7 +22,7 @@ export const dialogChannels = defineChannels('dialog', {
    */
   chooseFile: {
     request: z.object({
-      purpose: z.enum(['taxonomy-file', 'backup-file', 'bib-source', 'resource-file']),
+      purpose: z.enum(['taxonomy-file', 'backup-file', 'bib-source', 'resource-file', 'manuscript-file']),
       title: z.string().max(200).optional(),
     }),
     response: z.object({ path: z.string(), name: z.string() }).nullable(),

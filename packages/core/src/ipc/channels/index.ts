@@ -70,7 +70,7 @@ export { projectDetailSchema, projectSummarySchema, projectMemberViewSchema, rea
 export { noteViewSchema, noteListItemSchema, type NoteView } from './notes.js';
 export { annotationColorSchema, annotationInputSchema, externalItemSchema, pdfReasonSchema, pdfStateSchema, type AnnotationInput, type ExternalItem, type PdfReason, type PdfState } from './annotations.js';
 export { CROP_BASE64_MAX, explainResultSchema, type ExplainResult } from './readertools.js';
-export { OUTLINE_LIMITS, REPORT_AUDIENCES, REPORT_PARTS, claimSchema, evidenceSchema, outlineSchema, type Claim, type Evidence, type Outline } from './project.js';
+export { MANUSCRIPT_LIMITS, manuscriptRefSchema, manuscriptSchema, type Manuscript, type ManuscriptRef, OUTLINE_LIMITS, REPORT_AUDIENCES, REPORT_PARTS, claimSchema, evidenceSchema, outlineSchema, type Claim, type Evidence, type Outline } from './project.js';
 export { DISCOVER_LIMITS, DISCOVER_SUMMARY_CHOICES, discoverReasonSchema, discoverRunSchema, discoverSummarySchema, type DiscoverOutcome, type DiscoverCandidate, type DiscoverKind, type DiscoverReason, type DiscoverRun, type DiscoverRunSummary, type DiscoverSummary } from './discover.js';
 export type { PrismaCounts, PrismaState } from './bib.js';
 export { LITERATURE_KEYS, LITERATURE_MAX_DOCS, TEMPLATE_LIMITS, type LiteratureKey, type LiteratureNote } from './literature.js';

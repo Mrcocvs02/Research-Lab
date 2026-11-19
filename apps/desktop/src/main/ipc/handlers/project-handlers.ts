@@ -4,6 +4,7 @@ import type { MainServices } from './services.js';
 
 const feature = () => import('../../features/project/index.js');
 const manuscript = () => import('../../features/manuscript/index.js');
+const manuscriptAi = () => import('../../features/manuscript/ai.js');
 const ai = () => import('../../features/project/ai.js');
 
 export const projectSchemaHandlers = (s: MainServices): DomainHandlers<'project'> => ({
@@ -26,4 +27,6 @@ export const projectSchemaHandlers = (s: MainServices): DomainHandlers<'project'
   'project:citeRun': async (req) => (await ai()).citeRun(s, req),
   'project:evidencePreview': async (req) => (await ai()).evidencePreview(s, req),
   'project:evidenceRun': async (req) => (await ai()).evidenceRun(s, req),
+  'project:previewAssignSuggest': async (req) => (await manuscriptAi()).previewAssignSuggest(s, req),
+  'project:assignSuggest': async (req) => (await manuscriptAi()).assignSuggest(s, req),
 });

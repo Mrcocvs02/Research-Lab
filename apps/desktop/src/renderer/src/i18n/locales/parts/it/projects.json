@@ -264,7 +264,15 @@
     "writeHere": "Scrivi le sezioni qui",
     "unlink": "Scollega il manoscritto",
     "propose": "✦ Proponi le assegnazioni…",
-    "proposeSoon": "Non ancora disponibile",
+    "suggest": {
+      "title": "Proponi le assegnazioni",
+      "what": "Si inviano i titoli delle sezioni e titolo e abstract di {{count}} paper (mai il testo del manoscritto).",
+      "nothing": "Niente da proporre: servono sezioni nel manoscritto e paper del progetto in cartelle abilitate.",
+      "none": "Nessuna corrispondenza chiara.",
+      "accept": "Accetta",
+      "acceptAll": "Accetta tutte ({{count}})",
+      "accepted": "Assegnato."
+    },
     "exportCsv": "Copia la matrice (CSV)",
     "csvCopied": "Matrice copiata in CSV.",
     "summaryGaps_one": "{{count}} sezione senza fonti",

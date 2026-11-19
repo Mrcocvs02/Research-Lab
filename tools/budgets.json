@@ -23,7 +23,8 @@
       "EvidenceDialog": 16,
       "ManuscriptView": 16,
       "ManuscriptMatrix": 16,
-      "AssignDialog": 16
+      "AssignDialog": 16,
+      "AssignSuggestDialog": 16
     }
   },
   "main": {

@@ -27,6 +27,7 @@
     "skipped": "Già collegati: {{existing}} · tolti in precedenza: {{dismissed}}",
     "none": "Nessun collegamento sopra la soglia: il più vicino è {{title}} ({{score}})",
     "noneAny": "Nessun collegamento sopra la soglia.",
+    "noneNew": "Nessun collegamento nuovo: quelli sopra la soglia ci sono già ({{count}}).",
     "below_one": "{{count}} sotto la soglia (il migliore {{best}})",
     "below_other": "{{count}} sotto la soglia (il migliore {{best}})",
     "add": "Aggiungi",

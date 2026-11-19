@@ -789,3 +789,64 @@ Ordine: 1 Z1 · 2 Z2 · 3 Z3 + Z4 + Z5 · 4 Z6 · 5 Z7 · 6 Z9 · 7 Z10 · 8 Z11
 3. **T3 · Viste** — `views/reader/**`, `views/library/**`, `views/compare/**`, `views/export/**`, `views/discover/**`, `views/projects/**`, `views/review/**`, `views/inbox/**`, `components/AiCostPreview.tsx`. Corregge Z1 (plurali di `CompareView.tsx`), Z7, Z8, Z9, Z10, Z12, Z13, Z14, Z17-Z22, Z23 (⋯ del pannello Annotazioni).
 
 T1 e T3 si toccano solo se T3 cambia testi: i testi nuovi di T3 vanno nelle **parti** della sua vista (`locales/parts/*/<vista>.json`) solo dopo che T1 è unito, oppure T3 consegna l'elenco delle chiavi e T1 le scrive. Dopo le correzioni: rieseguire il giro "final" (una sola esecuzione, `RL_DESIGN_AUDIT_OUT=run9`) e il controllo delle chiavi.
+
+## Audit §18 (dati reali)
+
+Oggetto: ramo `audit49` (= `main` a 64e5479), app compilata, guidata con uno script Playwright `_electron` fuori dal repository, rete tagliata, nessuna chiamata all'AI. Dati: **copia** temporanea di una cartella reale di 21 PDF insieme alla copia della cartella dati della libreria che la contiene (tassonomia e tag veri dell'utente, importati a suo tempo da un vecchio indice); originali mai toccati, copia e dati temporanei cancellati alla fine. Qui solo numeri aggregati e osservazioni anonime: nessun titolo, nome, tag o percorso.
+
+**Verdetto.** Funziona e a questa scala non diventa troppo complesso: Automatica separa bene, Trova collegamenti è misurato, la matrice si legge. Il punto debole era il colore per Topic su una tassonomia reale quasi piatta (centinaia di tag radice tipo parola chiave accanto a poche macro-aree vere): **206 macro-aree**, "Altre 199 aree", tinte date a parole chiave a caso. Corretto (D-490): ora 20 aree e le 7 tinte vanno alle macro-aree vere. Restano i colori spenti (quasi ogni lavoro sta in 2-3 aree: è vero, ma il colore dice poco) e la scarsità di famiglie: senza livelli né gruppi la libreria offre solo Topic, due famiglie da suggerimento di gruppo e Automatica.
+
+### Numeri
+
+| Misura | Valore |
+| --- | --- |
+| Documenti | 21 (17 con tag, 4 aggiunti dopo l'ultima etichettatura e senza tag) |
+| Tassonomia | 220 nodi, nessun livello (`level`), 23 nodi con un genitore; suggerimenti di gruppo: 11 "macro", 23 "micro", 186 "extra:…" |
+| Tag diretti per documento | 3-80 (mediana 26); 210 tag distinti usati, circa la metà su un solo documento |
+| Copertura per gruppo di tag | macro 17/17 (2-3 per lavoro) · micro 17/17 (1-6) · extra principale 10/17 (22-70 per lavoro, tipo parole chiave) · extra secondario 5/17 (1) |
+| Famiglie offerte | Topic (17 doc) · 2 da suggerimento di gruppo (10 e 5 doc) · Automatica; **niente** Metodologia (nessun nodo `method`) né Gruppo (nessuna istituzione: rete spenta, DOI su 7/17) |
+| Topic prima / dopo D-490 | 206 / 20 aree; quota dell'area principale 34-64 % / 34-78 %; 4 nodi senza area (i 4 senza tag) |
+| Famiglia "extra" principale | 7 cluster + altro, 9 lavori su 10 in più cluster, quota principale 34 % (tutti tenui) |
+| Automatica | 3 comunità (9 · 7 · 5) su tutti i 21 lavori (anche i 4 senza tag), nessuna in "altro"; nomi dai tag lunghi 38-63 caratteri |
+| Archi "simili" (Collegamenti) | 270 (135 coppie su 210 possibili), grado 3-17, peso p10 0,04 · mediana 0,06 · p90 0,17 · max 0,32 |
+| Trova collegamenti, 5 partenze × 3 soglie | τ normale 0,15 (pavimento: la mediana dei vicini è 0,06), rigorosa 0,25, ampia 0,10; sopra la soglia per partenza: rigorosa 0-3, normale 2-4, ampia 2-6; mai metà libreria, mai zero a soglia normale; motivi sempre "termini + tag" (+ autori in 2 casi) |
+| Matrice | 25 sezioni × 21 paper, 51 assegnazioni; 3 buchi e 2 fonti non usate visibili a colpo d'occhio a 1024 × 700 |
+
+### Risultati
+
+| Id | Gravità | Dove | Cosa non va | Esito |
+| --- | --- | --- | --- | --- |
+| R1 | **bloccante** | Mappa, Topic (Panorama e Collegamenti) | Le radici senza figli (parole chiave) diventano macro-aree: 206 aree, le 7 tinte a parole chiave scelte per numero di documenti, il resto grigio | **corretto** (D-490): con una gerarchia (≥ 2 radici con figli) una radice senza figli è un tag sciolto e colora solo i lavori che non raggiungono un'area vera |
+| R2 | importante | Collegamenti | Legenda delle aree e riquadro "N nodi · documento · cartella · tag" sovrapposti in basso a sinistra (la riga "pieno/tenue" coperta) | **corretto**: una colonna sola (`.net-bl`) |
+| R3 | importante | Trova collegamenti | Il dialogo (520 px) è più stretto del suo contenuto (560 px; titoli lunghi senza `minmax(0, 1fr)`): Partenza, pesi e motivi tagliati, barra orizzontale | **corretto**: dialogo a 640 px, righe che si accorciano |
+| R4 | importante | Trova collegamenti | Ripetendo una ricerca compare "Nessun collegamento sopra la soglia" anche se 4 sono sopra ma già collegati | **corretto**: "Nessun collegamento nuovo: quelli sopra la soglia ci sono già (N)" |
+| R5 | importante | Matrice | Con autori scritti "Cognome I." la colonna diceva "R. 2026" (l'iniziale presa per cognome): 8 colonne su 14 | **corretto**: l'iniziale si salta (test unitario) |
+| R6 | minore | Panorama | "Raggruppato per X" incollato all'angolo del riquadro, dove sta anche la pillola del suggerimento | **corretto**: pillola in alto a destra |
+| R7 | minore | Matrice | "⚠Sezione" senza spazio (lo spazio finale si perde nella riga flessibile) | **corretto** |
+| R8 | minore | Collegamenti | Dopo R1 i tag sciolti senza area venivano disegnati col colore del testo (rombi neri pesanti) | **corretto**: grigio tenue |
+| R9 | importante | Collegamenti | Espandere un lavoro con 26-80 tag aggiunge fino a 50 rombi (`rec.tags.slice(0, limit)`, in ordine di inserimento): una stella di tag a una sola foglia, non una rete | aperto: prima i tag condivisi da ≥ 2 lavori e i più specifici, tetto ~10 con "+N tag" |
+| R10 | importante | Panorama | La legenda (240 px, alta fino a 400) copre i punti in basso a sinistra; l'inquadratura non ne tiene conto | aperto: margine sinistro dell'inquadratura pari alla legenda, o legenda richiudibile |
+| R11 | importante | Topic | Colori spenti: 13 lavori su 17 hanno 3 aree; una macro-area copre il 76 % (sotto la soglia di discesa dell'80 %) | aperto: opzione "colore dell'area principale" (senza mescolanza) o soglia di discesa al 60-70 %, da provare su più librerie |
+| R12 | minore | Automatica | Le etichette sulla tela (termini dei cluster della mappa) e i nomi in legenda (tag della comunità) sono due nomi diversi per gli stessi gruppi; la striscia "pieno/tenue" non serve (ogni lavoro è al 100 % in una comunità) | aperto |
+| R13 | minore | Esporta | Stessa regola "ultima parola = cognome" in `familyName` delle chiavi di citazione (`packages/export/src/citekeys.ts`) | aperto: cambia chiavi già esportate, da decidere |
+| R14 | minore | Daltonismo | Simulazione Machado: in deuteranopia e protanopia la terza tinta (magenta) diventa grigia, vicina ad "altro"; si distingue per luminosità, ma con "altro" presente conviene la legenda. Tritanopia non ottimizzata (già nota) | nota |
+| R15 | — | Tema scuro | Panorama, Collegamenti e matrice leggibili, nodi ben contrastati | va bene |
+
+### Più tag? Famiglie consigliate
+
+Il problema non è il numero dei tag (già tanti, fino a 80 per lavoro) ma la loro forma: due livelli utili (11 macro-aree, 23 sottotemi) e una lunga coda di parole chiave su uno o due lavori, che per la Mappa sono rumore (servono alla ricerca). Mancano famiglie **ortogonali** con un solo valore per lavoro, quelle che danno cluster netti e colori pieni. Per una libreria di questo tipo (lavori di ricerca su metodi e sistemi):
+
+1. **Metodologia** (`level: method`): 4-8 valori, uno per lavoro (per esempio simulazione numerica, metodo analitico, apprendimento automatico, analisi di dati sperimentali).
+2. **Sistema o modello studiato**: la classe di sistemi (5-8 valori).
+3. **Tecnica**: lo strumento principale (rete neurale, rete tensoriale, Monte Carlo, …).
+4. **Tipo di dati**: simulati, sperimentali, teorici, misure campionate.
+5. **Tipo di lavoro**: articolo di metodo, applicazione, rassegna, tesi, appunti.
+
+Regola pratica: ogni famiglia con 3-8 valori e un valore per lavoro su almeno l'80 % dei lavori; mettere i tag anche ai 4 lavori nuovi. Automatica trova già 3 comunità coerenti che coprono anche i lavori senza tag: è il punto di partenza per nominarle ("Dai un nome con Claude", non provato qui sui dati veri) e poi trasformarle in una famiglia.
+
+**Proposte economiche nell'app** (nessuna costruita):
+- **Famiglia da un nodo**: nella gestione dei tag, "Usa i figli come famiglia" su un nodo radice. Oggi `level` non si imposta da nessuna parte dell'interfaccia e il suggerimento di gruppo solo alla creazione: Metodologia si raggiunge solo importando una tassonomia.
+- **Offrire come famiglia anche i suggerimenti di gruppo diversi da `extra:`** (qui "micro": 23 sottotemi su 17/17 lavori).
+- **"✦ Proponi i tag di una famiglia…"**: il percorso delle proposte di tag dell'AI con un vincolo (una famiglia, 3-8 valori, uno per lavoro), con anteprima e accettazione come oggi.
+- **Da Automatica a famiglia**: "Salva questi cluster come famiglia" (crea i nodi e mette i tag, annullabile).
+- In Collegamenti, tag ordinati per utilità e con tetto (R9). In Trova collegamenti i tag radice restano esclusi dal segnale dei tag: giusto per le parole chiave radice di questa libreria, da rivedere se le famiglie nuove saranno radici senza figli.

@@ -27,6 +27,7 @@
     "skipped": "Already linked: {{existing}} · removed earlier: {{dismissed}}",
     "none": "No link above the threshold: the closest is {{title}} ({{score}})",
     "noneAny": "No link above the threshold.",
+    "noneNew": "No new link: the ones above the threshold are already there ({{count}}).",
     "below_one": "{{count}} below the threshold (best {{best}})",
     "below_other": "{{count}} below the threshold (best {{best}})",
     "add": "Add",

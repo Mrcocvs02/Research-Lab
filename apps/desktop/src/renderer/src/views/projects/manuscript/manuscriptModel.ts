@@ -102,10 +102,14 @@ export interface Summary {
 }
 export const summarize = (rows: readonly Row[], columns: readonly Column[]): Summary => ({ gaps: rows.filter((r) => r.gap).length, unused: columns.filter((c) => c.unused).length });
 
-/** "Surname year" of a paper: the first author (the part before a comma, else the last word) and the year. */
+/** An initial such as "R.", "J.-P." or "RJ": never taken for a surname. */
+const INITIAL = /^(?:\p{Lu}{1,2}\.?-?)+$/u;
+
+/** "Surname year" of a paper: the first author (the part before a comma, else the last word that is not an initial, so "Rossi M." and "M. Rossi" both give Rossi) and the year. */
 export function paperLabel(p: Paper): string {
   const first = (p.authors[0] ?? '').trim();
-  const surname = first.includes(',') ? first.split(',')[0]!.trim() : (first.split(/\s+/).pop() ?? '');
+  const words = first.split(/\s+/).filter((w) => w !== '');
+  const surname = first.includes(',') ? first.split(',')[0]!.trim() : ([...words].reverse().find((w) => !INITIAL.test(w)) ?? words.pop() ?? '');
   return [surname || p.title.slice(0, 16), p.year ?? ''].filter((x) => x !== '').join(' ');
 }
 

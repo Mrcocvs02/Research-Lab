@@ -118,7 +118,7 @@ export default function ManuscriptMatrix({
             return (
               <div key={row.section.id} role="row" className="ms-matrix__row" style={{ top: HEAD + i * ROW, height: ROW }} data-section-id={row.section.id}>
                 <div role="rowheader" className={`ms-matrix__side${row.gap ? ' is-gap' : ''}`} style={{ width: SIDE, paddingLeft: 8 + (row.section.level - 1) * 12 }} title={safeText(row.section.title)}>
-                  {row.gap && <span aria-hidden="true">⚠ </span>}
+                  {row.gap && <span aria-hidden="true" className="ms-gap-mark">⚠</span>}
                   {safeText(row.section.title)}
                 </div>
                 {columns.slice(c0, c1).map((col, q) => {

@@ -903,3 +903,44 @@
   border-radius: 8px;
   box-shadow: var(--e-2);
 }
+
+/* Collegamenti: the legend and the node count share the bottom-left corner in one column (audit on real data, D-490). */
+.net-bl {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 3;
+  max-height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+.net-bl > * {
+  pointer-events: auto;
+}
+.net-wrap .net-bl .area-legend,
+.net-wrap .net-bl .net-legend-box {
+  position: static;
+}
+.net-wrap .net-bl .area-legend {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+/* Panorama: "Grouped by X" is a small pill at the top right, clear of the hint pill at the top left. */
+.map-wrap > .group-label {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 4;
+  max-width: min(320px, calc(100% - 24px));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 10px;
+  border-radius: var(--r-pill, 999px);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--e-1);
+}

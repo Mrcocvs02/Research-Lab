@@ -59,4 +59,19 @@ describe('computeAreas (§18.3.4)', () => {
     expect(m.tagShare('ml')!.ar[0]![0]).toBe(m.docs.get('b')!.ar[0]![0]);
     expect(m.tagShare('nope')).toBeNull();
   });
+  it('treats childless roots as loose tags when the taxonomy has a hierarchy, and uses them only as a fallback (D-490)', () => {
+    const kw = Array.from({ length: 30 }, (_, i) => n(`kw${i}`));
+    const t = [...tax, ...kw];
+    const many = kw.map((k): [string, number] => [k.id, 1]);
+    const m = computeAreas(t, [d('a', ['optics', 1], ...many), d('b', ['ml', 1], ...many.slice(0, 10)), d('c', ['kw3', 1], ['kw4', 1])]);
+    // The keywords do not become areas for documents that reach a real one: they keep their full colour.
+    expect(m.docs.get('a')!.ar).toEqual([[m.areas.findIndex((x) => x.id === 'phys'), 0, 100]]);
+    expect(m.docs.get('b')!.ar[0]![2]).toBe(100);
+    // A document with keywords only still gets a colour from them.
+    expect(m.docs.get('c')!.ar.map((x) => m.areas[x[0]]!.id).sort()).toEqual(['kw3', 'kw4']);
+    expect(m.areas.map((x) => x.id)).toEqual(['cs', 'kw3', 'kw4', 'phys']);
+    // A flat taxonomy (fewer than two roots with children) keeps every root as an area.
+    const flat = computeAreas(kw, [d('a', ['kw1', 1]), d('b', ['kw2', 1])]);
+    expect(flat.areas).toHaveLength(2);
+  });
 });

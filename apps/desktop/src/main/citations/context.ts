@@ -1,10 +1,12 @@
 import { AppError, type UserProfile } from '@rl/core';
-import { buildOwnedIndex, createCitationService, createCitationSources, createNet, createWatchFetcher, type CitationServiceX, type CitationSourceX, type OwnedIndex, type WatchQuery, type WatchResult } from '@rl/citations';
+import { buildOwnedIndex, createCitationService, createCitationSources, createNet, createWatchFetcher, type CitationServiceX, type CitationSourceX, type Net as HostNet, type OwnedIndex, type WatchQuery, type WatchResult } from '@rl/citations';
 import type { LibraryRuntime } from '../library/library-runtime.js';
 import type { MainServices } from '../ipc/handlers/services.js';
 
 /** Sources, throttle state and the email choice of one app session (one per `MainServices`, so rate limits are shared by every caller). */
 interface Net {
+  /** The throttled, size-capped client of the online hosts (used by the discovery engine for its own OpenAlex queries). */
+  net: HostNet;
   sources: CitationSourceX[];
   service: CitationServiceX;
   watch: (q: WatchQuery, signal?: AbortSignal) => Promise<WatchResult>;
@@ -39,7 +41,7 @@ export async function online(s: MainServices): Promise<Net & { profile: UserProf
     const key = { value: null as string | null, at: 0 };
     const net = createNet({ fetch: s.fetch ?? fetch, email: () => email.value, apiKey: () => key.value, ...(netTuning.sleep ? { sleep: netTuning.sleep } : {}), ...(netTuning.timeoutMs ? { timeoutMs: netTuning.timeoutMs } : {}) });
     const sources = createCitationSources({ fetch: s.fetch ?? fetch, net });
-    n = { sources, service: createCitationService(sources), watch: createWatchFetcher(net), email, key };
+    n = { net, sources, service: createCitationService(sources), watch: createWatchFetcher(net), email, key };
     nets.set(s, n);
   }
   const st = await s.settings.get();

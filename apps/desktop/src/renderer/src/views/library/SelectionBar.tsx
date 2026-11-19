@@ -9,8 +9,12 @@ import { Menu, type MenuGroups } from '../../components/Menu';
 import { Popover } from '../../components/Popover';
 import { useAiUi } from '../../lib/aiUi';
 import { useCitationJob } from '../../lib/citationJobs';
+import { useNav } from '../../lib/nav';
 import { useNotify } from '../../lib/notify';
+import { useReader } from '../../lib/reader';
 import { rl } from '../../lib/rl';
+import { bridgeItem } from './selection/actions/bridge';
+import { extendItem } from './selection/actions/extend';
 import type { DocRow } from './useDocumentList';
 
 /** Several default-program windows at once are too many: the menu entry waits for a smaller selection. */
@@ -36,6 +40,8 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
   const { openExport, setChatOpen } = useAiUi();
   const citationJob = useCitationJob();
   const { info, reportError } = useNotify();
+  const { navigate } = useNav();
+  const { openReader } = useReader();
   const tagAnchor = useRef<HTMLSpanElement>(null);
   const claudeAnchor = useRef<HTMLSpanElement>(null);
   const moreAnchor = useRef<HTMLSpanElement>(null);
@@ -54,6 +60,11 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
     },
   ];
   const tooMany = ids.length > OPEN_MANY_MAX;
+  // "Read side by side" (feature 3): exactly two documents, otherwise disabled with the reason.
+  const side =
+    ids.length === 2
+      ? { id: 'side', testId: 'selection-side-by-side', label: t('library.selSideBySide'), onSelect: () => openReader(ids[0]!, undefined, { beside: ids[1]! }) }
+      : { id: 'side', testId: 'selection-side-by-side', label: t('library.selSideBySide'), disabled: true as const, disabledReason: t('library.selSideReason'), onSelect: () => {} };
   const more: MenuGroups = [
     {
       id: 'more',
@@ -61,6 +72,9 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
         citationJob.busy
           ? { id: 'citations', label: t('citations.bulk'), disabled: true, disabledReason: t('citations.alreadyRunning'), onSelect: () => {} }
           : { id: 'citations', label: t('citations.bulk'), onSelect: () => void citationJob.start(ids) },
+        extendItem(t, ids, () => navigate({ view: 'discover' })),
+        bridgeItem(t, ids, () => navigate({ view: 'discover' })),
+        side,
         { id: 'export', label: t('secondBrain.button'), onSelect: () => openExport({ docIds: ids }) },
         {
           id: 'bibtex',

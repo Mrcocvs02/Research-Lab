@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DEFAULT_MODELS, defaultLibraryConfig, exportPresetSchema, modelConfigSchema, type ExportPreset, type LibraryConfig, type LibraryConfigPatch, type McpStatus, type ModelConfig } from '@rl/core';
 import { Button } from '../components/Button';
+import { EXPERIMENTAL_KEY } from '../lib/reader';
 import { rl } from '../lib/rl';
+import { useLocalFlag } from '../lib/useLocalFlag';
+import { Switch } from '../components/Switch';
 import { useApp } from '../state/app-context';
 import { lazyView, Lazy } from '../components/Lazy';
 import { Fold, Group, NeedsLibrary, Row, SectionHead, TextRow, useLibraryPatch, useSettings } from './rows';
@@ -63,6 +66,17 @@ function ExecutableRow() {
       <Button size="sm" disabled={cc?.source !== 'settings'} onClick={() => void save.run(async () => (await rl.invoke('ai:clearExecutable', {}), reloadAccount()))} data-testid="ai-exe-auto">
         {t('settings.ai.exe.auto')}
       </Button>
+    </Row>
+  );
+}
+
+/** "Experimental features": a per-viewer switch (the guide of the reader exists only while it is on). */
+function ExperimentalRow() {
+  const { t } = useTranslation();
+  const [on, setOn] = useLocalFlag(EXPERIMENTAL_KEY, false);
+  return (
+    <Row sid="experimental" label={t('settings.experimental.label')} help={t('settings.experimental.help')}>
+      <Switch aria-label={t('settings.experimental.label')} checked={on} onChange={setOn} data-testid="experimental-switch" />
     </Row>
   );
 }
@@ -265,6 +279,9 @@ export function AdvancedSection() {
       <Group testId="advanced-groups">
         <Fold fold="claude" title={t('settings.advanced.claude')}>
           {config ? <ClaudeGroup config={config} /> : <NeedsLibrary />}
+        </Fold>
+        <Fold fold="experimental" title={t('settings.advanced.experimental')}>
+          <ExperimentalRow />
         </Fold>
         <Fold fold="mcp" title={t('settings.advanced.mcp')}>
           <Lazy>

@@ -12,6 +12,7 @@ import { chatChannels, chatEvents } from './chat.js';
 import { citationsChannels, citationsEvents, recommendChannels } from './citations.js';
 import { commandsChannels } from './commands.js';
 import { dialogChannels } from './dialog.js';
+import { discoverChannels } from './discover.js';
 import { documentsChannels } from './documents.js';
 import { exploreChannels, graphChannels, graphEvents } from './graph.js';
 import { exportChannels, exportEvents } from './export.js';
@@ -28,6 +29,7 @@ import { notesChannels } from './notes.js';
 import { projectsChannels } from './projects.js';
 import { readerChannels } from './reader.js';
 import { readerToolsChannels } from './readertools.js';
+import { guidesChannels, refsChannels } from './refs.js';
 import { importIdChannels, resourcesChannels, resumeChannels } from './resources.js';
 import { reviewChannels } from './review.js';
 import { taxonomyChannels } from './taxonomy.js';
@@ -38,7 +40,12 @@ import { indexChannels, searchChannels } from './search.js';
 import { secretsChannels } from './secrets.js';
 import { settingsChannels } from './settings.js';
 
-export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels, citationsChannels, recommendChannels, watchChannels, graphChannels, exploreChannels, exportChannels, mcpChannels, backupChannels, maintenanceChannels, bibChannels, readerToolsChannels, resourcesChannels, importIdChannels, resumeChannels, literatureChannels, projectSchemaChannels);
+export const channels = mergeRegistries(appChannels, settingsChannels, libraryChannels, dialogChannels, importChannels, secretsChannels, scanChannels, searchChannels, indexChannels, documentsChannels, taxonomyChannels, historyChannels, projectsChannels, readerChannels, notesChannels, annotationsChannels, thumbsChannels, aiChannels, chatChannels, commandsChannels, jobsChannels, reviewChannels, inboxChannels, citationsChannels, recommendChannels, watchChannels, graphChannels, exploreChannels, exportChannels, mcpChannels, backupChannels, maintenanceChannels, bibChannels, readerToolsChannels, resourcesChannels, importIdChannels, resumeChannels, literatureChannels,
+  discoverChannels,
+  refsChannels,
+  guidesChannels,
+  projectSchemaChannels,
+);
 
 export const events = mergeRegistries(aiEvents, annotationsEvents, appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, watchEvents, graphEvents, exportEvents, mcpEvents, backupEvents);
 
@@ -60,6 +67,7 @@ export { noteViewSchema, noteListItemSchema, type NoteView } from './notes.js';
 export { annotationColorSchema, annotationInputSchema, externalItemSchema, pdfReasonSchema, pdfStateSchema, type AnnotationInput, type ExternalItem, type PdfReason, type PdfState } from './annotations.js';
 export { CROP_BASE64_MAX, explainResultSchema, type ExplainResult } from './readertools.js';
 export { OUTLINE_LIMITS, REPORT_AUDIENCES, REPORT_PARTS, claimSchema, evidenceSchema, outlineSchema, type Claim, type Evidence, type Outline } from './project.js';
+export { DISCOVER_LIMITS, DISCOVER_SUMMARY_CHOICES, discoverReasonSchema, discoverRunSchema, discoverSummarySchema, type DiscoverOutcome, type DiscoverCandidate, type DiscoverKind, type DiscoverReason, type DiscoverRun, type DiscoverRunSummary, type DiscoverSummary } from './discover.js';
 export { LITERATURE_KEYS, LITERATURE_MAX_DOCS, TEMPLATE_LIMITS, type LiteratureKey, type LiteratureNote } from './literature.js';
 export { thumbItemSchema } from './thumbs.js';
 export { aiAccountSchema, aiAuthSchema, aiPreviewSchema, aiSendViewSchema, aiStatusSchema, type AiAccount, type AiTokenUsage, aiTokenUsageSchema } from './ai.js';
@@ -75,3 +83,4 @@ export { mcpLogItemSchema, mcpStatusSchema, mcpToolNameSchema, MCP_LIMITS, MCP_T
 export { backupInfoSchema, backupJobStatusSchema, backupManifestSchema, backupPreviewSchema, backupResultSchema, backupSettingsSchema, BACKUP_FORMAT_VERSION, BACKUP_LIMITS, type BackupInfo, type BackupJobStatus, type BackupManifest, type BackupSettings } from './backup.js';
 export { maintenanceTargetSchema, MAINTENANCE_TARGETS } from './maintenance.js';
 export { RESOURCE_KINDS, type ResourceKind, type ResourceView, type ImportIdItem, type ImportIdAddResult, type ImportIdState, type ResumeInfo } from './resources.js';
+export { REFS_LIMITS, type GuidePassage, type RefEntry } from './refs.js';

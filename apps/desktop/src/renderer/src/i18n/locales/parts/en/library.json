@@ -55,6 +55,11 @@
     "copyBib": "Copy BibTeX references",
     "copiedBib": "BibTeX references copied to the clipboard ({{count}}).",
     "facetResources": "Resources",
-    "facetResourcesHint": "Show resources (code, data, web pages, notebooks, folders) instead of documents"
-  }
+    "facetResourcesHint": "Show resources (code, data, web pages, notebooks, folders) instead of documents",
+    "selExtend": "Extend the bibliography…",
+    "selBridge": "Find a bridge",
+    "selBridgeNeeds": "Select 2 documents"
+  },
+  "selSideBySide": "Read side by side",
+  "selSideReason": "Select 2 documents"
 }

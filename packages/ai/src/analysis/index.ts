@@ -5,3 +5,4 @@ export * from './candidates.js';
 export * from './litnote.js';
 export * from './prompts.js';
 export * from './explain.js';
+export * from './discover.js';

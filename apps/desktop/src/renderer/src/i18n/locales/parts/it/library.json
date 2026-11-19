@@ -55,6 +55,11 @@
     "copyBib": "Copia i riferimenti BibTeX",
     "copiedBib": "Riferimenti BibTeX copiati negli appunti ({{count}}).",
     "facetResources": "Risorse",
-    "facetResourcesHint": "Mostra le risorse (codice, dati, pagine web, notebook, cartelle) invece dei documenti"
-  }
+    "facetResourcesHint": "Mostra le risorse (codice, dati, pagine web, notebook, cartelle) invece dei documenti",
+    "selExtend": "Estendi la bibliografia…",
+    "selBridge": "Trova un ponte",
+    "selBridgeNeeds": "Seleziona 2 documenti"
+  },
+  "selSideBySide": "Leggi affiancati",
+  "selSideReason": "Seleziona 2 documenti"
 }

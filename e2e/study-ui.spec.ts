@@ -65,7 +65,7 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
     expect(shaBefore).toBe(file!.sha256);
 
     // Open it in the reader from the list.
-    await window.getByTestId('search-sort').selectOption('title');
+    await sortByTitle(window);
     // Everything the list shows about the document (title, authors, ...): a word from there would be answered by metadata.
     const rowText = await rowByTitle(window, title).innerText();
     await openInReader(window, title);
@@ -168,3 +168,11 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
     await ctx?.close();
   }
 });
+
+/** The sort order lives in the View popover of the header: open it, choose, close it again. */
+async function sortByTitle(window: Page): Promise<void> {
+  if (!(await window.getByTestId('search-sort').isVisible())) await window.getByTestId('view-menu').click();
+  await window.getByTestId('search-sort').selectOption('title');
+  await window.keyboard.press('Escape');
+  await expect(window.getByTestId('search-sort')).toBeHidden();
+}

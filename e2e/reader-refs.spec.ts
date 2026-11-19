@@ -29,7 +29,7 @@ test.describe.serial('side by side, citation cards, guide (X5)', () => {
   test.afterAll(async () => ctx?.close());
 
   test('the library offers "read side by side" only for exactly two documents', async () => {
-    const rows = window.getByTestId('library-row');
+    const rows = window.getByTestId('search-result');
     await rows.nth(0).click();
     await rows.nth(1).click({ modifiers: ['Control'] });
     await window.getByTestId('selection-more').click();
@@ -44,7 +44,7 @@ test.describe.serial('side by side, citation cards, guide (X5)', () => {
   test('two papers: one bar, a divider, tabs below 1280 px', async () => {
     test.setTimeout(240_000);
     await setWidth(1440);
-    const rows = window.getByTestId('library-row');
+    const rows = window.getByTestId('search-result');
     await rows.nth(2).click({ modifiers: ['Control'] });
     await window.getByTestId('selection-more').click();
     await window.getByTestId('selection-side-by-side').click();

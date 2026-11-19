@@ -4,7 +4,7 @@ import { AI_LIMITS, AppError, type AiTagScore, type AiJobStatus, type AiMeta, ty
 import type { z } from 'zod';
 import type { aiJobRequestSchema, aiPreviewSchema } from '@rl/core';
 import type { MainServices } from '../ipc/handlers/services.js';
-import { availability, buildDataBlock, classifyDocs, computePreview, loadCtx, monthUsage, type AiCtx } from './service.js';
+import { availability, buildDataBlock, classifyDocs, computePreview, loadCtx, monthUsage, type AiCtx, providerError, capError, assertModel } from './service.js';
 import { abortTracked } from './abort-registry.js';
 import { createToolsHost } from './tools-host.js';
 import { assertTokenCap, noteSend } from './token-cap.js';
@@ -161,7 +161,7 @@ async function plan(s: MainServices, ctx: AiCtx, req: JobRequest) {
 
 export async function estimateJob(s: MainServices, req: JobRequest) {
   const ctx = await loadCtx(s);
-  if (!ctx.cfg.ai.models.some((m) => m.id === req.model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
+  assertModel(ctx.cfg, req.model);
   const p = await plan(s, ctx, req);
   return { preview: p.preview, skipped: p.skipped, toSend: p.todo.length, calls: p.calls };
 }
@@ -176,13 +176,13 @@ export async function restartJob(s: MainServices, jobId: string): Promise<{ jobI
 export async function startJob(s: MainServices, req: JobRequest & { confirmed: boolean }): Promise<{ jobId: string }> {
   const ctx = await loadCtx(s);
   const { rt, cfg, provider } = ctx;
-  if (!cfg.ai.models.some((m) => m.id === req.model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
+  assertModel(cfg, req.model);
   const monthUsd = (await monthUsage(rt, monthOf(new Date()))).usd;
   const cap = cfg.ai.usageCap.monthlyUsd;
-  if (cap !== null && monthUsd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached', { monthUsd, capUsd: cap });
+  if (cap !== null && monthUsd >= cap) throw capError(monthUsd, cap);
   await assertTokenCap(s, 0);
   const av = await availability(s, provider);
-  if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
+  if (!av.available || !provider) throw providerError(av);
   const p = await plan(s, ctx, req);
   if (p.todo.length === 0) throw new AppError('INVALID_REQUEST', 'No document would be sent', { reason: 'nothing-to-send', skipped: p.skipped, refused: p.preview.refused.length });
   if (cap !== null && p.preview.overCap) throw new AppError('AI_BUDGET_EXCEEDED', 'This job would go over the monthly AI spending cap', { monthUsd, capUsd: cap, estimatedUsd: p.preview.estimatedUsd });

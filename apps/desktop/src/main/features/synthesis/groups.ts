@@ -13,7 +13,7 @@ import { aiSends, isToolPurpose, monthOf } from '../../ai/usage.js';
 import type { MainServices } from '../../ipc/handlers/services.js';
 import { costDecision } from '../ai/batch.js';
 import { online } from '../../citations/context.js';
-import { cheapModel } from './compare.js';
+import { cheapModel } from '../ai/pick.js';
 
 /**
  * The research-group overview on request (feature 12, §17.4.19, D-393): a Markdown note in `notes/groups/<id>.md` with the authors,

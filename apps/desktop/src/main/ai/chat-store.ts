@@ -3,6 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { AI_LIMITS, AppError, chatTurnSchema, isoDateSchema, itemIdSchema } from '@rl/core';
 import { atomicWriteFile } from '@rl/core/node';
+import { KeyedQueue } from '../keyed-queue.js';
 
 export type ChatTurn = z.infer<typeof chatTurnSchema>;
 
@@ -48,7 +49,7 @@ export function titleFrom(text: string): string {
 export class ChatStore {
   private readonly dir: string;
   /** Writes of one conversation run one after the other. */
-  private readonly tails = new Map<string, Promise<unknown>>();
+  private readonly queue = new KeyedQueue();
 
   constructor(localDataDir: string, libraryId: string) {
     this.dir = path.join(localDataDir, 'chat', itemIdSchema.parse(libraryId));
@@ -98,14 +99,7 @@ export class ChatStore {
 `);
       return next;
     };
-    const prev = this.tails.get(id) ?? Promise.resolve();
-    const next = prev.then(run, run);
-    const tail = next.catch(() => {});
-    this.tails.set(id, tail);
-    void tail.then(() => {
-      if (this.tails.get(id) === tail) this.tails.delete(id);
-    });
-    return next;
+    return this.queue.run(id, run);
   }
 
   /**

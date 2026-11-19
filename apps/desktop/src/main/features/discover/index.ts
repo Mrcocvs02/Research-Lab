@@ -3,7 +3,8 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError, DISCOVER_LIMITS, documentIdSchema, itemIdSchema, type DiscoverCandidate, type DiscoverKind, type DiscoverOutcome, type DiscoverRun, type DiscoverSummary, type DocumentId, type DocumentRecord } from '@rl/core';
 import { atomicWriteJson } from '@rl/core/node';
-import { availability, loadCtx, monthUsage } from '../../ai/service.js';
+import { availability, loadCtx, monthUsage, providerError } from '../../ai/service.js';
+import { cheapModel as modelOf } from '../ai/pick.js';
 import { aiSends, isToolPurpose, monthOf } from '../../ai/usage.js';
 import { callStructured } from '../../analysis/call.js';
 import { online, ownedIndex } from '../../citations/context.js';
@@ -220,13 +221,6 @@ const startOfLocalDay = (): string => {
   return d.toISOString();
 };
 
-/** The cheap model by default: the configured one whose id says "haiku", else the default (D-419). */
-const modelOf = (models: ReadonlyArray<{ id: string }>, fallback: string, wanted?: string): string => {
-  const m = wanted ?? models.find((x) => /haiku/i.test(x.id))?.id ?? fallback;
-  if (!models.some((x) => x.id === m)) throw new AppError('INVALID_REQUEST', 'Unknown model');
-  return m;
-};
-
 export async function estimateDiscover(s: MainServices, req: { id: string; count: 10 | 20 | 50; model?: string | undefined }) {
   const ctx = await loadCtx(s);
   const { rt, cfg } = ctx;
@@ -277,7 +271,7 @@ export async function summarizeDiscover(s: MainServices, req: { token: string; i
   const cap = cfg.ai.usageCap.monthlyUsd;
   if (cap !== null && (await monthUsage(rt, monthOf(new Date()))).usd >= cap) throw new AppError('AI_BUDGET_EXCEEDED', 'The monthly AI spending cap is reached');
   const av = await availability(s, provider);
-  if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
+  if (!av.available || !provider) throw providerError(av);
   const o = await online(s);
   const deviceId = (await s.settings.get()).deviceId;
   const cacheDir = path.join(s.localDataDir, 'cache', 'discover', itemIdSchema.parse(rt.libraryId));

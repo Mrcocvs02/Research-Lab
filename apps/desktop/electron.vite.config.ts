@@ -43,11 +43,32 @@ function pdfjsResources(): Plugin {
   };
 }
 
+/**
+ * electron-vite adds its CommonJS shim to every chunk whose text contains `require(` (here: `runtime.require()`, a method). The
+ * bundler then drops the unused bindings and leaves a dead stub of about 150 bytes in each chunk. This removes the stub from the
+ * chunks that use no free `require`, `__filename` or `__dirname`: nothing they run changes.
+ */
+const DEAD_SHIM = /\n?\/\/ -- CommonJS Shims --\nimport __shims_module__ from "node:module";\nimport\.meta\.filename;\nimport\.meta\.dirname;\n__shims_module__\.createRequire\(import\.meta\.url\);\n/;
+function stripDeadShim(): Plugin {
+  return {
+    name: 'rl-strip-dead-shim',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type !== 'chunk' || !DEAD_SHIM.test(chunk.code)) continue;
+        const rest = chunk.code.replace(DEAD_SHIM, '\n');
+        if (!/(?<![.\w$])(require|__filename|__dirname)\b/.test(rest)) chunk.code = rest;
+      }
+    },
+  };
+}
+
 /** Workspace packages ship TypeScript sources: they must be bundled, not externalized. */
 const workspacePackages = ['@rl/core', '@rl/data', '@rl/search', '@rl/ai', '@rl/citations', '@rl/graph', '@rl/export', '@rl/mcp'];
 
 export default defineConfig({
   main: {
+    plugins: [stripDeadShim()],
     // True only in the test build of the packaged app (`npm run dist:test-dir`, RL_PACKAGED_TEST=1 at build time): the
     // one build that accepts a remote debugging port and `--user-data-dir` (D-296). Any other build refuses them.
     define: { __RL_PACKAGED_TEST__: JSON.stringify(process.env.RL_PACKAGED_TEST === '1') },

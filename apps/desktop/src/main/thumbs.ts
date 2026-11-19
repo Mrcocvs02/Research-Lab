@@ -4,6 +4,7 @@ import path from 'node:path';
 import { AppError, THUMB_LIMITS, THUMB_SCHEME, type DocumentId } from '@rl/core';
 import { openPdfHandle, presentPdf, stillTheSameFile } from './ipc/handlers/doc-files.js';
 import type { MainServices } from './ipc/handlers/services.js';
+import { KeyedQueue } from './keyed-queue.js';
 
 /**
  * Grid thumbnails (D-194, D-196): small WebP images of the first page of a PDF, drawn by the renderer and kept in the
@@ -62,16 +63,8 @@ export async function listThumbs(s: ThumbServices, docIds: string[]): Promise<Th
 }
 
 /** Writes of one document run one after the other, so the cleanup of an older write never removes a newer file. */
-const tails = new Map<string, Promise<unknown>>();
-function serial<T>(key: string, task: () => Promise<T>): Promise<T> {
-  const next = (tails.get(key) ?? Promise.resolve()).then(task, task);
-  const tail = next.catch(() => {});
-  tails.set(key, tail);
-  void tail.then(() => {
-    if (tails.get(key) === tail) tails.delete(key);
-  });
-  return next;
-}
+const queue = new KeyedQueue();
+const serial = <T>(key: string, task: () => Promise<T>): Promise<T> => queue.run(key, task);
 
 /**
  * Stores an image for the content with `hash` as `<docId>-<hash8>.<ext>`. Nothing is stored (and the answer is `null`)

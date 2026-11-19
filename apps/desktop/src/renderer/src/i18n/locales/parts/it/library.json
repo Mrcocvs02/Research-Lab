@@ -59,5 +59,7 @@
     "selExtend": "Estendi la bibliografia…",
     "selBridge": "Trova un ponte",
     "selBridgeNeeds": "Seleziona 2 documenti"
-  }
+  },
+  "selSideBySide": "Leggi affiancati",
+  "selSideReason": "Seleziona 2 documenti"
 }

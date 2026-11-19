@@ -66,6 +66,13 @@ interface Props {
   onUnderlined(v: boolean): void;
   sideOpen: boolean;
   onSide(): void;
+  /** Side by side (feature 3): the panel is closed while two papers are open, with this reason on the button. */
+  sideDisabled?: string | undefined;
+  /** Two papers are open: the menu entry closes the split instead of opening it. */
+  split?: boolean;
+  onSideBySide(): void;
+  /** The guide checkbox of the menu (experiment 30): only passed while Experimental features is on. */
+  guide?: { on: boolean; onToggle(): void } | undefined;
   canUndo: boolean;
   onUndo(): void;
   onOpenFile(): void;
@@ -142,7 +149,7 @@ export function ReaderBar(p: Props) {
       items: [
         { id: 'undo', label: t('history.undo'), keys: 'Ctrl+Z', testId: 'reader-undo', ...(p.canUndo ? {} : { disabled: t('history.nothingToUndo') }), onSelect: p.onUndo },
         { id: 'history', label: t('history.title'), keys: 'Ctrl+H', testId: 'reader-history', onSelect: () => setOpen('history') },
-        { id: 'side', label: t('reader.sideBySide'), testId: 'reader-side-by-side', disabled: later, onSelect: () => {} },
+        { id: 'side', label: p.split ? t('reader.unsplit') : t('reader.sideBySide'), testId: 'reader-side-by-side', onSelect: p.onSideBySide },
       ],
     },
     {
@@ -153,8 +160,9 @@ export function ReaderBar(p: Props) {
         { id: 'export', label: t('reader.exportCopy'), testId: 'reader-export-copy', disabled: later, onSelect: () => {} },
       ],
     },
-    { id: 'c', items: [{ id: 'guide', label: t('reader.guideMode'), keys: 'G', testId: 'reader-guide', disabled: later, onSelect: () => {} }] },
-  ];
+    // The guide checkbox exists only while Experimental features is on; with it off the menu has no trace of it.
+    { id: 'c', items: p.guide ? [{ id: 'guide', label: t('reader.guideMode'), keys: 'G', checked: p.guide.on, testId: 'reader-guide', onSelect: p.guide.onToggle }] : [] },
+  ].filter((g) => g.items.length > 0);
 
   const tools = TOOLS.map((id) => {
     const label = t(`reader.tools.${id}`);
@@ -262,7 +270,7 @@ export function ReaderBar(p: Props) {
         <ReaderMenu anchor={studyBtn} open={open === 'study'} onClose={close} groups={studyGroups} label={t('reader.study')} width={280} />
       </div>
       <div className="rbar__grp rbar__end">
-        <BarButton label={t('reader.panel')} pressed={p.sideOpen} testId="reader-side" onClick={p.onSide}>
+        <BarButton label={t('reader.panel')} pressed={p.sideOpen} disabled={!!p.sideDisabled} reason={p.sideDisabled} testId="reader-side" onClick={p.onSide}>
           <Glyph name="panel" />
         </BarButton>
         <BarButton label={t('reader.more')} expanded={open === 'more'} testId="reader-more" buttonRef={moreBtn} onClick={() => setOpen(open === 'more' ? null : 'more')}>

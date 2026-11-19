@@ -10,7 +10,7 @@ import { errorMessage } from '../../lib/errors';
 import { useHistory } from '../../lib/history';
 import { resolveShortcut, useEffectiveShortcuts, useShortcutMatcher } from '../../lib/keymap';
 import { useNotify } from '../../lib/notify';
-import type { ReaderTarget } from '../../lib/reader';
+import { EXPERIMENTAL_KEY, useReader, type ReaderTarget } from '../../lib/reader';
 import { rl } from '../../lib/rl';
 import { RlError } from '../../lib/rl-error';
 import { useApp } from '../../state/app-context';
@@ -46,6 +46,21 @@ const ExplainCard = lazyView(() => import('./ExplainCard').then((m) => ({ defaul
 // The literature note of the paper (tab "Literature" of the notes) loads when that tab is opened.
 const LiteratureRow = lazyView(() => import('../literature/LiteratureNote').then((m) => ({ default: m.LiteratureRow })), ['literature', 'reader']);
 
+// Citation cards (29), the guide margin (30) and the partner picker of "Open another paper beside this one" load when first needed.
+const CitationLayer = lazyView(() => import('./CitationCard').then((m) => ({ default: m.CitationLayer })), ['reader']);
+const GuideMargin = lazyView(() => import('./GuideMargin').then((m) => ({ default: m.GuideMargin })), ['reader']);
+const PartnerPicker = lazyView(() => import('./PartnerPicker').then((m) => ({ default: m.PartnerPicker })), ['reader']);
+
+/** Side by side (feature 3): what `SplitReader` tells each of its two readers. Only the side with the focus shows the bar. */
+export interface SplitProps {
+  active: boolean;
+  onFocus(): void;
+  /** The title of the bar: "A ⇄ B". */
+  title: string;
+  /** Closes the split and keeps this paper alone. */
+  onUnsplit(): void;
+}
+
 type Failure = { kind: 'notPdf' | 'missing' | 'encrypted' | 'invalid' | 'failed' } | { kind: 'error'; error: unknown };
 type Side = 'annotations' | 'notes' | 'info';
 type Scope = 'pageNote' | 'fileNote' | 'notes' | 'literature';
@@ -77,6 +92,7 @@ function loadCtx(): Ctx {
 interface Props {
   target: ReaderTarget;
   onClose(): void;
+  split?: SplitProps;
 }
 
 /**
@@ -85,7 +101,7 @@ interface Props {
  * (Select, Highlight, Underline, Eraser; `toolMachine.ts`) and then annotates. The bar of the reader (`ReaderBar`) takes the
  * place of the top bar of the shell when the shell has a slot for it, and sits on top of the reader otherwise.
  */
-export function ReaderView({ target, onClose }: Props) {
+export function ReaderView({ target, onClose, split }: Props) {
   const { t } = useTranslation();
   const { reportError, fail, info: notifyInfo } = useNotify();
   const docId = target.docId;
@@ -121,6 +137,16 @@ export function ReaderView({ target, onClose }: Props) {
   // "✦ Spiega" (31): the passage being explained and where its card hangs.
   const [explain, setExplain] = useState<{ req: ExplainRequest; anchor: () => Anchor | null; key: number } | null>(null);
   const { config } = useApp();
+  const { openReader } = useReader();
+  const [picker, setPicker] = useState(false);
+  // Experimental features (30): the guide exists only while the flag is on; with it off nothing of it is read, drawn or kept.
+  const [experimental] = useLocalFlag(EXPERIMENTAL_KEY, false);
+  const [guideFlag, setGuideFlag] = useLocalFlag('rl.readerGuide', false);
+  const guideOn = experimental && guideFlag;
+  const [guideHost, setGuideHost] = useState<HTMLElement | null>(null);
+  // Citation cards (29): the layer is loaded at the first movement over the pages in Select, or at Alt+C.
+  const [citeArmed, setCiteArmed] = useState(false);
+  const [citeReq, setCiteReq] = useState(0);
   // The tool machine: its state is kept in a ref too, so a burst of events (a drag) always steps from the latest state.
   const [machine, setMachine] = useState<{ ctx: Ctx; mode: Mode }>(() => ({ ctx: loadCtx(), mode: { m: 'idle', hasSelection: false } }));
   const mref = useRef(machine);
@@ -130,9 +156,10 @@ export function ReaderView({ target, onClose }: Props) {
 
   // The chat uses the open document and page as its context.
   const { publishReader } = useAiUi();
+  const publishing = !split || split.active;
   useEffect(() => {
-    publishReader({ docId, page });
-  }, [docId, page, publishReader]);
+    if (publishing) publishReader({ docId, page });
+  }, [docId, page, publishReader, publishing]);
   useEffect(() => () => publishReader(null), [publishReader]);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -571,6 +598,14 @@ export function ReaderView({ target, onClose }: Props) {
     void createFrom(kind, read.pieces, false, color);
   };
 
+  /** "Keep" in the guide: the passage becomes a highlight of the user in the current colour. */
+  const keepPassage = async (page: number, rects: Rect[], text: string) => (await ann.save({ kind: 'highlight', page, rects, text: text.slice(0, STUDY_LIMITS.annotationText), color, geom: 2 })) !== null;
+  /** True when a point is on an annotation: a click there belongs to the annotation, not to a citation card. */
+  const onMark = useCallback((x: number, y: number) => {
+    const at = viewerRef.current?.pointAt({ target: document.elementFromPoint(x, y), clientX: x, clientY: y });
+    return !!at && annotationAt(annotationsRef.current, at.page, at.x, at.y) !== undefined;
+  }, []);
+
   const pick = (a: Annotation) => {
     setPending(null);
     setMode({ m: 'selected', annId: a.id });
@@ -612,6 +647,7 @@ export function ReaderView({ target, onClose }: Props) {
     }
   };
   const onPointerMove = (e: ReactPointerEvent) => {
+    if (!citeArmed && mref.current.ctx.tool === 'select') setCiteArmed(true);
     if (mref.current.mode.m === 'cropping') {
       const start = cropStart.current;
       const box = start ? layers.get(start.page)?.getBoundingClientRect() : undefined;
@@ -645,6 +681,8 @@ export function ReaderView({ target, onClose }: Props) {
     if (matches(e, 'reader.close')) return (e.preventDefault(), closeReader());
     if (findOpen && matches(e, 'reader.highlight')) return (e.preventDefault(), annotateMatch('highlight'));
     if (findOpen && matches(e, 'reader.underline')) return (e.preventDefault(), annotateMatch('underline'));
+    // Alt+C: the citation card of the reference nearest to the focus (29).
+    if (e.altKey && !mod && !inField && e.key.toLowerCase() === 'c') return (e.preventDefault(), setCiteArmed(true), setCiteReq((n) => n + 1));
     if (mod && !e.altKey) {
       const key = e.key.toLowerCase();
       if (key === 'g') return (e.preventDefault(), pageInputRef.current?.select());
@@ -673,6 +711,8 @@ export function ReaderView({ target, onClose }: Props) {
       containerRef.current?.scrollBy({ top: -(containerRef.current.clientHeight * 0.9) });
       return;
     }
+    // G: the guide layer (30), only while Experimental features is on.
+    if (experimental && !onButton && e.key.toLowerCase() === 'g') return (e.preventDefault(), setGuideFlag(!guideFlag));
     const id = resolveShortcut(e, keys, 'reader-tool') ?? (e.key === 'Backspace' ? 'reader.annotation.delete' : null);
     if (id) {
       const tool = TOOL_OF[id];
@@ -697,6 +737,8 @@ export function ReaderView({ target, onClose }: Props) {
 
   /* ---------------------------------------------------------------- render */
 
+  // Two papers: each has its own pages and tools, so the notes panel gives way (the bar's panel button says why).
+  const sideShown = sideOpen && !split;
   const title = safeText(doc?.title?.trim() || info?.title || '') || t('reader.untitled');
   const errorText = failure === null ? null : failure.kind === 'error' ? errorMessage(failure.error, t) : t(`reader.errors.${failure.kind}`);
   const markAnchor = useCallback((id: string): Anchor | null => {
@@ -730,7 +772,7 @@ export function ReaderView({ target, onClose }: Props) {
 
   const bar = (
     <ReaderBar
-      title={title}
+      title={split ? split.title : title}
       ready={ready}
       tool={ctx.tool}
       color={ctx.color}
@@ -754,8 +796,12 @@ export function ReaderView({ target, onClose }: Props) {
       pdf={pdf}
       onStudy={setStudyState}
       onUnderlined={setUnderlined}
-      sideOpen={sideOpen}
+      sideOpen={sideShown}
       onSide={() => setSideOpen(!sideOpen)}
+      sideDisabled={split ? t('reader.split.panelOff') : undefined}
+      split={!!split}
+      onSideBySide={() => (split ? split.onUnsplit() : setPicker(true))}
+      guide={experimental ? { on: guideFlag, onToggle: () => setGuideFlag(!guideFlag) } : undefined}
       canUndo={history.canUndo}
       onUndo={() => void history.undo()}
       onOpenFile={() => void rl.invoke('documents:open', { docId }).catch(reportError)}
@@ -771,10 +817,13 @@ export function ReaderView({ target, onClose }: Props) {
       data-testid="reader"
       data-doc-id={docId}
       onKeyDown={onKeyDown}
-      onFocus={() => setAway(false)}
+      onFocus={() => {
+        setAway(false);
+        split?.onFocus();
+      }}
       onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setAway(true)}
     >
-      {slot === undefined ? null : slot ? createPortal(bar, slot) : bar}
+      {slot === undefined || (split && !split.active) ? null : slot ? createPortal(bar, slot) : bar}
       {pdf.consentOpen(ann.annotations.length) && !consentDialog && <PdfConsentBanner onChoose={pdf.choose} />}
       {consentDialog && (
         <PdfConsentDialog
@@ -791,7 +840,7 @@ export function ReaderView({ target, onClose }: Props) {
       )}
       {pdf.ask === 'consent' && <PdfConsentDialog onChoose={pdf.choose} onClose={() => pdf.setAsk(null)} />}
       <PdfConfirmDialogs pdf={pdf} docId={docId} />
-      <div className={sideOpen ? 'reader-body with-side' : 'reader-body'}>
+      <div className={sideShown ? 'reader-body with-side' : 'reader-body'}>
         <div className="reader-main">
           {findOpen && (
             <FindBar
@@ -895,6 +944,28 @@ export function ReaderView({ target, onClose }: Props) {
               onReconfirm={() => void change(selected, {})}
             />
           )}
+          {citeArmed && (
+            <Lazy>
+              <CitationLayer docId={docId} container={containerRef.current} enabled={ctx.tool === 'select'} isMark={onMark} request={citeReq} />
+            </Lazy>
+          )}
+          {guideOn && (
+            <Lazy>
+              <GuideMargin docId={docId} layers={layers} viewer={viewerRef.current} ready={ready} listHost={guideHost} onKeep={keepPassage} onOff={() => setGuideFlag(false)} />
+            </Lazy>
+          )}
+          {picker && (
+            <Lazy>
+              <PartnerPicker
+                current={docId}
+                onPick={(other) => {
+                  setPicker(false);
+                  openReader(docId, page, { beside: other });
+                }}
+                onClose={() => setPicker(false)}
+              />
+            </Lazy>
+          )}
           {explain && (
             <Lazy>
               <ExplainCard key={explain.key} docId={docId} request={explain.req} anchor={explain.anchor} onClose={() => setExplain(null)} />
@@ -913,7 +984,7 @@ export function ReaderView({ target, onClose }: Props) {
           )}
         </div>
 
-        {sideOpen && (
+        {sideShown && (
           <aside className="reader-side" aria-label={t('reader.panel')} data-testid="reader-side-panel">
             <div className="rl-tabs" role="tablist" aria-label={t('reader.panel')}>
               {SIDES.map((id) => (
@@ -923,6 +994,7 @@ export function ReaderView({ target, onClose }: Props) {
               ))}
             </div>
             <div role="tabpanel" id="reader-sidepanel" aria-labelledby={`reader-panel-${side}`} className="reader-tabpanel">
+              {side === 'annotations' && guideOn && <div ref={setGuideHost} data-testid="guide-host" />}
               {side === 'annotations' && (
                 <AnnotationList
                   docId={docId}

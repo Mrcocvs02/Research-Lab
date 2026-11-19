@@ -26,6 +26,7 @@ import { graphHandlers } from './graph-handlers.js';
 import { backupHandlers, maintenanceHandlers } from './backup-handlers.js';
 import { discoverHandlers } from './discover-handlers.js';
 import { cropsHandlers, explainHandlers, linksHandlers, literatureHandlers, templatesHandlers } from './readertools-handlers.js';
+import { guidesHandlers, refsHandlers } from './refs-handlers.js';
 
 export type { MainServices } from './services.js';
 
@@ -74,5 +75,7 @@ export function buildHandlers(s: MainServices): HandlerMap<Channels> {
     ...templatesHandlers(s),
     ...linksHandlers(s),
     ...discoverHandlers(s),
+    ...refsHandlers(s),
+    ...guidesHandlers(s),
   };
 }

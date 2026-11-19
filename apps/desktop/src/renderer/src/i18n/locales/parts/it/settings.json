@@ -236,5 +236,18 @@
       "name": "Nome del modello",
       "body": "Testo del modello"
     }
+  },
+  "advanced": {
+    "experimental": "Funzioni sperimentali"
+  },
+  "grp": {
+    "experimental": "Funzioni sperimentali"
+  },
+  "ix": {
+    "experimental": "Funzioni sperimentali|guida evidenziazioni margine beta prove"
+  },
+  "experimental": {
+    "label": "Funzioni sperimentali",
+    "help": "Accende funzioni ancora in prova, come la guida di lettura nel margine. A funzione spenta non gira nulla."
   }
 }

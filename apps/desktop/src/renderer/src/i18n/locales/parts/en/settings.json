@@ -236,5 +236,18 @@
       "name": "Name of the template",
       "body": "Text of the template"
     }
+  },
+  "advanced": {
+    "experimental": "Experimental features"
+  },
+  "grp": {
+    "experimental": "Experimental features"
+  },
+  "ix": {
+    "experimental": "Experimental features|guide highlights margin beta labs"
+  },
+  "experimental": {
+    "label": "Experimental features",
+    "help": "Turns on features still being tried, such as the reading guide in the margin. Nothing runs while this is off."
   }
 }

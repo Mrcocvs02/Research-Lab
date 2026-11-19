@@ -8,15 +8,19 @@ export interface ReaderTarget {
   docId: string;
   page?: number;
   panel?: ReaderPanel;
+  /** A second paper read side by side with `docId` (feature 3); when set, the reader is the split one. */
+  beside?: string;
   /** Changes at every request, so that asking for the same page again scrolls there again. */
   nonce: number;
 }
+/** Settings › Advanced › "Experimental features": a per-viewer flag (the experiments, like the guide, exist only while it is on). */
+export const EXPERIMENTAL_KEY = 'rl.experimental';
 export type ReaderPanel = 'annotations' | 'pageNote' | 'fileNote' | 'notes';
 
 interface ReaderValue {
   target: ReaderTarget | null;
   /** Opens the in-app reader on a document (a PDF), optionally at a page. Any view can call it; phase 4 links use it too. */
-  openReader(docId: string, page?: number, opts?: { panel?: ReaderPanel }): void;
+  openReader(docId: string, page?: number, opts?: { panel?: ReaderPanel; beside?: string }): void;
   /**
    * Closes the reader after every unsaved note has been saved; if one cannot be saved the reader stays open (the editor
    * shows the error) and nothing typed is lost.
@@ -33,7 +37,7 @@ const Ctx = createContext<ReaderValue>(NONE);
 export function ReaderProvider({ children }: { children: ReactNode }) {
   const [target, setTarget] = useState<ReaderTarget | null>(null);
   const openReader = useCallback<ReaderValue['openReader']>((docId, page, opts) => {
-    setTarget((cur) => ({ docId, ...(page !== undefined ? { page } : {}), ...(opts?.panel ? { panel: opts.panel } : {}), nonce: (cur?.nonce ?? 0) + 1 }));
+    setTarget((cur) => ({ docId, ...(page !== undefined ? { page } : {}), ...(opts?.panel ? { panel: opts.panel } : {}), ...(opts?.beside && opts.beside !== docId ? { beside: opts.beside } : {}), nonce: (cur?.nonce ?? 0) + 1 }));
   }, []);
   const { t } = useTranslation();
   const { fail } = useNotify();

@@ -4,8 +4,10 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SRC, TOKENS_CSS } from './tokensModel';
 
-// 5.6: no literal colour outside styles/tokens.css. Excepted: the vendored pdf.js sheet (not ours) and the SVG icons (currentColor in tsx).
+// 5.6: no literal colour outside styles/tokens.css. Excepted: the vendored pdf.js sheet (not ours), the SVG icons (currentColor in tsx)
+// and the Map's categorical palette, a token file of its own by design (D-452; its 3:1 contrast is checked in network.test.ts).
 const PDFJS_SHEET = path.join(SRC, 'views/reader/pdfjs-viewer.css');
+const MAP_PALETTE = path.join(SRC, 'views/network/palette.css');
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -32,7 +34,7 @@ export function literalColors(css: string): string[] {
 }
 
 describe('no literal colours outside tokens.css', () => {
-  const sheets = walk(SRC).filter((f) => f.endsWith('.css') && f !== TOKENS_CSS && f !== PDFJS_SHEET);
+  const sheets = walk(SRC).filter((f) => f.endsWith('.css') && f !== TOKENS_CSS && f !== PDFJS_SHEET && f !== MAP_PALETTE);
 
   it('finds the stylesheets of the split (sanity)', () => {
     const names = sheets.map((f) => path.relative(SRC, f).replace(/\\/g, '/'));

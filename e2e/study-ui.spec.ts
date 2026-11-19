@@ -121,7 +121,7 @@ test('highlight a PDF in the reader, write a page note, restart, find both again
     for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
     delete env.ELECTRON_RENDERER_URL;
     delete env.ELECTRON_RUN_AS_NODE;
-    Object.assign(env, { RL_USER_DATA_DIR: ctx.userDataDir, RL_LOCAL_DATA_DIR: ctx.localDataDir, NODE_ENV: 'production', RL_E2E_HIDDEN: '1' });
+    Object.assign(env, { RL_USER_DATA_DIR: ctx.userDataDir, RL_LOCAL_DATA_DIR: ctx.localDataDir, NODE_ENV: 'production', RL_E2E: '1', RL_E2E_HIDDEN: '1' });
     second = await electron.launch({ args: [DESKTOP_DIR], env });
     window = await second.firstWindow();
     await window.getByTestId('search-result').first().waitFor({ state: 'visible', timeout: 60_000 });

@@ -1,18 +1,30 @@
 import { useEffect, useId, useMemo, useState, type CSSProperties, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TaxonomyNodeView } from '@rl/core';
+import type { TagProposal, TaxonomyNodeView } from '@rl/core';
 import { Button } from '../../components/Button';
 import { IconPlus } from '../../components/icons';
+import { Lazy, lazyView } from '../../components/Lazy';
+import { Tabs } from '../../components/Tabs';
 import { Tree } from '../../components/Tree';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
+import { useNav } from '../../lib/nav';
+import { rl } from '../../lib/rl';
 import { useNotify } from '../../lib/notify';
 import { splitLines } from '../../lib/validate';
 import { safeText } from './safeText';
 import { TagChip, TagPicker } from './TagParts';
-import { canDelete, descendants, parentsAfterDrop, fold, flattenTree, impliesCycle, pathLabel, wouldCycle, type TreeRow } from './taxonomyModel';
-import { TaxonomyFamilies } from './TaxonomyFamilies';
+import { canDelete, descendants, parentsAfterDrop, fold, flattenTree, impliesCycle, pathLabel, treeSections, wouldCycle, type TreeRow } from './taxonomyModel';
+import './tags/tags.css';
+import { TagHealth } from './tags/TagHealth';
+import type { HealthTarget } from './tags/tagHealthModel';
+import { applyItem, proposalsFor, type ReviewFilter } from './tags/tagReviewModel';
+import { useTagChange, useTagReview } from './tags/useTagReview';
 import { useTaxonomy } from './useTaxonomy';
+
+// "To review" and the guided cleanup load when first opened (D-501); each has its own chunk.
+const TagReview = lazyView(() => import('./tags/TagReview').then((m) => ({ default: m.TagReview })), ['taxonomy']);
+const TagCleanup = lazyView(() => import('./tags/TagCleanup').then((m) => ({ default: m.TagCleanup })), ['taxonomy']);
 
 export const PRESET_COLORS = ['#d9480f', '#e8590c', '#f08c00', '#2f9e44', '#0c8599', '#1971c2', '#4263eb', '#7048e8', '#ae3ec9', '#d6336c', '#868e96', '#495057'];
 
@@ -57,8 +69,43 @@ function Fold({ id, title, open, children }: { id: string; title: string; open?:
   );
 }
 
+/** The review rows that touch the node ("Similar"), each with its one-click merge. */
+function Similar({ node, proposals, onSelect }: { node: TaxonomyNodeView; proposals: TagProposal[]; onSelect(id: string): void }) {
+  const { t } = useTranslation();
+  const { labelOf } = useTaxonomy();
+  const { run, offerUndo } = useTagChange();
+  const mine = proposalsFor(proposals, node.id);
+  if (mine.length === 0) return null;
+  return (
+    <Fold id="similar" title={t('tax.similar', { count: mine.length })}>
+      <ul className="plain-list" data-testid="node-similar">
+        {mine.map((p) => (
+          <li key={p.id}>
+            {p.tags.map((id) => safeText(labelOf(id))).join(' · ')}{' '}
+            <button
+              type="button"
+              className="link"
+              onClick={() =>
+                void run(() => rl.invoke('tagReview:apply', { items: [applyItem(p, { keep: node.id })] })).then((r) => {
+                  if (r) {
+                    offerUndo(t('tax.review.done.merge', { count: p.tags.length, name: safeText(node.label) }), r.changeId);
+                    if (p.tags.includes(node.id)) onSelect(node.id);
+                  }
+                })
+              }
+              data-testid="node-similar-merge"
+            >
+              {t('tax.review.accept.merge')}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Fold>
+  );
+}
+
 /** Edits one node: name, colour, aliases, parents, implications, status, merge and delete. */
-function NodeEditor({ node, onGone, onSelect }: { node: TaxonomyNodeView; onGone(): void; onSelect(id: string): void }) {
+function NodeEditor({ node, proposals, onGone, onSelect }: { node: TaxonomyNodeView; proposals: TagProposal[]; onGone(): void; onSelect(id: string): void }) {
   const { t } = useTranslation();
   const { model, apply, labelOf } = useTaxonomy();
   const { fail } = useNotify();
@@ -146,7 +193,23 @@ function NodeEditor({ node, onGone, onSelect }: { node: TaxonomyNodeView; onGone
         </div>
       </div>
 
+      {parents.length === 0 && (
+        <div className="field">
+          <label htmlFor={`${colorId}-fam`}>{t('tax.family.label')}</label>
+          <select id={`${colorId}-fam`} value={node.family ?? ''} onChange={(e) => void apply([{ op: 'setFamily', id: node.id, family: (e.target.value || null) as 'one' | 'many' | 'keywords' | null }])} data-testid="node-family">
+            <option value="">{t('tax.family.none')}</option>
+            {(['many', 'one', 'keywords'] as const).map((f) => (
+              <option key={f} value={f}>
+                {t(`tax.family.${f}`)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       </Fold>
+
+      <Similar node={node} proposals={proposals} onSelect={onSelect} />
 
       <Fold id="aliases" title={t('tax.sectionAliases')}>
       <CommitText label={t('tax.aliases')} value={node.aliases.join('\n')} multiline onCommit={(v) => void apply([{ op: 'setAliases', id: node.id, aliases: splitLines(v) }])} testId="node-aliases" />
@@ -377,23 +440,66 @@ function TypesAndVenues() {
   );
 }
 
-/** The taxonomy as a tree of free levels: create, rename, move (drag or "parents"), aliases, implications, colour, merge, deprecate, delete. */
+/** A new family: a root with a kind (D-493), made by two writes (the id of the root is only known once it exists). */
+function NewFamilyForm({ onDone }: { onDone(createdId: string | null): void }) {
+  const { t } = useTranslation();
+  const { apply } = useTaxonomy();
+  const [label, setLabel] = useState('');
+  const [kind, setKind] = useState<'many' | 'one'>('many');
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!label.trim() || busy) return;
+    setBusy(true);
+    const made = await apply([{ op: 'create', label: label.trim() }]);
+    const id = made?.created[0]?.id;
+    if (id) await apply([{ op: 'setFamily', id, family: kind }]);
+    setBusy(false);
+    if (id) onDone(id);
+  };
+  return (
+    <form className="inline-form" onSubmit={(e) => void submit(e)} onKeyDown={(e) => e.key === 'Escape' && onDone(null)} data-testid="tax-family-form">
+      <input type="text" autoFocus value={label} maxLength={60} onChange={(e) => setLabel(e.target.value)} aria-label={t('tax.family.name')} placeholder={t('tax.family.name')} data-testid="tax-family-name" />
+      <select value={kind} onChange={(e) => setKind(e.target.value as 'many' | 'one')} aria-label={t('tax.family.label')} data-testid="tax-family-kind-input">
+        <option value="many">{t('tax.family.many')}</option>
+        <option value="one">{t('tax.family.one')}</option>
+      </select>
+      <button type="submit" className="primary" disabled={busy || !label.trim()}>
+        {t('tax.create')}
+      </button>
+      <button type="button" onClick={() => onDone(null)}>
+        {t('common.cancel')}
+      </button>
+    </form>
+  );
+}
+
+/** The vocabulary: health strip, the tree (families, "To sort", Keywords) and "To review" in tabs, the node editor, and the guided cleanup. */
 export function TaxonomyManager({ onBack }: { onBack(): void }) {
   const { t } = useTranslation();
   const { model, loaded, error, apply, view } = useTaxonomy();
   const { fail } = useNotify();
+  const { navigate } = useNav();
   const [selected, setSelected] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showDeprecated, setShowDeprecated] = useState(true);
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
+  const [newFamily, setNewFamily] = useState(false);
+  const [tab, setTab] = useState<'tree' | 'review'>('tree');
+  const [filter, setFilter] = useState<ReviewFilter | null>(null);
+  const [only, setOnly] = useState<Set<string> | null>(null);
+  const [cleanup, setCleanup] = useState<{ step: number | null } | null>(null);
   const queryId = useId();
+  const { data: review } = useTagReview();
 
   const visible = useMemo(() => {
     const q = fold(query);
-    if (!q) return null;
+    if (!q && !only) return null;
     const hits = new Set<string>();
-    for (const n of model.nodes) if (fold(n.label).includes(q) || n.aliases.some((a) => fold(a).includes(q))) hits.add(n.id);
+    if (q) {
+      for (const n of model.nodes) if (fold(n.label).includes(q) || n.aliases.some((a) => fold(a).includes(q))) hits.add(n.id);
+    } else for (const id of only!) hits.add(id);
     // keep the ancestors of every hit so the tree stays connected
     const keep = new Set(hits);
     const up = (id: string) => {
@@ -406,12 +512,14 @@ export function TaxonomyManager({ onBack }: { onBack(): void }) {
     };
     for (const h of hits) up(h);
     return keep;
-  }, [model, query]);
+  }, [model, query, only]);
 
-  const rows = useMemo(
-    () => flattenTree(model, visible ? 'all' : expanded, (n) => (!showDeprecated && n.status === 'deprecated') || (visible !== null && !visible.has(n.id))),
-    [model, expanded, showDeprecated, visible],
-  );
+  const sections = useMemo(() => treeSections(model), [model]);
+  const legacy = sections.families.length === 0 && sections.keywords === null;
+  const rowsOf = (roots: readonly string[]) => flattenTree(model, visible ? 'all' : expanded, (n) => (!showDeprecated && n.status === 'deprecated') || (visible !== null && !visible.has(n.id)), roots);
+  const familyRows = rowsOf(legacy ? model.roots : sections.families);
+  const unsortedRows = legacy ? [] : rowsOf(sections.unsortedRoots);
+  const keywordRows = sections.keywords ? rowsOf([sections.keywords]) : [];
   const node = selected ? model.byId.get(selected) : undefined;
   useEffect(() => {
     if (selected && loaded && !model.byId.has(selected)) setSelected(null);
@@ -438,7 +546,50 @@ export function TaxonomyManager({ onBack }: { onBack(): void }) {
     void apply([{ op: 'move', id: dragged.id, parents }]);
   };
 
+  const open = (target: HealthTarget) => {
+    if (target.to === 'review') {
+      setFilter(target.filter);
+      setTab('review');
+    } else if (target.to === 'tree') {
+      setOnly(new Set(target.ids));
+      setTab('tree');
+    } else setCleanup({ step: target.step });
+  };
+
+  const tree = (rows: TreeRow[], testId: string) => (
+    <Tree
+      items={rows}
+      selectedKey={rows.find((r) => r.id === selected)?.key ?? null}
+      ariaLabel={t('tax.treeLabel')}
+      testId={testId}
+      draggable
+      dataKey={(r) => r.id}
+      onSelect={(r) => setSelected(r.id)}
+      onToggle={toggle}
+      onDrop={drop}
+      renderLabel={(r) => {
+        const n = model.byId.get(r.id)!;
+        return (
+          <>
+            <span className="rl-swatch" style={n.color ? ({ background: n.color } as CSSProperties) : undefined} aria-hidden="true" />
+            <span className={n.status === 'deprecated' ? 'tree-name deprecated' : 'tree-name'}>{safeText(n.label)}</span>
+            {n.family && r.parentId === null && (
+              <span className="badge" data-testid="tax-family-kind" data-family={n.family}>
+                {t(`tax.family.${n.family}`)}
+              </span>
+            )}
+            {n.parents.length > 1 && <span className="badge" title={t('tax.multiParent')}>{n.parents.length}↑</span>}
+            <span className="facet-count" title={t('tags.countHint')} data-testid="tax-count">
+              {n.counts.subtree}
+            </span>
+          </>
+        );
+      }}
+    />
+  );
+
   if (error && !loaded) return <ErrorNote>{errorMessage(error, t)}</ErrorNote>;
+  const reviewCount = review?.proposals.length ?? 0;
   return (
     <div className="taxonomy-page" data-testid="taxonomy-manager">
       <header className="library-head">
@@ -450,72 +601,108 @@ export function TaxonomyManager({ onBack }: { onBack(): void }) {
           <h1>{t('tax.pageTitle')}</h1>
         </nav>
         <div className="library-head__acts">
+          <Button onClick={() => setNewFamily(true)} data-testid="tax-family-new">
+            {t('tax.family.new')}
+          </Button>
           <Button variant="primary" icon={<IconPlus size={16} />} onClick={() => setCreating(true)} data-testid="new-top-level">
             {t('tax.newTopLevelButton')}
           </Button>
         </div>
       </header>
-      <div className="taxonomy-manager">
-      <div className="taxonomy-tree-pane">
-        {creating && (
-          <NewNodeForm
-            parent={null}
-            onDone={(id) => {
-              setCreating(false);
-              if (id) setSelected(id);
-            }}
+      {review && <TagHealth health={review.health} onOpen={open} onCleanup={() => setCleanup({ step: null })} />}
+      {cleanup ? (
+        <Lazy>
+          <TagCleanup initialStep={cleanup.step} onClose={() => setCleanup(null)} onMap={() => navigate({ view: 'map' })} />
+        </Lazy>
+      ) : (
+        <>
+          <Tabs
+            label={t('tax.tabs')}
+            value={tab}
+            onChange={(v) => setTab(v as 'tree' | 'review')}
+            testIdBase="tax-tab"
+            tabs={[
+              { id: 'tree', label: t('tax.tabTree') },
+              { id: 'review', label: t('tax.tabReview', { count: reviewCount }) },
+            ]}
           />
-        )}
-        <div className="field">
-          <label htmlFor={queryId}>{t('tax.search')}</label>
-          <input id={queryId} type="search" value={query} onChange={(e) => setQuery(e.target.value)} data-testid="tax-search" />
-        </div>
-        <div className="check">
-          <input id={`${queryId}-dep`} type="checkbox" checked={showDeprecated} onChange={(e) => setShowDeprecated(e.target.checked)} />
-          <label htmlFor={`${queryId}-dep`}>{t('tax.showDeprecated')}</label>
-        </div>
-        <p className="hint">{t('tax.dragHint')}</p>
-        {loaded && rows.length === 0 ? (
-          <p className="empty" data-testid="tax-empty">
-            {query ? t('tax.noMatch') : t('tax.empty')}
-          </p>
-        ) : (
-          <Tree
-            items={rows}
-            selectedKey={rows.find((r) => r.id === selected)?.key ?? null}
-            ariaLabel={t('tax.treeLabel')}
-            testId="tax-tree"
-            draggable
-            dataKey={(r) => r.id}
-            onSelect={(r) => setSelected(r.id)}
-            onToggle={toggle}
-            onDrop={drop}
-            renderLabel={(r) => {
-              const n = model.byId.get(r.id)!;
-              return (
-                <>
-                  <span className="rl-swatch" style={n.color ? ({ background: n.color } as CSSProperties) : undefined} aria-hidden="true" />
-                  <span className={n.status === 'deprecated' ? 'tree-name deprecated' : 'tree-name'}>{safeText(n.label)}</span>
-                  {n.parents.length > 1 && <span className="badge" title={t('tax.multiParent')}>{n.parents.length}↑</span>}
-                  <span className="facet-count" title={t('tags.countHint')} data-testid="tax-count">
-                    {n.counts.subtree}
-                  </span>
-                </>
-              );
-            }}
-          />
-        )}
-        {view && <TaxonomyFamilies />}
-        {view && <TypesAndVenues />}
-      </div>
-      <div className="taxonomy-editor-pane">
-        {node ? (
-          <NodeEditor key={node.id} node={node} onGone={() => setSelected(null)} onSelect={setSelected} />
-        ) : (
-          <p className="hint">{t('tax.selectHint')}</p>
-        )}
-      </div>
-      </div>
+          {tab === 'review' ? (
+            review ? (
+              <Lazy>
+                <TagReview key={filter ?? 'all'} data={review} initial={filter} />
+              </Lazy>
+            ) : null
+          ) : (
+            <div className="taxonomy-manager">
+              <div className="taxonomy-tree-pane">
+                {creating && (
+                  <NewNodeForm
+                    parent={null}
+                    onDone={(id) => {
+                      setCreating(false);
+                      if (id) setSelected(id);
+                    }}
+                  />
+                )}
+                {newFamily && (
+                  <NewFamilyForm
+                    onDone={(id) => {
+                      setNewFamily(false);
+                      if (id) setSelected(id);
+                    }}
+                  />
+                )}
+                <div className="field">
+                  <label htmlFor={queryId}>{t('tax.search')}</label>
+                  <input id={queryId} type="search" value={query} onChange={(e) => setQuery(e.target.value)} data-testid="tax-search" />
+                </div>
+                {only && (
+                  <p className="hint" data-testid="tax-only">
+                    {t('tax.only', { count: only.size })}{' '}
+                    <button type="button" className="link" onClick={() => setOnly(null)}>
+                      {t('tax.onlyClear')}
+                    </button>
+                  </p>
+                )}
+                <div className="check">
+                  <input id={`${queryId}-dep`} type="checkbox" checked={showDeprecated} onChange={(e) => setShowDeprecated(e.target.checked)} />
+                  <label htmlFor={`${queryId}-dep`}>{t('tax.showDeprecated')}</label>
+                </div>
+                <p className="hint">{t('tax.dragHint')}</p>
+                {loaded && familyRows.length + unsortedRows.length + keywordRows.length === 0 ? (
+                  <p className="empty" data-testid="tax-empty">
+                    {query || only ? t('tax.noMatch') : t('tax.empty')}
+                  </p>
+                ) : (
+                  <>
+                    {tree(familyRows, 'tax-tree')}
+                    {unsortedRows.length > 0 && (
+                      <details open className="tax-section" data-testid="tax-unsorted">
+                        <summary>{t('tax.unsorted', { count: sections.unsortedIds.length })}</summary>
+                        {tree(unsortedRows, 'tax-tree-unsorted')}
+                      </details>
+                    )}
+                    {keywordRows.length > 0 && (
+                      <details className="tax-section" data-testid="tax-keywords" open={visible !== null}>
+                        <summary>{t('tax.keywords', { count: model.children.get(sections.keywords!)?.length ?? 0 })}</summary>
+                        {tree(keywordRows, 'tax-tree-keywords')}
+                      </details>
+                    )}
+                  </>
+                )}
+                {view && <TypesAndVenues />}
+              </div>
+              <div className="taxonomy-editor-pane">
+                {node ? (
+                  <NodeEditor key={node.id} node={node} proposals={review?.proposals ?? []} onGone={() => setSelected(null)} onSelect={setSelected} />
+                ) : (
+                  <p className="hint">{t('tax.selectHint')}</p>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

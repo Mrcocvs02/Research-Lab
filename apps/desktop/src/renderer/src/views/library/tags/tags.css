@@ -1,0 +1,169 @@
+/* the vocabulary: health strip, review list, guided cleanup (D-494, D-497) */
+.tag-health {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--space-3);
+}
+.tag-health__chip {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text-muted);
+}
+.tag-health__chip.is-flagged {
+  border-color: var(--warning, var(--accent));
+  color: var(--text);
+}
+.tax-section {
+  margin-top: var(--space-3);
+}
+.tax-section > summary {
+  min-height: 32px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tag-review__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.tag-review__show {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag-review__row {
+  display: grid;
+  grid-template-columns: auto minmax(110px, 0.7fr) minmax(0, 1.6fr) auto minmax(0, 1.4fr) auto auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.tag-review__row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.tag-review__row.is-folded {
+  opacity: 0.6;
+}
+.tag-review__tags {
+  overflow-wrap: anywhere;
+}
+.tag-review__to {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.tag-review__acts {
+  display: flex;
+  gap: 6px;
+}
+.tag-review__n,
+.tag-review__why {
+  color: var(--text-muted);
+  font-size: var(--fs-caption);
+}
+.tag-ai-text {
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  font-size: var(--fs-caption);
+}
+.tag-cleanup__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.tag-cleanup__head h2 {
+  margin: 0;
+  font-size: var(--fs-title);
+}
+.tag-cleanup__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tag-cleanup__steps button {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: transparent;
+}
+.tag-cleanup__steps button.is-current {
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.tag-cleanup__steps button[data-state='applied']::after {
+  content: ' ✓';
+}
+.tag-cleanup__rows {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+}
+.tag-cleanup__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tag-cleanup__row.is-marked {
+  background: color-mix(in srgb, var(--warning, var(--accent)) 10%, transparent);
+}
+.tag-cleanup__table th,
+.tag-cleanup__table td {
+  padding: 4px 12px;
+  text-align: left;
+}
+.tag-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+.tag-board__put {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.tag-board__list,
+.tag-board__tree,
+.tag-board__tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.tag-board__list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+.tag-board__tree ul {
+  padding-left: 18px;
+}
+.tag-board__ghost {
+  font-style: italic;
+  opacity: 0.8;
+}
+@container (max-width: 700px) {
+  .tag-review__row,
+  .tag-board {
+    grid-template-columns: 1fr;
+  }
+}

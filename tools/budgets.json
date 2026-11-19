@@ -26,7 +26,10 @@
       "AssignDialog": 16,
       "AssignSuggestDialog": 16,
       "LinkFinderDialog": 16,
-      "DocLinks": 16
+      "DocLinks": 16,
+      "TagReview": 16,
+      "TagCleanup": 16,
+      "TagAiConfirm": 16
     }
   },
   "main": {

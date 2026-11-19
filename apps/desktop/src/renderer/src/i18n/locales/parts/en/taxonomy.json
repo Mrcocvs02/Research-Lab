@@ -62,13 +62,217 @@
     "sectionAliases": "Alternative names",
     "sectionRelations": "Relations",
     "sectionMerge": "Merge and retire",
-    "families": "Families (for the Map)",
-    "familiesHint": "A family groups tags of one kind, such as Method or System. The Map \"Group by\" lists them. To nest a tag under another, set its parent in the tag editor.",
-    "familyRename": "Rename",
-    "familyEmpty": "No tags yet",
-    "familyRemove": "Remove {{name}} from the family",
-    "familyAdd": "Add a tag to {{family}}",
-    "familyAddPlaceholder": "Add a tag…",
-    "familyNew": "New family name"
+    "family": {
+      "label": "Family",
+      "none": "None (to sort)",
+      "many": "many values",
+      "one": "one value",
+      "keywords": "keywords",
+      "new": "New family",
+      "name": "Family name"
+    },
+    "similar": "Similar ({{count}})",
+    "tabs": "Tag manager",
+    "tabTree": "Tree",
+    "tabReview": "To review ({{count}})",
+    "only": "Showing {{count}} tags behind the check.",
+    "onlyClear": "Show all",
+    "unsorted": "To sort ({{count}})",
+    "keywords": "Keywords ({{count}})",
+    "health": {
+      "title": "Vocabulary health",
+      "chip": {
+        "dupes": "Duplicates",
+        "twins": "Twins",
+        "singletons": "Single-paper tags",
+        "generic": "Too generic",
+        "orphans": "To sort",
+        "multiparent": "Several parents",
+        "onevalue": "Extra values",
+        "styles": "Name styles",
+        "metadata": "Metadata",
+        "unused": "Unused",
+        "depth": "Shallow"
+      },
+      "hint": {
+        "dupes": "Concepts written in several ways: open them in the review list",
+        "twins": "Groups of tags on exactly the same papers",
+        "singletons": "Tags on a single paper (keywords excluded)",
+        "generic": "Tags on more than half of the papers: they do not tell papers apart",
+        "orphans": "Tags outside every family",
+        "multiparent": "Tags with more than one parent",
+        "onevalue": "Papers with 2 or more values in a one-value family",
+        "styles": "Different name styles in use",
+        "metadata": "Tags that are really a venue or a publication status",
+        "unused": "Tags on no paper",
+        "depth": "The largest many-values family has too few levels"
+      }
+    },
+    "review": {
+      "title": "Proposals to review",
+      "undo": "Undo",
+      "show": "Show",
+      "empty": "Nothing to review.",
+      "acceptSure": "Accept the sure ones ({{count}})",
+      "kind": {
+        "merge": "Duplicates",
+        "twins": "Twins",
+        "parent": "Parents",
+        "name": "Names",
+        "metadata": "Metadata"
+      },
+      "conf": {
+        "sure": "Sure",
+        "likely": "Likely",
+        "maybe": "Maybe"
+      },
+      "reason": {
+        "form": "form",
+        "plural": "plural",
+        "alias": "alias",
+        "acronym-in-name": "acronym",
+        "acronym-expansion": "acronym",
+        "spelling": "spelling",
+        "twins": "twins",
+        "inclusion": "inclusion",
+        "cooccurrence": "co-occurrence",
+        "venue": "venue",
+        "status": "status",
+        "underscore": "underscore",
+        "case": "capitalisation",
+        "long": "too long"
+      },
+      "keep": "Keep",
+      "parentOf": "Put under",
+      "twinsAction": "What to do with the twins",
+      "rename": "Rename",
+      "action": {
+        "merge": "Merge into one",
+        "keywords": "Move to Keywords"
+      },
+      "field": {
+        "venue": "venue",
+        "status": "status"
+      },
+      "papers_one": "{{count}} paper",
+      "papers_other": "{{count}} papers",
+      "shared_one": "{{count}} paper in common",
+      "shared_other": "{{count}} papers in common",
+      "accept": {
+        "merge": "Merge",
+        "twins": "Apply",
+        "parent": "Put under",
+        "name": "Rename",
+        "metadata": "Move to the field"
+      },
+      "reject": {
+        "merge": "Not the same",
+        "twins": "Leave",
+        "parent": "No",
+        "name": "No",
+        "metadata": "No"
+      },
+      "done": {
+        "merge": "Merged {{count}} tags into “{{name}}”",
+        "twins": "Twins applied",
+        "parent": "Tag placed",
+        "name": "Renamed to “{{name}}”",
+        "metadata": "Moved to the field"
+      },
+      "doneMany": "Changes applied: {{count}}",
+      "rejected_one": "Marked as not the same",
+      "rejected_other": "Marked {{count}} as not the same",
+      "ai": {
+        "button": "✦ Ask for confirmation ({{count}})",
+        "none": "No uncertain pairs to ask about",
+        "title": "Confirm with Claude",
+        "what": "{{count}} uncertain pairs would be sent to {{model}}: only tag names with their family path and paper counts, never titles or texts.",
+        "noPrice": "price not known",
+        "cost": "About {{tokens}} input tokens · {{usd}}",
+        "cap": "The daily cap would be exceeded: nothing is sent.",
+        "send": "Send",
+        "off": {
+          "no-folder": "No folder is enabled for AI: enable one in the folder settings.",
+          "no-pairs": "There are no uncertain pairs to ask about."
+        },
+        "verdict": {
+          "same": "Claude: same",
+          "broader": "Claude: broader",
+          "narrower": "Claude: narrower",
+          "related": "Claude: related",
+          "different": "Claude: different"
+        }
+      }
+    },
+    "cleanup": {
+      "open": "Tidy up…",
+      "title": "Tidy up the vocabulary",
+      "close": "Back to the tags",
+      "step": {
+        "1": "Sure duplicates",
+        "2": "Likely duplicates",
+        "3": "Twins",
+        "4": "Families",
+        "5": "Names",
+        "6": "Summary"
+      },
+      "intro": {
+        "1": "Different spellings of the same tag. All ticked.",
+        "2": "Probable duplicates: the likely ones are ticked. You can ask Claude to confirm.",
+        "3": "Tags on the same papers: merge them, move them to Keywords, or leave them.",
+        "4": "Put every tag in a family: drag it, or select tags and use “Put in…”. Proposals stand in place as ghosts to confirm.",
+        "5": "Names according to the convention; the old name stays as an alias. Publication data becomes a field."
+      },
+      "stats": "{{tags}} tags · {{singletons}} on one paper · {{dupes}} duplicate concepts · {{orphans}} to sort · depth {{depth}}",
+      "state": {
+        "applied": "This step is applied.",
+        "skipped": "This step was skipped."
+      },
+      "noRows": "Nothing to propose in this step.",
+      "apply": "Apply and continue ({{count}})",
+      "skip": "Skip",
+      "undoStep": "Undo this step",
+      "undoAll": "Undo the whole tidy-up",
+      "toMap": "Go to the Map",
+      "before": "Before",
+      "after": "After",
+      "stat": {
+        "tags": "Tags",
+        "singletons": "On one paper",
+        "dupeConcepts": "Duplicate concepts",
+        "orphans": "To sort",
+        "maxDepth": "Depth"
+      },
+      "applied": "Step {{step}} applied ({{count}})",
+      "undone": "Undone: {{count}} steps",
+      "kind": {
+        "merge": "duplicate",
+        "twins": "twins",
+        "family": "old family to a root",
+        "onevalue": "one value per paper",
+        "paper-type": "paper type family",
+        "parent": "several parents",
+        "place": "placement",
+        "name": "name",
+        "metadata": "metadata"
+      },
+      "marked": "check",
+      "remains": "some papers keep the tag",
+      "variant": "Choice",
+      "variants": {
+        "default": "Proposed",
+        "merge": "Merge into one",
+        "keywords": "Move to Keywords",
+        "leave": "Leave",
+        "pick": "One value per paper",
+        "many": "Allow many values"
+      }
+    },
+    "board": {
+      "unsorted": "To sort ({{count}})",
+      "families": "Families",
+      "putIn": "Put in…",
+      "put": "Put in ({{count}})"
+    }
   }
 }

@@ -15,6 +15,18 @@ describe('index entry of a document', () => {
     expect(doc.directTags).toEqual(['nn']);
   });
 
+  it('shows the visible research groups as tags apart from the direct ones, and the stamp follows them (D-488)', async () => {
+    const lookup = makeTaxonomyLookup(taxonomyFileSchema.parse({ nodes: [node('nn')] }));
+    const r = { ...rec(['nn']), groups: ['Lab One', 'Lab Two'], groupsHidden: ['Lab Two'] };
+    const doc = await buildIndexable(src, lookup, r);
+    expect(doc.record.tags).toEqual(['nn', 'grp:Lab One']);
+    expect(doc.directTags).toEqual(['nn']);
+    expect(doc.tagTerms['grp:Lab One']).toEqual(['Lab One']);
+    expect(lookup.tagLabel('grp:Lab One')).toBe('Lab One');
+    expect(indexStamp({ ...r, groupsHidden: [] }, lookup)).not.toBe(indexStamp(r, lookup));
+    expect(lookup.tagsOfRecord(rec(['nn']))).toEqual(['nn']);
+  });
+
   it('the stamp changes with the taxonomy parts the document depends on, and only with those', () => {
     const base = [node('a'), node('b', { parents: ['a'] }), node('other')];
     const stamp = (nodes: unknown[], tags = ['b']) => {

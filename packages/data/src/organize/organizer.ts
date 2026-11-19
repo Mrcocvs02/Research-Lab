@@ -46,7 +46,7 @@ export interface FolderNode {
 /** Records read at once when a bulk change looks for the documents it affects. */
 const READ_CHUNK = 32;
 
-const DOCUMENT_FIELD_KEYS = ['title', 'authors', 'year', 'type', 'ref', 'doi', 'arxivId', 'userDescription', 'study', 'extracted'] as const;
+const DOCUMENT_FIELD_KEYS = ['title', 'authors', 'year', 'type', 'ref', 'doi', 'arxivId', 'userDescription', 'groupsHidden', 'study', 'extracted'] as const;
 const EXTRACTABLE = ['title', 'authors', 'year', 'doi', 'arxivId'] as const;
 
 const nonEmpty = (s: string | null | undefined): string | null => {
@@ -86,6 +86,7 @@ export function patchDocument(cur: DocumentRecord, patch: DocumentPatch, taxonom
   if (patch.doi !== undefined) next.doi = cleanDoiInput(patch.doi);
   if (patch.arxivId !== undefined) next.arxivId = nonEmpty(patch.arxivId);
   if (patch.userDescription !== undefined) next.userDescription = patch.userDescription.trim();
+  if (patch.groupsHidden !== undefined) next.groupsHidden = [...new Set(patch.groupsHidden)];
   if (patch.studyState !== undefined && patch.studyState !== cur.study.state) next.study = { ...next.study, state: patch.studyState, updatedAt: now };
   if (patch.underlined !== undefined) next.study = { ...next.study, underlined: { value: patch.underlined, origin: 'manual' } };
 

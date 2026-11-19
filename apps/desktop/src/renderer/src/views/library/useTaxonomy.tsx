@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Channels, RequestOf, ResponseOf, TaxonomyOp, TaxonomyView } from '@rl/core';
+import { groupTagLabel, type Channels, type RequestOf, type ResponseOf, type TaxonomyOp, type TaxonomyView } from '@rl/core';
 import { useChangeVersion, useLibraryEvents } from '../../lib/events';
 import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
@@ -98,7 +98,7 @@ export function TaxonomyProvider({ children }: { children: ReactNode }) {
       error,
       reload,
       apply,
-      labelOf: (id) => model.byId.get(id)?.label ?? id,
+      labelOf: (id) => model.byId.get(id)?.label ?? groupTagLabel(id),
       colorOf: (id) => model.byId.get(id)?.color,
     }),
     [view, model, error, reload, apply],

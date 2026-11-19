@@ -47,7 +47,7 @@ export async function loadView(rt: LibraryRuntime): Promise<LibraryView> {
     lookup,
     tagsOf(rec) {
       let t = tagMemo.get(rec.id);
-      if (!t) tagMemo.set(rec.id, (t = lookup.expandTags(rec.tags)));
+      if (!t) tagMemo.set(rec.id, (t = lookup.tagsOfRecord(rec)));
       return t;
     },
     tagCount(tag) {

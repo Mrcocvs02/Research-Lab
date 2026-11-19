@@ -2921,6 +2921,7 @@ Prova con due insiemi più ampi (progetti o tag) o (Mostra i candidati deboli).
 - **Stati:** dati incompleti (detto per autore) · pronta · aggiornata (data).
 - **Claude:** Haiku, circa 3 mila token (sotto la soglia: stima nella voce).
 - **Dati:** `notes/groups/<id>.md`.
+- **Il gruppo come tag (D-488):** le istituzioni di OpenAlex di ogni lavoro (per DOI) si salvano in `record.groups` a ogni panoramica e diventano tag `grp:<nome>`, una famiglia a parte dai tag dell'utente e dalla tassonomia. Si vedono nella riga del documento (3-4 tag), nei filtri per tag e nei facet della Libreria, nella scheda (riga "Gruppi di ricerca" con ✕ per nasconderne uno e "Mostra i gruppi nascosti"; `groupsHidden`) e valgono come segnale per i lavori simili e i collegamenti. Non sono macroaree: i colori della Mappa restano quelli dei temi gerarchici (`areas` legge solo `rec.tags`).
 - **Peso:** R 1-2; M parte di `features/synthesis`.
 - **Carico visivo:** voci di menu.
 

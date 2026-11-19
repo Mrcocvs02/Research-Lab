@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { groupTagLabel } from '@rl/core';
 import { RlError } from '../../lib/rl-error';
 import { Button } from '../../components/Button';
 import { IconButton } from '../../components/IconButton';
@@ -73,7 +74,7 @@ function Tags({ tags, max }: { tags: string[] | null; max: number }) {
     <span className="doc-tags" data-testid="doc-tags">
       {shown.map((id) => {
         const node = model.byId.get(resolveId(model, id));
-        return <TagChip key={id} id={id} label={node?.label ?? id} color={node?.color} deprecated={node?.status === 'deprecated'} />;
+        return <TagChip key={id} id={id} label={node?.label ?? groupTagLabel(id)} color={node?.color} deprecated={node?.status === 'deprecated'} />;
       })}
       {tags.length > max && <span className="tag tag-more">{t('docs.moreTags', { count: tags.length - max })}</span>}
     </span>

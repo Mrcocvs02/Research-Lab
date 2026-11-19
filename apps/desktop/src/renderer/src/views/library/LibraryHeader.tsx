@@ -8,7 +8,7 @@ import { Menu, type MenuGroups } from '../../components/Menu';
 import { Popover } from '../../components/Popover';
 import { Segmented } from '../../components/Segmented';
 import { useAiUi } from '../../lib/aiUi';
-import type { ViewMode } from './DocViews';
+import { CARD_SIZES, type CardSize, type ViewMode } from './DocViews';
 import { SORTS, type BrowseState } from './docQuery';
 import { IconPanelRight } from './libraryIcons';
 
@@ -16,6 +16,9 @@ interface Props {
   count: number;
   view: ViewMode;
   onView(v: ViewMode): void;
+  /** Size of the cards of the grid (S / M / L), offered with the grid. */
+  cardSize: CardSize;
+  onCardSize(s: CardSize): void;
   /** The sort in force (relevance only with a text). */
   sort: BrowseState['sort'];
   hasText: boolean;
@@ -35,7 +38,7 @@ interface Props {
  * The view header (1.1, 4.2): title and count, then the four controls of the design — View, "+ Add PDF" (the one primary),
  * the menu and the details toggle, which is not an action and comes last.
  */
-export function LibraryHeader({ count, view, onView, sort, hasText, onSort, scanning, onScan, onCancelScan, onManageTags, detailOpen, onDetail, navOpen, onNav }: Props) {
+export function LibraryHeader({ count, view, onView, cardSize, onCardSize, sort, hasText, onSort, scanning, onScan, onCancelScan, onManageTags, detailOpen, onDetail, navOpen, onNav }: Props) {
   const { t } = useTranslation();
   const { openExport } = useAiUi();
   const viewAnchor = useRef<HTMLSpanElement>(null);
@@ -82,6 +85,14 @@ export function LibraryHeader({ count, view, onView, sort, hasText, onSort, scan
                 { value: 'grid', label: t('docs.view_grid'), testId: 'view-grid' },
               ]}
             />
+            {view === 'grid' && (
+              <Segmented<CardSize>
+                label={t('docs.cardSize')}
+                value={cardSize}
+                onChange={onCardSize}
+                options={CARD_SIZES.map((s) => ({ value: s, label: t(`docs.size_${s}`), testId: `card-size-${s}` }))}
+              />
+            )}
             <label className="lib-view-pop__sort">
               <span>{t('search.sort')}</span>
               <select value={shownSort} onChange={(e) => onSort(e.target.value as BrowseState['sort'])} data-testid="search-sort">

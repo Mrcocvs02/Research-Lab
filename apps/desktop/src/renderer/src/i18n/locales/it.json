@@ -346,6 +346,10 @@
     "view": "Vista",
     "view_list": "Elenco",
     "view_grid": "Griglia",
+    "cardSize": "Dimensione delle schede",
+    "size_s": "S",
+    "size_m": "M",
+    "size_l": "L",
     "navigation": "Esplora",
     "tabs": {
       "folders": "Cartelle",

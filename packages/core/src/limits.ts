@@ -90,10 +90,10 @@ export const INBOX_LIMITS = {
 
 /**
  * Compile-time switch of the whole path that writes highlights and underlines INTO the original PDFs (D-354, D-316).
- * Off in the merge: the annotations stay in the app and the reader says "Only in the app". It is turned on only after
- * the dedicated security review; tests turn it on locally.
+ * On since the final security review (D-473): each library still asks for consent before its first write, and every write
+ * keeps a safety copy that can be restored. Tests pass the switch explicitly.
  */
-export const PDF_WRITE_ENABLED = false;
+export const PDF_WRITE_ENABLED = true;
 
 /** Limits of the PDF annotation writer (ARCHITETTURA-UI §8.3.10, §8.3.12). */
 export const PDF_WRITE_LIMITS = {

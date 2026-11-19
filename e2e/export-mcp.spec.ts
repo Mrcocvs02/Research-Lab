@@ -5,7 +5,7 @@ import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { launchApp, type LaunchedApp } from './helpers/launch';
 import { asArray, createLibraryViaWizard, idOf, ipcData, pathOf, searchHits, waitForScan } from './helpers/phase1';
-import { clickRow } from './helpers/ui';
+import { clickRow, pickSort } from './helpers/ui';
 
 /**
  * Phase 7 criterion, through the interface, on the synthetic libraries (never a real one).
@@ -25,7 +25,7 @@ import { clickRow } from './helpers/ui';
  */
 
 const OA = 'https://api.openalex.org';
-const LINK = 'id,doi,title,publication_year,authorships,primary_location';
+const LINK = 'id,doi,title,publication_year,authorships,primary_location,locations';
 const EXPORT_DIR = 'second-brain-e2e';
 
 const work = (id: string, doi: string, title: string, extra: Record<string, unknown> = {}) => ({
@@ -127,7 +127,7 @@ test('export a project as a second brain, answer control questions from the fold
     await ipcData(window, 'citations:refresh', { docId: idB });
 
     // A project of A and B, made from the library selection.
-    await window.getByTestId('search-sort').selectOption('title');
+    await pickSort(window, 'title');
     await clickRow(window, a.title!);
     await clickRow(window, b.title!, ['Control']);
     await expect(window.getByTestId('selection-count')).toHaveText(/2 selected/);

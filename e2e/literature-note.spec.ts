@@ -1,3 +1,4 @@
+import { openCardSection, pickSort } from './helpers/ui';
 import { expect, test, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -92,8 +93,10 @@ test('a paper in a folder that is not enabled sends nothing: a poor note from ti
     expect(run.note).toMatchObject({ abstractOnly: true, ai: false, review: 'approved' });
 
     // The card says so, in the Notes section.
-    await window.getByTestId('search-sort').selectOption('title');
-    await window.getByTestId('search-result').first().click();
+    await pickSort(window, 'title');
+    // By id: the library holds another document with the same title in a folder that is enabled.
+    await window.locator(`[data-testid="search-result"][data-doc-id="${docId}"]`).click();
+    await openCardSection(window, 'doc-notes');
     await expect(window.getByTestId('lit-poor')).toBeVisible({ timeout: 30_000 });
   } finally {
     await ctx?.close();
@@ -110,7 +113,7 @@ test('at most five papers per send (2)', async ({}, testInfo) => {
     const six = [...ids.values()].slice(0, 6);
     test.skip(six.length < 6, 'needs six documents');
     expect((await ipc(window, 'literature:estimate', { docIds: six })).error?.code).toBe('INVALID_REQUEST');
-    await window.getByTestId('search-sort').selectOption('title');
+    await pickSort(window, 'title');
     await window.getByTestId('search-result').first().click();
     for (let i = 1; i < 6; i++) await window.getByTestId('search-result').nth(i).click({ modifiers: ['Control'] });
     await window.getByTestId('bulk-claude').click();
@@ -152,9 +155,10 @@ test('a note with a formula, a formula that is not understood, and a link that s
 
     // In the card: the preview shows the formula as MathML, the other one as written with a mark, and the link with the new title.
     const titleA = ((await ipcData<{ docs: Record<string, string> }>(window, 'links:titles', { docIds: [a!], projectIds: [] })).docs[a!])!;
-    await window.getByTestId('search-sort').selectOption('title');
+    await pickSort(window, 'title');
     await window.getByTestId('search-result').filter({ hasText: titleA }).first().click();
     await window.getByTestId('search-result').first().click();
+    await openCardSection(window, 'doc-notes');
     await window.getByTestId('card-note-layout-preview').click();
     await expect(window.getByTestId('math').first()).toBeVisible();
     await expect(window.locator('[data-testid="math"] math')).toHaveCount(1);

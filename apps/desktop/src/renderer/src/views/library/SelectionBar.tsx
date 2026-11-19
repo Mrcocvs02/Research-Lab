@@ -62,7 +62,7 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
     {
       id: 'claude',
       items: [
-        { id: 'propose', label: t('jobs.propose'), icon: <IconClaude size={16} />, onSelect: onPropose },
+        { id: 'propose', label: t('jobs.propose'), icon: <IconClaude size={16} />, testId: 'selection-propose', onSelect: onPropose },
         { id: 'literature', label: t('library.selLiterature'), icon: <IconClaude size={16} />, testId: 'selection-literature', onSelect: onLiterature },
         { ...compareItem(t, ids, () => setCompareOpen(true)), icon: <IconClaude size={16} /> },
         { ...groupsItem(t, ids, () => setGroupsOpen(true)), icon: <IconClaude size={16} /> },

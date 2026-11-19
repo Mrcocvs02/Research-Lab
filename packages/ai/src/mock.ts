@@ -85,6 +85,7 @@ export function mockStructured(request: { schema: unknown; prompt: string }): un
   const out: Record<string, unknown> = {};
   for (const k of keys) {
     if (k === 'tagIds') out[k] = (hits.length > 0 ? hits : nodes.slice(0, 1)).map((n) => n.id);
+    else if (k === 'tags') out[k] = (hits.length > 0 ? hits : nodes.slice(0, 1)).map((n) => ({ id: n.id, weight: 0.9, reason: 'Mock reason from the note.' }));
     else if (k === 'newTags') out[k] = [];
     else if (k === 'description') out[k] = 'Mock description of the document.';
     else if (k === 'summary') out[k] = 'Mock summary.';
@@ -94,6 +95,13 @@ export function mockStructured(request: { schema: unknown; prompt: string }): un
     else if (k === 'means') out[k] = 'Mock explanation of the selection.';
     else if (k === 'symbols') out[k] = [{ symbol: 'x', meaning: 'a mock symbol' }];
     else if (k === 'role') out[k] = 'Mock role in the paper.';
+    else if (k === 'note') out[k] = ['## Problem', '', 'Mock note of the paper.', '', '## Contribution', '', 'Mock contribution of the paper.'].join('\n');
+    else if (k === 'cells') out[k] = [...request.prompt.matchAll(/^key: (\S+)$/gm)].map((m) => ({ key: m[1] as string, text: 'Mock value from the paper.', pages: [1] }));
+    else if (k === 'overview') out[k] = 'Mock overview of the papers.';
+    else if (k === 'themes') {
+      const keys = [...request.prompt.matchAll(/^key: (\S+)$/gm)].map((m) => m[1] as string);
+      out[k] = keys.length > 0 ? [{ name: 'Mock theme', summary: 'Mock summary of the theme.', keys }] : [];
+    }
     else if (k === 'sections') out[k] = ['problem', 'contribution', 'method', 'results', 'data', 'limits'].map((key) => ({ key, text: `Mock ${key} of the paper.`, pages: [1] }));
   }
   return out;
@@ -185,7 +193,7 @@ export function createMockAiProvider(script: MockScript = {}): AiProviderEx {
     async completeStructured<T>(request: StructuredRequest<T>): Promise<StructuredResult<T>> {
       if (script.fail) throw new AppError(script.fail.code, script.fail.message, script.fail.sent === undefined ? undefined : { sent: script.fail.sent });
       const parsed = request.schema.safeParse(script.structuredFn ? script.structuredFn(request) : script.structured !== undefined ? script.structured : mockStructured(request));
-      if (!parsed.success) throw new AppError('AI_PROVIDER_ERROR', 'The mock answer does not match the schema');
+      if (!parsed.success) throw new AppError('AI_PROVIDER_ERROR', `The mock answer does not match the schema (${parsed.error.issues.slice(0, 2).map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')})`);
       const usage: TokenUsageWithCost = script.usage ?? { inputTokens: approxTokens(request.system.length + request.prompt.length), outputTokens: 50 };
       return { value: parsed.data, usage, meta: { model: request.model, provider: 'mock', date: now(), source: request.source } };
     },

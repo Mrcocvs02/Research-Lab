@@ -160,7 +160,7 @@ test('token cap: a refused chat message offers the raise, "Double" lifts the cap
   await expect(banner).toHaveAttribute('data-kind', 'tokenCap');
   await expect(banner).toContainText('Request not run: monthly cap of');
   await banner.getByRole('button', { name: 'Double' }).click();
-  expect((await ipcData<{ tokenCap: number }>(w, 'ai:tokenUsage', {})).tokenCap).toBe(used * 2);
+  await expect.poll(async () => (await ipcData<{ tokenCap: number }>(w, 'ai:tokenUsage', {})).tokenCap).toBe(used * 2);
 
   // After the raise the same request is offered again and goes.
   await w.getByTestId('toasts').getByRole('button', { name: 'Retry' }).click();

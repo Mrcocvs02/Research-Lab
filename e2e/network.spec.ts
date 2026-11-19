@@ -242,8 +242,14 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
     await window.getByTestId('net-tab-explore').click();
     const panel = window.getByTestId('explore-panel');
     await expect(panel).toHaveAttribute('data-dim', 'topic');
+    // The actions of a row appear when the pointer reaches it and make the row's button narrower: hover first, then click (section 4.22, Esplora).
+    const pickNode = async (node: ReturnType<typeof window.getByTestId>) => {
+      await node.hover();
+      await expect(node.locator('xpath=ancestor::li').getByTestId('explore-actions')).toBeVisible();
+      await node.click();
+    };
     const macroNode = window.getByTestId('explore-node').filter({ hasText: 'Macro' });
-    await macroNode.click();
+    await pickNode(macroNode);
     let zooms = 0;
     for (; zooms < 6; ) {
       const sel = panel.locator('[data-testid="explore-node"][aria-pressed="true"]');
@@ -251,7 +257,7 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
       await window.getByTestId('explore-zoom').click();
       zooms++;
       await expect(panel).toHaveAttribute('data-depth', String(zooms));
-      await window.getByTestId('explore-node').first().click();
+      await pickNode(window.getByTestId('explore-node').first());
     }
     expect(zooms).toBeGreaterThan(0);
     expect(zooms, 'zooms from a macro-topic to the paper').toBeLessThanOrEqual(4);
@@ -281,11 +287,11 @@ test('network, map, clusters, expandable graph and zoomable exploration (phase 6
         }
       }
       expect(groupLabel, 'group holding the author').not.toBeNull();
-      await window.getByTestId('explore-node').filter({ hasText: groupLabel! }).first().click();
+      await pickNode(window.getByTestId('explore-node').filter({ hasText: groupLabel! }).first());
       await window.getByTestId('explore-zoom').click();
     }
     const author = window.getByTestId('explore-node').filter({ hasText: 'Test Author A' });
-    await author.click();
+    await pickNode(author);
     await window.getByTestId('explore-related-topic').click();
     await expect(window.getByTestId('explore-related')).toHaveAttribute('data-to', 'topic');
     await expect(window.getByTestId('related-node').first()).toBeVisible();

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { launchApp, type LaunchedApp } from './helpers/launch';
 import { createLibraryViaWizard, skipUnlessChannels, waitForScan } from './helpers/phase1';
-import { clickRow } from './helpers/ui';
+import { clickRow, pickSort } from './helpers/ui';
 
 /**
  * Discovery runs (features 41, 42; §17.4.17), with the network replaced by an empty `RL_E2E_NET_FIXTURES`: "New search" offers
@@ -36,18 +36,21 @@ test('new search menu, extend and bridge from the selection, an honest answer (f
 
     // The bridge needs exactly two documents.
     await window.getByTestId('nav-library').click();
-    await window.getByTestId('search-sort').selectOption('title');
+    await pickSort(window, 'title');
+    // The selection bar (and its menu) exists from two documents on (section 4.2, B3): with every document selected the bridge is off, with a reason.
     await clickRow(window, papers[0]!.title!);
+    await window.getByTestId('search-results').press('Control+a');
     await window.getByTestId('selection-more').click();
-    await expect(window.getByTestId('selection-bridge')).toBeDisabled();
+    await expect(window.getByTestId('selection-bridge')).toHaveAttribute('aria-disabled', 'true');
     await window.keyboard.press('Escape');
+    await clickRow(window, papers[0]!.title!);
     await clickRow(window, papers[1]!.title!, ['Control']);
     await window.getByTestId('selection-more').click();
     await window.getByTestId('selection-bridge').click();
 
     // Discover opens on the Searches tab and answers, without downloading anything.
     await expect(window.getByTestId('discover-searches')).toBeVisible({ timeout: 30_000 });
-    await expect(window.getByTestId('run-body').or(window.getByTestId('search-transient'))).toBeVisible({ timeout: 60_000 });
+    await expect(window.getByTestId('run-body').or(window.getByTestId('search-transient')).first()).toBeVisible({ timeout: 60_000 });
     await expect(window.getByTestId('run-import')).toHaveCount(0);
   } finally {
     await ctx?.close();

@@ -2,7 +2,7 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import { DESKTOP_DIR, launchApp, type LaunchedApp } from './helpers/launch';
 import { createLibraryViaWizard, skipUnlessChannels, waitForScan } from './helpers/phase1';
 import { enableAiFolder, openSettings, waitClaudeReady } from './helpers/settings';
-import { clickRow } from './helpers/ui';
+import { clickRow, pickSort, rowByTitle } from './helpers/ui';
 
 /**
  * Phase 4 (wave 4.1) criterion: the AI interface against the mock provider (`RL_AI_PROVIDER=mock`, no network).
@@ -44,9 +44,10 @@ test('enable a folder, preview and confirm, streamed answer with card and chip, 
     // 2. Select a document.
     await window.getByTestId('nav-library').click();
     await expect(window.getByTestId('section-library')).toBeVisible();
-    await window.getByTestId('search-sort').selectOption('title');
+    await pickSort(window, 'title');
     await clickRow(window, title);
-    await expect(window.getByTestId('selection-count')).toBeVisible();
+    // One document: the row is selected; the selection bar is for several documents (section 4.2, B3).
+    await expect(rowByTitle(window, title)).toHaveAttribute('aria-selected', 'true');
 
     // 3. Open the chat (button; the shortcut is Ctrl+J). The selection is the context.
     await window.getByTestId('chat-toggle').click();

@@ -76,3 +76,20 @@ export async function openActivity(window: Page): Promise<void> {
   if (!(await window.getByTestId('activity-popover').isVisible())) await window.getByTestId('scan-status').click();
   await expect(window.getByTestId('activity-popover')).toBeVisible();
 }
+
+/** The Library sort lives in the View popover: opens it when needed, picks the order and closes it again. */
+export async function pickSort(window: Page, value: string): Promise<void> {
+  const sort = window.getByTestId('search-sort');
+  if (!(await sort.isVisible())) await window.getByTestId('view-menu').click();
+  await sort.selectOption(value);
+  await window.keyboard.press('Escape');
+  await expect(sort).toBeHidden();
+}
+
+/** The card of the selected document opens on the right and one of its closed sections (`doc-notes`, `doc-metadata`, ...) opens in it (section 4.14). */
+export async function openCardSection(window: Page, testId: string): Promise<void> {
+  if (!(await window.getByTestId('detail-pane').isVisible())) await window.getByTestId('detail-toggle').click();
+  const section = window.getByTestId(testId);
+  await expect(section).toBeVisible();
+  if ((await section.getAttribute('data-open')) !== 'true') await section.locator('.card-section__toggle').click();
+}

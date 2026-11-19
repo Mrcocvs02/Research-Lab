@@ -54,11 +54,15 @@ export function LinksPanel({ active, onCtl, start, scopes, selectedDoc, selected
     if (mapAction(e)?.type !== 'mode') return;
     e.preventDefault();
     setMode(MODES[(MODES.indexOf(mode) + 1) % MODES.length]!);
+    // The canvas of the old mode goes away with the focus on it: the panel keeps it, so that M keeps working.
+    requestAnimationFrame(() => {
+      if (!box.current?.contains(document.activeElement)) box.current?.focus({ preventScroll: true });
+    });
   };
 
   const chip = <ModeChip mode={mode} onChange={setMode} />;
   return (
-    <div className="links-panel" ref={box} onKeyDown={onKeyDown} data-testid="links-panel" data-mode={mode}>
+    <div className="links-panel" ref={box} tabIndex={-1} style={{ outline: 'none' }} onKeyDown={onKeyDown} data-testid="links-panel" data-mode={mode}>
       {mode === 'doc' ? (
         <GraphNet active={active} modeChip={chip} start={start} scopes={scopes} selectedDoc={selectedDoc} selectedDocLabel={selectedDocLabel} onSelectDoc={onSelectDoc} onStart={onStart} onExplore={() => onExplore('topic')} onCtl={onCtl} />
       ) : (

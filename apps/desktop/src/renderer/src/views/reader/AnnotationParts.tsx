@@ -13,6 +13,13 @@ import './reader-tools.css';
 /** The picture of a crop, loaded from the data folder when its entry is drawn; nothing shows while it is missing. */
 function CropThumb({ docId, annId, label }: { docId: string; annId: string; label: string }) {
   const [src, setSrc] = useState<string | null>(null);
+  const [again, setAgain] = useState(0);
+  // The entry is drawn when the annotation is saved, a moment before its picture is: ask again when the picture arrives.
+  useEffect(() => {
+    const onSaved = (e: Event) => (e as CustomEvent<string>).detail === annId && setAgain((n) => n + 1);
+    window.addEventListener(CROP_SAVED, onSaved);
+    return () => window.removeEventListener(CROP_SAVED, onSaved);
+  }, [annId]);
   useEffect(() => {
     let alive = true;
     rl.invoke('crops:get', { docId, annId }).then(
@@ -22,9 +29,13 @@ function CropThumb({ docId, annId, label }: { docId: string; annId: string; labe
     return () => {
       alive = false;
     };
-  }, [docId, annId]);
+  }, [docId, annId, again]);
   return src ? <img className="crop-thumb" src={src} alt={label} data-testid="crop-thumb" /> : null;
 }
+
+/** Tells the list that the picture of a crop is now in the data folder. */
+const CROP_SAVED = 'rl-crop-saved';
+export const announceCropSaved = (annId: string): void => void window.dispatchEvent(new CustomEvent(CROP_SAVED, { detail: annId }));
 
 const pct = (n: number) => `${Math.round(Math.min(1, Math.max(0, Number(n) || 0)) * 10000) / 100}%`;
 

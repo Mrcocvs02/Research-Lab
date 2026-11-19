@@ -43,3 +43,22 @@
   font-family: var(--mono);
   font-size: 12px;
 }
+/* Quiet section titles (no capitals), thin scrollbar, advanced options folded. */
+.export-dialog h3 {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--fs-body, 14px);
+  color: var(--text);
+}
+.rl-dialog:has(.export-dialog) .dlg-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.sb-advanced > summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+.sb-advanced:not([open]) {
+  margin-bottom: 0;
+}

@@ -1,6 +1,6 @@
 {
   "secondBrain": {
-    "title": "Esporta come secondo cervello",
+    "title": "Esporta",
     "intro": "Scrive una cartella di file Markdown collegati (un indice, una scheda per documento, concetti, le tue note e evidenziazioni) che Claude Code o qualsiasi agente può leggere. Non viene inviato nulla: l'esportazione è locale e gli originali sono solo letti.",
     "remove": "Rimuovi {{name}}",
     "run": "Esporta",
@@ -20,7 +20,7 @@
       "update": "{{name}} ({{when}})"
     },
     "selection": {
-      "title": "Cosa esportare",
+      "title": "Quali documenti",
       "hint": "L'unione di tutto ciò che segue.",
       "project": "Progetto",
       "projectNone": "Nessun progetto",
@@ -134,7 +134,8 @@
       "secondBrain": "Un secondo cervello (cartella di Markdown)",
       "bibtex": "Riferimenti: BibTeX (.bib)",
       "ris": "Riferimenti: RIS (.ris)",
-      "csl": "Riferimenti: CSL JSON (.json)"
+      "csl": "Riferimenti: CSL JSON (.json)",
+      "short": {"sb": "Secondo cervello", "bibtex": "BibTeX", "ris": "RIS", "csl": "CSL JSON"}
     },
     "refs": {
       "intro": "Scrive un file con i riferimenti della selezione, con le chiavi di citazione di Impostazioni › Libreria. Un file esistente non viene mai sovrascritto: il nome prende un numero.",

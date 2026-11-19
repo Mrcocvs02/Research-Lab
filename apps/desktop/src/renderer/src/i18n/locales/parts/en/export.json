@@ -1,6 +1,6 @@
 {
   "secondBrain": {
-    "title": "Export as a second brain",
+    "title": "Export",
     "intro": "Writes a folder of linked Markdown files (an index, one card per document, concepts, your notes and highlights) that Claude Code or any agent can read. Nothing is sent anywhere: the export is local and your originals are only read.",
     "remove": "Remove {{name}}",
     "run": "Export",
@@ -20,7 +20,7 @@
       "update": "{{name}} ({{when}})"
     },
     "selection": {
-      "title": "What to export",
+      "title": "Which documents",
       "hint": "The union of everything below.",
       "project": "Project",
       "projectNone": "No project",
@@ -134,7 +134,8 @@
       "secondBrain": "A second brain (folder of Markdown)",
       "bibtex": "References: BibTeX (.bib)",
       "ris": "References: RIS (.ris)",
-      "csl": "References: CSL JSON (.json)"
+      "csl": "References: CSL JSON (.json)",
+      "short": {"sb": "Second brain", "bibtex": "BibTeX", "ris": "RIS", "csl": "CSL JSON"}
     },
     "refs": {
       "intro": "Writes one file with the references of the selection, with the citation keys of Settings › Library. An existing file is never overwritten: the name gets a number.",

@@ -69,6 +69,9 @@ test('project from the library selection, members, notes, reading plan, archive 
 
     // Notes in Markdown: raw HTML is shown as text, never interpreted.
     await window.getByTestId('project-tab-notes').click();
+    // Until the project has a research outline there are three tabs; the Notes tab invites to write it (X7).
+    await expect(window.locator('[role="tab"]')).toHaveCount(3);
+    await expect(window.getByTestId('notes-outline-invite')).toBeVisible();
     await window.getByTestId('notes-input').fill('# Plan\n\nRead **first** then <img src=x onerror="document.title=1"> second.\n\n- one\n- two');
     await expect(window.getByTestId('notes-preview').locator('strong')).toHaveText('first');
     await expect(window.getByTestId('notes-preview').locator('img')).toHaveCount(0);

@@ -250,7 +250,7 @@
   overflow-wrap: anywhere;
 }
 .schema-question h3 {
-  font-size: var(--fs-base);
+  font-size: var(--fs-body);
   margin: var(--space-4) 0 var(--space-2);
 }
 .schema-claims,

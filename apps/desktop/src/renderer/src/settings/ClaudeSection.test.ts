@@ -109,12 +109,16 @@ describe('Token cap row (D-442)', () => {
     const text = await screen.findByTestId('token-usage-text');
     await waitFor(() => expect(text.textContent).toBe('123,456 / 500,000 (25%)'));
     expect(screen.getAllByRole('progressbar').length).toBeGreaterThan(0);
+    const select = screen.getByTestId('token-cap-select') as HTMLSelectElement;
+    expect(select.value).toBe('500000');
+    expect(screen.queryByTestId('token-cap-input')).toBeNull();
+    fireEvent.change(select, { target: { value: 'custom' } });
     const input = screen.getByTestId('token-cap-input') as HTMLInputElement;
     expect(input.value).toBe('500000');
     fireEvent.change(input, { target: { value: '1000000' } });
     fireEvent.blur(input);
     await waitFor(() => expect(callsTo('ai:setTokenCap').at(-1)).toMatchObject({ monthlyTokens: 1000000 }));
-    fireEvent.click(screen.getByTestId('token-cap-none'));
+    fireEvent.change(screen.getByTestId('token-cap-select'), { target: { value: 'none' } });
     await waitFor(() => expect(callsTo('ai:setTokenCap').at(-1)).toMatchObject({ monthlyTokens: null }));
     expect(ai.tokenCap).toBeNull();
   });

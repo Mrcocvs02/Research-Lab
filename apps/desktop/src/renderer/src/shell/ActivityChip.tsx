@@ -24,6 +24,18 @@ function Ring({ value }: { value: number | undefined }) {
   );
 }
 
+/** The short text of the chip (4.10): what is going on in a few words; the full sentence is the tooltip and the popover. Pure, so it is tested. */
+export function shortScanText(scan: { state: string; phase?: string | undefined; processed: number; total?: number | undefined; seen?: number | undefined }, t: (k: string, o?: Record<string, unknown>) => string): string {
+  if (scan.state === 'running') {
+    const total = scan.phase === 'hashing' ? (scan.total as number | undefined) : scan.total;
+    const done = scan.phase === 'hashing' ? (scan.seen ?? 0) : scan.processed;
+    return total ? t('activity.chip.progress', { pct: Math.min(100, Math.round((done / total) * 100)) }) : t('activity.chip.scanning');
+  }
+  if (scan.state === 'failed') return t('activity.chip.failed');
+  if (scan.state === 'cancelled') return t('activity.chip.cancelled');
+  return t('activity.chip.ready');
+}
+
 const usdText = (usd: number) => (usd > 0 && usd < 0.01 ? '<$0.01' : `$${usd.toFixed(2)}`);
 
 /**
@@ -65,13 +77,16 @@ export function ActivityChip({ scan: scanApi }: { scan: ReturnType<typeof useSca
     if (activityOpen) setUnseen(false);
   }, [activityOpen]);
 
+  // `full` is the tooltip and the accessible name; `text` is the short text the chip shows.
+  let full: string;
   let text: string;
-  if (sum.main === 'scan' && scan) text = scanText(scan, t);
-  else if (sum.main === 'job' && job) text = t('jobs.running', { done: job.done, total: job.total + job.skipped, usd: usdText(job.usd) });
-  else if (sum.main === 'citations' && citations) text = t('citations.job.running', { done: citations.done, total: citations.total });
-  else if (sum.main === 'other') text = generic.find((g) => g.group === 'running')?.text ?? '';
-  else if (sum.attention > 0) text = t('activity.attention', { count: sum.attention });
-  else text = scan ? scanText(scan, t) : t('activity.idle');
+  if (sum.main === 'scan' && scan) (full = scanText(scan, t)), (text = shortScanText(scan, t));
+  else if (sum.main === 'job' && job) (full = t('jobs.running', { done: job.done, total: job.total + job.skipped, usd: usdText(job.usd) })), (text = t('activity.chip.proposals', { done: job.done, total: job.total + job.skipped }));
+  else if (sum.main === 'citations' && citations) (full = t('citations.job.running', { done: citations.done, total: citations.total })), (text = t('activity.chip.citations', { done: citations.done, total: citations.total }));
+  else if (sum.main === 'other') text = full = generic.find((g) => g.group === 'running')?.text ?? '';
+  else if (sum.attention > 0) text = full = t('activity.attention', { count: sum.attention });
+  else if (scan) (full = scanText(scan, t)), (text = shortScanText(scan, t));
+  else text = full = t('activity.idle');
 
   const tone = sum.running > 0 ? 'busy' : sum.attention > 0 ? 'bad' : 'ok';
   const extra = sum.running > 1 ? ` (+${sum.running - 1})` : '';
@@ -87,8 +102,8 @@ export function ActivityChip({ scan: scanApi }: { scan: ReturnType<typeof useSca
         {...(scan?.phase ? { 'data-phase': scan.phase } : {})}
         aria-haspopup="dialog"
         aria-expanded={activityOpen}
-        aria-label={`${t('activity.title')}: ${text}${extra}`}
-        title={`${t('activity.title')}: ${text}${extra}`}
+        aria-label={`${t('activity.title')}: ${full}${extra}`}
+        title={`${t('activity.title')}: ${full}${extra}`}
         onClick={() => setActivityOpen(!activityOpen)}
       >
         <Ring value={sum.running > 0 ? sum.progress : 1} />

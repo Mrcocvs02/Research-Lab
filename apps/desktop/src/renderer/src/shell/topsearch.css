@@ -78,7 +78,7 @@
     display: none;
   }
 }
-.topsearch__menu { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface-raised, var(--surface)); border: 1px solid var(--border); border-radius: var(--radius-md, 8px); box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.15)); padding: var(--space-1); display: flex; flex-direction: column; }
+.topsearch__menu { position: fixed; z-index: 70; min-width: 260px; background: var(--surface-raised, var(--surface)); border: 1px solid var(--border); border-radius: var(--radius-md, 8px); box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.15)); padding: var(--space-1); display: flex; flex-direction: column; }
 .topsearch__menu button { text-align: left; background: none; border: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm, 6px); color: inherit; cursor: pointer; font: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topsearch__menu button:hover, .topsearch__menu button:focus-visible { background: var(--surface-hover, rgba(127, 127, 127, 0.12)); }
 .topsearch__menu-head { color: var(--text-muted); font-size: 0.75rem; padding: var(--space-1) var(--space-3); }

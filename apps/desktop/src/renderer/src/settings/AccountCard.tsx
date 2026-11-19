@@ -213,7 +213,7 @@ export function AccountCard() {
         </div>
         <div className="acct__test">
           <Button size="sm" busy={test.busy} onClick={() => void runTest()} data-testid="ai-test">
-            {test.busy ? t('settings.account.testing') : t('settings.account.test')}
+            {test.busy ? t('settings.account.testing') : t('settings.account.test', { cost: new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'USD', minimumFractionDigits: 3 }).format(0.001) })}
           </Button>
           {result && (
             <p className="acct__result" role="status" data-testid="ai-test-result" data-ok={result === 'offline' ? false : result.ok}>

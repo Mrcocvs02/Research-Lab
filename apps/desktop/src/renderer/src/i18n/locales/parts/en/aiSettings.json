@@ -76,7 +76,7 @@
       "keyOnly": "The saved API key is used",
       "programFound": "Claude Code {{version}}, {{where}}",
       "keyUnused": "An API key is saved but not used in this mode.",
-      "test": "Test the connection · about $0.001",
+      "test": "Test the connection · about {{cost}}",
       "testing": "Testing…",
       "testOk": "✓ Works · {{s}} s · {{model}}",
       "testOffline": "You are offline: the test did not start",
@@ -135,6 +135,7 @@
       "tokenHelp": "Input + output of all libraries. Over the cap, requests do not start.",
       "tokenOf": "{{used}} / {{cap}} ({{pct}}%)",
       "tokenUsedNoCap": "{{used}} (no cap)",
+      "tokenCustom": "Custom…",
       "tokenNoCap": "No cap"
     },
     "claude": {

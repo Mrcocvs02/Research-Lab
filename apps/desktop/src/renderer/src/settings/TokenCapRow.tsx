@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ProgressBar } from '../components/Progress';
 import { rl } from '../lib/rl';
@@ -28,10 +28,17 @@ export function TokenCapRow() {
     async (v) => void (await rl.invoke('ai:setTokenCap', { monthlyTokens: parse(v) ?? null })),
     (v) => (parse(v) === undefined ? t('validation.tokenCap') : undefined),
   );
-  const pick = (n: number | null) => {
-    a.change(n === null ? '' : String(n));
+  const [custom, setCustom] = useState(false);
+  const n = parse(a.draft);
+  // One setting, one control (Z11): a list of caps; the field appears only for "Custom…" or for a cap that is not on the list.
+  const choice = custom || n === undefined || (n !== null && !PRESETS.includes(n)) ? 'custom' : n === null ? 'none' : String(n);
+  const pick = (v: string) => {
+    if (v === 'custom') return setCustom(true);
+    setCustom(false);
+    a.change(v === 'none' ? '' : v);
     a.flush();
   };
+  const compact = new Intl.NumberFormat(i18n.language, { notation: 'compact' });
   return (
     <Row sid="tokenCap" label={t('settings.account.tokenMonth')} help={t('settings.account.tokenHelp')} htmlFor={id} save={a.save} error={a.problem}>
       <div className="acct__usage" data-testid="token-usage">
@@ -45,15 +52,18 @@ export function TokenCapRow() {
       </div>
       {u?.tokenCap != null && <ProgressBar value={u.monthTokens / u.tokenCap} label={t('settings.account.tokenMonth')} />}
       <div className="acct__usage">
-        <input id={id} className="is-short" inputMode="numeric" value={a.draft} placeholder={t('settings.account.tokenNoCap')} aria-invalid={a.problem ? true : undefined} data-testid="token-cap-input" onChange={(e) => a.change(e.target.value)} onBlur={a.flush} />
-        {PRESETS.map((n) => (
-          <button key={n} type="button" className="link" onClick={() => pick(n)} data-testid={`token-cap-preset-${n}`}>
-            {new Intl.NumberFormat(i18n.language, { notation: 'compact' }).format(n)}
-          </button>
-        ))}
-        <button type="button" className="link" onClick={() => pick(null)} data-testid="token-cap-none">
-          {t('settings.account.tokenNoCap')}
-        </button>
+        <select id={id} value={choice} onChange={(e) => pick(e.target.value)} data-testid="token-cap-select">
+          <option value="none">{t('settings.account.tokenNoCap')}</option>
+          {PRESETS.map((p) => (
+            <option key={p} value={String(p)}>
+              {compact.format(p)}
+            </option>
+          ))}
+          <option value="custom">{t('settings.account.tokenCustom')}</option>
+        </select>
+        {choice === 'custom' && (
+          <input className="is-short" inputMode="numeric" value={a.draft} placeholder="1 000 000" aria-label={t('settings.account.tokenMonth')} aria-invalid={a.problem ? true : undefined} data-testid="token-cap-input" onChange={(e) => a.change(e.target.value)} onBlur={a.flush} />
+        )}
       </div>
     </Row>
   );

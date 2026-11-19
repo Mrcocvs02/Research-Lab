@@ -341,12 +341,24 @@ export async function surprising(s: MainServices, docId: string | undefined, lim
     if (doc === undefined) return { pairs: [] };
   }
   const vec = (k: number) => modelVector(m, k);
-  const pairs = surprisingPairs(m, { doc, limit: limit * 2 })
-    .filter((p) => view.byId.has(m.ids[p.a] as string) && view.byId.has(m.ids[p.b] as string))
+  const [{ knownPairs, novelPairs }, { readLinks }] = await Promise.all([import('./surprise.js'), import('../features/doclinks/store.js')]);
+  const [files, links] = await Promise.all([rt.store.citations.list().catch(() => []), readLinks(rt.store.dataDir)]);
+  const known = knownPairs(
+    files.map((f) => ({ docId: f.docId as string, others: [...f.references, ...f.citedBy].map((r) => r.matchedDocId).filter((x): x is DocumentId => !!x) })),
+    [...links.links, ...links.dismissed],
+  );
+  const raw = surprisingPairs(m, { doc, limit: limit * 8 }).filter((p) => view.byId.has(m.ids[p.a] as string) && view.byId.has(m.ids[p.b] as string));
+  const pairs = novelPairs(raw, {
+    known,
+    authorsOf: (id) => view.byId.get(id)?.authors ?? [],
+    clusterOf: (i) => m.cl[i]?.[0],
+    idOf: (i) => m.ids[i] as string,
+    termsOf: (a, b) => sharedTerms(vec(a), vec(b), m.vocab, 8),
+  })
     .slice(0, limit)
     .map((p) => {
       const [a, b] = doc !== undefined && p.b === doc ? [p.b, p.a] : [p.a, p.b];
-      return { a: m.ids[a] as string, b: m.ids[b] as string, score: clamp01(p.text), terms: sharedTerms(vec(a), vec(b), m.vocab, 8) };
+      return { a: m.ids[a] as string, b: m.ids[b] as string, score: clamp01(p.text), terms: p.terms };
     });
   return { pairs };
 }

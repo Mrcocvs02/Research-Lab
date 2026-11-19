@@ -272,13 +272,14 @@ function RunBody({ run, onRun }: { run: DiscoverRun; onRun(r: DiscoverRun): void
   const { t } = useTranslation();
   const { openReader } = useReader();
   const [weak, setWeak] = useState(false);
+  const [classics, setClassics] = useState(false);
   const bridge = run.kind === 'bridge';
   const mark = async (key: string, state: DiscoverCandidate['state'], reason?: string) => {
     onRun({ ...run, items: run.items.map((c) => (c.key === key ? { ...c, state } : c)) });
     // Transient answers (offline, missing identifier) were never saved: nothing to write.
     if (run.outcome === 'ok' || run.outcome === 'no-bridge') await rl.invoke('discover:mark', { id: run.id, key, state, ...(reason ? { reason } : {}) }).catch(() => undefined);
   };
-  const shown = run.items.filter((c) => c.state !== 'dismissed' && (!bridge || weak || !c.weak));
+  const shown = run.items.filter((c) => c.state !== 'dismissed' && (!bridge || weak || !c.weak) && (classics || !c.classic));
   return (
     <div data-testid="run-body" data-outcome={run.outcome}>
       {bridge && (
@@ -327,6 +328,11 @@ function RunBody({ run, onRun }: { run: DiscoverRun; onRun(r: DiscoverRun): void
       {run.outcome === 'ok' && bridge && run.items.some((c) => c.weak) && (
         <button type="button" className="link" aria-pressed={weak} onClick={() => setWeak(!weak)} data-testid="run-weak-toggle">
           {weak ? t('discover.searches.hideWeak') : t('discover.searches.showWeak')}
+        </button>
+      )}
+      {run.items.some((c) => c.classic) && (
+        <button type="button" className="link" aria-pressed={classics} onClick={() => setClassics(!classics)} data-testid="run-classics-toggle">
+          {classics ? t('discover.searches.hideClassics') : t('discover.searches.showClassics')}
         </button>
       )}
       {!bridge && run.items.length > 0 && <SummaryBar run={run} onRun={onRun} />}

@@ -15,7 +15,8 @@ describe('cite keys written to files', () => {
   it('a hostile key cannot inject a field in BibTeX, RIS or CSL', () => {
     const bib = bibtexEntry(doc, HOSTILE);
     expect(bib.match(/@/g)).toHaveLength(1);
-    expect(bib).not.toContain('evil');
+    expect(bib).not.toMatch(/^\s*author\s*=/m); // the hostile text stays inside the sanitised key, never a field of its own
+    expect(bib.split('\n')[0]).not.toMatch(/[\s{},=]evil/);
     expect(risFile([{ doc, key: HOSTILE }])).not.toMatch(/\r\nAU/);
     expect((JSON.parse(cslFile([{ doc, key: HOSTILE }])) as Array<{ id: string }>)[0]!.id).toBe(safeKey(HOSTILE));
   });

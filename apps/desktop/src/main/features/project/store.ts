@@ -120,6 +120,9 @@ const reportFile = (dataDir: string, projectId: string, date: string): string =>
 export const readReport = async (dataDir: string, projectId: string, date: string): Promise<string | null> => readFile(reportFile(dataDir, projectId, date), 'utf8').catch(() => null);
 export async function writeReport(dataDir: string, projectId: string, date: string, body: string): Promise<void> {
   await mkdir(path.dirname(reportFile(dataDir, projectId, date)), { recursive: true });
+  // The report of the same day that is replaced is kept once, as `<date>.prev.md` (I1); it is not listed.
+  const before = await readReport(dataDir, projectId, date);
+  if (before !== null) await atomicWriteFile(path.join(path.dirname(reportFile(dataDir, projectId, date)), `${date}.prev.md`), before);
   await atomicWriteFile(reportFile(dataDir, projectId, date), body.endsWith('\n') ? body : `${body}\n`);
 }
 

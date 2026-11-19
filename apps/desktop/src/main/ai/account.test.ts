@@ -343,7 +343,7 @@ describe('the channels (handlers over the simulated Claude Code)', () => {
   afterEach(() => rm(dir, { recursive: true, force: true }));
 
   it('ai:account, ai:setAuthMode, ai:login, ai:loginDone and ai:logout answer through the dispatcher', async () => {
-    const s = fakeServices({ claudeIo: simulatedClaudeIo(dir) });
+    const s = fakeServices({ claudeIo: simulatedClaudeIo(dir), localDataDir: dir });
     const call = async (c: string, p: unknown = {}): Promise<IpcEnvelope> => createDispatcher(channels, buildHandlers(s), log)(c, p);
     const acc = await call('ai:account');
     expect(acc).toMatchObject({ ok: true, data: { claudeCode: { version: '3.0.0', loggedIn: true, account: { email: EMAIL } } } });

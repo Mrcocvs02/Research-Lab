@@ -75,7 +75,7 @@ function harness() {
     emit: (e: string, p: unknown) => changed.push([e, p]),
     runtime: { sync: async () => {}, hold: () => () => {}, status: () => ({}), require: async () => rt },
     libraries: { profile: async () => ({ rootPath: root, id: 'lib-1' }), dataDir: async () => store.dataDir },
-    settings: { get: async () => ({ deviceId: 'device-12345678', ai: { claudeCodePath: null } }) },
+    settings: { get: async () => ({ deviceId: 'device-12345678', ai: { claudeCodePath: null, tokenCap: { monthlyTokens: null, warnAtPct: 80 } } }) },
     secrets: { get: async () => null },
     aiProvider: (cfg: { models: any }) => {
       const p: any = createMockAiProvider({ models: cfg.models });

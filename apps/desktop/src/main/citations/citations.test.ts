@@ -86,6 +86,7 @@ function harness() {
       urls.push(url);
       return net(new URL(url), init?.signal ?? undefined);
     }) as unknown as typeof fetch,
+    localDataDir: os.tmpdir(),
   } as unknown as MainServices;
   const dispatch = createDispatcher(channels, buildHandlers(services), log);
   return async (c: string, p: unknown = {}) => dispatch(c, p);
@@ -150,7 +151,8 @@ describe('citations:get and citations:refresh', () => {
     await store.documents.put(doc(5, 'papers/z.pdf', { doi: '10.1001/w7' }));
     // the index of owned documents is reused for a while: a refresh of any document rebuilds it
     ok(await call('citations:refresh', { docId: hex(1), what: ['references'] }));
-    expect(ok(await call('citations:get', { docId: hex(1) })).references[1].matched.docId).toBe(hex(5));
+    // references come in order of relevance (D-446 g), so the new match is looked up by its work and not by position
+    expect(ok(await call('citations:get', { docId: hex(1) })).references.find((r: any) => r.externalId === 'W7').matched.docId).toBe(hex(5));
     expect(urls.length).toBeGreaterThan(n);
   });
 
@@ -766,7 +768,7 @@ describe('net fixtures hook', () => {
       throw new Error('the network must not be used');
     };
     const rt = fixtureFetch(file);
-    const services = { log: createMemoryLogger(), emit: () => {}, runtime: { require: async () => ({ libraryId, store, getDocument: async (id: string) => store.documents.get(id as never) }) }, settings: { get: async () => settings }, isOnline: () => true, fetch: rt } as unknown as MainServices;
+    const services = { log: createMemoryLogger(), localDataDir: os.tmpdir(), emit: () => {}, runtime: { require: async () => ({ libraryId, store, getDocument: async (id: string) => store.documents.get(id as never) }) }, settings: { get: async () => settings }, isOnline: () => true, fetch: rt } as unknown as MainServices;
     const d = createDispatcher(channels, buildHandlers(services), createMemoryLogger());
     const v = ok(await d('citations:refresh', { docId: hex(1) }));
     expect(v).toMatchObject({ fetched: true, references: [{ externalId: 'W2' }, { externalId: 'W7' }, { externalId: 'W8' }] });

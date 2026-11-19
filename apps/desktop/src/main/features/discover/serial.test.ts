@@ -15,8 +15,9 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+const cand = (key: string) => ({ key, title: null, authors: [], year: null, venue: null, doi: null, arxivId: null, score: 0.5, reasons: [], state: 'new', weak: false, fresh: false, summary: null });
 const run = (): DiscoverRun =>
-  ({ id: 'run1', kind: 'question', title: 'q', createdAt: '2026-01-01T00:00:00.000Z', outcome: 'ok', fresh: 0, sides: [], items: [{ key: 'a', state: 'new' }, { key: 'b', state: 'new' }] }) as unknown as DiscoverRun;
+  ({ id: 'run1', kind: 'question', title: 'q', createdAt: '2026-01-01T00:00:00.000Z', outcome: 'ok', candidates: 2, fresh: 0, sides: [], missing: [], local: [], seedCount: 0, summarizedWith: null, items: [cand('W1'), cand('W2')] }) as unknown as DiscoverRun;
 
 describe('marks of a search', () => {
   it('read-modify-write steps of one run go one after the other and keep every change', async () => {
@@ -24,10 +25,10 @@ describe('marks of a search', () => {
     const mark = (key: string) =>
       serialRun('run1', async () => {
         const cur = (await readRun(dir, 'run1'))!;
-        await new Promise((r) => setTimeout(r, key === 'a' ? 20 : 0));
+        await new Promise((r) => setTimeout(r, key === 'W1' ? 20 : 0));
         await writeRun(dir, { ...cur, items: cur.items.map((c) => (c.key === key ? { ...c, state: 'dismissed' } : c)) } as DiscoverRun);
       });
-    await Promise.all([mark('a'), mark('b')]);
+    await Promise.all([mark('W1'), mark('W2')]);
     expect((await readRun(dir, 'run1'))!.items.map((c) => c.state)).toEqual(['dismissed', 'dismissed']);
   });
   it('a failing step does not block the next one', async () => {

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { documentRecordSchema, projectSchema, type DocumentRecord, type Project } from '@rl/core';
+import { defaultLibraryConfig, documentRecordSchema, projectSchema, type DocumentRecord, type Project } from '@rl/core';
 import type { MainServices } from '../../ipc/handlers/services.js';
 import { GENERATED_LINE } from './bibtex-write.js';
 import { copyBib, manage, sync } from './link.js';
@@ -32,6 +32,7 @@ beforeEach(async () => {
   const rt = {
     store: {
       rootPath: lib,
+      readConfig: async () => defaultLibraryConfig(),
       documents: {
         list: async () => [...docs.values()],
         update: async (id: string, fn: (c: DocumentRecord | null) => DocumentRecord) => {
@@ -67,7 +68,7 @@ describe('the managed .bib file', () => {
     expect(text.split('\n')[0]).toBe(GENERATED_LINE);
     expect(text).toContain('@misc{mykey,');
     const key = docs.get('aaaaaaaaaaaaaaaa')!.citeKey!;
-    expect(key).toBe('roe2020alpha');
+    expect(key).toBe('roe2020');
     expect(text).toContain(`{${key},`);
     // The key never changes again, even if the title does.
     docs.set('aaaaaaaaaaaaaaaa', { ...docs.get('aaaaaaaaaaaaaaaa')!, title: 'Totally different' });

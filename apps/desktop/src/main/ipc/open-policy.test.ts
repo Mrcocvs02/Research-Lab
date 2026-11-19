@@ -34,6 +34,7 @@ async function call(docId: string): Promise<IpcEnvelope> {
     runtime: { require: async () => rt },
     libraries: { profile: async () => ({ rootPath: root, id: 'lib-1' }) },
     shell: { openPath: async (p: string) => (opened.push(p), ''), showItemInFolder: () => {} },
+    localDataDir: os.tmpdir(),
   } as unknown as MainServices;
   return createDispatcher(channels, buildHandlers(services), log)('documents:open', { docId });
 }

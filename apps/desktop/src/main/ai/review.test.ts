@@ -23,7 +23,8 @@ function harness() {
     log,
     emit: (e: string, p: unknown) => changed.push([e, p]),
     runtime: { sync: async () => {}, hold: () => () => {}, status: () => ({}), require: async () => rt },
-    settings: { get: async () => ({ deviceId: 'device-12345678', ai: { claudeCodePath: null } }) },
+    settings: { get: async () => ({ deviceId: 'device-12345678', ai: { claudeCodePath: null, tokenCap: { monthlyTokens: null, warnAtPct: 80 } } }) },
+    localDataDir: os.tmpdir(),
   } as unknown as MainServices;
   const dispatch = createDispatcher(channels, buildHandlers(services), log);
   return async (c: string, p: unknown = {}) => dispatch(c, p);

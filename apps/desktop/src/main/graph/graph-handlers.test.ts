@@ -68,7 +68,7 @@ function harness() {
     localDataDir: local,
     emit: (channel: string, payload: unknown) => events.push({ channel, payload }),
     runtime: { sync: async () => {}, hold: () => () => {}, status: () => ({}), require: async () => rt },
-    settings: { get: async () => ({ deviceId: 'device-12345678', ai: { claudeCodePath: null } }) },
+    settings: { get: async () => ({ deviceId: 'device-12345678', ai: { claudeCodePath: null, tokenCap: { monthlyTokens: null, warnAtPct: 80 } } }) },
     aiProvider: (cfg: { models: any }) => {
       const p: any = createMockAiProvider({ models: cfg.models, ...script });
       return Object.assign(Object.create(p), {
@@ -647,7 +647,8 @@ describe('graph:entityNetwork and the author corrections (N4)', () => {
   it('answers tags and authors without a model, and an empty topic network until one is built', async () => {
     const call = harness();
     const tags = ok(await call('graph:entityNetwork', net('tag')));
-    expect(tags.nodes.map((n: any) => n.id)).toEqual(expect.arrayContaining(['tag0', 'tag1', 'science']));
+    // only tags that documents carry become nodes: the parent 'science' has none of its own
+    expect(tags.nodes.map((n: any) => n.id).sort()).toEqual(['tag0', 'tag1', 'tag2', 'tag3']);
     expect(tags.documents).toBe(COUNT);
     expect(tags.yearRange).toEqual([2000, 2019]);
     expect(tags.nodes[0].years).toHaveLength(10);

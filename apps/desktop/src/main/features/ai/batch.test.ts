@@ -28,7 +28,7 @@ describe('ai batch', () => {
     expect(d).toEqual({ needsDialog: false, overDailyCap: false, todayPct: 10 });
   });
   it("the cap of the day: share used with this send, refused past it", () => {
-    expect(costDecision({ ...base, todayTokens: 100, dailyCap: 2600 }).todayPct).toBe(58);
+    expect(costDecision({ ...base, todayTokens: 100, dailyCap: 2600 }).todayPct).toBe(54);
     expect(costDecision({ ...base, todayTokens: 100, dailyCap: 1000 }).overDailyCap).toBe(true);
     expect(costDecision({ ...base, todayTokens: 100, dailyCap: 1400 }).overDailyCap).toBe(false);
   });

@@ -137,6 +137,9 @@ async function until(check: () => boolean | Promise<boolean>, ms = 8000): Promis
   }
 }
 
+/** The write is over: the document reports synced (the journal and the local state are saved after the replacement). */
+const synced = (w: World, n = 1) => until(() => w.events.filter(([c, p]) => c === 'annotations:pdfProgress' && (p as { state: string }).state === 'synced').length >= n);
+
 let w: World;
 beforeEach(async () => {
   fail.eperm = 0;
@@ -376,7 +379,8 @@ describe('the moments of writing (D-349)', () => {
     await vi.advanceTimersByTimeAsync(100_000);
     expect((await bytes(w)).equals(w.original)).toBe(true);
     await vi.advanceTimersByTimeAsync(20_001);
-    await until(async () => (await bytes(w)).length > w.original.length);
+    await until(async () => (await stat(w.file)).size > w.original.length); // stat, not a read: on Windows a file open for reading makes the replacement retry on a timer the fake clock never fires
+    await synced(w);
     // all the changes are in one revision
     expect(docOf(await bytes(w)).sections).toBe(docOf(w.original).sections + 1);
     expect(annotsCount(await bytes(w))).toBe(2);
@@ -387,14 +391,16 @@ describe('the moments of writing (D-349)', () => {
     const ps = new PdfSync(w.s, true);
     ps.touch(LIB, DOC);
     await vi.advanceTimersByTimeAsync(120_001);
-    await until(async () => (await bytes(w)).length > w.original.length);
+    await until(async () => (await stat(w.file)).size > w.original.length); // stat, not a read: on Windows a file open for reading makes the replacement retry on a timer the fake clock never fires
+    await synced(w);
     const first = await bytes(w);
     w.anns.set(DOC, { ...w.anns.get(DOC)!, annotations: w.anns.get(DOC)!.annotations.map((a) => ({ ...a, comment: 'edited', updatedAt: '2026-02-03T00:00:00.000Z' })) });
     ps.touch(LIB, DOC);
     await vi.advanceTimersByTimeAsync(130_000);
     expect((await bytes(w)).equals(first)).toBe(true);
     await vi.advanceTimersByTimeAsync(480_000);
-    await until(async () => !(await bytes(w)).equals(first));
+    await until(async () => (await stat(w.file)).size > first.length);
+    await synced(w, 2);
   }, 30_000);
 
   it('with the document open and over 50 MB nothing is written until it closes', async () => {

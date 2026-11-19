@@ -287,50 +287,50 @@
       "none": "No meaning",
       "menu": "Filter by meaning"
     },
-    "listCrop": "Crop, page {{page}}"
-  },
-  "unsplit": "Close the side-by-side view",
-  "split": {
-    "narrow": "Narrow window: the two papers take turns (Ctrl+Tab).",
-    "tabs": "The two papers",
-    "divider": "Divider between the two papers",
-    "swap": "Swap the two papers",
-    "link": "Linked scrolling",
-    "panelOff": "The notes panel is closed while two papers are open",
-    "pickTitle": "Open another paper beside this one",
-    "pickSearch": "Search a paper by title, author or text",
-    "pickNone": "No paper found that the reader can open."
-  },
-  "cite": {
-    "label": "Reference",
-    "inLibrary": "in your library",
-    "open": "Open",
-    "later": "Read later",
-    "import": "Import",
-    "added": "Added to your library.",
-    "skipped": "It was already in your library.",
-    "textOnly": "Only the text of the bibliography is known."
-  },
-  "guide": {
-    "title": "Guide ✦",
-    "off": "Turn the guide off",
-    "notPrepared": "Guide ✦ not prepared yet",
-    "prepare": "Prepare (≈ {{tokens}} tokens)",
-    "working": "Guide ✦: preparing…",
-    "failed": "Guide ✦: could not be read.",
-    "disabled": "Guide ✦: the folder of this paper is not enabled for sending its text.",
-    "none": "Guide ✦: no safe passage found.",
-    "markLabel": "Guide ✦ passage: {{kind}}",
-    "kinds": {
-      "contribution": "contribution",
-      "method": "method",
-      "result": "result",
-      "limit": "limit"
+    "listCrop": "Crop, page {{page}}",
+    "unsplit": "Close the side-by-side view",
+    "split": {
+      "narrow": "Narrow window: the two papers take turns (Ctrl+Tab).",
+      "tabs": "The two papers",
+      "divider": "Divider between the two papers",
+      "swap": "Swap the two papers",
+      "link": "Linked scrolling",
+      "panelOff": "The notes panel is closed while two papers are open",
+      "pickTitle": "Open another paper beside this one",
+      "pickSearch": "Search a paper by title, author or text",
+      "pickNone": "No paper found that the reader can open."
     },
-    "page": "p. {{page}}",
-    "keep": "Keep",
-    "askTitle": "Prepare the guide?",
-    "askBody": "The text of this paper (≈ {{tokens}} tokens) is sent once to Claude, the small model, to pick the passages worth reading first. Nothing else is sent.",
-    "go": "Prepare"
+    "cite": {
+      "label": "Reference",
+      "inLibrary": "in your library",
+      "open": "Open",
+      "later": "Read later",
+      "import": "Import",
+      "added": "Added to your library.",
+      "skipped": "It was already in your library.",
+      "textOnly": "Only the text of the bibliography is known."
+    },
+    "guide": {
+      "title": "Guide ✦",
+      "off": "Turn the guide off",
+      "notPrepared": "Guide ✦ not prepared yet",
+      "prepare": "Prepare (≈ {{tokens}} tokens)",
+      "working": "Guide ✦: preparing…",
+      "failed": "Guide ✦: could not be read.",
+      "disabled": "Guide ✦: the folder of this paper is not enabled for sending its text.",
+      "none": "Guide ✦: no safe passage found.",
+      "markLabel": "Guide ✦ passage: {{kind}}",
+      "kinds": {
+        "contribution": "contribution",
+        "method": "method",
+        "result": "result",
+        "limit": "limit"
+      },
+      "page": "p. {{page}}",
+      "keep": "Keep",
+      "askTitle": "Prepare the guide?",
+      "askBody": "The text of this paper (≈ {{tokens}} tokens) is sent once to Claude, the small model, to pick the passages worth reading first. Nothing else is sent.",
+      "go": "Prepare"
+    }
   }
 }

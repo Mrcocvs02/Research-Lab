@@ -38,7 +38,7 @@ describe('dictionaries', () => {
     for (const code of ERROR_CODES) expect(enKeys, code).toContain(`errors.${code}`);
   });
 
-  it('define every key used literally in the renderer code', () => {
+  it('define every key used by t() in the renderer code, in Italian and English', () => {
     const root = path.resolve(import.meta.dirname, '..');
     const files: string[] = [];
     const walk = (dir: string) => {
@@ -49,14 +49,20 @@ describe('dictionaries', () => {
       }
     };
     walk(root);
-    const has = (key: string) => enKeys.includes(key) || enKeys.some((k) => k.startsWith(`${key}_`));
+    const languages: Array<[string, string[]]> = [
+      ['en', enKeys],
+      ['it', itKeys],
+    ];
+    const has = (keys: string[], key: string) => keys.includes(key) || keys.some((k) => k.startsWith(`${key}_`));
     const missing: string[] = [];
     for (const file of files) {
       const src = readFileSync(file, 'utf8');
-      for (const m of src.matchAll(/\bt\(\s*'([A-Za-z0-9_.]+)'/g)) if (!has(m[1]!)) missing.push(`${path.basename(file)}: ${m[1]}`);
-      // Dynamic keys: `t(`prefix.${x}`)` needs at least one key under the prefix.
-      for (const m of src.matchAll(/\bt\(\s*`([A-Za-z0-9_.]+)\.\$\{/g)) {
-        if (!enKeys.some((k) => k.startsWith(`${m[1]}.`))) missing.push(`${path.basename(file)}: ${m[1]}.*`);
+      for (const [lng, keys] of languages) {
+        for (const m of src.matchAll(/\bt\(\s*'([A-Za-z0-9_.]+)'/g)) if (!has(keys, m[1]!)) missing.push(`${path.basename(file)}: ${lng} ${m[1]}`);
+        // Dynamic keys: `t(`prefix.${x}`)` needs at least one key under the prefix.
+        for (const m of src.matchAll(/\bt\(\s*`([A-Za-z0-9_.]+)\.\$\{/g)) {
+          if (!keys.some((k) => k.startsWith(`${m[1]}.`))) missing.push(`${path.basename(file)}: ${lng} ${m[1]}.*`);
+        }
       }
     }
     expect(missing).toEqual([]);

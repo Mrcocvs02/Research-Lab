@@ -72,7 +72,8 @@
       "export": "Esportazione",
       "maintenance": "Manutenzione",
       "annotations": "Annotazioni nei PDF",
-      "notes": "Note"
+      "notes": "Note",
+      "experimental": "Funzioni sperimentali"
     },
     "ix": {
       "uiLanguage": "Lingua dell'interfaccia|language italiano english",
@@ -137,7 +138,8 @@
       "costThreshold": "Soglia dell'anteprima del costo|token dialogo stima invio",
       "dailyTokenCap": "Tetto di token al giorno|limite giorno budget token",
       "noteTemplates": "Modelli di nota|modello letteratura segnaposto markdown",
-      "citeKeySchema": "Chiavi di citazione|bibtex ris csl riferimenti chiave cite autore anno"
+      "citeKeySchema": "Chiavi di citazione|bibtex ris csl riferimenti chiave cite autore anno",
+      "experimental": "Funzioni sperimentali|guida evidenziazioni margine beta prove"
     },
     "search": {
       "label": "Cerca nelle impostazioni",
@@ -240,19 +242,13 @@
       "restore": "Ripristina il predefinito",
       "name": "Nome del modello",
       "body": "Testo del modello"
+    },
+    "advanced": {
+      "experimental": "Funzioni sperimentali"
+    },
+    "experimental": {
+      "label": "Funzioni sperimentali",
+      "help": "Accende funzioni ancora in prova, come la guida di lettura nel margine. A funzione spenta non gira nulla."
     }
-  },
-  "advanced": {
-    "experimental": "Funzioni sperimentali"
-  },
-  "grp": {
-    "experimental": "Funzioni sperimentali"
-  },
-  "ix": {
-    "experimental": "Funzioni sperimentali|guida evidenziazioni margine beta prove"
-  },
-  "experimental": {
-    "label": "Funzioni sperimentali",
-    "help": "Accende funzioni ancora in prova, come la guida di lettura nel margine. A funzione spenta non gira nulla."
   }
 }

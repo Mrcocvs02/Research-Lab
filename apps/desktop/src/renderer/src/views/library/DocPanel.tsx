@@ -21,7 +21,7 @@ import { useDecide, type ReviewField } from '../review/useDecide';
 import { Lazy, lazyView } from '../../components/Lazy';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
-import { NoteEditor } from '../notes/NoteEditor';
+import { NotesSection } from './docpanel/NotesSection';
 import { baseName } from './fileName';
 import { formatSize } from './formatSize';
 import { safeText } from './safeText';
@@ -583,7 +583,7 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
 
       <CardSection id="notes" title={t('doc.notes')} testId="doc-notes">
         <p className="hint">{t('doc.notesHint')}</p>
-        <NoteEditor docId={docId} testId="card-note" />
+        <NotesSection docId={docId} />
         <Field label={t('doc.userDescription')} hint={t('doc.userDescriptionHint')} multiline rows={3} value={doc.userDescription ?? ''} onCommit={(v) => save({ userDescription: v })} testId="field-description" />
       </CardSection>
 

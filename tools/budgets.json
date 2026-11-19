@@ -8,7 +8,12 @@
     "initialJsKB": 396,
     "totalJsKB": 2050,
     "totalKB": 2170,
-    "readerResourcesKB": 2760
+    "readerResourcesKB": 2760,
+    "chunkCapsKB": {
+      "NoteRich": 16,
+      "LiteratureNote": 16,
+      "IncomingLinks": 16
+    }
   },
   "main": {
     "entryJsKB": 1110,

@@ -67,7 +67,8 @@
       "scan": "Scan",
       "export": "Export",
       "maintenance": "Maintenance",
-      "annotations": "PDF annotations"
+      "annotations": "PDF annotations",
+      "notes": "Notes"
     },
     "ix": {
       "uiLanguage": "Interface language|language italiano english lingua",
@@ -130,7 +131,8 @@
       "tokenCap": "Monthly token cap|limit consumption tokens budget account",
       "colorMeanings": "Colour meanings|highlight colours legend names",
       "costThreshold": "Cost preview threshold|tokens dialog estimate send",
-      "dailyTokenCap": "Daily token cap|limit day budget tokens"
+      "dailyTokenCap": "Daily token cap|limit day budget tokens",
+      "noteTemplates": "Note templates|template literature placeholders markdown"
     },
     "search": {
       "label": "Search settings",
@@ -222,6 +224,17 @@
       "hint": "Name what you use each colour for, for example \"Key result\". The names show in the reader, on the colour dots and in the annotation list.",
       "placeholder": "No meaning",
       "field": "Meaning of {{color}}"
+    },
+    "noteTemplates": {
+      "title": "Note templates",
+      "label": "Templates",
+      "hint": "Markdown with placeholders: {{titolo}}, {{autori}}, {{anno}}, {{evidenziazioni}}. \"Letteratura\" is the template of the literature note, with {{problema}}, {{contributo}}, {{metodo}}, {{risultati}}, {{dati}}, {{figure}} and {{limiti}} for its sections. A new note offers the templates when there is more than one.",
+      "newName": "New template",
+      "add": "New",
+      "remove": "Delete",
+      "restore": "Restore the default",
+      "name": "Name of the template",
+      "body": "Text of the template"
     }
   }
 }

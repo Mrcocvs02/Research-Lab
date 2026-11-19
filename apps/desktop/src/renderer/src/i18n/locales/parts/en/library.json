@@ -25,6 +25,7 @@
     "selClaude": "Claude",
     "selectionActions": "Actions on the selected documents",
     "askClaude": "Ask Claude…",
+    "selLiterature": "Write the literature notes…",
     "openDefault": "Open with the default program",
     "openManyMax": "At most {{count}} documents open at once.",
     "open": "Open",

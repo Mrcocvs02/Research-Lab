@@ -24,7 +24,7 @@ import { bibHandlers } from './bib-handlers.js';
 import { importIdHandlers, resourcesHandlers, resumeHandlers } from './resources-handlers.js';
 import { graphHandlers } from './graph-handlers.js';
 import { backupHandlers, maintenanceHandlers } from './backup-handlers.js';
-import { cropsHandlers, explainHandlers } from './readertools-handlers.js';
+import { cropsHandlers, explainHandlers, linksHandlers, literatureHandlers, templatesHandlers } from './readertools-handlers.js';
 
 export type { MainServices } from './services.js';
 
@@ -69,5 +69,8 @@ export function buildHandlers(s: MainServices): HandlerMap<Channels> {
     ...resourcesHandlers(s),
     ...importIdHandlers(s),
     ...resumeHandlers(s),
+    ...literatureHandlers(s),
+    ...templatesHandlers(s),
+    ...linksHandlers(s),
   };
 }

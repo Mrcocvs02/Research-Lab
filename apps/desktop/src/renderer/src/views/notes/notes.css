@@ -29,3 +29,111 @@
   display: flex;
   gap: var(--space-2);
 }
+
+/* Formulas (feature 37): MathML from the own converter; one that is not understood stays as written, with a discreet dot. */
+.math {
+  position: relative;
+  display: inline-block;
+}
+.math--display {
+  display: block;
+  margin: var(--space-2) 0;
+  text-align: center;
+  overflow-x: auto;
+}
+.math__copy {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 14px;
+  opacity: 0;
+  color: var(--text-subtle);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.math:hover .math__copy,
+.math__copy:focus-visible {
+  opacity: 1;
+}
+.math-raw {
+  font-family: var(--mono);
+  white-space: pre-wrap;
+}
+.math-raw::after {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 4px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: var(--text-subtle);
+}
+
+/* `[[` links by identifier, the completion list, and the incoming links (feature 38). */
+.note-link {
+  display: inline;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.note-link--gone {
+  color: var(--text-subtle);
+  text-decoration: line-through;
+}
+.notes-edit {
+  position: relative;
+}
+.link-picker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 28px;
+  z-index: 5;
+  max-height: 220px;
+  margin: 0;
+  padding: var(--space-1);
+  overflow-y: auto;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.link-picker button {
+  display: block;
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+  background: none;
+  border: 0;
+}
+.link-picker button.is-on,
+.link-picker button:hover {
+  background: var(--accent-soft);
+}
+.link-picker__kind {
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+.incoming-links {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+.incoming-links h4 {
+  margin: 0 0 var(--space-1);
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+.incoming-links ul {
+  margin: 0;
+  padding-left: var(--space-4);
+}

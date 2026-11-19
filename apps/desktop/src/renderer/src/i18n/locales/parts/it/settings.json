@@ -67,7 +67,8 @@
       "scan": "Scansione",
       "export": "Esportazione",
       "maintenance": "Manutenzione",
-      "annotations": "Annotazioni nei PDF"
+      "annotations": "Annotazioni nei PDF",
+      "notes": "Note"
     },
     "ix": {
       "uiLanguage": "Lingua dell'interfaccia|language italiano english",
@@ -130,7 +131,8 @@
       "tokenCap": "Tetto mensile di token|limite consumo token budget account",
       "colorMeanings": "Significato dei colori|evidenziazioni legenda nomi",
       "costThreshold": "Soglia dell'anteprima del costo|token dialogo stima invio",
-      "dailyTokenCap": "Tetto di token al giorno|limite giorno budget token"
+      "dailyTokenCap": "Tetto di token al giorno|limite giorno budget token",
+      "noteTemplates": "Modelli di nota|modello letteratura segnaposto markdown"
     },
     "search": {
       "label": "Cerca nelle impostazioni",
@@ -222,6 +224,17 @@
       "hint": "Scrivi a cosa serve ogni colore, per esempio «Risultato chiave». I nomi compaiono nel lettore, sui pallini dei colori e nell'elenco delle annotazioni.",
       "placeholder": "Nessun significato",
       "field": "Significato del colore {{color}}"
+    },
+    "noteTemplates": {
+      "title": "Modelli di nota",
+      "label": "Modelli",
+      "hint": "Markdown con segnaposto: {{titolo}}, {{autori}}, {{anno}}, {{evidenziazioni}}. \"Letteratura\" è il modello della nota di letteratura, con {{problema}}, {{contributo}}, {{metodo}}, {{risultati}}, {{dati}}, {{figure}} e {{limiti}} per le sue sezioni. Una nota nuova propone i modelli quando ce n’è più di uno.",
+      "newName": "Nuovo modello",
+      "add": "Nuovo",
+      "remove": "Elimina",
+      "restore": "Ripristina il predefinito",
+      "name": "Nome del modello",
+      "body": "Testo del modello"
     }
   }
 }

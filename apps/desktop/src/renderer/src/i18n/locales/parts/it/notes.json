@@ -1,0 +1,24 @@
+{
+  "notes": {
+    "math": {
+      "unrendered": "Formula non resa",
+      "copy": "Copia LaTeX"
+    },
+    "links": {
+      "open": "Apri",
+      "gone": "Questo elemento non esiste più",
+      "picker": "Collega un documento o un progetto",
+      "none": "Nessun risultato",
+      "kind_doc": "Documento",
+      "kind_project": "Progetto"
+    },
+    "templates": {
+      "use": "Usa un modello…"
+    },
+    "incoming": {
+      "title_one": "Collegamenti in entrata ({{count}})",
+      "title_other": "Collegamenti in entrata ({{count}})",
+      "page": "{{title}} · pagina {{page}}"
+    }
+  }
+}

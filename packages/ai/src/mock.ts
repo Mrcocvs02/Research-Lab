@@ -94,6 +94,7 @@ export function mockStructured(request: { schema: unknown; prompt: string }): un
     else if (k === 'means') out[k] = 'Mock explanation of the selection.';
     else if (k === 'symbols') out[k] = [{ symbol: 'x', meaning: 'a mock symbol' }];
     else if (k === 'role') out[k] = 'Mock role in the paper.';
+    else if (k === 'sections') out[k] = ['problem', 'contribution', 'method', 'results', 'data', 'limits'].map((key) => ({ key, text: `Mock ${key} of the paper.`, pages: [1] }));
   }
   return out;
 }

@@ -105,6 +105,16 @@ for (const c of main.lazyChunks) {
   }
 }
 
+// Named lazy chunks of the renderer with their own cap (D-426: the three chunks of the notes, each at most 16 KiB).
+for (const [name, cap] of Object.entries(budgets.renderer?.chunkCapsKB ?? {})) {
+  for (const f of files(path.join(out, 'renderer', 'assets'), '.js').filter((x) => path.basename(x).startsWith(`${name}-`))) {
+    const size = kib(statSync(f).size);
+    const over = size > cap;
+    console.log(`${over ? 'X' : ' '} renderer chunk ${name.padEnd(16)} ${String(size).padStart(8)} KiB   cap ${cap} KiB${over ? '   OVER' : ''}`);
+    if (over) chunkFailures.push(name);
+  }
+}
+
 const limitOf = (key) => key.split('.').reduce((o, k) => o?.[k], budgets);
 let failed = chunkFailures.length;
 for (const [key, value] of Object.entries(measured)) {

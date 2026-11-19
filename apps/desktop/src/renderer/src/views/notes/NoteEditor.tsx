@@ -1,7 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { STUDY_LIMITS } from '@rl/core';
-import { Lazy, lazyRetry } from '../../components/Lazy';
+import { Lazy, lazyView } from '../../components/Lazy';
 import { draftKey, keepDraft, registerEditor, takeDraft } from '../../lib/dirtyEditors';
 import { useChangeVersion, useLibraryEvents } from '../../lib/events';
 import { useNotify } from '../../lib/notify';
@@ -10,8 +10,17 @@ import { RlError } from '../../lib/rl-error';
 import { useApp } from '../../state/app-context';
 import './notes.css';
 
-// The Markdown renderer is loaded when the preview is first shown.
-const Markdown = lazyRetry(() => import('../../lib/markdown').then((m) => ({ default: m.Markdown })));
+// The rich side (formulas, `[[` links, templates) and the incoming links are loaded when first needed (D-426): three chunks.
+const NotePreview = lazyView(() => import('./NoteRich').then((m) => ({ default: m.NotePreview })), ['notes']);
+const LinkPicker = lazyView(() => import('./NoteRich').then((m) => ({ default: m.LinkPicker })), ['notes']);
+const TemplateMenu = lazyView(() => import('./NoteRich').then((m) => ({ default: m.TemplateMenu })), ['notes']);
+const IncomingLinks = lazyView(() => import('./IncomingLinks').then((m) => ({ default: m.IncomingLinks })), ['notes']);
+
+/** The `[[` being typed before the caret: where it starts and what follows it. */
+const openLink = (value: string, caret: number): { start: number; query: string } | null => {
+  const m = /\[\[([^\]\n|]{0,60})$/.exec(value.slice(0, caret));
+  return m ? { start: m.index, query: m[1]! } : null;
+};
 
 interface Props {
   docId: string;
@@ -44,6 +53,8 @@ export function NoteEditor({ docId, page, testId }: Props) {
   const [saveError, setSaveError] = useState(false);
   const [restored, setRestored] = useState(false);
   const [layout, setLayout] = useState<'edit' | 'preview'>('edit');
+  const [link, setLink] = useState<{ start: number; end: number; query: string } | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const preview = useDeferredValue(text);
 
   // What the latest save and the latest unmount read: the state of the render that scheduled them may be old.
@@ -200,6 +211,22 @@ export function NoteEditor({ docId, page, testId }: Props) {
     }
   };
 
+  const watchLink = (el: HTMLTextAreaElement) => {
+    const o = openLink(el.value, el.selectionStart);
+    setLink(o ? { ...o, end: el.selectionStart } : null);
+  };
+  const pickLink = (md: string) => {
+    if (!link) return;
+    const next = `${textRef.current.slice(0, link.start)}${md}${textRef.current.slice(link.end)}`.slice(0, STUDY_LIMITS.noteBody);
+    changeText(next);
+    setLink(null);
+    const caret = Math.min(next.length, link.start + md.length);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(caret, caret);
+    });
+  };
+
   const dirty = text !== saved;
   if (!loaded) return <p className="hint">{t('common.loading')}</p>;
   return (
@@ -223,6 +250,11 @@ export function NoteEditor({ docId, page, testId }: Props) {
             </label>
           ))}
         </div>
+        {text === '' && layout === 'edit' && (
+          <Lazy>
+            <TemplateMenu docId={docId} onApply={changeText} />
+          </Lazy>
+        )}
         <span className="spacer" />
         <span className="hint" role="status" data-testid={`${testId}-state`}>
           {dirty ? t('notes.unsaved') : t('notes.saved')}
@@ -247,7 +279,23 @@ export function NoteEditor({ docId, page, testId }: Props) {
       {layout === 'edit' ? (
         <div className="field notes-edit">
           <label htmlFor={id}>{page === undefined ? t('notes.fileLabel') : t('notes.pageLabel', { page })}</label>
-          <textarea id={id} value={text} maxLength={STUDY_LIMITS.noteBody} onChange={(e) => changeText(e.target.value)} onBlur={() => void save()} spellCheck data-testid={`${testId}-input`} />
+          <textarea
+            id={id}
+            ref={inputRef}
+            value={text}
+            maxLength={STUDY_LIMITS.noteBody}
+            onChange={(e) => (changeText(e.target.value), watchLink(e.target))}
+            onKeyUp={(e) => ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && watchLink(e.currentTarget)}
+            onClick={(e) => watchLink(e.currentTarget)}
+            onBlur={() => (setLink(null), void save())}
+            spellCheck
+            data-testid={`${testId}-input`}
+          />
+          {link && (
+            <Lazy>
+              <LinkPicker query={link.query} input={inputRef.current} onPick={pickLink} onClose={() => setLink(null)} />
+            </Lazy>
+          )}
           <p className="hint">{t('notes.markdownHint')}</p>
         </div>
       ) : (
@@ -256,10 +304,15 @@ export function NoteEditor({ docId, page, testId }: Props) {
             <p className="hint">{t('notes.empty')}</p>
           ) : (
             <Lazy>
-              <Markdown source={preview} />
+              <NotePreview source={preview} />
             </Lazy>
           )}
         </div>
+      )}
+      {page === undefined && (
+        <Lazy>
+          <IncomingLinks docId={docId} />
+        </Lazy>
       )}
     </div>
   );

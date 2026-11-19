@@ -25,6 +25,7 @@
     "selClaude": "Claude",
     "selectionActions": "Azioni sui documenti selezionati",
     "askClaude": "Chiedi a Claude…",
+    "selLiterature": "Scrivi le note di letteratura…",
     "openDefault": "Apri con il programma predefinito",
     "openManyMax": "Si aprono al massimo {{count}} documenti alla volta.",
     "open": "Apri",

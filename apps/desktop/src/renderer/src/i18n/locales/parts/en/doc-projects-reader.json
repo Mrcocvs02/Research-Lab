@@ -8,7 +8,8 @@
     "layout_edit": "Edit",
     "layout_preview": "Preview",
     "preview": "Preview of the notes",
-    "markdownHint": "Headings with #, lists with -, **bold**, *italic*, `code`. HTML is not interpreted.",
+    "markdownHint": "Headings with #, lists with -, **bold**, *italic*, `code`. Formulas between $…$, links to documents with [[. HTML is not interpreted.",
+    "tabLiterature": "Literature",
     "empty": "Nothing to preview.",
     "unsaved": "Unsaved changes",
     "saved": "Saved"

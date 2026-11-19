@@ -32,6 +32,7 @@ import './library.css';
 const DocumentCard = lazyView(() => import('./DocPanel').then((m) => ({ default: m.DocumentCard })), ['doc', 'doc-projects-reader', 'doc-reader', 'doc-review']);
 const BulkTagEditor = lazyView(() => import('./DocPanel').then((m) => ({ default: m.BulkTagEditor })), ['doc', 'doc-projects-reader', 'doc-reader', 'doc-review']);
 const TaxonomyManager = lazyView(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })), ['taxonomy']);
+const LiteratureDialog = lazyView(() => import('../literature/LiteratureNote').then((m) => ({ default: m.LiteratureDialog })), ['literature', 'reader']);
 const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);
 const AddToProject = lazyView(() => import('./AddToProject').then((m) => ({ default: m.AddToProject })), ['addToProject']);
 
@@ -69,6 +70,7 @@ function LibraryInner() {
   const [mode, setMode] = useState<'browse' | 'taxonomy'>('browse');
   const [addOpen, setAddOpen] = useState(false);
   const [jobOpen, setJobOpen] = useState(false);
+  const [litOpen, setLitOpen] = useState(false);
   const set = (patch: Partial<Omit<BrowseState, 'text'>>) => setState((b) => ({ ...b, ...patch }));
 
   // The text of the search box is the view's own while it lives: it goes away with the view.
@@ -183,6 +185,7 @@ function LibraryInner() {
               rows={selectedRows}
               onProject={() => setAddOpen(true)}
               onPropose={() => setJobOpen(true)}
+              onLiterature={() => setLitOpen(true)}
               onClear={() => setSelection(emptySelection())}
               tagEditor={(close) => <BulkTagEditor docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onClose={close} />}
             />
@@ -278,6 +281,11 @@ function LibraryInner() {
       {jobOpen && (
         <Lazy>
           <JobDialog docIds={selectedIds} onClose={() => setJobOpen(false)} />
+        </Lazy>
+      )}
+      {litOpen && (
+        <Lazy>
+          <LiteratureDialog docIds={selectedIds} onClose={() => setLitOpen(false)} />
         </Lazy>
       )}
       {addOpen && (

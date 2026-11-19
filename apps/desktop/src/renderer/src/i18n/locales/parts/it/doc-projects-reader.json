@@ -8,7 +8,8 @@
     "layout_edit": "Modifica",
     "layout_preview": "Anteprima",
     "preview": "Anteprima delle note",
-    "markdownHint": "Titoli con #, elenchi con -, **grassetto**, *corsivo*, `codice`. L'HTML non viene interpretato.",
+    "markdownHint": "Titoli con #, elenchi con -, **grassetto**, *corsivo*, `codice`. Formule tra $…$, collegamenti ai documenti con [[. L'HTML non viene interpretato.",
+    "tabLiterature": "Letteratura",
     "empty": "Niente da mostrare.",
     "unsaved": "Modifiche non salvate",
     "saved": "Salvato"

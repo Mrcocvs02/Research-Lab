@@ -43,6 +43,7 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   e('annotBackupLocation', 'library', 'annotations', ['annotations.backupLocation']),
   e('annotCopies', 'library', 'annotations', ['annotations.copies', 'pdfMode']),
   e('colorMeanings', 'library', 'annotations', []),
+  e('noteTemplates', 'library', 'notes', []),
   e('authMode', 'claude', 'account', ['ai.authMode']),
   e('account', 'claude', 'account', ['ai:status']),
   e('secretAnthropic', 'claude', 'account', ['secret.anthropic-api-key']),

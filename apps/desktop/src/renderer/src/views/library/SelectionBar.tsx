@@ -23,6 +23,7 @@ interface Props {
   tagEditor(close: () => void): React.ReactNode;
   onProject(): void;
   onPropose(): void;
+  onLiterature(): void;
   onClear(): void;
 }
 
@@ -30,7 +31,7 @@ interface Props {
  * The bar that takes the place of the filter row when several documents are selected (3 of 1.1, 4.2): "N selected",
  * Tag, Project, Claude, the menu and "Clear selection" — five controls, one line at every width.
  */
-export function SelectionBar({ ids, tagEditor, onProject, onPropose, onClear }: Props) {
+export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiterature, onClear }: Props) {
   const { t } = useTranslation();
   const { openExport, setChatOpen } = useAiUi();
   const citationJob = useCitationJob();
@@ -47,6 +48,7 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onClear }: 
       id: 'claude',
       items: [
         { id: 'propose', label: t('jobs.propose'), icon: <IconClaude size={16} />, onSelect: onPropose },
+        { id: 'literature', label: t('library.selLiterature'), icon: <IconClaude size={16} />, testId: 'selection-literature', onSelect: onLiterature },
         { id: 'ask', label: t('library.askClaude'), icon: <IconClaude size={16} />, onSelect: () => setChatOpen(true) },
       ],
     },

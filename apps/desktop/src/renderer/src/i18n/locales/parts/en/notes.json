@@ -1,0 +1,24 @@
+{
+  "notes": {
+    "math": {
+      "unrendered": "Formula not rendered",
+      "copy": "Copy LaTeX"
+    },
+    "links": {
+      "open": "Open",
+      "gone": "This target no longer exists",
+      "picker": "Link to a document or a project",
+      "none": "Nothing matches",
+      "kind_doc": "Document",
+      "kind_project": "Project"
+    },
+    "templates": {
+      "use": "Use a template…"
+    },
+    "incoming": {
+      "title_one": "Incoming links ({{count}})",
+      "title_other": "Incoming links ({{count}})",
+      "page": "{{title}} · page {{page}}"
+    }
+  }
+}

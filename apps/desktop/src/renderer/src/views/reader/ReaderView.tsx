@@ -43,11 +43,14 @@ import './cursors.css';
 // "✦ Spiega" and its cost dialog load when the first explanation is asked for.
 const ExplainCard = lazyView(() => import('./ExplainCard').then((m) => ({ default: m.ExplainCard })), ['reader']);
 
+// The literature note of the paper (tab "Literature" of the notes) loads when that tab is opened.
+const LiteratureRow = lazyView(() => import('../literature/LiteratureNote').then((m) => ({ default: m.LiteratureRow })), ['literature', 'reader']);
+
 type Failure = { kind: 'notPdf' | 'missing' | 'encrypted' | 'invalid' | 'failed' } | { kind: 'error'; error: unknown };
 type Side = 'annotations' | 'notes' | 'info';
-type Scope = 'pageNote' | 'fileNote' | 'notes';
+type Scope = 'pageNote' | 'fileNote' | 'notes' | 'literature';
 const SIDES: Side[] = ['annotations', 'notes', 'info'];
-const SCOPES: Scope[] = ['pageNote', 'fileNote', 'notes'];
+const SCOPES: Scope[] = ['pageNote', 'fileNote', 'notes', 'literature'];
 const TOOL_KEY = 'rl.readerTool';
 const SPACE_KEY = 'rl.readerSpaceHint';
 const OVERLAY = '.rl-popover, [role="dialog"][aria-modal="true"]';
@@ -943,12 +946,17 @@ export function ReaderView({ target, onClose }: Props) {
                   <div className="rl-seg rl-seg--sm" role="radiogroup" aria-label={t('reader.sides.notes')}>
                     {SCOPES.map((id) => (
                       <button key={id} type="button" role="radio" aria-checked={scope === id} className={scope === id ? 'rl-seg__opt is-on' : 'rl-seg__opt'} onClick={() => setScope(id)} data-testid={`reader-tab-${id}`}>
-                        {t(`reader.tabs.${id}`)}
+                        {id === 'literature' ? t('notes.tabLiterature') : t(`reader.tabs.${id}`)}
                       </button>
                     ))}
                   </div>
                   {scope === 'pageNote' && <NoteEditor key={`page-${page}`} docId={docId} page={page} testId="note-page" />}
                   {scope === 'fileNote' && <NoteEditor key="file" docId={docId} testId="note-file" />}
+                  {scope === 'literature' && (
+                    <Lazy>
+                      <LiteratureRow docId={docId} open />
+                    </Lazy>
+                  )}
                   {scope === 'notes' && (
                     <NotesList
                       docId={docId}

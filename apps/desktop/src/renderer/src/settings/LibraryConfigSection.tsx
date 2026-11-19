@@ -14,6 +14,7 @@ import { rl } from '../lib/rl';
 import { validateWith, validationKey } from '../lib/validate';
 import { useApp } from '../state/app-context';
 import { ColorMeaningsGroup } from './ColorMeaningsGroup';
+import { NoteTemplatesGroup } from './NoteTemplatesGroup';
 import { LibraryAnnotationsGroup } from './LibraryAnnotationsGroup';
 import { Group, NeedsLibrary, Row, SectionHead, TextRow, useLibraryPatch } from './rows';
 import { useAutoSave } from './useAutoSave';
@@ -259,6 +260,7 @@ export function LibraryConfigSection({ onNewLibrary }: { onNewLibrary(): void })
       </Group>
       {libraryId && config && <LibraryAnnotationsGroup />}
       {libraryId && config && <ColorMeaningsGroup />}
+      {libraryId && config && <NoteTemplatesGroup />}
     </>
   );
 }

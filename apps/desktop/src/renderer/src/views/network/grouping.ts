@@ -9,6 +9,8 @@ import type { PreparedMap } from './mapModel';
  * used today; every other family comes from `graph:family` (a tag kind, research groups, or communities found in the network).
  */
 export const TOPIC_FAMILY = 'topic';
+/** "None": the free layout of the map, with no blocks (D-498). */
+export const NONE_FAMILY = 'none';
 const KEY = 'rl.map.family';
 const EVENT = 'rl-map-family';
 const NAMES_EVENT = 'rl-map-family-names';
@@ -17,6 +19,9 @@ export interface FamilyInfo {
   id: string;
   label: string;
   count: number;
+  /** Whether the family passes the test of the blocks, and the numbers behind it (section 19.2.2). */
+  eligible?: boolean | undefined;
+  reason?: { coverage: number; clarity: number; values: number } | undefined;
 }
 export interface FamilyShares {
   areas: AreaDef[];

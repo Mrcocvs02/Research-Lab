@@ -954,3 +954,147 @@
   text-align: left;
   cursor: pointer;
 }
+
+/* Map in blocks (D-498): the frame lives outside the canvas, nothing sits over it. */
+.map-stage {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.map-stage > .map-wrap {
+  flex: 1;
+}
+.map-loading {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+.map-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.map-notes .map-pill {
+  position: static;
+  max-width: none;
+  box-shadow: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.group-by {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-small, 13px);
+}
+.group-by-label {
+  color: var(--text-muted);
+}
+.group-reason {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.map-side {
+  flex: none;
+  width: 248px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.map-side.is-folded {
+  width: 40px;
+  align-items: center;
+  padding: var(--space-2) 0;
+}
+.map-side-toggle {
+  align-self: flex-end;
+}
+.map-side.is-folded .map-side-toggle {
+  align-self: center;
+}
+.map-side-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+}
+.map-blocklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.map-blocklist .legend-item {
+  width: 100%;
+}
+.map-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.map-ctl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.map-ctl-title {
+  font-size: var(--fs-small, 13px);
+  color: var(--text-muted);
+}
+.map-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.map-count {
+  margin: 0;
+}
+.map-minislot {
+  margin-top: auto;
+  display: flex;
+  justify-content: center;
+}
+.map-minislot:empty {
+  display: none;
+}
+.map-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.map-strip-blocks {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0 0 2px;
+  list-style: none;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.map-strip-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.net-pop .group-by {
+  display: flex;
+  justify-content: space-between;
+}

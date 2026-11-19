@@ -11,6 +11,7 @@ import { IconDiscover } from '../../components/icons-shell';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { useLibraryEvents } from '../../lib/events';
+import { useNav } from '../../lib/nav';
 import { useNotify } from '../../lib/notify';
 import { useReader } from '../../lib/reader';
 import { rl } from '../../lib/rl';
@@ -19,6 +20,7 @@ import { useApp } from '../../state/app-context';
 import { WorkRow } from '../citations/WorkRow';
 import { safeText } from '../library/safeText';
 import { bridgePath, strengthDots } from '../network/BridgePath';
+import { setMapBridge } from '../network/bridgeIntent';
 import '../citations/citations.css';
 import './discover.css';
 
@@ -152,6 +154,7 @@ function Candidate({ run, c, onMark }: { run: DiscoverRun; c: DiscoverCandidate;
   const { t } = useTranslation();
   const { reportError, info } = useNotify();
   const { invalidateAll } = useLibraryEvents();
+  const nav = useNav();
   const bridge = run.kind === 'bridge';
   const idKind = c.doi ? 'doi' : c.arxivId ? 'arxiv' : null;
   const importIt = async () => {
@@ -185,7 +188,18 @@ function Candidate({ run, c, onMark }: { run: DiscoverRun; c: DiscoverCandidate;
       )}
       {path && (
         <span className="hint" data-testid="run-path">
-          {t('discover.searches.path', { a: safeText(path.nodes[0].title), b: safeText(path.nodes[2].title) })}
+          {t('discover.searches.path', { a: safeText(path.nodes[0].title), b: safeText(path.nodes[2].title) })}{' '}
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              setMapBridge(path);
+              nav.navigate({ view: 'map' });
+            }}
+            data-testid="run-show-on-map"
+          >
+            {t('discover.searches.showOnMap')}
+          </button>
         </span>
       )}
       <span className="hint" data-testid="run-why">

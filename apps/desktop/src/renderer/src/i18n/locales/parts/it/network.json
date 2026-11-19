@@ -163,7 +163,8 @@
       "doc": "{{title}}, {{topic}}"
     },
     "card": {
-      "topic": "Argomento: {{topic}}"
+      "topic": "Argomento: {{topic}}",
+      "actions": "Azioni sul documento"
     },
     "minimap": "Mostra la minimappa",
     "minimapLabel": "Minimappa: trascina il rettangolo per spostare la vista",
@@ -272,7 +273,19 @@
       "related": {
         "author": "Autori correlati",
         "topic": "Argomenti correlati"
-      }
+      },
+      "sizeBy": "Dimensione per",
+      "sizeBy_docs": "Documenti",
+      "sizeBy_links": "Collegamenti",
+      "sizeBy_equal": "Tutti uguali",
+      "sharedThemes": "Mostra temi in comune",
+      "cutHint": "oltre il limite",
+      "cutShown": "Mostrato senza i suoi collegamenti: è oltre gli {{limit}} nodi che la rete può contenere."
+    },
+    "bridge": {
+      "find": "Trova un ponte…",
+      "pickSecond": "Fai clic sul secondo documento per un ponte con «{{title}}»",
+      "note": "Ponte: {{a}} ⇢ lavoro ⇢ {{b}}"
     }
   }
 }

@@ -4,7 +4,7 @@ import { QuadTree } from './quadtree';
 
 /** The expandable network: nodes, edges and a tiny incremental force simulation (no graph library). */
 export type NodeKind = 'doc' | 'folder' | 'tag' | 'entity';
-export type EdgeKind = 'similar' | 'cites' | 'tagged' | 'contains' | 'link' | 'implies';
+export type EdgeKind = 'similar' | 'cites' | 'tagged' | 'contains' | 'link' | 'implies' | 'theme';
 
 export interface NetNode {
   /** Unique key `kind:id`. */

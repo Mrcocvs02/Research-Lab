@@ -6,7 +6,11 @@ import { Lazy, lazyView } from '../../components/Lazy';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { useAiUi } from '../../lib/aiUi';
+import { setDiscoverIntent } from '../../lib/discoverIntent';
+import { useNav } from '../../lib/nav';
 import { useLocalFlag } from '../../lib/useLocalFlag';
+import type { BridgePath } from './BridgePath';
+import { takeMapBridge } from './bridgeIntent';
 import { rl } from '../../lib/rl';
 import { RlError } from '../../lib/rl-error';
 import { safeText } from '../library/safeText';
@@ -56,6 +60,9 @@ export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMap
   const [allow, setAllow] = useState<ReadonlySet<string> | null>(null);
   const [surprise, setSurprise] = useState<{ terms: string[] } | null>(null);
   const rand = useRef(rng(Date.now() & 0xffff));
+  const nav = useNav();
+  // A bridge found in Discover ("Show on the map"): drawn on the canvas until the note is closed.
+  const [bridge, setBridge] = useState<BridgePath | null>(() => takeMapBridge());
 
   const scope = useMemo<MapScope | undefined>(() => {
     if (kind === 'all' || value === '') return undefined;
@@ -261,6 +268,14 @@ export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMap
           </button>
         </p>
       )}
+      {bridge && (
+        <p className="surprise-note" role="status" data-testid="map-bridge-note">
+          {t('network.bridge.note', { a: safeText(bridge.nodes[0].title), b: safeText(bridge.nodes[2].title) })}{' '}
+          <button type="button" className="link" onClick={() => setBridge(null)} data-testid="map-bridge-close">
+            {t('common.close')}
+          </button>
+        </p>
+      )}
       {map && map.omitted > 0 && (
         <p className="hint" role="status" data-testid="map-omitted">
           {t('network.mapOmitted', { count: map.omitted, shown: map.n })}
@@ -274,7 +289,7 @@ export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMap
       )}
       {map && (
         <div className="map-body">
-          <MapCanvas map={map} level={lvl} selected={selected} onSelect={onSelect} onRead={onRead} onExplore={onExplore} tints={tints} allow={allow} minimap={mini} aiBadge={t('ai.badge')} label={t('network.mapLabel')} fitKey={mapKey} handle={handle} />
+          <MapCanvas map={map} level={lvl} selected={selected} onSelect={onSelect} onRead={onRead} onExplore={onExplore} tints={tints} allow={allow} minimap={mini} bridge={bridge} onBridge={(a, b) => { setDiscoverIntent({ kind: 'bridge', docIds: [a, b] }); nav.navigate({ view: 'discover' }); }} aiBadge={t('ai.badge')} label={t('network.mapLabel')} fitKey={mapKey} handle={handle} />
           <ul className="legend" data-testid="cluster-legend" aria-label={t('network.legend')}>
             {clusters.slice(0, 60).map((c, i) => {
               const txt = clusterText(c);

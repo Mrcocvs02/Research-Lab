@@ -434,6 +434,25 @@
   font-size: var(--fs-small, 13px);
   pointer-events: none;
 }
+.hovercard.hc-live {
+  pointer-events: auto;
+}
+.hc-more {
+  align-self: flex-end;
+}
+.bridge-note {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 10px;
+  background: var(--surface);
+  border-radius: var(--r-md, 10px);
+  box-shadow: var(--e-1);
+}
 .hc-title {
   display: -webkit-box;
   -webkit-line-clamp: 2;

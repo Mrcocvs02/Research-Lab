@@ -9,10 +9,12 @@ import { isDarkTheme } from '../../lib/theme';
 import { useLocalFlag } from '../../lib/useLocalFlag';
 import { safeText } from '../library/safeText';
 import { reducedMotion } from './camera';
-import { mix, readTheme, type MapTheme } from './colors';
+import { assignKeyTints, mix, readTheme, withAlpha, type MapTheme } from './colors';
 import { controlPoint, edgeAlpha, fillTapered, MAX_CURVED } from './edges';
 import { MAX_NET_NODES, Network, type EdgeKind, type NetNode, type NodeKind } from './forceSim';
 import { boundsOf, toScreenX, toScreenY, type Bounds } from './geometry';
+import { centroidOf, convexHull, hullShape, type Pt } from './hulls';
+import { clusterText } from './mapModel';
 import { DocCard, HoverCard, useRestingHover } from './HoverCard';
 import { pickLabels, shortLabel, type LabelCandidate } from './labelsLod';
 import { firstNode, mapAction, nearestInDirection } from './mapKeyboard';
@@ -57,6 +59,7 @@ const EDGE_STYLE: Record<EdgeKind, { dash: number[]; color: keyof MapTheme }> = 
   contains: { dash: [], color: 'muted' },
   link: { dash: [], color: 'muted' },
   implies: { dash: [4, 4], color: 'muted' },
+  theme: { dash: [2, 4], color: 'muted' },
 };
 const NODE_FILL: Record<NodeKind, keyof MapTheme> = { doc: 'accent', folder: 'muted', tag: 'text', entity: 'accent' };
 
@@ -85,6 +88,8 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
   const [surprise, setSurprise] = useState<{ a: string; b: string; terms: string[] } | null>(null);
   const [chips, setChips] = useState<Array<{ id: string; label: string; n: number }>>([]);
   const [mini, setMini] = useLocalFlag('rl.mapMini', true);
+  /** The topics of the Panorama: the topic of each document (coarsest level), the tint of each topic and its name. */
+  const topics = useRef<{ of: Map<string, string>; tint: Map<string, number>; name: Map<string, string> } | null>(null);
   const hoverKey = useRef<string | null>(null);
   const refs = useRef({ selKey, cursor, pathKeys, focusKey, surprise });
   refs.current = { selKey, cursor, pathKeys, focusKey, surprise };
@@ -97,6 +102,13 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
   const autoTried = useRef(false);
   const rand = useRef(rng(Date.now() & 0xffff));
   const searchRef = useRef<HTMLInputElement>(null);
+
+  /** Documents take the colour and the hull of their topic (the same tints as the Panorama); the simulation pulls them towards it. */
+  function tagTopics(): void {
+    const tp = topics.current;
+    if (!tp) return;
+    for (const n of net.nodes.values()) if (n.kind === 'doc' && n.group === undefined) n.group = tp.of.get(n.id);
+  }
 
   function getBounds(): Bounds | null {
     if (net.size === 0) return null;
@@ -138,6 +150,33 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
       const onPath = new Set<string>();
       if (path) for (let i = 0; i + 1 < path.length; i++) onPath.add(`${path[i]}|${path[i + 1]}`).add(`${path[i + 1]}|${path[i]}`);
       const fade = (k: string): number => (focusSet && !focusSet.has(k) ? 0.12 : hk && !near.has(k) ? 0.35 : pathSet && !pathSet.has(k) ? 0.25 : 1);
+      // Hulls of the topics (documents of one topic, widened and rounded), behind the edges.
+      const tp = topics.current;
+      const topicTexts: Array<{ text: string; x: number; y: number }> = [];
+      if (tp) {
+        const groups = new Map<string, Pt[]>();
+        for (const n of nodes.values()) if (n.kind === 'doc' && n.group) (groups.get(n.group) ?? groups.set(n.group, []).get(n.group)!).push([sx(n.x), sy(n.y)]);
+        ctx.font = '600 13px system-ui, sans-serif';
+        for (const [id, pts] of groups) {
+          if (pts.length < 2) continue;
+          const tint = th.tints[tp.tint.get(id) ?? 0] ?? th.muted;
+          const hull = convexHull(pts);
+          const shape = hullShape(hull, 16);
+          if (shape.length < 3) continue;
+          ctx.beginPath();
+          ctx.moveTo(shape[0]![0], shape[0]![1]);
+          for (let i = 1; i < shape.length; i++) ctx.lineTo(shape[i]![0], shape[i]![1]);
+          ctx.closePath();
+          ctx.fillStyle = withAlpha(tint, dark ? 0.12 : 0.07);
+          ctx.fill();
+          ctx.strokeStyle = withAlpha(tint, dark ? 0.35 : 0.25);
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          const c = centroidOf(hull);
+          const name = tp.name.get(id);
+          if (name) topicTexts.push({ text: shortLabel(name), x: c[0], y: Math.min(...hull.map((p) => p[1])) - 22 });
+        }
+      }
       const visible = [];
       for (const e of net.edges) {
         const a = nodes.get(e.a);
@@ -209,7 +248,8 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
         if (x < -30 || y < -30 || x > w + 30 || y > h + 30) continue;
         const r = NODE_R * (n.key === hk ? 1.25 : 1);
         ctx.globalAlpha = fade(n.key);
-        ctx.fillStyle = th[NODE_FILL[n.kind]] as string;
+        const tin = n.kind === 'doc' && n.group !== undefined ? tp?.tint.get(n.group) : undefined;
+        ctx.fillStyle = tin !== undefined ? (th.tints[tin] ?? th.accent) : (th[NODE_FILL[n.kind]] as string);
         ctx.strokeStyle = th.bg;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -245,6 +285,17 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
         labels.push({ id: texts.length - 1, x, y: y + r + 12, w: ctx.measureText(texts[texts.length - 1]!).width + 6, size: n.expanded ? r + 3 : r, forced: n.key === hk || n.key === sel || n.key === cur });
       }
       ctx.globalAlpha = 1;
+      ctx.font = '600 13px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (const tt of topicTexts) {
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = th.bg;
+        ctx.strokeText(tt.text, tt.x, tt.y);
+        ctx.fillStyle = th.muted;
+        ctx.fillText(tt.text, tt.x, tt.y);
+      }
+      ctx.font = '12px system-ui, sans-serif';
       // Labels: everywhere when the network is small, else the ones that matter and do not overlap.
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -369,6 +420,7 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
       const live = net.nodes.get(n.key);
       if (!live) return;
       const res = net.expand(live, r.nodes, r.edges);
+      tagTopics();
       if (res.capped) setNote({ text: t('network.net.capped', { count: res.omitted, limit: MAX_NET_NODES }), only: live });
       else if (res.added === 0) setNote({ text: t('network.net.nothingNew') });
       syncCount();
@@ -390,6 +442,7 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
     lastStart.current = start.nonce;
     net.clear();
     const seed = net.seed({ kind: start.kind, id: start.id, label: start.label });
+    tagTopics();
     setSelKey(seed.key);
     setError(null);
     setNote(null);
@@ -409,6 +462,12 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
     let live = true;
     (async () => {
       if (selectedDoc) return onStart({ kind: 'doc', id: selectedDoc, label: selectedDocLabel ?? selectedDoc.slice(0, 8) });
+      // The document read last, when it is still in the library, is the natural place to start.
+      const resume = await rl.invoke('resume:get', {}).catch(() => null);
+      if (resume?.last) {
+        const d = await rl.invoke('documents:get', { docId: resume.last.docId }).catch(() => null);
+        if (d && live) return onStart({ kind: 'doc', id: resume.last.docId, label: d.title ?? resume.last.docId.slice(0, 8) });
+      }
       const list = await rl.invoke('documents:list', { limit: 8, sort: 'added-desc' });
       const scored = await Promise.all(
         list.items.map((d) => {
@@ -429,6 +488,27 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [count, start?.nonce]);
+
+  // The topics of the Panorama, once (nothing when the model is not built): documents are tinted and ringed by topic.
+  useEffect(() => {
+    let live = true;
+    rl.invoke('graph:map', {}).then(
+      (m) => {
+        if (!live) return;
+        const top = m.clusters.filter((c) => c.level === 0);
+        const of = new Map<string, string>();
+        for (const p of m.points) if (p.clusters[0] !== undefined) of.set(p.docId, p.clusters[0]);
+        topics.current = { of, tint: assignKeyTints(top.map((c) => c.id)), name: new Map(top.map((c) => [c.id, clusterText(c).text])) };
+        tagTopics();
+        view.requestDraw();
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selected = selKey ? net.nodes.get(selKey) : undefined;
   const hovered = hover ? net.nodes.get(hover.key) : undefined;

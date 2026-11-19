@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.web.json",
+  "compilerOptions": {
+    "paths": {
+      "@rl/core": ["../../packages/core/src/index.ts"],
+      "@rl/core/node": ["../../packages/core/src/node/index.ts"],
+      "@rl/core/ipc-names": ["../../packages/core/src/ipc/names.ts"],
+      "@rl/ai": ["../../packages/ai/src/index.ts"],
+      "@rl/ai/analysis": ["../../packages/ai/src/analysis/index.ts"]
+    }
+  }
+}

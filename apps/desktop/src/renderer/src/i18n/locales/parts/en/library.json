@@ -69,6 +69,37 @@
     "selLinks": "Find links…",
     "docLinksFind": "Find links…",
     "moreKeywords": "+{{count}} keywords",
-    "hideKeywords": "Hide keywords"
+    "hideKeywords": "Hide keywords",
+    "sel": {
+      "type": "Type",
+      "years": "Years",
+      "authors": "Authors in common",
+      "folder": "Folder",
+      "status": "Status",
+      "none": "none",
+      "different_one": "{{count}} different",
+      "different_other": "{{count}} different",
+      "nOf": "{{n}} of {{total}}",
+      "state": {
+        "to-read_one": "{{count}} to read",
+        "to-read_other": "{{count}} to read",
+        "reading_one": "{{count}} reading",
+        "reading_other": "{{count}} reading",
+        "read_one": "{{count}} read",
+        "read_other": "{{count}} read"
+      },
+      "tagsAll_one": "Tag on all ({{count}})",
+      "tagsAll_other": "Tags on all ({{count}})",
+      "noneShared": "No tag is shared by all.",
+      "removeAll": "Remove {{name}} from all",
+      "addAll": "Add a tag to all…",
+      "tagsSome_one": "Tag on some ({{count}})",
+      "tagsSome_other": "Tags on some ({{count}})",
+      "addToOthers_one": "Add to the other {{count}}",
+      "addToOthers_other": "Add to the other {{count}}",
+      "remove": "Remove",
+      "showAll": "Show all ({{count}})",
+      "toProject": "Add to project…"
+    }
   }
 }

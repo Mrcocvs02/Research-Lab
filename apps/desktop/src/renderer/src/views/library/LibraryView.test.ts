@@ -294,15 +294,13 @@ describe('LibraryView: tags', () => {
     expect(callsTo('taxonomy:apply')[0].ops[0]).toMatchObject({ op: 'create', label: 'Brand new topic' });
   });
 
-  it('removes a tag from the selection only after a confirmation', async () => {
+  it('removes a tag shared by the whole selection from all of it', async () => {
     const docs = makeDocs(3);
     docs[0]!.tags = ['stats'];
     docs[1]!.tags = ['stats'];
     const lib = setup({ docs });
     await selectTwo();
-    fireEvent.click(await screen.findByTestId('bulk-remove'));
-    expect(callsTo('documents:tag')).toHaveLength(0);
-    fireEvent.click(screen.getByTestId('bulk-remove-confirm'));
+    fireEvent.click(within(await screen.findByTestId('sel-tag-all')).getByRole('button'));
     await waitFor(() => expect(lib.state.docs.some((d) => d.tags.includes('stats'))).toBe(false));
     expect(callsTo('documents:tag')[0]).toMatchObject({ remove: ['stats'] });
   });
@@ -664,7 +662,7 @@ describe('LibraryView: phase 2 review fixes', () => {
     await waitFor(() => expect(rowOf('Paper 0003').getAttribute('aria-selected')).toBe('true'));
   });
 
-  it('offers to remove only the tags put by hand and marks the implied ones', async () => {
+  it('shows only the hand-put tags shared by the selection and hides the implied ones', async () => {
     const nodes = [node('ml', 'Machine learning', { implies: ['stats'] }), node('stats', 'Statistics')];
     const docs = makeDocs(3);
     docs[0]!.tags = ['ml'];
@@ -674,12 +672,9 @@ describe('LibraryView: phase 2 review fixes', () => {
     fireEvent.click(rowOf('Paper 0000'));
     fireEvent.click(rowOf('Paper 0001'), { ctrlKey: true });
     openDetail();
-    const items = await screen.findAllByTestId('bulk-tag');
-    const byTag = (id: string) => items.find((i) => i.dataset.tag === id)!;
-    expect(within(byTag('ml')).getByTestId('bulk-remove')).toBeTruthy();
-    expect(within(byTag('stats')).getByTestId('bulk-implied')).toBeTruthy();
-    expect(within(byTag('stats')).queryByTestId('bulk-remove')).toBeNull();
-    expect(byTag('ml').textContent).toContain('on 2 of 2');
+    const shared = await screen.findByTestId('sel-tags-all');
+    expect(within(shared).getAllByTestId('sel-tag-all').map((c) => c.dataset.tag)).toEqual(['ml']);
+    expect(screen.queryByTestId('sel-tags-some')).toBeNull();
     void lib;
   });
 

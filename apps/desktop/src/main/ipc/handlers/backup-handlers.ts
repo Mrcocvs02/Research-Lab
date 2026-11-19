@@ -1,28 +1,29 @@
-/** Phase 8: backup and restore (D-255, D-256) and maintenance (D-258). Contracts in `ipc/channels/backup.ts` and `maintenance.ts`; the logic lives in `main/backup/` and `main/maintenance/`. */
-import * as backup from '../../backup/service.js';
-import * as maintenance from '../../maintenance/service.js';
+/** The logic is loaded on the first call. Phase 8: backup and restore (D-255, D-256) and maintenance (D-258). Contracts in `ipc/channels/backup.ts` and `maintenance.ts`; the logic lives in `main/backup/` and `main/maintenance/`. */
 import type { DomainHandlers } from '../types.js';
 import type { MainServices } from './services.js';
 
+const backupMod = () => import('../../backup/service.js');
+const maintenanceMod = () => import('../../maintenance/service.js');
+
 export const backupHandlers = (s: MainServices): DomainHandlers<'backup'> => ({
-  'backup:settings': () => backup.getSettings(s),
-  'backup:chooseDestination': () => backup.chooseDestination(s),
-  'backup:configure': (req) => backup.configure(s, req),
-  'backup:preview': (req) => backup.preview(s, req),
-  'backup:create': (req) => backup.create(s, req),
-  'backup:list': () => backup.list(s),
-  'backup:inspect': (req) => backup.inspect(s, req),
-  'backup:verify': (req) => backup.verify(s, req),
-  'backup:restore': (req) => backup.restore(s, req),
-  'backup:status': ({ jobId }) => backup.status(s, jobId),
-  'backup:cancel': ({ jobId }) => backup.cancel(s, jobId),
-  'backup:reveal': (req) => backup.reveal(s, req),
-  'backup:remove': (req) => backup.remove(s, req),
+  'backup:settings': async () => (await backupMod()).getSettings(s),
+  'backup:chooseDestination': async () => (await backupMod()).chooseDestination(s),
+  'backup:configure': async (req) => (await backupMod()).configure(s, req),
+  'backup:preview': async (req) => (await backupMod()).preview(s, req),
+  'backup:create': async (req) => (await backupMod()).create(s, req),
+  'backup:list': async () => (await backupMod()).list(s),
+  'backup:inspect': async (req) => (await backupMod()).inspect(s, req),
+  'backup:verify': async (req) => (await backupMod()).verify(s, req),
+  'backup:restore': async (req) => (await backupMod()).restore(s, req),
+  'backup:status': async ({ jobId }) => (await backupMod()).status(s, jobId),
+  'backup:cancel': async ({ jobId }) => (await backupMod()).cancel(s, jobId),
+  'backup:reveal': async (req) => (await backupMod()).reveal(s, req),
+  'backup:remove': async (req) => (await backupMod()).remove(s, req),
 });
 
 export const maintenanceHandlers = (s: MainServices): DomainHandlers<'maintenance'> => ({
-  'maintenance:report': (req) => maintenance.report(s, req),
-  'maintenance:clean': (req) => maintenance.clean(s, req),
-  'maintenance:openLogs': () => maintenance.openLogs(s),
-  'maintenance:copyDiagnostics': () => maintenance.diagnostics(s),
+  'maintenance:report': async (req) => (await maintenanceMod()).report(s, req),
+  'maintenance:clean': async (req) => (await maintenanceMod()).clean(s, req),
+  'maintenance:openLogs': async () => (await maintenanceMod()).openLogs(s),
+  'maintenance:copyDiagnostics': async () => (await maintenanceMod()).diagnostics(s),
 });

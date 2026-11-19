@@ -33,7 +33,7 @@ import { createBackupPolicy } from './library/backup-policy.js';
 import { RuntimeManager } from './library/runtime-manager.js';
 import { spawnScanWorker, watchdogFromEnv } from './library/worker-host.js';
 import { spawnGraphWorker, type GraphHost } from './graph/host.js';
-import { autoBackupOnStart, cancelAllBackups, whenBackupDone } from './backup/service.js';
+import { cancelAllBackups, whenBackupDone } from './backup/registry.js';
 import { closeGraph } from './graph/service.js';
 import { reconcileMcp, stopMcp } from './mcp/service.js';
 import { LibraryService } from './library-service.js';
@@ -231,7 +231,11 @@ async function main(): Promise<void> {
     .then(() => reconcileMcp(services))
     // The automatic backup waits for the first scan to end: both read the same folder, and one heavy job at a time.
     .then(() => runtimeManager.require().then((rt) => rt.whenIdle()).catch(() => undefined))
-    .then(() => autoBackupOnStart(services))
+    .then(async () => {
+      // The backup code is loaded only when the automatic backup is on.
+      const app = await settings.get();
+      if (app.backup.auto !== 'off' && app.activeLibraryId !== null) await (await import('./backup/service.js')).autoBackupOnStart(services);
+    })
     .catch((e: unknown) => log.warn('start-up tasks failed', { error: e }));
   let quitting = false;
   app.on('before-quit', (event) => {

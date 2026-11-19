@@ -25,8 +25,10 @@ import { atomicWriteJson, readJsonFile, resolveInRoot } from '@rl/core/node';
 import type { MainServices } from '../ipc/handlers/services.js';
 import { isInsideLibrary } from '../export/target.js';
 import { reconcileMcp } from '../mcp/service.js';
-import { collectFiles, extractArchive, LOCAL_PREFIX, openArchive, renameIntoPlace, verifyArchive, writeArchive, type SourceFile } from './archive.js';
+import type { SourceFile } from './archive.js';
+import { LOCAL_PREFIX } from './names.js';
 import { readState, updateState } from './state.js';
+import { backupRunning, cancelAllBackups, jobRegistry, starting, whenBackupDone } from './registry.js';
 
 type JobKind = 'create' | 'verify' | 'restore';
 type Result = NonNullable<BackupJobStatus['result']>;
@@ -55,18 +57,14 @@ const STALE_PART_MS = 60 * 60 * 1000;
 const PART_PREFIX = '.rlbackup-';
 const CADENCE_MS = { daily: 24 * 3600_000, weekly: 7 * 24 * 3600_000, monthly: 30 * 24 * 3600_000 } as const;
 
-const starting = new WeakSet<object>();
-const registries = new WeakMap<object, Map<string, Job>>();
-const jobsOf = (s: MainServices): Map<string, Job> => {
-  let m = registries.get(s);
-  if (!m) registries.set(s, (m = new Map()));
-  return m;
-};
+/** The archive and zip code is a chunk of its own, loaded by the first call that reads or writes a backup file. */
+const archive = () => import('./archive.js');
+
+const jobsOf = (s: MainServices): Map<string, Job> => jobRegistry<Job>(s);
 const statusOf = (j: Job): BackupJobStatus => ({ jobId: j.jobId, kind: j.kind, state: j.state, phase: j.phase, done: j.done, total: j.total, result: j.result, error: j.error });
 const emptyResult = (over: Partial<Result> = {}): Result => ({ file: null, bytes: 0, files: 0, problemCount: 0, problems: [], restoredLibraryId: null, settingsRestored: false, secretsToEnter: [], ...over });
 
-/** True while a backup job runs (the maintenance clean waits for it). */
-export const backupRunning = (s: MainServices): boolean => starting.has(s) || [...jobsOf(s).values()].some((j) => j.state === 'running');
+export { backupRunning, cancelAllBackups, whenBackupDone };
 
 const sameFile = (a: string, b: string) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
 const isBackupName = (n: string) => n.toLowerCase().endsWith(BACKUP_LIMITS.extension);
@@ -144,16 +142,6 @@ export function cancel(s: MainServices, jobId: string): { cancelled: boolean } {
   return { cancelled: true };
 }
 
-/** Cancels every running job (app quit); `whenBackupDone` then waits for their clean-up. */
-export function cancelAllBackups(s: MainServices): void {
-  for (const j of jobsOf(s).values()) if (j.state === 'running') j.controller.abort();
-}
-
-/** Resolves when the running job (if any) has finished (tests, the start-up check, the quit). */
-export async function whenBackupDone(s: MainServices): Promise<void> {
-  await Promise.all([...jobsOf(s).values()].map((j) => j.finished));
-}
-
 /* -------------------------------------------------------------- settings */
 
 export async function getSettings(s: MainServices): Promise<BackupSettings> {
@@ -216,8 +204,8 @@ async function freeBytes(dir: string | null): Promise<number | null> {
 }
 
 async function gather(s: MainServices, libraryId: string, dataDir: string, includeLocal: boolean) {
-  const data = await collectFiles(dataDir, BACKUP_LIMITS.entries);
-  const local = includeLocal ? await collectFiles(path.join(s.localDataDir, 'chat', libraryId), BACKUP_LIMITS.entries) : { files: [] as SourceFile[], bytes: 0 };
+  const data = await (await archive()).collectFiles(dataDir, BACKUP_LIMITS.entries);
+  const local = includeLocal ? await (await archive()).collectFiles(path.join(s.localDataDir, 'chat', libraryId), BACKUP_LIMITS.entries) : { files: [] as SourceFile[], bytes: 0 };
   // settings.json and manifest.json are two more entries.
   if (data.files.length + local.files.length + 2 > BACKUP_LIMITS.entries) throw new AppError('CONFLICT', 'The library has too many files for one backup', { reason: 'too-large', limit: BACKUP_LIMITS.entries });
   return { data, local };
@@ -328,7 +316,7 @@ export function create(s: MainServices, req: CreateRequest): Promise<{ jobId: st
       await sweepRestoreResidue(s, null, null).catch(() => 0);
       const tmp = path.join(dest, `${PART_PREFIX}${randomBytes(6).toString('hex')}.part`);
       try {
-        const written = await writeArchive({
+        const written = await (await archive()).writeArchive({
           tmpFile: tmp,
           library: data.files,
           local: local.files,
@@ -387,7 +375,7 @@ async function listIn(dest: string, max: number): Promise<Listed[]> {
   const out: Listed[] = [];
   for (const f of files.slice(0, max)) {
     try {
-      const { reader, manifest, header } = await openArchive(f.file);
+      const { reader, manifest, header } = await (await archive()).openArchive(f.file);
       out.push({ info: infoOf(f.file, reader.size, manifest, header), libraryId: manifest?.sourceLibraryId ?? (typeof header.sourceLibraryId === 'string' ? header.sourceLibraryId : null) });
     } catch {
       // not one of ours (or damaged): left out of the list
@@ -428,7 +416,7 @@ function approvedFile(s: MainServices, file: string): string {
 
 export async function inspect(s: MainServices, req: { file: string }): Promise<BackupInfo> {
   const f = approvedFile(s, req.file);
-  const { reader, manifest, header } = await openArchive(f);
+  const { reader, manifest, header } = await (await archive()).openArchive(f);
   return infoOf(f, reader.size, manifest, header);
 }
 
@@ -442,7 +430,7 @@ export async function remove(s: MainServices, req: { file: string }): Promise<{ 
   }
   const st = await lstat(f).catch(() => null);
   if (!st?.isFile()) throw new AppError('NOT_FOUND', 'The backup file does not exist');
-  await openArchive(f); // a file that is not a backup is never deleted from here
+  await (await archive()).openArchive(f); // a file that is not a backup is never deleted from here
   await rm(f, { force: true });
   return { ok: true };
 }
@@ -466,11 +454,11 @@ const sumSizes = (m: BackupManifest) => m.entries.reduce((n, e) => n + e.size, 0
 export function verify(s: MainServices, req: { file: string }): Promise<{ jobId: string }> {
   return exclusive(s, async () => {
     const f = approvedFile(s, req.file);
-    const { reader, manifest } = await openArchive(f);
+    const { reader, manifest } = await (await archive()).openArchive(f);
     if (!manifest) throw new AppError('CONFLICT', 'The backup was made by a newer version of the app', { reason: 'newer-format' });
     return launch(s, 'verify', sumSizes(manifest), f, async (job, set) => {
       set('verify');
-      const out = await verifyArchive(reader, manifest, { signal: job.controller.signal, onBytes: (n) => set('verify', n) });
+      const out = await (await archive()).verifyArchive(reader, manifest, { signal: job.controller.signal, onBytes: (n) => set('verify', n) });
       return emptyResult({ file: f, bytes: reader.size, files: out.files, problemCount: out.problemCount, problems: out.problems });
     });
   });
@@ -506,7 +494,7 @@ const portableOf = (raw: Buffer | null) => {
 async function renameRetry(from: string, to: string): Promise<void> {
   for (let i = 0; ; i++) {
     try {
-      await renameIntoPlace(from, to);
+      await (await archive()).renameIntoPlace(from, to);
       return;
     } catch (e) {
       const code = (e as NodeJS.ErrnoException).code ?? '';
@@ -531,7 +519,7 @@ export function restore(s: MainServices, req: RestoreRequest): Promise<{ jobId: 
     const root = s.approved.resolve(req.rootPath, 'library-root');
     if (root === null) throw new AppError('PERMISSION_DENIED', 'The folder must be chosen with the folder dialog');
     if (!(await stat(root).then((st) => st.isDirectory(), () => false))) throw new AppError('NOT_FOUND', 'The chosen folder does not exist');
-    const { reader, manifest } = await openArchive(f);
+    const { reader, manifest } = await (await archive()).openArchive(f);
     if (!manifest) throw new AppError('CONFLICT', 'The backup was made by a newer version of the app', { reason: 'newer-format' });
     const dirName = dataDirNameSchema.safeParse(manifest.dataDirName);
     if (!dirName.success) throw new AppError('INVALID_REQUEST', 'The file is not a Research Lab backup', { reason: 'not-a-backup', why: 'data-dir-name' });
@@ -556,7 +544,7 @@ export function restore(s: MainServices, req: RestoreRequest): Promise<{ jobId: 
     return launch(s, 'restore', bytes * 2, f, async (job, set) => {
       const signal = job.controller.signal;
       set('verify');
-      const check = await verifyArchive(reader, manifest, { signal, onBytes: (n) => set('verify', n) });
+      const check = await (await archive()).verifyArchive(reader, manifest, { signal, onBytes: (n) => set('verify', n) });
       if (check.problemCount > 0) {
         job.result = emptyResult({ file: f, bytes: reader.size, files: check.files, problemCount: check.problemCount, problems: check.problems });
         throw new AppError('CONFLICT', 'The backup is damaged or has been changed', { reason: 'integrity', problemCount: check.problemCount });
@@ -571,7 +559,7 @@ export function restore(s: MainServices, req: RestoreRequest): Promise<{ jobId: 
         let localPlaced = false;
         try {
           set('extract');
-          const { settings: rawSettings } = await extractArchive(reader, manifest, { library: tmpData, local: tmpLocal }, { signal, onBytes: (n) => set('extract', n) });
+          const { settings: rawSettings } = await (await archive()).extractArchive(reader, manifest, { library: tmpData, local: tmpLocal }, { signal, onBytes: (n) => set('extract', n) });
           for (const sub of DATA_SUBDIRS) await mkdir(path.join(tmpData, sub), { recursive: true });
           const name = req.name ?? manifest.libraryName;
           const configFile = path.join(tmpData, dataPath.config);

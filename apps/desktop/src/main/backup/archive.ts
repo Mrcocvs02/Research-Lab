@@ -18,10 +18,9 @@ import { ZipReader, ZipWriter, type ZipEntry } from './zip.js';
 
 /** Files up to this size are compressed from memory. */
 const SMALL_FILE_BYTES = 256 * 1024;
-export const MANIFEST_NAME = 'manifest.json';
-export const SETTINGS_NAME = 'settings.json';
-export const LIBRARY_PREFIX = 'library/';
-export const LOCAL_PREFIX = 'local/';
+import { LIBRARY_PREFIX, LOCAL_PREFIX } from './names.js';
+export { LIBRARY_PREFIX, LOCAL_PREFIX, MANIFEST_NAME, SETTINGS_NAME } from './names.js';
+import { MANIFEST_NAME, SETTINGS_NAME } from './names.js';
 /** `settings.json` of an archive is small (portable settings only); anything larger is not ours. */
 export const MAX_SETTINGS_ENTRY_BYTES = 1024 * 1024;
 

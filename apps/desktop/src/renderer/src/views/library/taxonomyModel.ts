@@ -151,3 +151,30 @@ export function parentsAfterDrop(node: Pick<TaxonomyNodeView, 'parents'>, fromPa
   if (target === null) return rest;
   return rest.includes(target) ? rest : [...rest, target];
 }
+
+/** Prefix of the grouping hint that makes a tag part of a user family of the Map (D-491): `extra:<Name>`. */
+export const FAMILY_PREFIX = 'extra:';
+
+export interface TagFamily {
+  name: string;
+  /** Ids of the live tags in the family. */
+  members: string[];
+}
+
+/** The user families (grouping hint `extra:<Name>`) with their members, by name. Deprecated tags are left out. */
+export function tagFamilies(nodes: readonly TaxonomyNodeView[]): TagFamily[] {
+  const by = new Map<string, string[]>();
+  for (const n of nodes) {
+    const g = n.group;
+    if (!g || !g.startsWith(FAMILY_PREFIX) || g.length === FAMILY_PREFIX.length || n.status === 'deprecated') continue;
+    const name = g.slice(FAMILY_PREFIX.length);
+    by.set(name, [...(by.get(name) ?? []), n.id]);
+  }
+  return [...by].map(([name, members]) => ({ name, members })).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
+}
+
+/** Operations that put `ids` in family `name` (null: out of any family). Tags already there are skipped. */
+export function familyOps(model: Pick<TaxonomyModel, 'byId'>, ids: readonly string[], name: string | null): Array<{ op: 'setGroup'; id: string; group: string | null }> {
+  const group = name === null ? null : `${FAMILY_PREFIX}${name.trim().slice(0, 100 - FAMILY_PREFIX.length)}`;
+  return ids.filter((id) => model.byId.has(id) && (model.byId.get(id)!.group ?? null) !== group).map((id) => ({ op: 'setGroup', id, group }));
+}

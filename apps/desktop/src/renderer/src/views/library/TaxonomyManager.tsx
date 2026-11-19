@@ -11,6 +11,7 @@ import { splitLines } from '../../lib/validate';
 import { safeText } from './safeText';
 import { TagChip, TagPicker } from './TagParts';
 import { canDelete, descendants, parentsAfterDrop, fold, flattenTree, impliesCycle, pathLabel, wouldCycle, type TreeRow } from './taxonomyModel';
+import { TaxonomyFamilies } from './TaxonomyFamilies';
 import { useTaxonomy } from './useTaxonomy';
 
 export const PRESET_COLORS = ['#d9480f', '#e8590c', '#f08c00', '#2f9e44', '#0c8599', '#1971c2', '#4263eb', '#7048e8', '#ae3ec9', '#d6336c', '#868e96', '#495057'];
@@ -504,6 +505,7 @@ export function TaxonomyManager({ onBack }: { onBack(): void }) {
             }}
           />
         )}
+        {view && <TaxonomyFamilies />}
         {view && <TypesAndVenues />}
       </div>
       <div className="taxonomy-editor-pane">

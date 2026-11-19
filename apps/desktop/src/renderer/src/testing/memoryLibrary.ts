@@ -35,6 +35,7 @@ export interface FakeNode {
   status: 'active' | 'candidate' | 'deprecated';
   origin: 'user' | 'ai' | 'import';
   color?: string;
+  group?: string;
 }
 
 interface FakeProject {
@@ -491,6 +492,12 @@ export function memoryLibrary(init: { docs?: FakeDoc[]; nodes?: FakeNode[]; proj
               const n = node(op.id);
               if (op.color === null) delete n.color;
               else n.color = op.color;
+              break;
+            }
+            case 'setGroup': {
+              const n = node(op.id);
+              if (op.group === null) delete n.group;
+              else n.group = op.group;
               break;
             }
             case 'deprecate':

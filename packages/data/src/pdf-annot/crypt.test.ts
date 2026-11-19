@@ -35,7 +35,7 @@ const FILL = (len: number, v: number) => Buffer.alloc(len, v);
 
 type Kind = 'rc4-40' | 'rc4-128' | 'aes-128' | 'aes-256-r5' | 'aes-256-r6';
 const KINDS: Kind[] = ['rc4-40', 'rc4-128', 'aes-128', 'aes-256-r5', 'aes-256-r6'];
-interface Opts { P?: number; password?: string; layout?: 'table' | 'stream' }
+interface Opts { P?: number; password?: string; layout?: 'table' | 'stream'; perms?: 'ok' | 'bad' | 'none' }
 
 /** A one-page file with a foreign annotation, encrypted as the revision of `kind` says, opened by the user password `opts.password` ('' by default). */
 function encrypted(kind: Kind, opts: Opts = {}): Buffer {
@@ -53,7 +53,12 @@ function encrypted(kind: Kind, opts: Opts = {}): Buffer {
     const c = createCipheriv('aes-256-cbc', h(ksalt), FILL(16, 0)).setAutoPadding(false);
     const UE = Buffer.concat([c.update(fileKey), c.final()]);
     const U = Buffer.concat([h(vsalt), vsalt, ksalt]);
-    encDict = `<< /Filter /Standard /V 5 /R ${R} /Length 256 /P ${P} /O <${hex(FILL(48, 1))}> /U <${hex(U)}> /OE <${hex(FILL(32, 2))}> /UE <${hex(UE)}> /Perms <${hex(FILL(16, 3))}> /CF << /StdCF << /CFM /AESV3 /AuthEvent /DocOpen /Length 32 >> >> /StmF /StdCF /StrF /StdCF >>`;
+    const pm = FILL(16, 3);
+    pm.writeInt32LE(opts.perms === 'bad' ? P ^ 8 : P, 0);
+    pm.fill(255, 4, 8);
+    pm.write('Tadb', 8, 'latin1');
+    const perms = createCipheriv('aes-256-ecb', fileKey, null).setAutoPadding(false).update(pm);
+    encDict = `<< /Filter /Standard /V 5 /R ${R} /Length 256 /P ${P} /O <${hex(FILL(48, 1))}> /U <${hex(U)}> /OE <${hex(FILL(32, 2))}> /UE <${hex(UE)}>${opts.perms === 'none' ? '' : ` /Perms <${hex(perms)}>`} /CF << /StdCF << /CFM /AESV3 /AuthEvent /DocOpen /Length 32 >> >> /StmF /StdCF /StrF /StdCF >>`;
   } else {
     const O = FILL(32, 0x5a);
     const pb = Buffer.alloc(4);
@@ -239,4 +244,14 @@ describe('what stays refused or tolerated', () => {
     const rc = await open(encrypted('rc4-128'));
     expect(rc.crypt!.encStr(Buffer.alloc(0), 7, 0)).toHaveLength(0);
   });
+});
+
+describe('/Perms of revisions 5 and 6 (M4)', () => {
+  for (const kind of ['aes-256-r5', 'aes-256-r6'] as const) {
+    it(`${kind}: a /Perms that agrees with /P, or none, opens; one that does not is refused as damaged`, async () => {
+      expect((await plan(encrypted(kind))).res).toMatchObject({ ok: true });
+      expect((await plan(encrypted(kind, { perms: 'none' }))).res).toMatchObject({ ok: true });
+      expect((await plan(encrypted(kind, { perms: 'bad' }))).res).toMatchObject({ ok: false, reason: 'damaged', detail: 'perms' });
+    });
+  }
 });

@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { deflateSync } from 'node:zlib';
@@ -51,10 +51,19 @@ function encryptedR2(P: number, wrongPassword = false): DocSpec {
   const U = wrongPassword ? Buffer.alloc(32, 1) : rc4(key, PAD);
   return { trailer: `/Encrypt 20 0 R ${idEntry}`, extraObjs: [{ n: 20, body: `<< /Filter /Standard /V 1 /R 2 /O <${O.toString('hex')}> /U <${U.toString('hex')}> /P ${P} >>` }] };
 }
-function encryptedR5(P: number): DocSpec {
+/** /Perms as the specification says: P, 0xffffffff, T, "adb", filler, encrypted with AES-256-ECB under the file key. */
+const permsOf = (key: Buffer, P: number, bad = false): Buffer => {
+  const b = Buffer.alloc(16, 5);
+  b.writeInt32LE(bad ? P ^ 8 : P, 0);
+  b.fill(255, 4, 8);
+  b.write('Tadb', 8, 'latin1');
+  return createCipheriv('aes-256-ecb', key, null).setAutoPadding(false).update(b);
+};
+function encryptedR5(P: number, perms: 'ok' | 'bad' | 'none' = 'ok'): DocSpec {
   const vsalt = Buffer.alloc(8, 3), ksalt = Buffer.alloc(8, 4);
+  const key = createDecipheriv('aes-256-cbc', createHash('sha256').update(ksalt).digest(), Buffer.alloc(16)).setAutoPadding(false).update(Buffer.alloc(32));
   const U = Buffer.concat([createHash('sha256').update(vsalt).digest(), vsalt, ksalt]);
-  return { trailer: `/Encrypt 20 0 R ${idEntry}`, extraObjs: [{ n: 20, body: `<< /Filter /Standard /V 5 /R 5 /O <${'00'.repeat(48)}> /U <${U.toString('hex')}> /OE <${'00'.repeat(32)}> /UE <${'00'.repeat(32)}> /P ${P} /Perms <${'00'.repeat(16)}> >>` }] };
+  return { trailer: `/Encrypt 20 0 R ${idEntry}`, extraObjs: [{ n: 20, body: `<< /Filter /Standard /V 5 /R 5 /O <${'00'.repeat(48)}> /U <${U.toString('hex')}> /OE <${'00'.repeat(32)}> /UE <${'00'.repeat(32)}> /P ${P}${perms === 'none' ? '' : ` /Perms <${permsOf(key, P, perms === 'bad').toString('hex')}>`} >>` }] };
 }
 
 describe('refusals, one per reason of §8.3.5 (nothing is written to a refused file)', () => {
@@ -129,5 +138,29 @@ describe('accepted: what must not be refused (D-351)', () => {
 
   it('an /AcroForm without signatures and without XFA', async () => {
     expect(refusal(await plan(docPdf({ catalogExtra: '/AcroForm << /Fields [] >>' })))).toBe('ok');
+  });
+});
+
+describe('fail-safe signature check and /Perms (I4, M4)', () => {
+  const sigPdf = (fields: number, extra: Array<{ n: number; body: string }>): DocSpec => ({ catalogExtra: `/AcroForm << /Fields [${Array.from({ length: fields }, (_, i) => `${100 + i} 0 R`).join(' ')}] >>`, extraObjs: extra });
+
+  it('more than 5000 form fields cannot be judged: refused as signed, not written', async () => {
+    const many = Array.from({ length: 5100 }, (_, i) => ({ n: 100 + i, body: '<< /FT /Tx /T (x) >>' }));
+    expect(refusal(await plan(docPdf(sigPdf(5100, many))))).toBe('signed');
+  });
+
+  it('fields nested deeper than 32 levels cannot be judged: refused as signed', async () => {
+    const deep = Array.from({ length: 40 }, (_, i) => ({ n: 100 + i, body: i < 39 ? `<< /FT /Tx /Kids [${101 + i} 0 R] >>` : '<< /FT /Tx >>' }));
+    expect(refusal(await plan(docPdf(sigPdf(1, deep))))).toBe('signed');
+  });
+
+  it('a few ordinary fields are still annotated', async () => {
+    expect(refusal(await plan(docPdf(sigPdf(2, [{ n: 100, body: '<< /FT /Tx /T (a) >>' }, { n: 101, body: '<< /FT /Tx /T (b) >>' }]))))).toBe('ok');
+  });
+
+  it('R5: a valid /Perms or none is accepted, a /Perms that disagrees with /P is damaged', async () => {
+    expect(refusal(await plan(docPdf(encryptedR5(-4, 'ok'))))).toBe('ok');
+    expect(refusal(await plan(docPdf(encryptedR5(-4, 'none'))))).toBe('ok');
+    expect(await plan(docPdf(encryptedR5(-4, 'bad')))).toMatchObject({ ok: false, reason: 'damaged', detail: 'perms' });
   });
 });

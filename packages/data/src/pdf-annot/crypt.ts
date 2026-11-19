@@ -50,12 +50,20 @@ function aesSeal(key: Buffer, b: Buffer): Buffer {
   return Buffer.concat([iv, c.update(b), c.final()]);
 }
 
+/** `/Perms` of revisions 5 and 6 against `/P`; a missing /Perms is tolerated by the caller. */
+function permsAgree(key: Buffer, perms: Buffer, P: number): boolean {
+  if (perms.length < 16) return false;
+  const d = createDecipheriv('aes-256-ecb', key, null).setAutoPadding(false);
+  const x = Buffer.concat([d.update(perms.subarray(0, 16)), d.final()]);
+  return x.readInt32LE(0) === P && x.toString('latin1', 9, 12) === 'adb';
+}
+
 /**
  * Opens the file with the empty user password. `'password'`: it does not open it. On success the Crypt decrypts what is read and encrypts what
  * is written; the revision, the variant and the permissions were checked by the caller (refuse.ts).
  */
-export function openCrypt(p: CryptParams, skip: number | undefined): Crypt | 'password' {
-  const { R, P, n, stm, str, O, U, UE, id0, noMetadata } = p;
+export function openCrypt(p: CryptParams, skip: number | undefined): Crypt | 'password' | 'perms' {
+  const { R, P, n, stm, str, O, U, UE, Perms, id0, noMetadata } = p;
   let key: Buffer;
   if (R >= 5) {
     if (U.length < 48 || UE.length < 32) return 'password';
@@ -63,6 +71,8 @@ export function openCrypt(p: CryptParams, skip: number | undefined): Crypt | 'pa
     if (!hash(U.subarray(32, 40)).equals(U.subarray(0, 32))) return 'password';
     const d = createDecipheriv('aes-256-cbc', hash(U.subarray(40, 48)), Buffer.alloc(16)).setAutoPadding(false);
     key = Buffer.concat([d.update(UE.subarray(0, 32)), d.final()]);
+    // /Perms (when present) must agree with /P: AES-256-ECB under the file key, P in bytes 0-3 (little endian), "adb" in bytes 9-11.
+    if (Perms?.length && !permsAgree(key, Perms, P)) return 'perms';
   } else {
     if (O.length < 32 || U.length < 16) return 'password';
     const pb = Buffer.alloc(4);

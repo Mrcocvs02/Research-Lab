@@ -40,7 +40,7 @@ export interface Crypt {
 }
 export type CryptMethod = 'none' | 'rc4' | 'aes128' | 'aes256';
 /** The Encrypt dictionary as refuse.ts read it: `n` key bytes, the methods of streams and strings, the entries the empty password is checked against. */
-export interface CryptParams { R: number; P: number; n: number; stm: CryptMethod; str: CryptMethod; O: Buffer; U: Buffer; UE: Buffer; id0: Buffer; noMetadata: boolean }
+export interface CryptParams { R: number; P: number; n: number; stm: CryptMethod; str: CryptMethod; O: Buffer; U: Buffer; UE: Buffer; Perms?: Buffer; id0: Buffer; noMetadata: boolean }
 
 /** The strings of a value read from object `n g`, decrypted. */
 function unseal(c: Crypt, v: Val, n: number, g: number): Val {
@@ -132,6 +132,9 @@ export function streamData(doc: Pick<Doc, 'src' | 'xref'> & Partial<Doc>, ind: I
   return pr === 1 ? out : unpredict(out, pr, asNum(dp?.get('Columns')) ?? 1, asNum(dp?.get('Colors')) ?? 1, asNum(dp?.get('BitsPerComponent')) ?? 8);
 }
 
+/** A cap on the entries one xref section may hold (each maps to an object the file can really have). */
+const MAX_XREF_ENTRIES = LIM.maxObjStmObjects * 10;
+
 function mergeEntries(x: Map<number, XEnt>, n: number, e: XEnt): void { if (!x.has(n)) x.set(n, e); }
 
 function readTable(src: SyncSource, off: number, xref: Map<number, XEnt>): Dict {
@@ -139,11 +142,13 @@ function readTable(src: SyncSource, off: number, xref: Map<number, XEnt>): Dict 
     lx.pos = 0;
     if (lx.word() !== 'xref') return damaged('xref-kw');
     const found: [number, XEnt][] = [];
+    let total = 0;
     for (;;) {
       const w = lx.word();
       if (w === 'trailer') break;
       const start = Number(w), count = Number(lx.word());
       if (!Number.isInteger(start) || !Number.isInteger(count) || count < 0 || count * 18 > src.size) return damaged('xref-subsection');
+      if ((total += count) > MAX_XREF_ENTRIES) return damaged('xref-count');
       for (let i = 0; i < count; i++) {
         const o = Number(lx.word()), g = Number(lx.word()), t = lx.word();
         if (!Number.isFinite(o) || !Number.isFinite(g)) return damaged('xref-entry');
@@ -164,14 +169,20 @@ function readStreamSection(src: SyncSource, off: number, xref: Map<number, XEnt>
   if (!w || w.length !== 3 || w.some((x) => x < 0 || x > 8)) return damaged('xref-W');
   const [w0, w1, w2] = w as [number, number, number];
   const size = asNum(d.get('Size')) ?? damaged('xref-size');
-  const idx = (d.get('Index') as Val[] | undefined)?.map((x) => asNum(x) ?? 0) ?? [0, size];
+  const idx = (d.get('Index') as Val[] | undefined)?.map((x) => asNum(x) ?? -1) ?? [0, size];
+  if (idx.some((x) => !(x >= 0))) return damaged('xref-index');
   const data = streamData({ src, xref }, ind);
   const rl = w0 + w1 + w2;
   if (rl === 0) return damaged('xref-W');
+  // Every entry is a row of the stream: a count beyond what the data holds is a lie, and so is a total beyond the cap.
+  const room = Math.min(Math.floor(data.length / rl), MAX_XREF_ENTRIES);
   let p = 0;
   const rd = (n: number) => { let v = 0; for (let i = 0; i < n; i++) v = v * 256 + data[p++]!; return v; };
   for (let k = 0; k + 1 < idx.length; k += 2) {
-    for (let i = 0; i < idx[k + 1]!; i++) {
+    const count = idx[k + 1]!;
+    if (count > room - p / rl) return damaged('xref-short');
+    for (let i = 0; i < count; i++) {
+      if ((i & 4095) === 0) tick();
       if (p + rl > data.length) return damaged('xref-short');
       const t = w0 ? rd(w0) : 1, a = rd(w1), b = rd(w2);
       mergeEntries(xref, idx[k]! + i, t === 0 ? { t: 0 } : t === 1 ? { t: 1, off: a, gen: b } : t === 2 ? { t: 2, stm: a, idx: b } : { t: 0 });

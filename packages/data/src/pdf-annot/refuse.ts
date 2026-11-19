@@ -38,10 +38,11 @@ export async function unlock(doc: Doc): Promise<{ ok: true } | { ok: false; reas
     n = V === 1 ? 5 : Math.min(16, Math.max(5, Math.floor((num('Length') ?? 40) / 8)));
   } else return no('encrypted', 'handler');
   const P = (num('P') ?? 0) | 0;
-  const params: CryptParams = { R, P, n, stm, str, O: bytes('O'), U: bytes('U'), UE: bytes('UE'), id0: Array.isArray(ids) && ids[0] instanceof Str ? ids[0].b : Buffer.alloc(0), noMetadata: R >= 4 && resolve(doc, enc.get('EncryptMetadata')) === false };
+  const params: CryptParams = { R, P, n, stm, str, O: bytes('O'), U: bytes('U'), UE: bytes('UE'), Perms: R >= 5 ? bytes('Perms') : undefined, id0: Array.isArray(ids) && ids[0] instanceof Str ? ids[0].b : Buffer.alloc(0), noMetadata: R >= 4 && resolve(doc, enc.get('EncryptMetadata')) === false };
   const ref = t.get('Encrypt');
   const c = (await import('./crypt.js')).openCrypt(params, ref instanceof Ref ? ref.n : undefined);
   if (c === 'password') return no('encrypted', 'password');
+  if (c === 'perms') return no('damaged', 'perms');
   if ((P & 32) === 0) return no('permission', 'no-annotate-bit', true);
   doc.crypt = c;
   return { ok: true };
@@ -55,10 +56,12 @@ function hasSignature(doc: Doc, root: Dict): boolean {
   let budget = 5000;
   const walk = (fields: Val | undefined, ft: string | undefined, depth: number): boolean => {
     const a = resolve(doc, fields);
-    if (!Array.isArray(a) || depth > 32) return false;
+    if (!Array.isArray(a)) return false;
+    if (depth > 32) return true; // too deep to judge: treated as signed
     for (const f of a) {
       const d = dictOf(doc, f);
-      if (!d || seen.has(d) || --budget < 0) continue;
+      if (!d || seen.has(d)) continue;
+      if (--budget < 0) return true; // too many fields to judge: treated as signed
       seen.add(d);
       const t = nameOf(resolve(doc, d.get('FT'))) ?? ft;
       if (t === 'Sig' && resolve(doc, d.get('V')) != null) return true;

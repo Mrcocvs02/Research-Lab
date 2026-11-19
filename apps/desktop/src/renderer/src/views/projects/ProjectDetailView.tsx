@@ -41,7 +41,7 @@ const AddDocuments = lazyView(() => import('./AddDocumentsDialog'), ['projects']
 // The Schema tab, the report and the citation suggestions: three lazy chunks, loaded when first shown (X7).
 const SchemaTab = lazyView(() => import('./SchemaTab'), ['projects']);
 const AssignDialog = lazyView(() => import('./manuscript/AssignDialog'), ['projects']);
-const ReportDialog = lazyView(() => import('./ReportDialog'), ['projects']);
+const ReportDialog = lazyView(() => import('./ReportDialog'), ['projects', 'export']);
 const CiteDialog = lazyView(() => import('./CiteDialog'), ['projects']);
 const PrismaDialog = lazyView(() => import('./PrismaDialog'), ['projects', 'discover', 'export']);
 const LinkBibDialog = lazyView(() => import('../import/LinkBibDialog'), ['import']);

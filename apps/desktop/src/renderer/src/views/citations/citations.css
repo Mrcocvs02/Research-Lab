@@ -52,3 +52,14 @@
   gap: var(--space-3);
   align-items: center;
 }
+.work-ctx {
+  flex: 1 0 100%;
+  margin: 0;
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+.work-ctx q {
+  quotes: none;
+}

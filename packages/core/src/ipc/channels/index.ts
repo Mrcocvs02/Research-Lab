@@ -32,6 +32,7 @@ import { readerToolsChannels } from './readertools.js';
 import { guidesChannels, refsChannels } from './refs.js';
 import { importIdChannels, resourcesChannels, resumeChannels } from './resources.js';
 import { reviewChannels } from './review.js';
+import { citectxChannels, compareChannels, groupsChannels } from './synthesis.js';
 import { taxonomyChannels } from './taxonomy.js';
 import { thumbsChannels } from './thumbs.js';
 import { watchChannels, watchEvents } from './watch.js';
@@ -44,6 +45,9 @@ export const channels = mergeRegistries(appChannels, settingsChannels, libraryCh
   discoverChannels,
   refsChannels,
   guidesChannels,
+  compareChannels,
+  groupsChannels,
+  citectxChannels,
   projectSchemaChannels,
 );
 
@@ -83,4 +87,5 @@ export { mcpLogItemSchema, mcpStatusSchema, mcpToolNameSchema, MCP_LIMITS, MCP_T
 export { backupInfoSchema, backupJobStatusSchema, backupManifestSchema, backupPreviewSchema, backupResultSchema, backupSettingsSchema, BACKUP_FORMAT_VERSION, BACKUP_LIMITS, type BackupInfo, type BackupJobStatus, type BackupManifest, type BackupSettings } from './backup.js';
 export { maintenanceTargetSchema, MAINTENANCE_TARGETS } from './maintenance.js';
 export { RESOURCE_KINDS, type ResourceKind, type ResourceView, type ImportIdItem, type ImportIdAddResult, type ImportIdState, type ResumeInfo } from './resources.js';
+export { CITECTX_LIMITS, COMPARE_LIMITS, GROUPS_LIMITS, compareCellSchema, compareColumnSchema, compareRowSchema, compareTableSchema, groupsOverviewSchema, type CompareCell, type CompareColumn, type CompareRow, type CompareTable, type GroupsOverview } from './synthesis.js';
 export { REFS_LIMITS, type GuidePassage, type RefEntry } from './refs.js';

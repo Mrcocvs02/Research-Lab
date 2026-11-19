@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
 import { ErrorNote } from '../../components/ui';
@@ -14,20 +14,30 @@ type Link = View['references'][number];
 
 const PAGE = 50;
 
-function Links({ links, testId, empty, title }: { links: readonly Link[]; testId: string; empty: string; title: string }) {
+/** What the host of the panel adds to the "cited by" list: a line under each work and a filter (the citation context, feature 11). */
+export interface CitedByExtra {
+  render(l: Link): ReactNode;
+  keep?(l: Link): boolean;
+  toolbar?: ReactNode;
+}
+
+function Links({ links, testId, empty, title, extra }: { links: readonly Link[]; testId: string; empty: string; title: string; extra?: CitedByExtra | undefined }) {
   const { t } = useTranslation();
   const [shown, setShown] = useState(PAGE);
   const headId = useId();
   return (
     <section aria-labelledby={headId} data-testid={`${testId}-list`}>
       <h4 id={headId}>{title}</h4>
+      {extra?.toolbar}
       {links.length === 0 ? (
         <p className="hint">{empty}</p>
       ) : (
         <>
           <ul className="work-list">
             {links.slice(0, shown).map((l, i) => (
-              <WorkRow key={`${l.externalId ?? l.doi ?? l.arxivId ?? ''}-${i}`} testId={testId} title={l.title} authors={l.authors} year={l.year} venue={l.venue} ids={l} matched={l.matched} />
+              <WorkRow key={`${l.externalId ?? l.doi ?? l.arxivId ?? ''}-${i}`} testId={testId} title={l.title} authors={l.authors} year={l.year} venue={l.venue} ids={l} matched={l.matched}>
+                {extra?.render(l)}
+              </WorkRow>
             ))}
           </ul>
           {links.length > shown && (
@@ -45,7 +55,7 @@ function Links({ links, testId, empty, title }: { links: readonly Link[]; testId
  * References and "cited by" of one document (lazy). What is stored is shown offline; the network is used only by
  * "Refresh". A work in the library opens the document; the others link to their DOI or arXiv page.
  */
-export function CitationsPanel({ docId }: { docId: string }) {
+export function CitationsPanel({ docId, citedByExtra }: { docId: string; citedByExtra?: CitedByExtra }) {
   const { t } = useTranslation();
   const [view, setView] = useState<View | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -119,7 +129,7 @@ export function CitationsPanel({ docId }: { docId: string }) {
       {view?.fetched && (
         <>
           <Links key={`ref-${docId}`} links={view.references} testId="citation-ref" title={t('citations.references', { count: view.references.length })} empty={t('citations.emptyRefs')} />
-          <Links key={`by-${docId}`} links={view.citedBy} testId="citation-citedby" title={t('citations.citedBy', { count: view.citedBy.length })} empty={t('citations.emptyCitedBy')} />
+          <Links key={`by-${docId}`} links={citedByExtra?.keep ? view.citedBy.filter(citedByExtra.keep) : view.citedBy} testId="citation-citedby" title={t('citations.citedBy', { count: view.citedBy.length })} empty={t('citations.emptyCitedBy')} extra={citedByExtra} />
         </>
       )}
     </div>

@@ -286,6 +286,11 @@
       "find": "Find a bridge…",
       "pickSecond": "Click the second document for a bridge with “{{title}}”",
       "note": "Bridge: {{a}} ⇢ work ⇢ {{b}}"
+    },
+    "timeline": {
+      "byYear": "Arrange by year",
+      "label": "By year · Esc to exit",
+      "noYear": "No year"
     }
   }
 }

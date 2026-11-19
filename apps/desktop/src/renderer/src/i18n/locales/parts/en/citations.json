@@ -13,6 +13,12 @@
     "citedBy": "Cited by ({{count}} listed)",
     "emptyRefs": "No references stored.",
     "emptyCitedBy": "No citing works stored.",
-    "notFound": "No online source knows this work, or it has no DOI, arXiv id or usable title to look it up."
+    "notFound": "No online source knows this work, or it has no DOI, arXiv id or usable title to look it up.",
+    "ctx": {
+      "filter": "With the context",
+      "empty": "No citing paper in the library has a sentence to show.",
+      "page": "p. {{page}}",
+      "open": "Open the citing paper at page {{page}}"
+    }
   }
 }

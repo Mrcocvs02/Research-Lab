@@ -1,0 +1,128 @@
+.cmp-page {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg);
+  color: var(--text);
+}
+.cmp-head,
+.cmp-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.cmp-head {
+  justify-content: space-between;
+}
+.cmp-crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.cmp-title {
+  min-width: 16ch;
+  max-width: 50ch;
+  font-weight: 600;
+}
+.cmp-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+.cmp-bar p {
+  margin: 0;
+}
+.cmp-scroll {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.cmp-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  min-width: 100%;
+}
+.cmp-table th,
+.cmp-table td {
+  vertical-align: top;
+  text-align: left;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  max-width: 28ch;
+  min-width: 18ch;
+}
+.cmp-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  z-index: 1;
+}
+.cmp-table tbody th {
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  max-width: 18ch;
+  min-width: 12ch;
+}
+.cmp-add input {
+  width: 14ch;
+}
+.cmp-x {
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.cmp-text {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: text;
+}
+.cmp-pg {
+  margin-left: var(--space-1);
+}
+.cmp-cell textarea {
+  width: 100%;
+  font: inherit;
+}
+.cmp-cell.is-waiting,
+.cmp-cell.is-writing {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.cmp-cell.is-not-found,
+.cmp-cell.is-not-enabled {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.cmp-cell.is-writing {
+  background-image: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2));
+  background-size: 200% 100%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cmp-cell.is-writing {
+    animation: cmp-shimmer 1.4s linear infinite;
+  }
+}
+@keyframes cmp-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}

@@ -19,6 +19,7 @@ import { rng } from './playful';
 import { MapCanvas, type MapHandle } from './MapCanvas';
 import { clusterCircles, clusterText, prepareMap, tintGroups, type PreparedMap } from './mapModel';
 import { NodeSearch } from './NodeSearch';
+import { useTimeline } from './timeline';
 import type { ScopeOptions } from './useScopes';
 import type { GraphStatus } from './useGraphModel';
 
@@ -92,6 +93,7 @@ export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMap
     // A new document placed incrementally (pending/documents) changes the map without a rebuild.
   }, [usable, scope, mapVersion, status.documents, status.pending, status.builtAt]);
 
+  const tl = useTimeline(map);
   const depth = map?.levels.length ?? 0;
   const lvl = Math.min(level, Math.max(depth - 1, 0));
   const clusters = map?.levels[lvl] ?? [];
@@ -235,6 +237,10 @@ export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMap
             </summary>
             <div className="map-more-body">
               <label className="check-inline">
+                <input type="checkbox" checked={tl.active} onChange={tl.toggle} disabled={!map} data-testid="map-timeline-toggle" />
+                {t('network.timeline.byYear')}
+              </label>
+              <label className="check-inline">
                 <input type="checkbox" checked={mini} onChange={(e) => setMini(e.target.checked)} data-testid="map-minimap-toggle" />
                 {t('network.minimap')}
               </label>
@@ -268,6 +274,12 @@ export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMap
           </button>
         </p>
       )}
+      {tl.active && (
+        <p className="hint" role="status" data-testid="map-timeline-label">
+          {t('network.timeline.label')}
+          {tl.withoutYear > 0 ? ` · ${t('network.timeline.noYear')}: ${tl.withoutYear}` : ''}
+        </p>
+      )}
       {bridge && (
         <p className="surprise-note" role="status" data-testid="map-bridge-note">
           {t('network.bridge.note', { a: safeText(bridge.nodes[0].title), b: safeText(bridge.nodes[2].title) })}{' '}
@@ -289,7 +301,7 @@ export function MapPanel({ status, mapVersion, scopes, selected, onSelect, onMap
       )}
       {map && (
         <div className="map-body">
-          <MapCanvas map={map} level={lvl} selected={selected} onSelect={onSelect} onRead={onRead} onExplore={onExplore} tints={tints} allow={allow} minimap={mini} bridge={bridge} onBridge={(a, b) => { setDiscoverIntent({ kind: 'bridge', docIds: [a, b] }); nav.navigate({ view: 'discover' }); }} aiBadge={t('ai.badge')} label={t('network.mapLabel')} fitKey={mapKey} handle={handle} />
+          <MapCanvas map={tl.map ?? map} level={lvl} selected={selected} onSelect={onSelect} onRead={onRead} onExplore={onExplore} tints={tints} allow={tl.only ?? allow} minimap={mini} bridge={bridge} onBridge={(a, b) => { setDiscoverIntent({ kind: 'bridge', docIds: [a, b] }); nav.navigate({ view: 'discover' }); }} aiBadge={t('ai.badge')} label={t('network.mapLabel')} fitKey={mapKey} handle={handle} />
           <ul className="legend" data-testid="cluster-legend" aria-label={t('network.legend')}>
             {clusters.slice(0, 60).map((c, i) => {
               const txt = clusterText(c);

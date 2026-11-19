@@ -9,7 +9,7 @@ export const dialogChannels = defineChannels('dialog', {
    */
   chooseFolder: {
     request: z.object({
-      purpose: z.enum(['library-root', 'legacy-index', 'export-destination', 'backup-destination']),
+      purpose: z.enum(['library-root', 'legacy-index', 'export-destination', 'backup-destination', 'resource-folder']),
       /** Dialog title (already localised by the renderer). */
       title: z.string().max(200).optional(),
     }),
@@ -22,7 +22,7 @@ export const dialogChannels = defineChannels('dialog', {
    */
   chooseFile: {
     request: z.object({
-      purpose: z.enum(['taxonomy-file', 'backup-file', 'bib-source']),
+      purpose: z.enum(['taxonomy-file', 'backup-file', 'bib-source', 'resource-file']),
       title: z.string().max(200).optional(),
     }),
     response: z.object({ path: z.string(), name: z.string() }).nullable(),

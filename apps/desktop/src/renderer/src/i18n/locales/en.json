@@ -266,7 +266,8 @@
       "annotation": "in highlights"
     },
     "openAtPage": "Open page {{page}} in the reader",
-    "openNotes": "Open the notes"
+    "openNotes": "Open the notes",
+    "addId": "Add from DOI or arXiv: {{id}}"
   },
   "scan": {
     "idle": "Index: {{count}} documents",
@@ -467,5 +468,14 @@
     "attention_one": "{{count}} to check",
     "attention_other": "{{count}} to check",
     "see": "See in Activity"
+  },
+  "resume": {
+    "banner": "The reader closed while you were reading {{title}}{{where}}.",
+    "action": "Resume",
+    "row": "Resume: {{title}}{{where}} · {{when}}",
+    "page": " (p. {{page}})",
+    "untitled": "Untitled document",
+    "recent": "Latest documents",
+    "menu": "Resume or add"
   }
 }

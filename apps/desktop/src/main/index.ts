@@ -27,6 +27,7 @@ import { simulatedClaudeIo } from './ai/account.js';
 import { createProviderFactory } from './ai/provider-factory.js';
 import { abortAllChatTurns } from './ai/service.js';
 import { abortAllJobs } from './ai/jobs.js';
+import { closeOpenMark, initResume } from './study/resume.js';
 import { fixtureFetch } from './net-fixtures.js';
 import { createBackupPolicy } from './library/backup-policy.js';
 import { RuntimeManager } from './library/runtime-manager.js';
@@ -76,6 +77,8 @@ function emit<K extends EventName>(event: K, payload: unknown): void {
 }
 
 async function main(): Promise<void> {
+  // The mark of the reader the last run left open (Resume): read and removed before anything can write a new one.
+  initResume(dirs.localData);
   if (refusedDebugSwitches) return;
   await app.whenReady();
   installGlobalSecurity();
@@ -138,7 +141,7 @@ async function main(): Promise<void> {
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
     async pickFile(purpose, title) {
-      if (purpose === 'bib-source') {
+      if (purpose === 'bib-source' || purpose === 'resource-file') {
         const override = e2eDialogOverride(process.env, dialogHooksPackaged, purpose);
         if (override) return override;
       }
@@ -146,7 +149,7 @@ async function main(): Promise<void> {
       const options: Electron.OpenDialogOptions = {
         title,
         properties: ['openFile'],
-        filters: purpose === 'backup-file' ? [{ name: 'Research Lab backup', extensions: ['rlbackup'] }] : purpose === 'bib-source' ? [{ name: 'BibTeX, CSL JSON, RDF, Zotero', extensions: ['bib', 'json', 'rdf', 'sqlite'] }] : [{ name: 'JSON', extensions: ['json'] }],
+        filters: purpose === 'backup-file' ? [{ name: 'Research Lab backup', extensions: ['rlbackup'] }] : purpose === 'bib-source' ? [{ name: 'BibTeX, CSL JSON, RDF, Zotero', extensions: ['bib', 'json', 'rdf', 'sqlite'] }] : purpose === 'resource-file' ? [] : [{ name: 'JSON', extensions: ['json'] }],
       };
       const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
       return result.canceled ? null : (result.filePaths[0] ?? null);
@@ -235,6 +238,8 @@ async function main(): Promise<void> {
     if (quitting) return;
     event.preventDefault();
     quitting = true;
+    // A normal quit: the reader's open mark goes, so the next start does not read it as an unclean close (Resume, D-414).
+    closeOpenMark(dirs.localData);
     // A running chat turn owns a Claude Code process: it ends with the app.
     abortAllChatTurns();
     abortAllJobs();

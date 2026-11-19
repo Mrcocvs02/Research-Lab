@@ -21,6 +21,7 @@ import { watchHandlers } from './watch-handlers.js';
 import { exploreHandlers } from './explore-handlers.js';
 import { exportHandlers } from './export-handlers.js';
 import { bibHandlers } from './bib-handlers.js';
+import { importIdHandlers, resourcesHandlers, resumeHandlers } from './resources-handlers.js';
 import { graphHandlers } from './graph-handlers.js';
 import { backupHandlers, maintenanceHandlers } from './backup-handlers.js';
 import { cropsHandlers, explainHandlers } from './readertools-handlers.js';
@@ -65,5 +66,8 @@ export function buildHandlers(s: MainServices): HandlerMap<Channels> {
     ...bibHandlers(s),
     ...cropsHandlers(s),
     ...explainHandlers(s),
+    ...resourcesHandlers(s),
+    ...importIdHandlers(s),
+    ...resumeHandlers(s),
   };
 }

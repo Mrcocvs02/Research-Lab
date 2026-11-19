@@ -34,6 +34,9 @@ export const studySchema = z.object({
   state: studyStateSchema.default('to-read'),
   underlined: underlinedSchema.prefault({}),
   updatedAt: isoDateSchema.optional(),
+  /** Where reading stopped ("Resume", D-414): written when the reader closes or rests on a page. */
+  lastPage: z.number().int().min(1).max(100_000).optional(),
+  lastOpenedAt: isoDateSchema.optional(),
 });
 export type Study = z.infer<typeof studySchema>;
 

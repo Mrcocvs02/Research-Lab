@@ -37,6 +37,7 @@ export type StringPart =
   | 'palette'
   | 'projects'
   | 'reader'
+  | 'resources'
   | 'review'
   | 'settings'
   | 'settings-wizard'

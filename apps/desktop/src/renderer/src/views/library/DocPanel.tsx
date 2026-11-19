@@ -33,6 +33,7 @@ import './library.css';
 
 const CitationsPanel = lazyView(() => import('../citations/CitationsPanel').then((m) => ({ default: m.CitationsPanel })), ['citations']);
 const SimilarPanel = lazyView(() => import('../network/SimilarPanel').then((m) => ({ default: m.SimilarPanel })), ['network']);
+const DocResources = lazyView(() => import('../resources/DocResources'), ['resources']);
 const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);
 
 const STUDY: StudyState[] = ['to-read', 'reading', 'read'];
@@ -595,6 +596,12 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
       <CardSection id="similar" title={t('doc.similarTitle')} testId="doc-similar" toggleTestId="similar-toggle">
         <Lazy>
           <SimilarPanel docId={docId} tagLabel={(id) => model.byId.get(resolveId(model, id))?.label ?? id} onOpen={openReader} />
+        </Lazy>
+      </CardSection>
+
+      <CardSection id="resources" title={t('doc.resources')} testId="doc-resources-section" toggleTestId="resources-toggle">
+        <Lazy>
+          <DocResources docId={docId} />
         </Lazy>
       </CardSection>
 

@@ -265,7 +265,7 @@ const libraryView = (snap: Snap, r: DocumentRecord, entry: Entry): InboxItem => 
 
 /* --------------------------------------------- online lookup --------------------------------------------- */
 
-async function lookupEntry(s: MainServices, ref: { doi?: string | undefined; arxivId?: string | undefined }): Promise<Pick<Entry, 'lookup' | 'metadata'>> {
+export async function lookupEntry(s: MainServices, ref: { doi?: string | undefined; arxivId?: string | undefined }): Promise<Pick<Entry, 'lookup' | 'metadata'>> {
   const checkedAt = new Date().toISOString();
   if (!ref.doi && !ref.arxivId) return { lookup: { state: 'skipped' }, metadata: null };
   const finish = (source: 'openalex' | 'arxiv', raw: unknown) => {

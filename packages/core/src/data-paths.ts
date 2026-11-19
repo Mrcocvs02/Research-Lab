@@ -22,10 +22,13 @@ export const dataPath = {
   /** Append-only JSONL, one file per device and month (avoids sync conflicts). */
   logFile: (kind: 'changes' | 'ai-sends', deviceId: string, month: string) => `log/${kind}-${month}.${deviceId}.jsonl`,
   commands: 'commands',
+  /** Resources beyond PDFs (D-398): one small file each. */
+  resources: 'resources',
+  resource: (id: string) => `resources/${id}.json`,
 } as const;
 
 /** Directory names created inside a data dir (for init and for generality/non-destructive checks). */
-export const DATA_SUBDIRS = ['documents', 'notes', 'annotations', 'citations', 'projects', 'log', 'commands'] as const;
+export const DATA_SUBDIRS = ['documents', 'notes', 'annotations', 'citations', 'projects', 'log', 'commands', 'resources'] as const;
 
 /** Local (not synced, rebuildable) files, relative to the machine-local app data dir of a library. */
 export const localPath = {

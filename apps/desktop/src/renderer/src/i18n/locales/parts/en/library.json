@@ -43,13 +43,17 @@
       "failedHint": "Their text cannot be read: they are searched by name.",
       "more": "and {{count}} more",
       "truncated": "The list is partial: the counts are complete."
-    }
-  },
-  "addMenu": {
-    "more": "More ways to add",
-    "pdf": "PDF…",
-    "zotero": "From Zotero or BibTeX…"
-  },
-  "copyBib": "Copy BibTeX references",
-  "copiedBib": "BibTeX references copied to the clipboard ({{count}})."
+    },
+    "addMenu": {
+      "more": "More ways to add",
+      "pdf": "PDF…",
+      "zotero": "From Zotero or BibTeX…",
+      "id": "From DOI, arXiv or URL…",
+      "resource": "Resource or link…"
+    },
+    "copyBib": "Copy BibTeX references",
+    "copiedBib": "BibTeX references copied to the clipboard ({{count}}).",
+    "facetResources": "Resources",
+    "facetResourcesHint": "Show resources (code, data, web pages, notebooks, folders) instead of documents"
+  }
 }

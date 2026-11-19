@@ -266,7 +266,8 @@
       "annotation": "nelle evidenziazioni"
     },
     "openAtPage": "Apri la pagina {{page}} nel lettore",
-    "openNotes": "Apri le note"
+    "openNotes": "Apri le note",
+    "addId": "Aggiungi da DOI o arXiv: {{id}}"
   },
   "scan": {
     "idle": "Indice: {{count}} documenti",
@@ -467,5 +468,14 @@
     "attention_one": "{{count}} da guardare",
     "attention_other": "{{count}} da guardare",
     "see": "Vedi in Attività"
+  },
+  "resume": {
+    "banner": "Il lettore si è chiuso mentre leggevi {{title}}{{where}}.",
+    "action": "Riprendi",
+    "row": "Riprendi: {{title}}{{where}} · {{when}}",
+    "page": " (p. {{page}})",
+    "untitled": "Documento senza titolo",
+    "recent": "Ultimi documenti",
+    "menu": "Riprendi o aggiungi"
   }
 }

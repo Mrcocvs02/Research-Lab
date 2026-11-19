@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Lazy, lazyView } from '../components/Lazy';
 import { NoticeBanner } from '../components/NoticeBanner';
+import { AddDialogs } from './AddDialogs';
+import { ShellResume } from './Resume';
 import { IconButton } from '../components/IconButton';
 import { useAiUi } from '../lib/aiUi';
 import { InShellContext } from '../lib/history';
@@ -107,6 +109,7 @@ export function Shell({ section, onSection, onNewLibrary, reviewDocs = 0, readin
         )}
         <div className="banner-slot" data-testid="banner-slot">
           <NoticeBanner />
+          <ShellResume />
           {reading ? null : banner}
         </div>
         <main id="main" className="main" tabIndex={-1}>
@@ -143,6 +146,7 @@ export function Shell({ section, onSection, onNewLibrary, reviewDocs = 0, readin
             )}
           </div>
         </aside>
+        <AddDialogs />
         {paletteOpen && (
           <Lazy>
             <Palette onClose={() => setPaletteOpen(false)} />

@@ -1,0 +1,19 @@
+.resource-dialog { display: flex; flex-direction: column; gap: var(--space-3); }
+.resource-dialog__local { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.resources-pane { display: flex; flex-direction: column; }
+.resource-row { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); }
+.resource-row__glyph { color: var(--text-muted); text-align: center; }
+.resource-row__main { min-width: 0; }
+.resource-row__title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.resource-row__sub { color: var(--text-muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+.resource-row__preview { margin: var(--space-1) 0 0; font-size: 0.875rem; }
+.resource-row__actions { display: flex; align-items: center; gap: var(--space-2); }
+.resource-row__warn { color: var(--text-muted); font-size: 0.875rem; }
+.card-resources { display: flex; flex-direction: column; gap: var(--space-2); }
+.card-resources__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.id-dialog { display: flex; flex-direction: column; gap: var(--space-3); }
+.id-dialog textarea { width: 100%; font-family: inherit; }
+.id-results { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.id-results li { display: flex; align-items: flex-start; gap: var(--space-3); }
+.id-results__body { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.id-results__meta { color: var(--text-muted); font-size: 0.875rem; }

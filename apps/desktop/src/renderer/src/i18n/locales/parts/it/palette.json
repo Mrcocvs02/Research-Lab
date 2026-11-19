@@ -90,6 +90,15 @@
       },
       "theme": {
         "label": "Cambia tema (chiaro o scuro)"
+      },
+      "resume": {
+        "label": "Riprendi la lettura"
+      },
+      "addFromId": {
+        "label": "Aggiungi da DOI, arXiv o URL…"
+      },
+      "addResource": {
+        "label": "Aggiungi una risorsa…"
       }
     },
     "paletteGroups": {
@@ -98,7 +107,8 @@
       "goto": "Vai a",
       "actions": "Azioni",
       "claude": "Chiedi a Claude",
-      "settings": "Impostazioni"
+      "settings": "Impostazioni",
+      "resume": "Lettura"
     },
     "paletteNoLibrary": "Apri prima una libreria"
   }

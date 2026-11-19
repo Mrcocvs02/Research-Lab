@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Banner } from '../components/Banner';
+import { Lazy, lazyView } from '../components/Lazy';
 import { useAiUi } from '../lib/aiUi';
 import { useShortcut } from '../lib/keymap';
 import { useReader } from '../lib/reader';
 import { rl } from '../lib/rl';
-import { safeText } from '../views/library/safeText';
 import { useApp } from '../state/app-context';
+
+// The banner (and the Banner component with it) loads only in the rare case it is shown.
+const ResumeBanner = lazyView(() => import('./ResumeBanner'), []);
 
 /** Seconds the reader rests on a page before the position is written (reading goes on, no write per page turn). */
 const REST_MS = 4000;
@@ -76,13 +78,14 @@ export function ShellResume() {
   });
 
   if (!unclean) return null;
-  const where = unclean.page ? t('resume.page', { page: unclean.page }) : '';
   return (
-    <div data-testid="resume-banner">
-      <Banner tone="info" action={{ label: t('resume.action'), onClick: () => (setUnclean(null), openReader(unclean.docId, unclean.page ?? undefined)) }} onClose={() => setUnclean(null)}>
-        {t('resume.banner', { title: safeText(unclean.title ?? t('resume.untitled')), where })}
-      </Banner>
-    </div>
+    <Lazy>
+      <ResumeBanner
+        title={unclean.title}
+        page={unclean.page}
+        onResume={() => (setUnclean(null), openReader(unclean.docId, unclean.page ?? undefined))}
+        onClose={() => setUnclean(null)}
+      />
+    </Lazy>
   );
 }
-

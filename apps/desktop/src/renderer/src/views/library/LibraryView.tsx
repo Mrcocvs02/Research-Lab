@@ -33,7 +33,7 @@ const DocumentCard = lazyView(() => import('./DocPanel').then((m) => ({ default:
 const BulkTagEditor = lazyView(() => import('./DocPanel').then((m) => ({ default: m.BulkTagEditor })), ['doc', 'doc-projects-reader', 'doc-reader', 'doc-review']);
 const TaxonomyManager = lazyView(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })), ['taxonomy']);
 const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);
-const ResourcesPane = lazyView(() => import('../resources/ResourcesPane'), ['resources']);
+const ResourcesPane = lazyView(() => import('../resources/ResourcesPane'), ['resources', 'library']);
 const AddToProject = lazyView(() => import('./AddToProject').then((m) => ({ default: m.AddToProject })), ['addToProject']);
 
 type PaneTab = 'folders' | 'tags';

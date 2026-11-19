@@ -429,8 +429,8 @@ test('crowding and layout at 1024x700: top bar 9, header 4, filters 8, selection
 
     // Header: View, + Add PDF, the menu, the card toggle.
     await expect(visible(window.locator('.library-head'))).toHaveCount(4);
-    // The row of filters: 6 facet chips and "Show missing files" (Clear appears with a filter).
-    await expect(visible(window.getByTestId('facet-bar'))).toHaveCount(7);
+    // The row of filters: 6 facet chips, the Resources facet and "Show missing files" (Clear appears with a filter).
+    await expect(visible(window.getByTestId('facet-bar'))).toHaveCount(8);
     // At least seven rows are visible without scrolling.
     const box = await window.getByTestId('search-results').boundingBox();
     const rowH = (await rows(window).first().boundingBox())!.height;
@@ -455,6 +455,44 @@ test('crowding and layout at 1024x700: top bar 9, header 4, filters 8, selection
     const listBox = (await window.getByTestId('results-pane').boundingBox())!;
     expect(listBox.width).toBeGreaterThanOrEqual(420);
     await ctx.verifyLibraryUntouched();
+  } finally {
+    await ctx?.close();
+  }
+});
+
+test('Resume: no banner at a normal start; the empty search box offers where to resume after reading (17.4.5)', async ({}, testInfo) => {
+  test.setTimeout(300_000);
+  let ctx: LaunchedApp | undefined;
+  try {
+    const opened = await openSyntheticLibrary(testInfo, 'papers');
+    ctx = opened.ctx;
+    const { window } = opened;
+    // A normal start shows no Resume banner, and the empty box has nothing to offer yet.
+    await expect(window.getByTestId('resume-banner')).toHaveCount(0);
+    await window.getByTestId('search-input').focus();
+    await expect(window.getByTestId('search-menu')).toHaveCount(0);
+
+    // Read a document and leave the reader.
+    const row = rows(window).first();
+    await row.hover();
+    await row.getByTestId('row-read').click();
+    await expect(window.getByTestId('reader-title')).toBeVisible({ timeout: 60_000 });
+    await window.getByTestId('reader-close').click();
+    await expect(window.getByTestId('section-library')).toBeVisible();
+
+    // The box, empty and focused, offers "Resume: <title>" and opens the reader on it.
+    await window.getByTestId('search-input').focus();
+    const resume = window.getByTestId('search-resume');
+    await expect(resume).toBeVisible({ timeout: 30_000 });
+    await expect(resume).toContainText('Resume:');
+    // Text in the box replaces the offer (a normal search).
+    await window.getByTestId('search-input').fill('x');
+    await expect(window.getByTestId('search-menu')).toHaveCount(0);
+    await window.getByTestId('search-input').fill('');
+    await expect(window.getByTestId('search-resume')).toBeVisible();
+    await window.getByTestId('search-resume').click();
+    await expect(window.getByTestId('reader-title')).toBeVisible({ timeout: 60_000 });
+    await expect(window.getByTestId('resume-banner')).toHaveCount(0);
   } finally {
     await ctx?.close();
   }

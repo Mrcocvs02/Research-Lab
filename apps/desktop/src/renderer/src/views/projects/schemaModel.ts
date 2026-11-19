@@ -74,7 +74,7 @@ export interface NoteParagraph {
   text: string;
   cited: boolean;
 }
-const CITED = /\cite[a-z]*\{|\[@[^\]]+\]|\]\(lab:\/\/doc\//;
+const CITED = /\\cite[a-z]*\{|\[@[^\]]+\]|\]\(lab:\/\/doc\//;
 export function noteParagraphs(notes: string): NoteParagraph[] {
   const out: NoteParagraph[] = [];
   let inFence = false;
@@ -98,4 +98,4 @@ export function noteParagraphs(notes: string): NoteParagraph[] {
 }
 
 /** What goes on the clipboard for "Copia la chiave": LaTeX or Pandoc. */
-export const citeSnippet = (key: string, style: 'latex' | 'pandoc'): string => (style === 'latex' ? `\cite{${key}}` : `[@${key}]`);
+export const citeSnippet = (key: string, style: 'latex' | 'pandoc'): string => (style === 'latex' ? `\\cite{${key}}` : `[@${key}]`);

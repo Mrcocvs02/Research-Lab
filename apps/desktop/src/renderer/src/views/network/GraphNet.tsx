@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, RequestOf } from '@rl/core';
 import { EmptyState } from '../../components/EmptyState';
+import { useNav } from '../../lib/nav';
+import { setDiscoverIntent } from '../../lib/discoverIntent';
+import { useNotify } from '../../lib/notify';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { rl } from '../../lib/rl';
@@ -19,6 +22,8 @@ import { DocCard, HoverCard, useRestingHover } from './HoverCard';
 import { pickLabels, shortLabel, type LabelCandidate } from './labelsLod';
 import { firstNode, mapAction, nearestInDirection } from './mapKeyboard';
 import { MiniMap } from './MiniMap';
+import { ChipPop, ChromeCtx, copyCanvasImage, HeadMore, MapIllustration, Pill, RowPortal, useHint } from './NetChrome';
+import type { NetCtl } from './NetworkView';
 import { NodeSearch } from './NodeSearch';
 import { bfsPath, rng } from './playful';
 import { useCanvasView } from './useCanvasView';
@@ -41,6 +46,11 @@ export interface NetStart {
 }
 
 interface Props {
+  active: boolean;
+  /** The "Network of" chip, drawn first in the row. */
+  modeChip: ReactNode;
+  /** What the node panel needs to expand, collapse, remove and look for a bridge (null: nothing selected). */
+  onCtl(c: NetCtl | null): void;
   start: NetStart | null;
   scopes: ScopeOptions;
   /** The document selected elsewhere (the map, a list): can be the start of the network. */
@@ -69,7 +79,7 @@ const NODE_FILL: Record<NodeKind, keyof MapTheme> = { doc: 'accent', folder: 'mu
  * edges, a card on hover, a path between two nodes, nodes that stay where they are dropped (the pin), the two-step
  * neighbourhood in focus on double click. No graph library, no DOM per node; frames only while something moves.
  */
-export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelectDoc, onStart, onExplore }: Props) {
+export function GraphNet({ active, modeChip, onCtl, start, scopes, selectedDoc, selectedDocLabel, onSelectDoc, onStart, onExplore }: Props) {
   const { t } = useTranslation();
   const net = useMemo(() => new Network(), []);
   const [kinds, setKinds] = useState<Kind[]>(DEFAULT_KINDS);
@@ -91,8 +101,9 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
   /** The topics of the Panorama: the topic of each document (coarsest level), the tint of each topic and its name. */
   const topics = useRef<{ of: Map<string, string>; tint: Map<string, number>; name: Map<string, string> } | null>(null);
   const hoverKey = useRef<string | null>(null);
-  const refs = useRef({ selKey, cursor, pathKeys, focusKey, surprise });
-  refs.current = { selKey, cursor, pathKeys, focusKey, surprise };
+  const [bridgeFrom, setBridgeFrom] = useState<string | null>(null);
+  const refs = useRef({ selKey, cursor, pathKeys, focusKey, surprise, bridgeFrom });
+  refs.current = { selKey, cursor, pathKeys, focusKey, surprise, bridgeFrom };
   const theme = useRef<MapTheme | null>(null);
   const kindsRef = useRef(kinds);
   kindsRef.current = kinds;
@@ -102,6 +113,11 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
   const autoTried = useRef(false);
   const rand = useRef(rng(Date.now() & 0xffff));
   const searchRef = useRef<HTMLInputElement>(null);
+  const chrome = useContext(ChromeCtx);
+  const nav = useNav();
+  const { info } = useNotify();
+  const untitled = t('network.untitled');
+  const [hint, dismissHint] = useHint(active);
 
   /** Documents take the colour and the hull of their topic (the same tints as the Panorama); the simulation pulls them towards it. */
   function tagTopics(): void {
@@ -167,11 +183,14 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
           ctx.moveTo(shape[0]![0], shape[0]![1]);
           for (let i = 1; i < shape.length; i++) ctx.lineTo(shape[i]![0], shape[i]![1]);
           ctx.closePath();
-          ctx.fillStyle = withAlpha(tint, dark ? 0.12 : 0.07);
+          const hovered = hk ? nodes.get(hk)?.group === id : false;
+          ctx.fillStyle = withAlpha(tint, hovered ? 0.12 : dark ? 0.08 : 0.05);
           ctx.fill();
-          ctx.strokeStyle = withAlpha(tint, dark ? 0.35 : 0.25);
-          ctx.lineWidth = 1;
-          ctx.stroke();
+          if (hovered) {
+            ctx.strokeStyle = withAlpha(tint, 0.4);
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
           const c = centroidOf(hull);
           const name = tp.name.get(id);
           if (name) topicTexts.push({ text: shortLabel(name), x: c[0], y: Math.min(...hull.map((p) => p[1])) - 22 });
@@ -299,7 +318,8 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
       // Labels: everywhere when the network is small, else the ones that matter and do not overlap.
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      for (const i of pickLabels(labels, w, h, nodes.size <= 120 ? 400 : 60)) {
+      const chosen = nodes.size < 30 ? labels.map((_, i) => i) : pickLabels(labels, w, h, nodes.size <= 120 ? 400 : 60);
+      for (const i of chosen) {
         const l = labels[i]!;
         ctx.lineWidth = 3;
         ctx.strokeStyle = th.bg;
@@ -331,6 +351,13 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
       view.requestDraw();
     },
     onClick(n, shift) {
+      dismissHint();
+      if (refs.current.bridgeFrom && n && n.kind === 'doc' && `doc:${refs.current.bridgeFrom}` !== n.key) {
+        setDiscoverIntent({ kind: 'bridge', docIds: [refs.current.bridgeFrom, n.id] });
+        setBridgeFrom(null);
+        nav.navigate({ view: 'discover' });
+        return;
+      }
       if (shift && n && refs.current.selKey && refs.current.selKey !== n.key) {
         const p = bfsPath((k) => net.neighbors(k), refs.current.selKey, n.key);
         setPathKeys(p);
@@ -426,8 +453,8 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
       syncCount();
       view.requestDraw();
       if (reducedMotion()) for (let i = 0; i < 400 && net.tick(); i++);
-      // The first expansion shows the whole network; later ones keep the view the user chose.
-      if (net.size <= 40) view.fit();
+      // After every expansion the view is fitted again, animated (400 ms; at once with reduced motion).
+      view.fit(true);
     } catch (e) {
       setError(e);
     } finally {
@@ -461,17 +488,17 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
     autoTried.current = true;
     let live = true;
     (async () => {
-      if (selectedDoc) return onStart({ kind: 'doc', id: selectedDoc, label: selectedDocLabel ?? selectedDoc.slice(0, 8) });
+      if (selectedDoc) return onStart({ kind: 'doc', id: selectedDoc, label: selectedDocLabel ?? untitled });
       // The document read last, when it is still in the library, is the natural place to start.
       const resume = await rl.invoke('resume:get', {}).catch(() => null);
       if (resume?.last) {
         const d = await rl.invoke('documents:get', { docId: resume.last.docId }).catch(() => null);
-        if (d && live) return onStart({ kind: 'doc', id: resume.last.docId, label: d.title ?? resume.last.docId.slice(0, 8) });
+        if (d && live) return onStart({ kind: 'doc', id: resume.last.docId, label: d.title ?? untitled });
       }
       const list = await rl.invoke('documents:list', { limit: 8, sort: 'added-desc' });
       const scored = await Promise.all(
         list.items.map((d) => {
-          const label = d.title ?? d.docId.slice(0, 8);
+          const label = d.title ?? untitled;
           return rl.invoke('graph:neighbors', { node: { kind: 'doc', id: d.docId }, kinds: ['similar', 'citations'], limit: 25 }).then(
             (r) => ({ id: d.docId, label, n: r.nodes.length }),
             () => ({ id: d.docId, label, n: 0 }),
@@ -511,6 +538,33 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
   }, []);
 
   const selected = selKey ? net.nodes.get(selKey) : undefined;
+  const afterChange = () => {
+    syncCount();
+    if (selKey && !net.nodes.has(selKey)) setSelKey(null);
+    view.requestDraw();
+  };
+  const ctlRef = useRef<{ expand(): void; collapse(): void; remove(): void; bridge(): void }>({ expand() {}, collapse() {}, remove() {}, bridge() {} });
+  ctlRef.current = {
+    expand: () => selected && void expand(selected),
+    collapse() {
+      if (selected) net.collapse(selected.key);
+      afterChange();
+    },
+    remove() {
+      if (selected) net.remove(selected.key);
+      afterChange();
+    },
+    bridge() {
+      if (selected?.kind === 'doc') setBridgeFrom(selected.id);
+    },
+  };
+  const ctlKey = selected && selected.kind === 'doc' ? `${selected.key}|${selected.expanded ? 1 : 0}|${busy ? 1 : 0}` : '';
+  useEffect(() => {
+    if (!active || !selected || selected.kind !== 'doc') return onCtl(null);
+    onCtl({ expanded: !!selected.expanded, busy, expand: () => ctlRef.current.expand(), collapse: () => ctlRef.current.collapse(), remove: () => ctlRef.current.remove(), bridge: () => ctlRef.current.bridge() });
+    return () => onCtl(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, ctlKey]);
   const hovered = hover ? net.nodes.get(hover.key) : undefined;
 
   const keyAt = () => {
@@ -588,20 +642,14 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
   };
 
   const toggleKind = (k: Kind) => setKinds((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : KINDS.filter((x) => x === k || cur.includes(x))));
-  const afterChange = () => {
-    syncCount();
-    if (selKey && !net.nodes.has(selKey)) setSelKey(null);
-    view.requestDraw();
-  };
-
   /** "Sorprendimi": a pair close in content but far in the topics; both documents join the network and the camera flies to them. */
   const doSurprise = async () => {
     try {
       const r = await rl.invoke('graph:surprising', { limit: 30 });
       const p = r.pairs[Math.floor(rand.current() * r.pairs.length)];
       if (!p) return setNote({ text: t('network.ent.noSurprise') });
-      const a = net.seed({ kind: 'doc', id: p.a, label: p.a.slice(0, 8) });
-      const b = net.seed({ kind: 'doc', id: p.b, label: p.b.slice(0, 8) });
+      const a = net.seed({ kind: 'doc', id: p.a, label: untitled });
+      const b = net.seed({ kind: 'doc', id: p.b, label: untitled });
       setSurprise({ a: a.key, b: b.key, terms: p.terms });
       syncCount();
       for (const n of [a, b]) {
@@ -631,9 +679,53 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
     [net],
   );
 
+  const reset = () => {
+    net.clear();
+    setSelKey(null);
+    setNote(null);
+    setError(null);
+    setSurprise(null);
+    setPathKeys(null);
+    lastStart.current = start?.nonce ?? 0;
+    autoTried.current = true;
+    afterChange();
+  };
+
+  let pill: ReactNode = null;
+  if (bridgeFrom) {
+    pill = (
+      <Pill testId="net-bridge-pick" onClose={() => setBridgeFrom(null)}>
+        {t('network.bridge.pickSecondShort')}
+      </Pill>
+    );
+  } else if (surprise) {
+    pill = (
+      <Pill testId="net-surprise-note" onClose={() => setSurprise(null)}>
+        {t('network.net.surprise', { terms: surprise.terms.slice(0, 5).map(safeText).join(', ') || '—' })}
+      </Pill>
+    );
+  } else if (note) {
+    pill = (
+      <Pill testId="net-note" onClose={() => setNote(null)}>
+        {note.text}
+        {note.only && (
+          <>
+            {' · '}
+            <button type="button" className="link" onClick={() => onStart({ kind: note.only!.kind, id: note.only!.id, label: note.only!.label })} data-testid="net-only-these">
+              {t('network.net.onlyThese')}
+            </button>
+          </>
+        )}
+      </Pill>
+    );
+  } else if (hint && count > 0) {
+    pill = <Pill testId="net-hint">{t('network.hint')}</Pill>;
+  }
+
   return (
     <div className="net-tab graph-tab" data-testid="graph-panel">
-      <div className="net-toolbar">
+      <RowPortal active={active}>
+        {modeChip}
         <NodeSearch
           ref={searchRef}
           testId="net-search"
@@ -641,7 +733,7 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
           placeholder={t('network.search.goDoc')}
           suggest={async (q) => {
             const r = await rl.invoke('search:query', { text: q, limit: 8 });
-            return r.hits.map((h) => ({ id: h.docId, label: h.title ?? h.docId.slice(0, 8), hint: h.year ? String(h.year) : undefined }));
+            return r.hits.map((h) => ({ id: h.docId, label: h.title ?? untitled, hint: h.year ? String(h.year) : undefined }));
           }}
           onPick={(it) => {
             const known = net.nodes.get(`doc:${it.id}`);
@@ -651,108 +743,85 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
             } else onStart({ kind: 'doc', id: it.id, label: it.label });
           }}
         />
-        <button type="button" onClick={() => selectedDoc && onStart({ kind: 'doc', id: selectedDoc, label: selectedDocLabel ?? selectedDoc.slice(0, 8) })} disabled={!selectedDoc} data-testid="net-start-doc">
-          {t('network.net.fromDoc')}
-        </button>
-        <label className="net-field">
-          <span>{t('network.net.fromFolder')}</span>
-          <select
-            value="__none"
-            onChange={(e) => {
-              if (e.target.value !== '__none') onStart({ kind: 'folder', id: e.target.value, label: e.target.value === '' ? '/' : (e.target.value.split('/').pop() ?? e.target.value) });
-            }}
-            data-testid="net-start-folder"
-          >
-            <option value="__none">{t('network.scope.pick')}</option>
-            <option value="">/</option>
-            {scopes.folders.map((f) => (
-              <option key={f} value={f}>
-                {safeText(f)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="net-field">
-          <span>{t('network.net.fromTag')}</span>
-          <select
-            value=""
-            onChange={(e) => {
-              if (e.target.value) onStart({ kind: 'tag', id: e.target.value, label: scopes.tagLabel(e.target.value) });
-            }}
-            data-testid="net-start-tag"
-          >
-            <option value="">{t('network.scope.pick')}</option>
-            {scopes.tags.map((x) => (
-              <option key={x.id} value={x.id}>
-                {safeText(x.label)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="net-field">
-          <span>{t('network.net.limit')}</span>
-          <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} data-testid="net-limit">
-            {LIMITS.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <fieldset className="net-kinds" data-testid="net-kinds">
-        <legend>{t('network.net.kinds')}</legend>
-        {KINDS.map((k) => (
-          <label key={k} className="check-inline">
-            <input type="checkbox" checked={kinds.includes(k)} onChange={() => toggleKind(k)} data-testid={`net-kind-${k}`} />
-            {t(`network.net.kind.${k}`)}
-          </label>
-        ))}
-      </fieldset>
-      <div className="net-toolbar">
-        <button type="button" onClick={() => selected && void expand(selected)} disabled={!selected || busy || selected.expanded} data-testid="net-expand">
-          {t('network.net.expand')}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (selected) net.collapse(selected.key);
-            afterChange();
-          }}
-          disabled={!selected || !selected.expanded}
-          data-testid="net-collapse"
-        >
-          {t('network.net.collapse')}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (selected) net.remove(selected.key);
-            afterChange();
-          }}
-          disabled={!selected}
-          data-testid="net-remove"
-        >
-          {t('network.net.remove')}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            net.clear();
-            setSelKey(null);
-            setNote(null);
-            setError(null);
-            setSurprise(null);
-            setPathKeys(null);
-            lastStart.current = start?.nonce ?? 0;
-            autoTried.current = true;
-            afterChange();
-          }}
-          disabled={count === 0}
-          data-testid="net-reset"
-        >
-          {t('network.net.reset')}
-        </button>
+        <ChipPop label={t('network.start')} testId="net-start" width={360}>
+          {(close) => (
+            <div className="net-pop-body">
+              <div className="net-pop-sec">{t('network.net.startFrom')}</div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedDoc) onStart({ kind: 'doc', id: selectedDoc, label: selectedDocLabel ?? untitled });
+                  close();
+                }}
+                disabled={!selectedDoc}
+                data-testid="net-start-doc"
+              >
+                {selectedDoc ? t('network.net.fromDocNamed', { title: safeText(selectedDocLabel ?? untitled) }) : t('network.net.fromDoc')}
+              </button>
+              <label className="net-field net-pop-row">
+                <span>{t('network.net.fromFolder')}</span>
+                <select
+                  value="__none"
+                  onChange={(e) => {
+                    if (e.target.value !== '__none') {
+                      onStart({ kind: 'folder', id: e.target.value, label: e.target.value === '' ? '/' : (e.target.value.split('/').pop() ?? e.target.value) });
+                      close();
+                    }
+                  }}
+                  data-testid="net-start-folder"
+                >
+                  <option value="__none">{t('network.scope.pick')}</option>
+                  <option value="">/</option>
+                  {scopes.folders.map((f) => (
+                    <option key={f} value={f}>
+                      {safeText(f)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="net-field net-pop-row">
+                <span>{t('network.net.fromTag')}</span>
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      onStart({ kind: 'tag', id: e.target.value, label: scopes.tagLabel(e.target.value) });
+                      close();
+                    }
+                  }}
+                  data-testid="net-start-tag"
+                >
+                  <option value="">{t('network.scope.pick')}</option>
+                  {scopes.tags.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {safeText(x.label)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="net-pop-sec">{t('network.net.eachExpansion')}</div>
+              <label className="net-field net-pop-row">
+                <span>{t('network.net.limit')}</span>
+                <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} data-testid="net-limit">
+                  {LIMITS.map((l) => (
+                    <option key={l} value={l}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <fieldset className="net-kinds" data-testid="net-kinds">
+                <legend className="visually-hidden">{t('network.net.kinds')}</legend>
+                {KINDS.map((k) => (
+                  <label key={k} className="check-inline">
+                    <input type="checkbox" checked={kinds.includes(k)} onChange={() => toggleKind(k)} data-testid={`net-kind-${k}`} />
+                    {t(`network.net.kind.${k}`)}
+                  </label>
+                ))}
+              </fieldset>
+            </div>
+          )}
+        </ChipPop>
         <span className="map-actions">
           <button
             type="button"
@@ -776,67 +845,41 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
           <button type="button" className="icon-button" title={t('network.fit')} aria-label={t('network.fit')} onClick={() => view.fit(true)} disabled={count === 0} data-testid="net-fit">
             ⤢
           </button>
-          <details className="map-more">
-            <summary aria-label={t('network.more')} title={t('network.more')} data-testid="net-more">
-              ⋯
-            </summary>
-            <div className="map-more-body">
-              <label className="check-inline">
-                <input type="checkbox" checked={mini} onChange={(e) => setMini(e.target.checked)} data-testid="net-minimap-toggle" />
-                {t('network.minimap')}
-              </label>
-              <button
-                type="button"
-                className="link"
-                onClick={() => {
+        </span>
+      </RowPortal>
+      <HeadMore
+        active={active}
+        testId="net-more"
+        groups={[
+          {
+            id: 'net',
+            items: [
+              count > 0 ? { id: 'reset', label: t('network.net.resetNet'), testId: 'net-reset', onSelect: reset } : { id: 'reset', label: t('network.net.resetNet'), testId: 'net-reset', onSelect: reset, disabled: true, disabledReason: t('network.net.emptyTitle') },
+              {
+                id: 'unpin',
+                label: t('network.unpinAll'),
+                testId: 'net-unpin-all',
+                onSelect: () => {
                   for (const n of net.nodes.values()) n.fixed = false;
                   view.requestDraw();
-                }}
-                data-testid="net-unpin-all"
-              >
-                {t('network.unpinAll')}
-              </button>
-            </div>
-          </details>
-        </span>
-        <span className="hint" data-testid="net-count" data-count={count} aria-live="polite">
-          {t('network.net.count', { count })}
-        </span>
-        <span className="net-key" aria-label={t('network.net.legend')} data-testid="net-legend">
-          <span className="key-doc">{t('network.net.docNode')}</span>
-          <span className="key-folder">{t('network.net.folderNode')}</span>
-          <span className="key-tag">{t('network.net.tagNode')}</span>
-          <span className="key-line key-similar">{t('network.net.kind.similar')}</span>
-          <span className="key-line key-cites">{t('network.net.edge.cites')}</span>
-          <span className="key-line key-tagged">{t('network.net.edge.tagged')}</span>
-          <span className="key-line key-contains">{t('network.net.edge.contains')}</span>
-        </span>
-      </div>
+                },
+              },
+            ],
+          },
+          {
+            id: 'view',
+            items: [
+              { id: 'minimap', label: t('network.minimap'), icon: <span>{mini ? '☑' : '☐'}</span>, testId: 'net-minimap-toggle', onSelect: () => setMini(!mini) },
+              { id: 'image', label: t('network.copyImage'), testId: 'net-image', onSelect: () => void copyCanvasImage(view.canvas.current).then((ok) => info(ok ? t('network.imageCopied') : t('network.imageFailed'))) },
+            ],
+          },
+          chrome.model,
+        ]}
+      />
       {error ? <ErrorNote testId="net-error">{errorMessage(error, t)}</ErrorNote> : null}
-      {note && (
-        <p className="hint" role="status" data-testid="net-note">
-          {note.text}
-          {note.only && (
-            <>
-              {' · '}
-              <button type="button" className="link" onClick={() => onStart({ kind: note.only!.kind, id: note.only!.id, label: note.only!.label })} data-testid="net-only-these">
-                {t('network.net.onlyThese')}
-              </button>
-            </>
-          )}
-        </p>
-      )}
-      {surprise && (
-        <p className="surprise-note" role="status" data-testid="net-surprise-note">
-          {t('network.net.surprise', { terms: surprise.terms.slice(0, 5).map(safeText).join(', ') || '—' })}{' '}
-          <button type="button" className="link" onClick={() => setSurprise(null)}>
-            {t('common.close')}
-          </button>
-        </p>
-      )}
-      {count === 0 ? (
+      {count === 0 && (
         <EmptyState
-          icon={<span>◌</span>}
+          icon={<MapIllustration />}
           title={t('network.net.emptyTitle')}
           action={
             chips.length > 0 ? (
@@ -852,10 +895,8 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
         >
           <span data-testid="net-empty">{t('network.net.empty')}</span>
         </EmptyState>
-      ) : (
-        <p className="hint">{t('network.net.help')}</p>
       )}
-      <div className="map-wrap net-wrap">
+      <div className="map-wrap net-wrap" hidden={count === 0}>
         <canvas
           ref={view.canvas}
           className="map-canvas"
@@ -873,6 +914,17 @@ export function GraphNet({ start, scopes, selectedDoc, selectedDocLabel, onSelec
         <span className="visually-hidden" aria-live="polite" data-testid="net-focus">
           {announce}
         </span>
+        {pill}
+        <div className="net-legend-box">
+          <span className="hint" data-testid="net-count" data-count={count} aria-live="polite">
+            {t('network.net.count', { count })}
+          </span>
+          <span className="net-key" aria-label={t('network.net.legend')} data-testid="net-legend">
+            <span className="key-doc">{t('network.net.docNode')}</span>
+            <span className="key-folder">{t('network.net.folderNode')}</span>
+            <span className="key-tag">{t('network.net.tagNode')}</span>
+          </span>
+        </div>
         {hovered && hover && (
           <HoverCard x={hover.x} y={hover.y} width={view.size.current.w} height={view.size.current.h} testId="net-tooltip">
             {hovered.kind === 'doc' ? (

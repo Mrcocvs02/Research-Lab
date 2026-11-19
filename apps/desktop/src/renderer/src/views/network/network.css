@@ -554,3 +554,282 @@
     transition: none;
   }
 }
+
+/* Simplified Map (§4.22): one row over a full-height canvas; the rest in chips, popovers, pills and the one `⋯`. */
+.net-head {
+  flex-wrap: nowrap;
+}
+.net-head h1 {
+  flex: none;
+}
+.net-build {
+  flex: none;
+  flex-wrap: nowrap;
+  margin-left: auto;
+}
+.net-head-slot {
+  display: inline-flex;
+}
+.net-more {
+  min-width: 32px;
+  height: 32px;
+  font-size: 18px;
+}
+.net-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.net-tabs {
+  flex: none;
+}
+.net-row-slot {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.net-row-slot > .map-actions {
+  margin-left: auto;
+  flex: none;
+}
+.net-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  height: var(--h-sm, 28px);
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-pill, 999px);
+  background: var(--surface);
+  font-size: var(--fs-small, 13px);
+}
+.net-chip.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.net-chip .chip-prefix {
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+.net-pop-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+.net-pop-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.net-pop-row input[type='range'] {
+  accent-color: var(--accent);
+}
+.net-pop-sec {
+  font-size: var(--fs-caption, 12px);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mode-menu {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2);
+}
+.mode-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  border: 0;
+  background: none;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: var(--r-sm, 6px);
+}
+.mode-item:hover,
+.mode-item.on {
+  background: var(--accent-soft);
+}
+.mode-name {
+  font-weight: 600;
+}
+.mode-key {
+  padding: 6px 10px 2px;
+  text-align: right;
+}
+.nodesearch input {
+  min-width: 0;
+  width: 170px;
+}
+@media (max-width: 1100px) {
+  .net-chip .chip-prefix {
+    display: none;
+  }
+  .nodesearch input {
+    width: 34px;
+    padding-left: 8px;
+    padding-right: 0;
+    cursor: pointer;
+    transition: width var(--dur) var(--ease);
+  }
+  .nodesearch input::placeholder {
+    color: transparent;
+  }
+  .nodesearch input:focus {
+    width: 200px;
+    cursor: text;
+    position: relative;
+    z-index: 6;
+  }
+  .nodesearch input:focus::placeholder {
+    color: var(--text-muted);
+  }
+}
+.map-pill {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 4;
+  max-width: min(520px, calc(100% - 20px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: var(--r-pill, 999px);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--e-1);
+  font-size: var(--fs-small, 13px);
+}
+.map-pill .pill-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pill-x {
+  flex: none;
+  padding: 0 2px;
+}
+.map-body .map-wrap,
+.net-wrap {
+  min-height: 320px;
+}
+.map-wrap .legend {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 3;
+  width: 240px;
+  max-height: calc(100% - 24px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: var(--r-md, 10px);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  border: 1px solid var(--border);
+}
+.legend li {
+  min-width: 0;
+}
+.legend-item {
+  min-width: 0;
+}
+.legend-more {
+  padding: 2px 6px;
+}
+.net-legend-box {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 3;
+  max-width: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: var(--r-md, 10px);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  border: 1px solid var(--border);
+  font-size: var(--fs-small, 13px);
+}
+.net-legend-box .net-key {
+  gap: var(--space-2);
+}
+.explore-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.explore-row .explore-node {
+  border-bottom: 0;
+  flex: 1;
+  min-width: 0;
+}
+.explore-actions {
+  flex: none;
+  display: inline-flex;
+  gap: var(--space-2);
+  padding-right: var(--space-2);
+}
+.explore-empty-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pair-row {
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.pair-main {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.pair-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--text);
+  font-size: var(--fs-body, 14px);
+  text-align: left;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.pair-link:hover {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+.pair-score {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.pair-show {
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.pair-row:hover .pair-show,
+.pair-show:focus-visible {
+  opacity: 1;
+}
+.pair-terms {
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pair-show,
+  .nodesearch input {
+    transition: none;
+  }
+}

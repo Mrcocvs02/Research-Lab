@@ -43,10 +43,12 @@ interface Props {
   onExplore?(): void;
   onBuild?(): void;
   onInfo?(i: { topics: number } | null): void;
+  /** "Show on the map" from the unexpected neighbours: the same highlight as the surprise. */
+  highlight?: { a: string; b: string; terms: string[]; nonce: number } | null;
 }
 
 /** The map tab: scope, level, the canvas, the legend of clusters and the labels by Claude. */
-export function MapPanel({ active, status, mapVersion, scopes, selected, onSelect, onMapChanged, onRead, onExplore, onBuild, onInfo }: Props) {
+export function MapPanel({ active, status, mapVersion, scopes, selected, onSelect, onMapChanged, onRead, onExplore, onBuild, onInfo, highlight }: Props) {
   const { t } = useTranslation();
   const { openExport } = useAiUi();
   const [kind, setKind] = useState<ScopeKind>('all');
@@ -152,6 +154,17 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     onInfo?.(map ? { topics } : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, topics]);
+
+  const lastHighlight = useRef(0);
+  useEffect(() => {
+    if (!highlight || highlight.nonce === lastHighlight.current || !map) return;
+    const run = setTimeout(() => {
+      lastHighlight.current = highlight.nonce;
+      handle.current?.surprise(highlight.a, highlight.b);
+      setSurprise({ terms: highlight.terms });
+    }, 80);
+    return () => clearTimeout(run);
+  }, [highlight, map]);
 
   const yearsActive = !!years && !!yearBounds && (years[0] > yearBounds[0] || years[1] < yearBounds[1]);
   const filterCount = (kind !== 'all' ? 1 : 0) + (yearsActive ? 1 : 0);

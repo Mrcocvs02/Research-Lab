@@ -12,6 +12,7 @@ import { AppProvider } from '../../state/app-context';
 import { ExportProbe } from '../../testing/exportProbe';
 import { callsTo, emitEvent, memoryBackend, setHandlers } from '../../testing/mockRl';
 import { Explore } from './Explore';
+import { ChromeCtx } from './NetChrome';
 import { MAX_NET_NODES, Network } from './forceSim';
 import { boundsOf, fitView, PointGrid, placeLabels, toScreenX, toWorldX, zoomAt } from './geometry';
 import { NetworkView } from './NetworkView';
@@ -333,7 +334,10 @@ describe('Explore', () => {
   };
 
   it('zooms down, keeps the selection when going back and switches dimension from a node', async () => {
-    await mount(createElement(Explore, { selectedDoc: null, onOpenDoc: () => undefined }), {
+    const row = document.createElement('div');
+    document.body.appendChild(row);
+    const noop = () => undefined;
+    await mount(createElement(ChromeCtx.Provider, { value: { head: null, row, model: { id: 'model', items: [] } } }, createElement(Explore, { active: true, selectedDoc: null, onOpenDoc: noop, onBuild: noop, onAddData: noop, onTags: noop })), {
       'explore:level': (p: any) => (p.dimension === 'author' ? nodes['@author'] : nodes[p.parentId ?? '']),
       'explore:documents': () => ({ docIds: [], total: 0 }),
       'explore:related': () => ({ nodes: [{ id: 'author:x', label: 'Author X', kind: 'author', count: 2, hasChildren: false, score: 0.8, path: [{ id: 'author:x', label: 'Author X' }] }] }),

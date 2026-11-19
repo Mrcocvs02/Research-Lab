@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Segmented } from '../../components/Segmented';
+import { Kbd } from '../../components/Kbd';
+import { ChipPop } from './NetChrome';
 import { useApp } from '../../state/app-context';
 import { EntityNet, type EmptyKind } from './EntityNet';
 import type { EntityNetwork, EntityNode, NetMode } from './entityTypes';
 import { MODES } from './entityTypes';
 import { GraphNet, type NetStart } from './GraphNet';
+import type { NetCtl } from './NetworkView';
 import { mapAction } from './mapKeyboard';
 import type { ScopeOptions } from './useScopes';
 
@@ -13,6 +15,8 @@ import type { ScopeOptions } from './useScopes';
 const modeOf = new Map<string, NetMode>();
 
 interface Props {
+  active: boolean;
+  onCtl(c: NetCtl | null): void;
   start: NetStart | null;
   scopes: ScopeOptions;
   selectedDoc: string | null;
@@ -33,7 +37,7 @@ interface Props {
  * The Links tab: one control for the mode ("Network of: Documents, Tags, Topics, Authors", `M` for the next), then the network
  * of documents or of entities. Only the mode shown is mounted; the mode is kept per library for the session.
  */
-export function LinksPanel({ start, scopes, selectedDoc, selectedDocLabel, selectedEntityId, onSelectDoc, onSelectEntity, onData, onStart, onExplore, onEmpty, mapVersion, mapReady }: Props) {
+export function LinksPanel({ active, onCtl, start, scopes, selectedDoc, selectedDocLabel, selectedEntityId, onSelectDoc, onSelectEntity, onData, onStart, onExplore, onEmpty, mapVersion, mapReady }: Props) {
   const { t } = useTranslation();
   const lib = useApp().activeLibraryId ?? '';
   const [mode, setModeState] = useState<NetMode>(() => modeOf.get(lib) ?? 'doc');
@@ -52,23 +56,16 @@ export function LinksPanel({ start, scopes, selectedDoc, selectedDocLabel, selec
     setMode(MODES[(MODES.indexOf(mode) + 1) % MODES.length]!);
   };
 
+  const chip = <ModeChip mode={mode} onChange={setMode} />;
   return (
     <div className="links-panel" ref={box} onKeyDown={onKeyDown} data-testid="links-panel" data-mode={mode}>
-      <div className="net-toolbar mode-bar">
-        <span className="mode-label">{t('network.mode.label')}</span>
-        <Segmented<NetMode>
-          label={t('network.mode.label')}
-          value={mode}
-          onChange={setMode}
-          options={MODES.map((m) => ({ value: m, label: t(`network.mode.${m}`), testId: `net-mode-${m}` }))}
-        />
-        <span className="hint">{t('network.mode.hint')}</span>
-      </div>
       {mode === 'doc' ? (
-        <GraphNet start={start} scopes={scopes} selectedDoc={selectedDoc} selectedDocLabel={selectedDocLabel} onSelectDoc={onSelectDoc} onStart={onStart} onExplore={() => onExplore('topic')} />
+        <GraphNet active={active} modeChip={chip} start={start} scopes={scopes} selectedDoc={selectedDoc} selectedDocLabel={selectedDocLabel} onSelectDoc={onSelectDoc} onStart={onStart} onExplore={() => onExplore('topic')} onCtl={onCtl} />
       ) : (
         <EntityNet
           key={mode}
+          active={active}
+          modeChip={chip}
           mode={mode}
           scopes={scopes}
           selectedId={selectedEntityId}
@@ -82,5 +79,27 @@ export function LinksPanel({ start, scopes, selectedDoc, selectedDocLabel, selec
         />
       )}
     </div>
+  );
+}
+
+/** "Network of: Documents ▾": a menu of the four modes, each with a sentence, `M` written on the right. */
+function ModeChip({ mode, onChange }: { mode: NetMode; onChange(m: NetMode): void }) {
+  const { t } = useTranslation();
+  return (
+    <ChipPop label={t(`network.mode.${mode}`)} prefix={t('network.mode.label')} testId="net-mode" width={320}>
+      {(close) => (
+        <div role="menu" aria-label={t('network.mode.label')} className="mode-menu">
+          {MODES.map((m) => (
+            <button key={m} type="button" role="menuitemradio" aria-checked={m === mode} className={m === mode ? 'mode-item on' : 'mode-item'} onClick={() => (onChange(m), close())} data-testid={`net-mode-${m}`}>
+              <span className="mode-name">{t(`network.mode.${m}`)}</span>
+              <span className="hint">{t(`network.mode.${m}Sentence`)}</span>
+            </button>
+          ))}
+          <div className="hint mode-key">
+            <Kbd>M</Kbd> {t('network.mode.hint')}
+          </div>
+        </div>
+      )}
+    </ChipPop>
   );
 }

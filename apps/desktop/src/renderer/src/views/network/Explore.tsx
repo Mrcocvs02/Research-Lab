@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
+import { EmptyState } from '../../components/EmptyState';
 import { ErrorNote } from '../../components/ui';
+import { MapIllustration, RowPortal } from './NetChrome';
 import { errorMessage } from '../../lib/errors';
 import { rl } from '../../lib/rl';
 import { RlError } from '../../lib/rl-error';
@@ -82,6 +84,10 @@ function Docs({ dim, id, onOpen, selectedDoc }: { dim: Dim; id: string; onOpen(d
 }
 
 interface Props {
+  active: boolean;
+  onBuild(): void;
+  onAddData(): void;
+  onTags(): void;
   selectedDoc: string | null;
   onOpenDoc(docId: string): void;
   /** `L` on the map: show this dimension (a new `nonce` asks again). */
@@ -93,7 +99,7 @@ interface Props {
  * depth), the breadcrumb and Back keep the way down, the selection and the scroll position of every level, and a node
  * leads to its documents or, through "Related", to the nodes of another dimension aligned on it (Back returns to the start).
  */
-export function Explore({ selectedDoc, onOpenDoc, dimRequest }: Props) {
+export function Explore({ active, onAddData, onTags, selectedDoc, onOpenDoc, dimRequest }: Props) {
   const { t } = useTranslation();
   const [loc, setLoc] = useState<Loc>({ dim: 'topic', parentId: null, selected: null });
   const [back, setBack] = useState<BackEntry[]>([]);
@@ -101,6 +107,7 @@ export function Explore({ selectedDoc, onOpenDoc, dimRequest }: Props) {
   const [error, setError] = useState<unknown>(null);
   const [rel, setRel] = useState<RelState | null>(null);
   const [relError, setRelError] = useState<unknown>(null);
+  const [hoverId, setHoverId] = useState<string | null>(null);
   const cache = useRef(new Map<string, Level>());
   const asked = useRef(0);
   useEffect(() => {
@@ -108,6 +115,28 @@ export function Explore({ selectedDoc, onOpenDoc, dimRequest }: Props) {
     asked.current = dimRequest.nonce;
     setLoc({ dim: dimRequest.dim, parentId: null, selected: null });
   }, [dimRequest]);
+  // The first visit opens on the first dimension that has something: Themes, then Authors, then Venues.
+  const probed = useRef(false);
+  useEffect(() => {
+    if (probed.current) return;
+    probed.current = true;
+    let live = true;
+    (async () => {
+      for (const d of DIMS) {
+        try {
+          const r = await rl.invoke('explore:level', { dimension: d, parentId: null });
+          if (!live || asked.current > 0) return;
+          cache.current.set(locKey(d, null), { ...r, key: locKey(d, null) });
+          if (r.nodes.length > 0) return void (d !== 'topic' && setLoc({ dim: d, parentId: null, selected: null }));
+        } catch {
+          /* try the next one */
+        }
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
   const scroll = useRef(new Map<string, number>());
   const list = useRef<HTMLUListElement>(null);
   const key = locKey(loc.dim, loc.parentId);
@@ -179,8 +208,8 @@ export function Explore({ selectedDoc, onOpenDoc, dimRequest }: Props) {
   // The documents shown are those of the chosen node, or else of the node being explored.
   const docsOf = selNode ? selNode.id : (pathLast?.id ?? null);
 
-  const relate = async (to: Dim) => {
-    const from = selNode ?? (pathLast ? { id: pathLast.id, label: pathLast.label } : null);
+  const relate = async (to: Dim, row?: ENode) => {
+    const from = row ?? selNode ?? (pathLast ? { id: pathLast.id, label: pathLast.label } : null);
     if (!from) return;
     setRelError(null);
     try {
@@ -201,18 +230,20 @@ export function Explore({ selectedDoc, onOpenDoc, dimRequest }: Props) {
 
   return (
     <div className="net-tab explore-tab" onKeyDown={(e) => e.key === 'Escape' && rel && setRel(null)} data-testid="explore-panel" data-dim={loc.dim} data-depth={ready ? data.path.length : 0}>
-      <div className="net-toolbar">
-        <div role="tablist" aria-label={t('network.explore.dimension')} className="seg">
+      <RowPortal active={active}>
+        <div role="tablist" aria-label={t('network.explore.dimension')} className="rl-seg rl-seg--sm">
           {DIMS.map((d) => (
-            <button key={d} type="button" role="tab" aria-selected={loc.dim === d} className={loc.dim === d ? 'tab on' : 'tab'} onClick={() => loc.dim !== d && go({ dim: d, parentId: null, selected: null })} data-testid={`explore-dim-${d}`}>
+            <button key={d} type="button" role="tab" aria-selected={loc.dim === d} className={loc.dim === d ? 'rl-seg__opt is-on' : 'rl-seg__opt'} onClick={() => loc.dim !== d && go({ dim: d, parentId: null, selected: null })} data-testid={`explore-dim-${d}`}>
               {t(`network.dim.${d}`)}
             </button>
           ))}
         </div>
-        <button type="button" onClick={goBack} disabled={!topBack} data-testid="explore-back" title={topBack ? t('network.explore.backTo', { label: topBack.label }) : undefined}>
-          {topBack ? t('network.explore.backTo', { label: safeText(topBack.label) }) : t('network.explore.back')}
-        </button>
-      </div>
+        {topBack && loc.parentId !== null && (
+          <button type="button" onClick={goBack} data-testid="explore-back" title={t('network.explore.backTo', { label: topBack.label })}>
+            {t('network.explore.back')}
+          </button>
+        )}
+      </RowPortal>
       <nav aria-label={t('network.explore.breadcrumb')} data-testid="explore-breadcrumb">
         <ol className="crumbs">
           <li>
@@ -272,7 +303,29 @@ export function Explore({ selectedDoc, onOpenDoc, dimRequest }: Props) {
           ) : (
             <>
               {!ready && !error && <p className="hint">{t('common.loading')}</p>}
-              {ready && nodes.length === 0 && <p className="hint" data-testid="explore-empty">{t('network.explore.empty')}</p>}
+              {ready && nodes.length === 0 && loc.parentId === null && (
+                <div className="explore-empty-box" data-testid="explore-empty">
+                  <EmptyState
+                    icon={<MapIllustration />}
+                    title={t(`network.explore.emptyTitle.${loc.dim}`)}
+                    action={
+                      <>
+                        <button type="button" className="primary" onClick={loc.dim === 'topic' ? onTags : onAddData} data-testid="explore-empty-action">
+                          {loc.dim === 'topic' ? t('network.explore.createTags') : t('network.ent.empty.review.action')}
+                        </button>
+                        {loc.dim !== 'author' && (
+                          <button type="button" className="link" onClick={() => go({ dim: 'author', parentId: null, selected: null })} data-testid="explore-empty-authors">
+                            {t('network.explore.byAuthors')}
+                          </button>
+                        )}
+                      </>
+                    }
+                  >
+                    {t(`network.explore.emptyText.${loc.dim}`)}
+                  </EmptyState>
+                </div>
+              )}
+              {ready && nodes.length === 0 && loc.parentId !== null && <p className="hint">{t('network.explore.leaf')}</p>}
               <ul
                 className="explore-list"
                 ref={list}
@@ -281,7 +334,7 @@ export function Explore({ selectedDoc, onOpenDoc, dimRequest }: Props) {
                 data-testid="explore-nodes"
               >
                 {nodes.map((n) => (
-                  <li key={n.id}>
+                  <li key={n.id} className="explore-row" onMouseEnter={() => setHoverId(n.id)} onMouseLeave={() => setHoverId((h) => (h === n.id ? null : h))} onFocus={() => setHoverId(n.id)}>
                     <button
                       type="button"
                       className={n.id === loc.selected ? 'explore-node on' : 'explore-node'}
@@ -299,23 +352,24 @@ export function Explore({ selectedDoc, onOpenDoc, dimRequest }: Props) {
                       </span>
                       {n.hasChildren && <span aria-hidden="true">▸</span>}
                     </button>
+                    {(n.id === loc.selected || n.id === hoverId) && (
+                      <span className="explore-actions" data-testid="explore-actions">
+                        {n.hasChildren && (
+                          <button type="button" onClick={() => go({ dim: loc.dim, parentId: n.id, selected: null })} data-testid="explore-zoom">
+                            {t('network.explore.zoomIn')}
+                          </button>
+                        )}
+                        {others.map((d) => (
+                          <button key={d} type="button" onClick={() => void relate(d, n)} data-testid={`explore-related-${d}`}>
+                            {t('network.explore.showRelated', { dim: t(`network.dim.${d}`) })}
+                          </button>
+                        ))}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
             </>
-          )}
-          {!rel && (
-            <div className="net-toolbar explore-actions" data-testid="explore-actions">
-              <button type="button" onClick={() => selNode && go({ dim: loc.dim, parentId: selNode.id, selected: null })} disabled={!selNode?.hasChildren} data-testid="explore-zoom">
-                {t('network.explore.zoomIn')}
-              </button>
-              <span className="hint">{t('network.explore.relatedLabel')}</span>
-              {others.map((d) => (
-                <button key={d} type="button" onClick={() => void relate(d)} disabled={!selNode && !pathLast} data-testid={`explore-related-${d}`}>
-                  {t(`network.dim.${d}`)}
-                </button>
-              ))}
-            </div>
           )}
         </div>
         {docsOf !== null && !rel && <Docs key={`${loc.dim}|${docsOf}`} dim={loc.dim} id={docsOf} onOpen={onOpenDoc} selectedDoc={selectedDoc} />}

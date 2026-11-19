@@ -3,7 +3,6 @@
     "level": "Level {{level}}",
     "colorBy": "Colour by",
     "fit": "Show all",
-    "mapInfo": "{{count}} documents · seed {{seed}}",
     "noMap": "The map is not available yet.",
     "noPoints": "No document in this scope.",
     "mapLabel": "Map of the documents: drag to move, wheel or plus and minus to zoom, click a point to select it, or press ] and [ to go through the points in view and Enter to select.",
@@ -54,7 +53,8 @@
       "folder": "Folder",
       "project": "Project",
       "tag": "Tag",
-      "pick": "Choose…"
+      "pick": "Choose…",
+      "active": "Scope on"
     },
     "labels": {
       "open": "Label clusters with Claude",
@@ -110,7 +110,14 @@
       "onlyThese": "Show only these",
       "announce": "{{name}}, {{kind}}, {{links}} links",
       "surprise": "Close in content, far in topics. Words in common: {{terms}}.",
-      "emptyTitle": "Choose a document to start from"
+      "emptyTitle": "Choose a document to start from",
+      "notExpanded": "The node is not expanded.",
+      "removeFromNet": "Remove from the network",
+      "showInNet": "Show in the network",
+      "resetNet": "Reset the network",
+      "startFrom": "Start from",
+      "eachExpansion": "At each expansion",
+      "fromDocNamed": "Chosen document: {{title}}"
     },
     "explore": {
       "documents": "Documents",
@@ -134,7 +141,21 @@
       },
       "count": "Documents",
       "zoomIn": "Zoom in",
-      "relatedLabel": "Show related:"
+      "relatedLabel": "Show related:",
+      "emptyTitle": {
+        "topic": "No topic",
+        "author": "No author",
+        "venue": "No venue"
+      },
+      "emptyText": {
+        "topic": "Topics come from tags: add some to a few documents.",
+        "author": "The documents have no authors in the data.",
+        "venue": "No venue in the data of the documents."
+      },
+      "createTags": "Create the first tags",
+      "byAuthors": "Explore by authors",
+      "leaf": "This level has no more nodes.",
+      "showRelated": "Show {{dim}}"
     },
     "dim": {
       "topic": "Topics",
@@ -156,7 +177,11 @@
       "none": "No similar papers found.",
       "surprisingTitle": "Close but do not look it",
       "surprisingHint": "Similar in content, yet with no shared tag, citation or folder.",
-      "noSurprising": "No unexpected pairs found."
+      "noSurprising": "Documents with text are needed to find some.",
+      "noSurprisingTitle": "No unexpected neighbours",
+      "backToMap": "Back to the Panorama",
+      "showOnMap": "Show on the map",
+      "commonWords": "Words in common: {{terms}}"
     },
     "roleMap": "map",
     "announce": {
@@ -181,14 +206,18 @@
     },
     "noMapTitle": "Build the map of your documents",
     "mapFiltered": "{{from}} → {{to}} documents",
-    "fewDocs": "The map needs at least 3 documents to show anything useful. Add PDFs to the library and build it again.",
+    "fewDocs": "The map makes sense from 3 documents up: add PDFs to the library and build it again.",
     "mode": {
       "label": "Network of:",
       "doc": "Documents",
       "tag": "Tags",
       "topic": "Topics",
       "author": "Authors",
-      "hint": "M changes mode"
+      "hint": "M changes mode",
+      "docSentence": "Documents linked by similarity, citations and tags.",
+      "tagSentence": "Tags that appear together in the same documents.",
+      "topicSentence": "The topics of the Panorama and how close they are.",
+      "authorSentence": "Authors who signed together."
     },
     "ent": {
       "groupOf": "Group of {{name}}",
@@ -258,8 +287,8 @@
           "action": "Complete the data"
         },
         "few": {
-          "title": "Widen the filters",
-          "text": "Fewer than 3 nodes pass the filters.",
+          "title": "No result with these filters",
+          "text": "With at least {{min}} documents there are {{count}}.",
           "action": "Clear the filters"
         }
       },
@@ -280,17 +309,56 @@
       "sizeBy_equal": "All the same",
       "sharedThemes": "Show shared themes",
       "cutHint": "beyond the limit",
-      "cutShown": "Shown without its links: it is beyond the {{limit}} nodes the network can carry."
+      "cutShown": "Shown without its links: it is beyond the {{limit}} nodes the network can carry.",
+      "lowered": "Also showing {{kind}} with 1 document."
     },
     "bridge": {
       "find": "Find a bridge…",
       "pickSecond": "Click the second document for a bridge with “{{title}}”",
-      "note": "Bridge: {{a}} ⇢ work ⇢ {{b}}"
+      "note": "Bridge: {{a}} ⇢ work ⇢ {{b}}",
+      "findWith": "Find a bridge with…",
+      "pickSecondShort": "Click the second document for the bridge"
     },
     "timeline": {
       "byYear": "Arrange by year",
       "label": "By year · Esc to exit",
       "noYear": "No year"
+    },
+    "untitled": "Untitled document",
+    "hint": "Drag, wheel to zoom, double-click to open",
+    "filters": "Filters",
+    "look": "Look",
+    "start": "Start",
+    "copyImage": "Copy as image",
+    "imageCopied": "Image copied to the clipboard.",
+    "imageFailed": "The image could not be copied.",
+    "updateMap": "Update the map",
+    "rebuildMap": "Rebuild the map",
+    "rebuildBusy": "A build is already running.",
+    "fewTitle": "At least 3 documents are needed",
+    "addPdf": "+ Add PDFs",
+    "noPointsTitle": "No document in this scope",
+    "clearScope": "Clear the scope",
+    "noModel": {
+      "title": "The map of your documents",
+      "text": "It is still to be built: it takes little time, depending on the number of documents, and nothing goes online."
+    },
+    "options": {
+      "open": "Model options…",
+      "title": "Model options",
+      "seedHelp": "The same seed gives the same layout. Leave empty to pick it automatically."
+    },
+    "head": {
+      "none": "Map not built",
+      "stale_one": "{{count}} new document",
+      "stale_other": "{{count}} new documents",
+      "removed_one": "{{count}} document removed",
+      "removed_other": "{{count}} documents removed",
+      "documents_one": "{{count}} document",
+      "documents_other": "{{count}} documents",
+      "topics_one": "{{count}} topic",
+      "topics_other": "{{count}} topics",
+      "updated": "updated {{date}}"
     }
   }
 }

@@ -21,6 +21,8 @@ export interface BibImportResult {
   notes: number;
   queued: number;
   notImported: Array<{ label: string; reason: string }>;
+  /** Imported tag names (D-497): already in the vocabulary, merged into a similar tag, new loose tags. */
+  tagSummary?: { total: number; known: number; merged: number; fresh: number };
 }
 export interface BibStatus {
   linked: boolean;

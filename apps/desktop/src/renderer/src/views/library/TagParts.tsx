@@ -1,7 +1,7 @@
 import { useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { safeText } from './safeText';
-import { canCreateTag, suggestTags } from './tagSuggest';
+import { canCreateTag, similarTag, suggestTags } from './tagSuggest';
 import type { TaxonomyModel } from './taxonomyModel';
 import './library.css';
 
@@ -15,6 +15,9 @@ export function TagChip({
   removeLabel,
   testId,
   id,
+  origin,
+  originTitle,
+  onConfirm,
 }: {
   label: string;
   color?: string | undefined;
@@ -24,12 +27,22 @@ export function TagChip({
   removeLabel?: string | undefined;
   testId?: string | undefined;
   id?: string | undefined;
+  /** Provenance (D-494): a tag the AI proposed and the user accepted, or one that came from an import; none for a tag set by hand. */
+  origin?: 'ai' | 'import' | undefined;
+  originTitle?: string | undefined;
+  /** "Confirm": the user vouches for the tag, which then loses the mark. */
+  onConfirm?: (() => void) | undefined;
 }) {
   const style = color ? ({ '--tag': color } as CSSProperties) : undefined;
   const classes = ['tag', color ? 'tag-colored' : '', deprecated ? 'tag-deprecated' : '', excluded ? 'tag-excluded' : ''].filter(Boolean).join(' ');
   return (
     <span className={classes} style={style} data-testid={testId ?? 'tag-chip'} data-tag={id}>
       <span className="tag-label">{safeText(label)}</span>
+      {origin && (
+        <span className="tag-origin" data-testid="tag-origin" data-origin={origin} title={originTitle} onClick={onConfirm} role={onConfirm ? 'button' : undefined}>
+          {origin === 'ai' ? '✦' : '⇣'}
+        </span>
+      )}
       {onRemove && (
         <button type="button" className="tag-remove" aria-label={removeLabel} title={removeLabel} onClick={onRemove}>
           <span aria-hidden="true">×</span>
@@ -69,6 +82,8 @@ export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaL
 
   const suggestions = useMemo(() => suggestTags(model, text, exclude ? { exclude } : {}), [model, text, exclude]);
   const create = onCreate !== undefined && canCreateTag(model, text);
+  // Before a new tag: a tag that is the same name written differently is offered instead (D-497).
+  const similar = create ? similarTag(model, text) : null;
   const options = [...suggestions.map((s) => ({ kind: 'tag' as const, s })), ...(create ? [{ kind: 'create' as const, label: text.trim() }] : [])];
   const activeIndex = Math.min(active, options.length - 1);
 
@@ -145,6 +160,14 @@ export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaL
         onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}
       />
+      {similar && open && !exclude?.has(similar.id) && (
+        <p className="tag-similar hint" data-testid="tag-picker-similar">
+          {t('tags.similar', { name: safeText(similar.label), defaultValue: 'Similar to: {{name}}' })}{' '}
+          <button type="button" className="link" onMouseDown={(e) => { e.preventDefault(); onPick(similar.id); reset(); }}>
+            {t('tags.useSimilar', { name: safeText(similar.label), defaultValue: 'Use {{name}}' })}
+          </button>
+        </p>
+      )}
       <ul id={listId} role="listbox" className="tag-options" hidden={!showList} data-testid="tag-options">
         {showList && options.map((o, i) => (
           <li

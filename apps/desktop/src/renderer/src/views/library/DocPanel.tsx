@@ -27,6 +27,7 @@ import { baseName } from './fileName';
 import { formatSize } from './formatSize';
 import { safeText } from './safeText';
 import { TagChip, TagPicker } from './TagParts';
+import { oneFamilyRemoval, tagRowsOf } from './tagRows';
 import { resolveId } from './taxonomyModel';
 import type { DocRow } from './useDocumentList';
 import { useTaxonomy } from './useTaxonomy';
@@ -393,6 +394,8 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
   const venues = view?.venues ?? [];
   const types = view?.documentTypes ?? [];
   const tagSet = useMemo(() => new Set(doc?.tags ?? []), [doc?.tags]);
+  const tagRows = useMemo(() => tagRowsOf(model, doc?.tags ?? []), [model, doc?.tags]);
+  const [showKeywords, setShowKeywords] = useState(false);
 
   if (error && !doc) return <ErrorNote>{errorMessage(error, t)}</ErrorNote>;
   if (!doc) return <p className="hint">{t('common.loading')}</p>;
@@ -490,19 +493,41 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
         <span className="card-state__label">{t('doc.tags')}</span>
         <div className="tag-list" data-testid="doc-tag-list">
           {doc.tags.length === 0 && <span className="hint">{t('doc.noTags')}</span>}
-          {doc.tags.map((id) => {
-            const node = model.byId.get(resolveId(model, id));
-            return (
-              <TagChip key={id} id={id} label={node?.label ?? id} color={node?.color} deprecated={node?.status === 'deprecated'} removeLabel={t('tags.removeFrom', { name: node?.label ?? id })} onRemove={() => void tag([docId], { remove: [id] })} />
-            );
-          })}
+          {tagRows.map((row) => (
+            <div key={row.key} className="card-tags-family" data-testid="doc-tags-family" data-family={row.family ?? ''}>
+              {row.family !== null && <span className="card-tags-family__name">{safeText(row.family)}:</span>}
+              {(row.keywords && !showKeywords ? [] : row.ids).map((id) => {
+                const node = model.byId.get(resolveId(model, id));
+                const origin = doc.tagOrigin?.[id];
+                return (
+                  <TagChip
+                    key={id}
+                    id={id}
+                    label={node?.label ?? id}
+                    color={node?.color}
+                    deprecated={node?.status === 'deprecated'}
+                    origin={origin}
+                    originTitle={origin ? t(origin === 'ai' ? 'tags.originAi' : 'tags.originImport', { defaultValue: origin === 'ai' ? 'Proposed by the AI and accepted. Click to confirm.' : 'Imported. Click to confirm.' }) : undefined}
+                    onConfirm={origin ? () => void tag([docId], { add: [id] }) : undefined}
+                    removeLabel={t('tags.removeFrom', { name: node?.label ?? id })}
+                    onRemove={() => void tag([docId], { remove: [id] })}
+                  />
+                );
+              })}
+              {row.keywords && (
+                <button type="button" className="link" data-testid="doc-tags-keywords" onClick={() => setShowKeywords((v) => !v)}>
+                  {showKeywords ? t('library.hideKeywords', { defaultValue: 'Hide keywords' }) : t('library.moreKeywords', { count: row.ids.length, defaultValue: '+{{count}} keywords' })}
+                </button>
+              )}
+            </div>
+          ))}
         </div>
         <TagPicker
           model={model}
           exclude={tagSet}
           ariaLabel={t('tags.add')}
           placeholder={t('tags.addPlaceholder')}
-          onPick={(id) => void tag([docId], { add: [id] })}
+          onPick={(id) => void tag([docId], { add: [id], ...oneFamilyRemoval(model, doc.tags, id) })}
           onCreate={(label) => createAndAdd([docId], label)}
           testId="tag-input"
         />

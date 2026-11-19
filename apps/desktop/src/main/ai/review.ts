@@ -226,8 +226,13 @@ async function applyNow(s: MainServices, rt: LibraryRuntime, decisions: Decision
         const f = fieldOf(cur, p.key);
         if (!f || f.review.status !== 'proposed') throw new AppError('CONFLICT', 'This field is not waiting for a review', { conflict: 'not-proposed', reason: 'not-proposed' });
         const tags = [...cur.tags];
-        for (const t of tagIds) if (!tags.includes(t)) tags.push(t);
-        return { ...cur, tags, ai: { ...cur.ai, [p.key]: p.next }, updatedAt: now } as DocumentRecord;
+        const tagOrigin = { ...cur.tagOrigin };
+        for (const t of tagIds) {
+          if (tags.includes(t)) continue;
+          tags.push(t);
+          tagOrigin[t] = 'ai'; // provenance (D-494): an accepted AI proposal; a tag already there keeps its own
+        }
+        return { ...cur, tags, ...(Object.keys(tagOrigin).length > 0 ? { tagOrigin } : {}), ai: { ...cur.ai, [p.key]: p.next }, updatedAt: now } as DocumentRecord;
       });
       for (const n of nodeIds) usedNodes.add(n);
       await cs.appendLog({

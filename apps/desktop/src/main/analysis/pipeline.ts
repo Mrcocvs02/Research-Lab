@@ -23,12 +23,14 @@ import {
   noteSchema,
   planNote,
   retrieveCandidates,
+  vocabularyNodes,
   splitSections,
   type AnalysisClean,
   type AnalysisRaw,
   type CandidateNode,
   type Lang,
 } from '@rl/ai/analysis';
+import { labelResolver } from '../ai/vocab.js';
 import { callStructured, strongModel, type Runner } from './call.js';
 import { isApprovedNote, readNote, writeNote } from './note-store.js';
 
@@ -104,7 +106,9 @@ export async function analyseOne(a: AnalyseArgs): Promise<void> {
   let note = a.regenerate && !(await isApprovedNote(rt.store.dataDir, rec.id)) ? null : await readNote(rt.store.dataDir, rec.id);
   note ??= await generateNote(a);
   const tax = a.fields.includes('tags') ? await rt.store.readTaxonomy().catch(() => null) : null;
-  const nodes: CandidateNode[] = (tax?.nodes ?? []).filter((n) => n.status === 'active').map((n) => ({ id: n.id, label: n.label, aliases: n.aliases, definition: n.definition, parents: n.parents, implies: n.implies }));
+  const allNodes: CandidateNode[] = (tax?.nodes ?? []).filter((n) => n.status === 'active').map((n) => ({ id: n.id, label: n.label, aliases: n.aliases, definition: n.definition, parents: n.parents, implies: n.implies, family: n.family }));
+  // Only the values of the one/many families are offered (no keywords, no loose tags: D-493).
+  const nodes = vocabularyNodes(allNodes);
   // Tags need a taxonomy to choose from (D-446: taxonomy first); without one the other fields are still derived.
   const fields = a.fields.filter((f) => f !== 'tags' || nodes.length > 0);
   if (fields.length === 0) return;
@@ -117,10 +121,10 @@ export async function analyseOne(a: AnalyseArgs): Promise<void> {
     docIds: [rec.id],
     folders: [folderOf(rec.path)],
     system: analysisSystem(fields, lang),
-    prompt: analysisPrompt(fields, docMeta(rec), note, fields.includes('tags') ? candidateBlock(cands, nodes) : null),
+    prompt: analysisPrompt(fields, docMeta(rec), note, fields.includes('tags') ? candidateBlock(cands, allNodes) : null),
     schema: analysisSchema(fields),
   });
-  const clean = cleanAnalysis(value as AnalysisRaw, fields, tax);
+  const clean = cleanAnalysis(value as AnalysisRaw, fields, tax, { resolveLabels: await labelResolver(tax) });
   await a.write({ ...clean, ...(clean.scores ? { scores: clean.scores } : {}) }, meta);
   // Local, no model: the references of the work in order of relevance, now that its note exists.
   await import('./cite-rank.js').then((m) => m.rankCitationsFor(r.s, rt, rec.id)).catch((e: unknown) => r.s.log.warn('citation ranking failed', { error: e }));

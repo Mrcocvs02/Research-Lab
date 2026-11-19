@@ -157,36 +157,90 @@ export async function importRun(s: MainServices, req: ImportRequest, queueFiles:
       if (req.collections === 'tags') for (const c of e.collections) addLabel(c, docId);
     }
   }
+  // Imported tag names resolve to the vocabulary with the sure rules (D-497): a variant goes to the canonical tag and becomes its alias,
+  // the rest become new loose tags (origin `import`, convention name, the original as alias). Collections kept as tags sit under a
+  // "Collezioni" family. Documents get the provenance `import` (D-494).
+  const tagSummary = { total: 0, known: 0, merged: 0, fresh: 0 };
   if (wanted.size > 0) {
-    const nodeOf = new Map<string, string>();
+    const { resolveIncomingLabels, conventionName } = await import('@rl/data/tag-vocabulary');
+    const tagLabels = new Set<string>();
+    const colLabels = new Set<string>();
+    for (const es of byDoc.values()) for (const e of es) {
+      if (req.tags) for (const t of e.tags) tagLabels.add(t);
+      if (req.collections === 'tags') for (const c of e.collections) colLabels.add(c);
+    }
+    const nodeOf = new Map<string, string>(); // incoming label -> node id (tags and collections are separate namespaces below)
+    const colOf = new Map<string, string>();
     await cs.updateTaxonomy((tax) => {
-      const find = (l: string) => tax.nodes.find((n) => n.status !== 'deprecated' && [n.label, ...n.aliases].some((a) => a.toLowerCase() === l.toLowerCase()));
-      const nodes = [...tax.nodes];
-      let changed = false;
-      for (const l of wanted.keys()) {
-        const hit = find(l);
-        if (hit) nodeOf.set(l, hit.id);
-        else {
-          let id = hid('tag', l);
-          for (let n = 2; nodes.some((x) => x.id === id); n++) id = `${hid('tag', l)}-${n}`;
-          const node: TaxonomyNode = { id, label: l.slice(0, 200), parents: [], aliases: [], implies: [], status: 'active', origin: 'import', createdAt: new Date().toISOString() };
-          nodes.push(node);
-          nodeOf.set(l, id);
-          changed = true;
+      const nodes = tax.nodes.map((n) => ({ ...n }));
+      const newId = (l: string) => {
+        let id = hid('tag', l);
+        for (let n = 2; nodes.some((x) => x.id === id); n++) id = `${hid('tag', l)}-${n}`;
+        return id;
+      };
+      const now = new Date().toISOString();
+      const r = resolveIncomingLabels([...tagLabels], nodes);
+      const byId = new Map(nodes.map((n) => [n.id, n]));
+      const exactIds = new Set<string>();
+      for (const [l, id] of Object.entries(r.matched)) {
+        nodeOf.set(l, id);
+        if (r.aliasAdds.some((x) => x.alias === l)) {
+          const n = byId.get(id)!;
+          if (n.aliases.length < 50 && l.length <= 200) n.aliases = [...n.aliases, l];
+          tagSummary.merged++;
+        } else {
+          exactIds.add(l);
+          tagSummary.known++;
         }
       }
-      return changed ? { ...tax, nodes } : tax;
-    });
-    for (const [l, docs] of wanted) {
-      const id = nodeOf.get(l)!;
-      for (const docId of docs) {
-        await cs.documents.update(docId, (cur) => {
-          if (!cur) throw new AppError('NOT_FOUND', 'Unknown document');
-          if (cur.tags.includes(id)) return cur;
-          tagged++;
-          return { ...cur, tags: [...cur.tags, id], updatedAt: new Date().toISOString() };
-        });
+      for (const l of r.fresh) {
+        const id = newId(l);
+        const name = conventionName(l).slice(0, 200) || l.slice(0, 200);
+        const node: TaxonomyNode = { id, label: name, parents: [], aliases: name === l ? [] : [l.slice(0, 200)], implies: [], status: 'active', origin: 'import', createdAt: now };
+        nodes.push(node);
+        byId.set(id, node);
+        nodeOf.set(l, id);
+        tagSummary.fresh++;
       }
+      // Spelling duplicates of one fresh label (the resolver lists it once) share its node.
+      for (const l of tagLabels) if (!nodeOf.has(l)) {
+        const twin = [...tagLabels].find((x) => nodeOf.has(x) && x.normalize('NFKD').toLowerCase() === l.normalize('NFKD').toLowerCase());
+        if (twin) nodeOf.set(l, nodeOf.get(twin)!);
+      }
+      tagSummary.total = tagLabels.size;
+      if (colLabels.size > 0) {
+        let fam = nodes.find((n) => n.status !== 'deprecated' && n.parents.length === 0 && n.label.toLowerCase() === 'collezioni');
+        if (!fam) {
+          fam = { id: newId('collezioni'), label: 'Collezioni', parents: [], aliases: [], implies: [], status: 'active', origin: 'import', family: 'many', createdAt: now };
+          nodes.push(fam);
+        }
+        for (const l of colLabels) {
+          const hit = nodes.find((n) => n.status !== 'deprecated' && n.parents.includes(fam!.id) && n.label.toLowerCase() === l.toLowerCase());
+          if (hit) colOf.set(l, hit.id);
+          else {
+            const id = newId(`collezioni/${l}`);
+            nodes.push({ id, label: l.slice(0, 200), parents: [fam.id], aliases: [], implies: [], status: 'active', origin: 'import', createdAt: now });
+            colOf.set(l, id);
+          }
+        }
+      }
+      return JSON.stringify(nodes) === JSON.stringify(tax.nodes) ? tax : { ...tax, nodes };
+    });
+    for (const [docId, es] of byDoc) {
+      const ids = new Set<string>();
+      for (const e of es) {
+        if (req.tags) for (const t of e.tags) ids.add(nodeOf.get(t)!);
+        if (req.collections === 'tags') for (const c of e.collections) ids.add(colOf.get(c)!);
+      }
+      await cs.documents.update(docId, (cur) => {
+        if (!cur) throw new AppError('NOT_FOUND', 'Unknown document');
+        const add = [...ids].filter((id) => id && !cur.tags.includes(id));
+        if (add.length === 0) return cur;
+        tagged += add.length;
+        const tagOrigin = { ...cur.tagOrigin };
+        for (const id of add) tagOrigin[id] = 'import';
+        return { ...cur, tags: [...cur.tags, ...add], tagOrigin, updatedAt: new Date().toISOString() };
+      });
     }
   }
 
@@ -246,5 +300,5 @@ export async function importRun(s: MainServices, req: ImportRequest, queueFiles:
   if (wanted.size > 0) s.emit('library:changed', { kind: 'taxonomy' });
   if (projects > 0) s.emit('library:changed', { kind: 'projects' });
   sessions.delete(req.previewId);
-  return { changeId: ids.length + projects > 0 ? changeId : null, updated: ids.length, tagged, projects, notes, queued, notImported: notImported.slice(0, 500) };
+  return { changeId: ids.length + projects > 0 ? changeId : null, updated: ids.length, tagged, projects, notes, queued, notImported: notImported.slice(0, 500), ...(tagSummary.total > 0 ? { tagSummary } : {}) };
 }

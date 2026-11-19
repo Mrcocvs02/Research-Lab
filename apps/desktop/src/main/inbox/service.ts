@@ -705,7 +705,8 @@ export async function proposeTags(s: MainServices, aiCtx: AiCtx, req: { id: stri
   }
   await sendLog(result.usage.inputTokens, result.usage.outputTokens, usdOfUsage(cfg.ai.models, req.model, result.usage));
   if (run.controller.signal.aborted) throw new AppError('CANCELLED', 'Cancelled');
-  const clean = cleanSuggestion(result.value as SuggestRaw, ['tags'], prep.tax);
+  const { labelResolver } = await import('../ai/vocab.js');
+  const clean = cleanSuggestion(result.value as SuggestRaw, ['tags'], prep.tax, { resolveLabels: await labelResolver(prep.tax) });
   const meta: AiMeta = { ...result.meta, source: 'inbox:tags' };
   const ai = { tagIds: clean.tags ?? [], newTags: clean.newTags ?? [], meta };
   await c.store.update((draft) => {
@@ -830,6 +831,15 @@ export async function confirmItem(s: MainServices, req: ConfirmReq): Promise<{ d
   const cs = store.withChange({ changeId, summary: `Added to the library from the inbox: ${path.posix.basename(relPath)}`.slice(0, 480) });
   const idByLabel = new Map<string, string>();
   for (const n of snap.tax.nodes) for (const t of [n.label, ...n.aliases]) idByLabel.set(norm(t), n.id);
+  // A new tag that is a variant of an existing one by the sure rules is that tag (D-497), not a new node.
+  const stillNew = req.newTags.filter((t) => !idByLabel.has(norm(t.label)));
+  if (stillNew.length > 0) {
+    const near = (await (await import('../ai/vocab.js')).labelResolver(snap.tax))(stillNew.map((t) => t.label));
+    for (const t of stillNew) {
+      const hit = near[t.label];
+      if (hit !== undefined) idByLabel.set(norm(t.label), hit);
+    }
+  }
   const create = [...new Map(req.newTags.filter((t) => !idByLabel.has(norm(t.label))).map((t) => [norm(t.label), t])).entries()];
   const createdIds: string[] = [];
   /** A failure up to the document write undoes what this call made; after that write the confirmation stands. */
@@ -877,7 +887,12 @@ export async function confirmItem(s: MainServices, req: ConfirmReq): Promise<{ d
       if (Object.keys(ex).length === 0) delete next.extracted;
       else next.extracted = ex;
     }
-    for (const t of [...tagIds, ...newTagNodeIds]) if (!next.tags.includes(t)) next.tags.push(t);
+    for (const t of [...tagIds, ...newTagNodeIds]) {
+      if (next.tags.includes(t)) continue;
+      next.tags.push(t);
+      // Provenance (D-494): an accepted AI proposal is `ai`, a tag the user picked has no entry (by hand).
+      if (createdIds.includes(t) || entry.ai?.tagIds.includes(t)) next.tagOrigin = { ...next.tagOrigin, [t]: 'ai' };
+    }
     if (entry.ai) {
       const review = { status: 'accepted' as const, at: now };
       if (entry.ai.tagIds.length > 0) {

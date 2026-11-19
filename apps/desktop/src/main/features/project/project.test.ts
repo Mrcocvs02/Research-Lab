@@ -77,4 +77,12 @@ describe('prompts', () => {
     const refs = new Map([['R1', { docId: D1, title: 'A [paper]' }]]);
     expect(linkMarkers('It holds [R1]. Also [R9].', refs)).toBe(`It holds [A paper](lab://doc/${D1}). Also.`);
   });
+  it('keeps the previous report of the same day when another one is saved (I1)', async () => {
+    const d = await mkdtemp(path.join(os.tmpdir(), 'rl-rep-'));
+    await writeReport(d, 'p1', '2026-11-19', 'mine');
+    await writeReport(d, 'p1', '2026-11-19', 'new');
+    expect(await readFile(path.join(d, 'projects', 'p1', 'reports', '2026-11-19.prev.md'), 'utf8')).toBe('mine\n');
+    expect((await listReports(d, 'p1')).length).toBe(1);
+    await rm(d, { recursive: true, force: true });
+  });
 });

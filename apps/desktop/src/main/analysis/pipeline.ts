@@ -30,7 +30,7 @@ import {
   type Lang,
 } from '@rl/ai/analysis';
 import { callStructured, strongModel, type Runner } from './call.js';
-import { readNote, writeNote } from './note-store.js';
+import { isApprovedNote, readNote, writeNote } from './note-store.js';
 
 /** Pages read from a document for the note (a thesis can run to several hundred). */
 export const ANALYSIS_MAX_PAGES = 600;
@@ -55,6 +55,11 @@ export async function generateNote(a: AnalyseArgs): Promise<string> {
   const { r, rec } = a;
   const { rt, cfg } = r.ctx;
   const lang: Lang = cfg.language;
+  // A note the user approved is theirs: it is used as it is, never regenerated or overwritten (I2).
+  if (await isApprovedNote(rt.store.dataDir, rec.id)) {
+    const kept = await readNote(rt.store.dataDir, rec.id);
+    if (kept !== null) return kept;
+  }
   const pages = await a.pageTexts(rec, range(ANALYSIS_MAX_PAGES));
   const sections = splitSections(pages);
   if (contentSections(sections).length === 0) throw new AppError('INVALID_REQUEST', 'This document has no text to summarise');
@@ -82,6 +87,8 @@ export async function generateNote(a: AnalyseArgs): Promise<string> {
   }
   const { value } = await callStructured(r, { ...base, purpose: 'job:note', reasoning: 'medium', system: litNoteSystem(lang, plan.mode), prompt: litNotePrompt(meta, body), schema: noteSchema });
   const { note } = completeNote(value.note, sections);
+  // The user may have approved the note while the model was answering: re-check right before writing.
+  if (await isApprovedNote(rt.store.dataDir, rec.id)) return (await readNote(rt.store.dataDir, rec.id)) ?? note;
   await writeNote(rt.store.dataDir, rec.id, note, { version: PROMPT_VERSIONS.litNote, model, generatedAt: new Date().toISOString(), mode: plan.mode });
   return note;
 }
@@ -94,7 +101,7 @@ export async function generateNote(a: AnalyseArgs): Promise<string> {
 export async function analyseOne(a: AnalyseArgs): Promise<void> {
   const { r, rec } = a;
   const { rt, cfg } = r.ctx;
-  let note = a.regenerate ? null : await readNote(rt.store.dataDir, rec.id);
+  let note = a.regenerate && !(await isApprovedNote(rt.store.dataDir, rec.id)) ? null : await readNote(rt.store.dataDir, rec.id);
   note ??= await generateNote(a);
   const tax = a.fields.includes('tags') ? await rt.store.readTaxonomy().catch(() => null) : null;
   const nodes: CandidateNode[] = (tax?.nodes ?? []).filter((n) => n.status === 'active').map((n) => ({ id: n.id, label: n.label, aliases: n.aliases, definition: n.definition, parents: n.parents, implies: n.implies }));

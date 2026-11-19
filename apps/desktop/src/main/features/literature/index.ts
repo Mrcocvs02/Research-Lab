@@ -31,6 +31,8 @@ interface PaperPlan {
   pageCount: number;
   cacheFile: string;
   approxTokens: number;
+  /** The folder is enabled but the paper has no extractable text (a scan): nothing is sent, the note is made from the abstract (I3). */
+  noText: boolean;
 }
 
 const startOfLocalDay = (): string => {
@@ -63,13 +65,14 @@ async function plan(s: MainServices, ctx: AiCtx, docId: string, model: string): 
   const base = { rec, enabled, folder };
   const cacheOf = (hash: string) => path.join(s.localDataDir, 'cache', 'literature', itemIdSchema.parse(ctx.rt.libraryId), `${hash}.json`);
   // A document that may not be sent is not even read here: nothing about it goes into a prompt.
-  if (!enabled) return { ...base, system: '', prompt: '', pageCount: 0, cacheFile: cacheOf('none'), approxTokens: 0 };
+  if (!enabled) return { ...base, system: '', prompt: '', pageCount: 0, cacheFile: cacheOf('none'), approxTokens: 0, noText: false };
   const pages = await hostOf(s, ctx, model, false).pageTexts(rec, Array.from({ length: LITERATURE_PAGES }, (_, i) => i + 1));
+  if (pages.length === 0 || pages.every((p) => p.text.trim() === '')) return { ...base, system: '', prompt: '', pageCount: 0, cacheFile: cacheOf('none'), approxTokens: 0, noText: true };
   const text = pagesText(pages, LITERATURE_TEXT_CHARS);
   const meta = [`title: ${rec.title ?? path.basename(rec.path)}`, rec.authors.length ? `authors: ${rec.authors.slice(0, 6).join('; ')}` : '', rec.year ? `year: ${rec.year}` : ''].filter(Boolean).join('\n');
   const system = literatureSystem(lang);
   const prompt = literaturePrompt(meta, text);
-  return { ...base, system, prompt, pageCount: pages.length, cacheFile: cacheOf(cacheHash([LITERATURE_VERSION, model, lang, text])), approxTokens: approxTokens(system.length + prompt.length) };
+  return { ...base, system, prompt, pageCount: pages.length, cacheFile: cacheOf(cacheHash([LITERATURE_VERSION, model, lang, text])), approxTokens: approxTokens(system.length + prompt.length), noText: false };
 }
 
 type Cached = { sections: CleanSection[]; model: string; at: string };
@@ -97,13 +100,18 @@ export async function getLiterature(s: MainServices, req: { docId: string }): Pr
 
 export async function estimateLiterature(s: MainServices, req: { docIds: string[]; model?: string | undefined }) {
   const ctx = await loadCtx(s);
-  const { rt, cfg } = ctx;
   const ids = [...new Set(req.docIds)].slice(0, LITERATURE_MAX_DOCS);
   const model = modelOf(ctx, req.model);
   const plans: PaperPlan[] = [];
   for (const id of ids) plans.push(await plan(s, ctx, id, model));
-  const caches = await Promise.all(plans.map(async (p) => (p.enabled ? (await readCache(p.cacheFile)) !== null : false)));
-  const toSend = plans.filter((p, i) => p.enabled && !caches[i]);
+  return estimateFrom(s, ctx, plans, model);
+}
+
+/** The estimate of plans already made (a run reuses its own plan instead of extracting the text twice, M4). */
+async function estimateFrom(s: MainServices, ctx: AiCtx, plans: PaperPlan[], model: string) {
+  const { rt, cfg } = ctx;
+  const caches = await Promise.all(plans.map(async (p) => (p.enabled && !p.noText ? (await readCache(p.cacheFile)) !== null : false)));
+  const toSend = plans.filter((p, i) => p.enabled && !p.noText && !caches[i]);
   const approx = toSend.reduce((n, p) => n + p.approxTokens, 0);
   const sends = aiSends(await rt.store.readLog({ type: 'ai-send' })).filter((e) => !isToolPurpose(e.purpose));
   const since = startOfLocalDay();
@@ -116,7 +124,7 @@ export async function estimateLiterature(s: MainServices, req: { docIds: string[
     model,
     approxTokens: approx,
     estimatedUsd: est?.usd ?? null,
-    cached: toSend.length === 0 && plans.some((p) => p.enabled),
+    cached: toSend.length === 0 && plans.some((p) => p.enabled && !p.noText),
     folderEnabled: plans.some((p) => p.enabled),
     firstFolderSend,
     thresholdTokens: cfg.ai.costThresholdTokens,
@@ -128,7 +136,7 @@ export async function estimateLiterature(s: MainServices, req: { docIds: string[
     todayPct: d.todayPct,
     sent: toSend.length,
     cachedDocs: caches.filter(Boolean).length,
-    abstractOnly: plans.filter((p) => !p.enabled).length,
+    abstractOnly: plans.filter((p) => !p.enabled || p.noText).length,
   };
 }
 
@@ -169,7 +177,7 @@ export async function runLiterature(s: MainServices, req: { docId: string; model
     s.emit('library:changed', { kind: 'notes', ids: [req.docId] });
     return note;
   };
-  if (!p.enabled) {
+  if (!p.enabled || p.noText) {
     const body = await render(s, ctx, p.rec, [], await abstractOf(s, ctx, p.rec, model));
     const note: LiteratureNote = { body, review: 'approved', ai: false, model: null, generatedAt: new Date().toISOString(), abstractOnly: true };
     await writeLiterature(dataDir, req.docId, note, LITERATURE_VERSION);
@@ -178,7 +186,7 @@ export async function runLiterature(s: MainServices, req: { docId: string; model
   let value = await readCache(p.cacheFile);
   const cached = value !== null;
   if (!value) {
-    const est = await estimateLiterature(s, { docIds: [req.docId], model });
+    const est = await estimateFrom(s, ctx, [p], model);
     if (est.needsDialog && !req.confirmed) throw new AppError('CONFLICT', 'The send needs the confirmation of the user', { reason: 'needs-confirmation' });
     if (est.overDailyCap) throw new AppError('AI_BUDGET_EXCEEDED', 'The daily token cap is reached', { reason: 'daily-cap', todayTokens: est.todayTokens, dailyCap: est.dailyCap });
     const monthUsd = (await monthUsage(rt, monthOf(new Date()))).usd;
@@ -189,7 +197,7 @@ export async function runLiterature(s: MainServices, req: { docId: string; model
     if (!av.available || !provider) throw new AppError('AI_PROVIDER_ERROR', av.reason === 'offline' ? 'Claude cannot be reached: no network connection' : 'Claude is not available: no access is configured', { reason: av.reason ?? 'no-access' });
     const deviceId = (await s.settings.get()).deviceId;
     const { value: raw } = await callStructured(
-      { s, ctx, provider, signal: new AbortController().signal, confirmed: true, deviceId, addUsd: () => {} },
+      { s, ctx, provider, signal: new AbortController().signal, confirmed: req.confirmed, deviceId, addUsd: () => {} },
       { purpose: 'literature', model, reasoning: cfg.ai.defaultReasoning, system: p.system, prompt: p.prompt, schema: literatureSchema, docIds: [req.docId], folders: [p.folder] },
     );
     value = { sections: cleanLiterature(raw, Math.max(p.pageCount, 1)), model, at: new Date().toISOString() };

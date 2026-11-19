@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { activeTagNodes, cleanSuggestion, folderOf, aiVisible, suggestPrompt, suggestSchema, suggestSystem, taxonomyBlock, type SuggestClean, type SuggestField, type SuggestRaw } from '@rl/ai';
+import { estimateCostFromModels, activeTagNodes, cleanSuggestion, folderOf, aiVisible, suggestPrompt, suggestSchema, suggestSystem, taxonomyBlock, type SuggestClean, type SuggestField, type SuggestRaw } from '@rl/ai';
 import { AI_LIMITS, AppError, type AiTagScore, type AiJobStatus, type AiMeta, type DocumentId, type DocumentRecord, type ReasoningLevel, type ReviewStatus, type TokenUsage } from '@rl/core';
 import type { z } from 'zod';
 import type { aiJobRequestSchema, aiPreviewSchema } from '@rl/core';
@@ -15,8 +15,40 @@ type Preview = z.infer<typeof aiPreviewSchema>;
 
 /** Pages characters of the excerpt one document sends (plus its metadata): a few thousand, never the whole text. */
 export const JOB_EXCERPT_CHARS = 4000;
-/** Characters one document sends in the analysis pipeline, for the preview: the note step reads up to 60000 (a thesis sends more, chapter by chapter; every call is capped before it starts). */
-const ANALYSIS_DOC_CHARS = 40_000;
+/** Documents whose text is read to size the analysis estimate exactly; the others take the average of those (the extraction is cached). */
+const ANALYSIS_SAMPLE_DOCS = 20;
+/** Fixed prompt text of a note call, the chars of a chapter summary and the size of a generated note, for the estimate. */
+const NOTE_CALL_OVERHEAD = 1500;
+const CHAPTER_SUMMARY_CHARS = 2000;
+const GENERATED_NOTE_CHARS = 6000;
+/** Output tokens of one call of the pipeline (the same default the other estimates use). */
+const OUT_TOKENS_PER_CALL = 1000;
+
+/**
+ * What the analysis pipeline sends for ONE document, mirroring `analysis/pipeline.ts`: the note step (stronger model: one call, or
+ * one per chapter group plus the call that writes the note) when there is no usable note, then the analysis call (chosen model).
+ * `text` is the sections of the document (null when it has none: the job will refuse it) and `noteChars` the existing note, if any.
+ */
+export function analysisCallsOf(
+  sections: { chars: number; calls: number } | null,
+  noteChars: number | null,
+  fixedChars: number,
+): { strongChars: number; strongCalls: number; chosenChars: number; chosenCalls: number } {
+  if (noteChars !== null) return { strongChars: 0, strongCalls: 0, chosenChars: fixedChars + noteChars, chosenCalls: 1 };
+  if (!sections) return { strongChars: 0, strongCalls: 0, chosenChars: 0, chosenCalls: 0 };
+  return { strongChars: sections.chars, strongCalls: sections.calls, chosenChars: fixedChars + GENERATED_NOTE_CHARS, chosenCalls: 1 };
+}
+
+/** The size of the note step of a document: calls and characters, from its page texts. */
+async function noteStepOf(pages: Array<{ page: number; text: string }>): Promise<{ chars: number; calls: number } | null> {
+  const { splitSections, contentSections, planNote, fitSections, NOTE_LIMITS } = await import('@rl/ai/analysis');
+  const secs = splitSections(pages);
+  if (contentSections(secs).length === 0) return null;
+  const plan = planNote(secs);
+  if (plan.mode === 'single') return { chars: NOTE_CALL_OVERHEAD + fitSections(plan.groups[0] ?? [], NOTE_LIMITS.singleCallChars).length, calls: 1 };
+  const chapters = plan.groups.reduce((n, g) => n + NOTE_CALL_OVERHEAD + fitSections(g, NOTE_LIMITS.chapterChars).length, 0);
+  return { chars: chapters + NOTE_CALL_OVERHEAD + plan.groups.length * CHAPTER_SUMMARY_CHARS, calls: plan.groups.length + 1 };
+}
 /** Pages read for the excerpt. */
 const EXCERPT_PAGES = [1, 2, 3];
 /** Consecutive provider failures after which a job stops (Claude unavailable would otherwise fail every document). */
@@ -71,6 +103,31 @@ function emit(j: JobRec, force: boolean): void {
   } else j.timer ??= setTimeout(send, PROGRESS_INTERVAL_MS - (now - j.lastEmit));
 }
 
+/** The analysis pipeline's real cost: the note calls with the stronger model, the analysis call with the chosen one, per document. */
+async function analysisEstimate(s: MainServices, ctx: AiCtx, req: JobRequest, todo: readonly DocumentRecord[], fixed: number) {
+  const { strongModel } = await import('../analysis/call.js');
+  const { readNote, isApprovedNote } = await import('../analysis/note-store.js');
+  const { ANALYSIS_MAX_PAGES } = await import('../analysis/pipeline.js');
+  const models = ctx.cfg.ai.models;
+  const strong = strongModel(models, req.model);
+  const host = createToolsHost({ s, rt: ctx.rt, provider: ctx.cfg.ai.provider, model: req.model, confirmed: false });
+  const per: Array<ReturnType<typeof analysisCallsOf>> = [];
+  for (const rec of todo.slice(0, ANALYSIS_SAMPLE_DOCS)) {
+    const note = req.regenerate && !(await isApprovedNote(ctx.rt.store.dataDir, rec.id)) ? null : await readNote(ctx.rt.store.dataDir, rec.id);
+    const sections = note === null ? await noteStepOf(await host.pageTexts(rec, Array.from({ length: ANALYSIS_MAX_PAGES }, (_, i) => i + 1))) : null;
+    per.push(analysisCallsOf(sections, note === null ? null : note.length, fixed));
+  }
+  const sum = (k: keyof (typeof per)[number]) => per.reduce((n, x) => n + x[k], 0);
+  const scale = per.length === 0 ? 0 : todo.length / per.length;
+  const strongChars = sum('strongChars') * scale;
+  const strongCalls = Math.ceil(sum('strongCalls') * scale);
+  const chosenChars = sum('chosenChars') * scale;
+  const chosenCalls = Math.ceil(sum('chosenCalls') * scale);
+  const a = estimateCostFromModels(models, { model: strong, promptChars: strongChars, expectedOutputTokens: strongCalls * OUT_TOKENS_PER_CALL });
+  const b = estimateCostFromModels(models, { model: req.model, promptChars: chosenChars, expectedOutputTokens: chosenCalls * OUT_TOKENS_PER_CALL });
+  return { model: strongCalls > 0 ? strong : req.model, inputTokens: a.inputTokens + b.inputTokens, usd: a.usd === null || b.usd === null ? null : a.usd + b.usd, calls: strongCalls + chosenCalls };
+}
+
 /** What a job would do: the allowed documents with something to send, those skipped, and the preview. */
 async function plan(s: MainServices, ctx: AiCtx, req: JobRequest) {
   const classified = await classifyDocs(ctx.rt, ctx.cfg, req.docIds);
@@ -82,21 +139,31 @@ async function plan(s: MainServices, ctx: AiCtx, req: JobRequest) {
   }
   const tax = req.fields.includes('tags') ? await ctx.rt.store.readTaxonomy().catch(() => null) : null;
   const fixed = suggestSystem(req.fields, ctx.cfg.language).length + (req.fields.includes('tags') ? taxonomyBlock(activeTagNodes(tax)).length : 0) + 200;
-  const { preview } = await computePreview(s, ctx, {
+  const base = await computePreview(s, ctx, {
     purpose: 'job:suggest',
     model: req.model,
     docIds: [...todo.map((d) => d.id), ...classified.refused.map((r) => r.docId)],
-    promptChars: fixed * todo.length,
-    ...(req.pipeline === 'analysis' ? { perDocChars: ANALYSIS_DOC_CHARS } : {}),
+    promptChars: req.pipeline === 'analysis' ? 0 : fixed * todo.length,
+    ...(req.pipeline === 'analysis' ? { perDocChars: 0 } : {}),
   });
-  return { todo, skipped, preview: preview as Preview };
+  let preview = base.preview;
+  let calls = todo.length;
+  if (req.pipeline === 'analysis') {
+    const e = await analysisEstimate(s, ctx, req, todo, fixed);
+    preview = { ...preview, model: e.model, approxInputTokens: e.inputTokens, estimatedUsd: e.usd };
+    const cap = ctx.cfg.ai.usageCap;
+    preview.needsConfirmation = preview.needsConfirmation || (e.usd !== null && e.usd > cap.confirmBatchAboveUsd);
+    preview.overCap = cap.monthlyUsd !== null && base.monthUsd + (e.usd ?? 0) > cap.monthlyUsd;
+    calls = e.calls;
+  }
+  return { todo, skipped, calls, preview: preview as Preview };
 }
 
 export async function estimateJob(s: MainServices, req: JobRequest) {
   const ctx = await loadCtx(s);
   if (!ctx.cfg.ai.models.some((m) => m.id === req.model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
   const p = await plan(s, ctx, req);
-  return { preview: p.preview, skipped: p.skipped, toSend: p.todo.length };
+  return { preview: p.preview, skipped: p.skipped, toSend: p.todo.length, calls: p.calls };
 }
 
 /** A finished job of this session started again with the same request (the plan leaves out what already has a value unless `regenerate`). */
@@ -370,7 +437,11 @@ export async function writeProposals(s: MainServices, rt: AiCtx['rt'], docId: st
       written.push(key);
     };
     put('suggestedTags', c.tags as never, !c.tags || c.tags.length === 0);
-    if (written.includes('suggestedTags') && c.scores && c.scores.length > 0) put('suggestedTagScores', c.scores as never, false);
+    if (written.includes('suggestedTags')) {
+      if (c.scores && c.scores.length > 0) put('suggestedTagScores', c.scores as never, false);
+      // New proposed tags without weights: the weights of the old ones no longer describe them (M5).
+      else if (ai.suggestedTagScores && ai.suggestedTagScores.review.status !== 'accepted' && ai.suggestedTagScores.review.status !== 'edited') delete ai.suggestedTagScores;
+    }
     put('suggestedNewTags', c.newTags as never, !c.newTags || c.newTags.length === 0);
     put('description', c.description as never, !c.description);
     put('summary', c.summary as never, !c.summary);

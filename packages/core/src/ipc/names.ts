@@ -152,6 +152,7 @@ export const CHANNEL_NAMES: readonly string[] = [
   'jobs:list',
   'jobs:restart',
   'jobs:start',
+  'jobs:taxonomy',
   'library:create',
   'library:forget',
   'library:getConfig',

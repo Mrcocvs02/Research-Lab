@@ -17,10 +17,11 @@ const FILE = 'paper.pdf';
 let root: string;
 let store: ReturnType<typeof createLibraryStore>;
 
-const scan = async (at = NOW) => {
+// The first scan of a test reads the file as already reviewed (no inbox flag), so that a flag after a later scan is that scan's own.
+const scan = async (at = NOW, markInbox = true) => {
   const config = defaultLibraryConfig();
   config.scan.extensions = ['pdf', 'txt'];
-  return createScanner({ now: () => at }).scan(root, { config, store });
+  return createScanner({ now: () => at }).scan(root, { config, store, markInbox });
 };
 const put = (bytes: Buffer) => writeFile(path.join(root, FILE), bytes);
 const record = async (): Promise<DocumentRecord> => (await store.documents.list())[0]!;
@@ -37,7 +38,7 @@ describe('content identity across annotation appends', () => {
   it('an annotation-only revision by another program keeps the identity: no "changed", base recorded, no inbox flag', async () => {
     const base = basePdf();
     await put(base);
-    expect((await scan()).added).toHaveLength(1);
+    expect((await scan(NOW, false)).added).toHaveLength(1);
     const first = await record();
     const v2 = acrobatStyle(base);
     await put(v2);
@@ -74,7 +75,7 @@ describe('content identity across annotation appends', () => {
   it('a revision that adds page content is a real change: same id, previous hash kept, flagged, no pdfWrite', async () => {
     const base = basePdf();
     await put(base);
-    await scan();
+    await scan(NOW, false);
     const first = await record();
     const v2 = appendRevision(base, [[3, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 5 0 R >>'], [5, stream('', 'BT (Other text) Tj ET')]]);
     await put(v2);

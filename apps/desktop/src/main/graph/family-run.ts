@@ -1,9 +1,9 @@
 import { visibleGroupTags, type DocumentRecord } from '@rl/core';
 import { autoMemberships, familyEligibility, familyModel, layoutBlocks, mainValue, neighborsOf, parseFamily, tagMemberships, vocabLinks, type AreaModel, type AreaSummary, type Block, type Eligibility, type FamilyNode, type Memberships, type VocabLink } from '@rl/graph';
 import type { MainServices } from '../ipc/handlers/services.js';
-import { areaModel, weightsOf } from './areas-run.js';
+import { areaModel, weightsOf, withoutKeywords } from './areas-run.js';
 import { readNames } from './family-names-store.js';
-import { drift, loadModel, modelId } from './service.js';
+import { loadModel, modelId } from './service.js';
 import { loadView, scopeIds, type LibraryView } from './view.js';
 
 /**
@@ -88,8 +88,8 @@ async function valuesOf(s: MainServices, view: LibraryView, scope: Scope, family
       if (best && !labels.has(best.id)) labels.set(best.id, view.lookup.tagLabel(best.id) ?? best.id);
       return best?.id ?? null;
     },
-    one: tops.length > 0 && tops.every((t) => byId.get(t)?.family === 'one'),
-    keywords: tops.length > 0 && tops.every((t) => byId.get(t)?.family === 'keywords'),
+    one: ref.kind === 'root' ? byId.get(ref.value)?.family === 'one' : tops.length > 0 && tops.every((t) => byId.get(t)?.family === 'one'),
+    keywords: ref.kind === 'root' ? byId.get(ref.value)?.family === 'keywords' : tops.length > 0 && tops.every((t) => byId.get(t)?.family === 'keywords'),
   };
 }
 
@@ -97,7 +97,17 @@ async function valuesOf(s: MainServices, view: LibraryView, scope: Scope, family
 async function listFamilies(s: MainServices, view: LibraryView, scope: Scope, recs: DocumentRecord[]): Promise<Offer[]> {
   const out: Offer[] = [];
   const topic = await areaModel(await s.runtime.require(), view, scope);
-  const nodes = (view.tax?.nodes ?? []) as FamilyNode[];
+  const nodes = (view.tax?.nodes ?? []) as Array<FamilyNode & { family?: string }>;
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  /** The family root above a node (a root with `family`), if any. */
+  const familyRoot = (id: string): string | undefined => {
+    let cur = byId.get(id);
+    for (let i = 0; cur && i < 50; i++) {
+      if (cur.parents.length === 0) return cur.family ? cur.id : undefined;
+      cur = byId.get(cur.parents[0]!);
+    }
+    return undefined;
+  };
   const check = async (o: { id: string; label: string }, count: number): Promise<void> => {
     const v = await valuesOf(s, view, scope, o.id, recs);
     const e = familyEligibility(v.docs.values(), recs.length, { one: v.one, keywords: v.keywords });
@@ -106,8 +116,17 @@ async function listFamilies(s: MainServices, view: LibraryView, scope: Scope, re
   await check({ id: 'topic', label: 'Topic' }, topic.tagged);
   const docs = view.records.map((r) => ({ id: r.id, tags: docTags(r, true) }));
   const offers: Array<{ id: string; label: string }> = [];
+  // The families of the controlled vocabulary (D-493): every root with `family` one / many, but the one the Topic areas already show (D-505).
+  const areaIds = new Set(topic.areas.map((a) => a.id));
+  for (const r of nodes.filter((n) => n.parents.length === 0 && n.status !== 'deprecated' && (n.family === 'one' || n.family === 'many'))) {
+    // The Topic areas are this root's subtree (its values, or deeper when a generic value gave way to its children): already offered.
+    if (areaIds.size > 0 && [...areaIds].every((a) => a === r.id || familyRoot(a) === r.id)) continue;
+    offers.push({ id: `root:${r.id}`, label: r.label });
+  }
   if (nodes.some((n) => n.level === 'method' && n.status !== 'deprecated')) offers.push({ id: 'level:method', label: 'Method' });
-  for (const g of new Set(nodes.map((n) => n.group).filter((g): g is string => !!g && g.startsWith(GROUP_HINT) && g.length > GROUP_HINT.length))) offers.push({ id: `group:${g}`, label: g.slice(GROUP_HINT.length) });
+  // A group hint of the old index whose tags all sit in a family now (moved by the cleanup) is no longer a family of its own (D-505).
+  const groups = new Set(nodes.map((n) => n.group).filter((g): g is string => !!g && g.startsWith(GROUP_HINT) && g.length > GROUP_HINT.length));
+  for (const g of groups) if (nodes.some((n) => n.group === g && n.status !== 'deprecated' && familyRoot(n.id) === undefined)) offers.push({ id: `group:${g}`, label: g.slice(GROUP_HINT.length) });
   offers.push({ id: 'prefix:grp:', label: 'Group' });
   for (const o of offers) {
     const count = tagMemberships(parseFamily(o.id), nodes, docs).docs.size;
@@ -124,11 +143,12 @@ export async function autoModel(s: MainServices, view: LibraryView, scope: Scope
   if (!lm) return null;
   const m = lm.model;
   const wanted = await scopeIds(rt, view, scope);
-  const stale = new Set(drift(view, m, lm.index).pending.map((r) => r.id));
+  // A paper changed since the build (new tags after a vocabulary cleanup, say) keeps its neighbours of the last build: leaving it out put
+  // 21 of 25 papers in "No value" right after the cleanup (D-505). The Map already offers to update itself.
   const at = new Map<number, number>();
   const ids: string[] = [];
   m.ids.forEach((id, i) => {
-    if (stale.has(id) || !view.byId.has(id) || (wanted && !wanted.has(id))) return;
+    if (!view.byId.has(id) || (wanted && !wanted.has(id))) return;
     at.set(i, ids.length);
     ids.push(id);
   });
@@ -137,7 +157,12 @@ export async function autoModel(s: MainServices, view: LibraryView, scope: Scope
     const b = at.get(nb.j);
     if (b !== undefined && a < b) edges.push({ a, b, w: nb.score });
   }
-  const tags = ids.map((id) => view.tagsOf(view.byId.get(id)!));
+  // The communities are named by their recurring tags, never by keywords (§19.1.1, D-505).
+  const all = (view.tax?.nodes ?? []) as Array<{ id: string; parents: string[]; family?: string }>;
+  const kept = new Set(withoutKeywords(all).map((n) => n.id));
+  const known = new Set(all.map((n) => n.id));
+  const keyword = (t: string): boolean => known.has(t) && !kept.has(t);
+  const tags = ids.map((id) => view.tagsOf(view.byId.get(id)!).filter((t) => !keyword(t)));
   return autoMemberships(ids, edges, (i) => tags[i]!, (t) => view.lookup.tagLabel(t) ?? (t.startsWith('grp:') ? t.slice(4) : t), 'Cluster', m.seed);
 }
 

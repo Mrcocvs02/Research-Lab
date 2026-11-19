@@ -77,14 +77,29 @@ export function cleanupPlan(input: CleanupInput, step: 1 | 2 | 3 | 4 | 5, review
 
 function twinRow(input: CleanupInput, p: Proposal): CleanupRow {
   const hasChild = new Set(input.nodes.flatMap((n) => n.parents));
-  const leaves = p.tags.filter((t) => !hasChild.has(t));
+  const by = new Map(input.nodes.map((n) => [n.id, n]));
+  // A topic of the old index (macro / micro hint) or a tag already in a family is never sent to Keywords with its twins: it is a
+  // value of the Map, the twins are its keywords (D-505).
+  const rootOf = (id: string): TaxonomyNode | undefined => {
+    let cur = by.get(id);
+    for (let i = 0; cur && cur.parents.length > 0 && i < 50; i++) cur = by.get(cur.parents[0] as string);
+    return cur;
+  };
+  const isTopic = (t: string): boolean => {
+    const n = by.get(t);
+    const r = rootOf(t);
+    return n?.group === 'macro' || n?.group === 'micro' || (r !== undefined && r.id !== t && r.family !== undefined && r.family !== 'keywords');
+  };
+  const leaves = p.tags.filter((t) => !hasChild.has(t) && !isTopic(t));
   const kw = input.nodes.find((n) => n.family === 'keywords');
   const taken = new Set(input.nodes.map((n) => n.id));
   const kwId = kw?.id ?? freshId(KEYWORDS, taken);
   const create: TaxonomyOp[] = kw ? [] : [{ op: 'create', id: kwId, label: KEYWORDS }, { op: 'setFamily', id: kwId, family: 'keywords' }];
-  const toKeywords: Variant = { ops: [...create, ...leaves.map<TaxonomyOp>((t) => ({ op: 'move', id: t, parents: [kwId] }))], docEdits: [] };
+  const toKeywords: Variant = leaves.length === 0 ? none : { ops: [...create, ...leaves.map<TaxonomyOp>((t) => ({ op: 'move', id: t, parents: [kwId] }))], docEdits: [] };
   const merge: Variant = { ops: mergeOps(input.nodes, p.tags, p.keep as string, p.label), docEdits: [] };
-  return { id: p.id, step: 3, kind: 'twins', tags: p.tags, confidence: p.confidence, checked: true, variants: { merge, keywords: toKeywords, leave: none }, variant: p.action === 'keywords' ? 'keywords' : 'merge' };
+  // Only topics in the group (nothing to send to Keywords, and merging distinct topics is not a default): leave it.
+  const variant = p.action === 'keywords' ? (leaves.length > 0 ? 'keywords' : 'leave') : 'merge';
+  return { id: p.id, step: 3, kind: 'twins', tags: p.tags, confidence: p.confidence, checked: variant !== 'leave', variants: { merge, keywords: toKeywords, leave: none }, variant };
 }
 
 function familiesPlan(input: CleanupInput, proposals: readonly Proposal[]): CleanupPlan {
@@ -132,14 +147,21 @@ function familiesPlan(input: CleanupInput, proposals: readonly Proposal[]): Clea
     const name = n.group.slice(6);
     (extraFamilies.get(name) ?? extraFamilies.set(name, []).get(name) ?? []).push(n);
   }
+  // A group of the old index with more values than a family can show (§19.2.2: at most 12) and several per paper is a keyword
+  // list, not a family: its tags are placed one by one like the "extra" hint (Keywords, or a detail under a topic) (D-505).
+  const keywordLike = new Set<string>();
   for (const [name, members] of extraFamilies) {
     const existing = input.nodes.find((n) => n.parents.length === 0 && n.family !== undefined && normalizeName(n.label) === normalizeName(name));
-    const rootId = existing?.id ?? freshId(name, taken);
     const withDoc = new Set<number>();
     for (const m of members) for (const d of docsOf(m.id)) withDoc.add(d);
     let single = 0;
     for (const d of withDoc) if (members.filter((m) => docsOf(m.id).has(d)).length === 1) single++;
     const kind: 'one' | 'many' = withDoc.size > 0 && single / withDoc.size >= 0.8 ? 'one' : 'many';
+    if (!existing && kind === 'many' && members.length > 12) {
+      for (const m of members) keywordLike.add(m.id);
+      continue;
+    }
+    const rootId = existing?.id ?? freshId(name, taken);
     const body = (fam: 'one' | 'many'): TaxonomyOp[] => [
       ...(existing ? [] : ([{ op: 'create', id: rootId, label: conventionName(name) }] as TaxonomyOp[])),
       { op: 'setFamily', id: rootId, family: fam },
@@ -152,19 +174,22 @@ function familiesPlan(input: CleanupInput, proposals: readonly Proposal[]): Clea
   const macros = roots.filter((n) => n.group === 'macro');
   const parentProposals = proposals.filter((p) => p.kind === 'parent');
   for (const n of roots) {
-    if (n.group?.startsWith('extra:')) continue;
+    if (n.group?.startsWith('extra:') && !keywordLike.has(n.id)) continue;
     if (n.group === 'macro') push(n.id, 'place', [n.id], [{ op: 'move', id: n.id, parents: [needTopic()] }]);
     else if (n.group === 'micro') {
-      let best: { id: string; p: number } | undefined;
+      // The macro that holds most of its papers; on a tie the smaller macro (the more specific one, the higher lift), then the id.
+      let best: { id: string; p: number; size: number } | undefined;
       const mine = docsOf(n.id).size;
       for (const m of macros) {
         const p = mine === 0 ? 0 : common(n.id, m.id) / mine;
-        if (p > (best?.p ?? 0) || (best && p === best.p && m.id < best.id)) best = { id: m.id, p };
+        const size = docsOf(m.id).size;
+        if (p > (best?.p ?? 0) || (best && p === best.p && (size < best.size || (size === best.size && m.id < best.id)))) best = { id: m.id, p, size };
       }
       if (best && best.p >= 0.5) push(n.id, 'place', [n.id], [{ op: 'move', id: n.id, parents: [best.id] }]);
       else push(n.id, 'place', [n.id], [{ op: 'move', id: n.id, parents: [needTopic()] }], { marked: true });
-    } else if (n.group === 'extra') {
-      const hint = parentProposals.find((p) => p.tags[1] === n.id && ['macro', 'micro'].includes(ix.byId.get(p.keep as string)?.group ?? ''));
+    } else if (n.group === 'extra' || keywordLike.has(n.id)) {
+      // Only an inclusion found by name and by papers (R8 likely) makes a keyword a detail of a topic.
+      const hint = parentProposals.find((p) => p.tags[1] === n.id && p.confidence !== 'maybe' && ['macro', 'micro'].includes(ix.byId.get(p.keep as string)?.group ?? ''));
       if (docsOf(n.id).size >= 3 && hint) push(n.id, 'place', [n.id], [{ op: 'move', id: n.id, parents: [hint.keep as string] }]);
       else push(n.id, 'place', [n.id], [{ op: 'move', id: n.id, parents: [needKeywords()] }]);
     } else if (hasChild.has(n.id)) {

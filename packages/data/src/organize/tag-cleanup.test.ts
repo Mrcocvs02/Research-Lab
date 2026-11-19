@@ -185,3 +185,39 @@ describe('idempotency: after the ticked rows are applied, nothing new is propose
     expect(get(after, 'orphans')).toBe(0);
   });
 });
+
+describe('cleanup on real-shaped vocabularies (D-505)', () => {
+  it('twins: topics (macro / micro) stay where they are; only their keyword twins go to Keywords', () => {
+    const nodes = [node('Topic t', { group: 'micro' }), node('kw a', { group: 'extra:K' }), node('kw b', { group: 'extra:K' }), node('kw c', { group: 'extra:K' })];
+    const tags = ['topic-t', 'kw-a', 'kw-b', 'kw-c'];
+    const docs: CleanupDoc[] = [{ id: 'd0', tags }, { id: 'd1', tags }];
+    const row = cleanupPlan({ nodes, docs }, 3).rows[0];
+    expect(row?.variant).toBe('keywords');
+    const moved = row?.variants['keywords']?.ops.filter((o) => o.op === 'move').map((o) => (o as { id: string }).id);
+    expect(moved?.sort()).toEqual(['kw-a', 'kw-b', 'kw-c']);
+    // A group of topics only: nothing to send to Keywords, left alone and not ticked.
+    const only = [node('Macro p', { group: 'macro' }), node('Micro q', { group: 'micro' })];
+    const r2 = cleanupPlan({ nodes: only, docs: [{ id: 'd0', tags: ['macro-p', 'micro-q'] }, { id: 'd1', tags: ['macro-p', 'micro-q'] }] }, 3).rows[0];
+    expect(r2).toMatchObject({ variant: 'leave', checked: false });
+  });
+  it('an extra:<Name> group with more than 12 values and several per paper is a keyword list, not a family', () => {
+    const kws = Array.from({ length: 14 }, (_, i) => node(`kw ${String.fromCharCode(97 + i)}`, { group: 'extra:Big' }));
+    const docs: CleanupDoc[] = [0, 1, 2].map((d) => ({ id: `d${d}`, tags: kws.map((k) => k.id) }));
+    const plan = cleanupPlan({ nodes: [node('Macro m', { group: 'macro' }), ...kws], docs }, 4);
+    expect(plan.rows.some((r) => r.kind === 'family')).toBe(false);
+    const kwRoot = plan.prelude.find((o) => o.op === 'setFamily' && o.family === 'keywords') as { id: string } | undefined;
+    expect(kwRoot).toBeDefined();
+    for (const k of kws) expect(plan.rows.find((r) => r.id === `place:${k.id}`)?.variants['default']?.ops[0]).toMatchObject({ op: 'move', parents: [kwRoot?.id] });
+  });
+  it('a micro on a tie goes under the smaller (more specific) macro', () => {
+    const nodes = [node('Big macro', { group: 'macro' }), node('Small macro', { group: 'macro' }), node('Micro s', { group: 'micro' })];
+    const docs: CleanupDoc[] = [
+      { id: 'd0', tags: ['big-macro', 'small-macro', 'micro-s'] },
+      { id: 'd1', tags: ['big-macro', 'small-macro', 'micro-s'] },
+      { id: 'd2', tags: ['big-macro'] },
+      { id: 'd3', tags: ['big-macro'] },
+    ];
+    const move = cleanupPlan({ nodes, docs }, 4).rows.find((r) => r.id === 'place:micro-s')?.variants['default']?.ops[0];
+    expect(move).toMatchObject({ parents: ['small-macro'] });
+  });
+});

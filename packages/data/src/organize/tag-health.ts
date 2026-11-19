@@ -101,7 +101,8 @@ export function tagHealth(input: ReviewInput, proposals?: readonly Proposal[]): 
   }
   add('onevalue', [...bad], bad.size > 0);
 
-  const styles = new Set(plain.map((n) => nameStyle(n.label)));
+  // "Extended name (ACR)" with a capital initial is the convention itself (§19.1.1), not a second style (D-505).
+  const styles = new Set(plain.map((n) => (nameStyle(n.label) === 'acronym' && /^\p{Lu}/u.test(n.label) ? 'capitalized' : nameStyle(n.label))));
   add('styles', [...styles], styles.size > 1, styles.size);
 
   const meta = props.filter((p) => p.kind === 'metadata').map((p) => p.tags[0] as string);

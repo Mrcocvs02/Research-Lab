@@ -35,7 +35,7 @@
     }
   },
   "main": {
-    "entryJsKB": 1130,
+    "entryJsKB": 1133,
     "lazyJsKB": 580,
     "lazyChunkKB": 30,
     "lazyChunkOverrides": {

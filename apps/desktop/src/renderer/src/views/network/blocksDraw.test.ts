@@ -92,3 +92,11 @@ describe('labels of the Map', () => {
     });
   }
 });
+
+describe('every title from a cell of 90 px (D-505)', () => {
+  it('a row of a cell 90 px wide still holds the two lines of a label (30 px)', async () => {
+    const { ALL_LABELS_CELL_PX } = await import('./labelsLod');
+    expect(ALL_LABELS_CELL_PX).toBeLessThanOrEqual(90);
+    expect((CELL_H * ALL_LABELS_CELL_PX) / CELL_W).toBeGreaterThanOrEqual(30);
+  });
+});

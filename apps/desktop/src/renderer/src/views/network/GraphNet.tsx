@@ -953,7 +953,8 @@ export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selec
           />
         )}
         <div className="net-legend-box">
-          {family !== TOPIC_FAMILY && count > 0 && <GroupLabel families={families} family={family} />}
+          {/* The legend already says "Grouped by X" in its title: not twice (D-505). */}
+          {family !== TOPIC_FAMILY && count > 0 && !(areaState && areaRef.current.on) && <GroupLabel families={families} family={family} />}
           <span className="hint" data-testid="net-count" data-count={count} aria-live="polite">
             {t('network.net.count', { count })}
           </span>
@@ -995,7 +996,8 @@ export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selec
             <LinkFinderDialog docIds={[findFor]} onClose={() => setFindFor(null)} onShowMap={(id, label) => onStart({ kind: 'doc', id, label: label || untitled })} />
           </Lazy>
         )}
-        {mini && count > 0 && <MiniMap bounds={getBounds()} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={count} />}
+        {/* Only for a big network (§19.2.6: the minimap from 150 nodes): over a neighbourhood of 9-30 papers it covered nodes and labels (D-505). */}
+        {mini && count > 150 && <MiniMap bounds={getBounds()} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={count} />}
       </div>
     </div>
   );

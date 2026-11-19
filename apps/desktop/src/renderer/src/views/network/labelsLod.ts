@@ -102,8 +102,9 @@ export interface PaperLabel extends Box {
   rank: number;
 }
 
-/** Width of a paper's cell on the screen from which every paper is labelled (D-498); below it only the forced and the central ones. */
-export const ALL_LABELS_CELL_PX = 110;
+/** Width of a paper's cell on the screen from which every paper is labelled (D-498); below it only the forced and the central ones. 90, not 110:
+ * a row is then still 32 px for a 30 px label, and at 1280 x 800 a 25-paper library showed 5-6 titles of 25 (D-505). */
+export const ALL_LABELS_CELL_PX = 90;
 /** Labels of the free layout ("Nessuno") in view at once. */
 export const FREE_LABEL_CAP = 40;
 

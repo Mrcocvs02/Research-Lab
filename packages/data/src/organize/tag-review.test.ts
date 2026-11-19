@@ -154,3 +154,41 @@ describe('the synthetic corpus', () => {
     expect(ms).toBeLessThan(15_000);
   });
 });
+
+describe('acronyms on real-shaped vocabularies (D-505)', () => {
+  it('two expansions that share an acronym only through an alias are a maybe, never ticked', () => {
+    const labels = ['Alpha learning', 'ancient_lore'];
+    const nodes = [node('Alpha learning', { aliases: ['AL'] }), node('ancient_lore')];
+    const p = merges({ nodes, docs: [{ id: 'd1', tags: labels.map(idOf) }] });
+    expect(p).toHaveLength(1);
+    expect(p[0]?.confidence).toBe('maybe');
+    // "Name (S)" against a different expansion with the same initials: a maybe as well.
+    const q = merges({ nodes: [node('Delta epsilon zeta (DEZ)'), node('dark_energy_zone')], docs: [{ id: 'd1', tags: ['delta-epsilon-zeta-dez', 'dark-energy-zone'] }] });
+    expect(q.every((x) => x.confidence === 'maybe')).toBe(true);
+  });
+  it('a bare sigla label still matches its expansion (sure with a shared paper)', () => {
+    const labels = ['DEZ', 'Delta epsilon zeta'];
+    expect(merges(input(labels, [{ id: 'd1', tags: labels.map(idOf) }]))[0]?.confidence).toBe('sure');
+  });
+  it('a lower-case sigla (old keyword lists) matches its expansion: likely with a shared paper, maybe without', () => {
+    const labels = ['dkl', 'delta-kappa_lambda'];
+    expect(merges(input(labels, [{ id: 'd1', tags: labels.map(idOf) }]))[0]?.confidence).toBe('likely');
+    expect(merges(input(labels))[0]?.confidence).toBe('maybe');
+  });
+  it('a sigla whose initials fit two different expansions is ambiguous: a maybe, so the expansions are never joined', () => {
+    const labels = ['ai', 'alpha_iota', 'aleph_index'];
+    const p = merges(input(labels, [{ id: 'd1', tags: labels.map(idOf) }]));
+    expect(p.length).toBeGreaterThan(0);
+    expect(p.every((x) => x.confidence === 'maybe')).toBe(true);
+    // One expansion written twice (plural, with its sigla) is still one expansion.
+    const q = merges(input(['DZ', 'Delta zeta', 'Delta zetas (DZ)'], [{ id: 'd1', tags: ['dz', 'delta-zeta'] }]));
+    expect(q.some((x) => x.confidence === 'sure' && x.tags.includes('dz'))).toBe(true);
+  });
+  it('the naming convention writes a short token with no vowel in capitals', () => {
+    expect(conventionName('pqr')).toBe('PQR');
+    expect(conventionName('zk_links')).toBe('ZK links');
+    expect(conventionName('3-kt')).toBe('3-KT');
+    expect(conventionName('alpha_steps')).toBe('Alpha steps');
+    expect(conventionName('3kt')).toBe('3kt');
+  });
+});

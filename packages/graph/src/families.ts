@@ -12,15 +12,15 @@ export const FAMILY_TOP = 7;
 /** Id of the cluster that gathers the clusters beyond the biggest eight. */
 export const OTHER_CLUSTER = '__other';
 
-export type FamilyKind = 'topic' | 'level' | 'group' | 'prefix' | 'auto';
+export type FamilyKind = 'topic' | 'level' | 'group' | 'prefix' | 'root' | 'auto';
 export interface FamilyRef {
   kind: FamilyKind;
   value: string;
 }
-/** `topic`, `auto`, `level:method`, `group:extra:x`, `prefix:grp:`. Unknown text is the topic family. */
+/** `topic`, `auto`, `level:method`, `group:extra:x`, `prefix:grp:`, `root:<id>` (a family of the controlled vocabulary, D-493). Unknown text is the topic family. */
 export function parseFamily(id: string): FamilyRef {
   if (id === 'auto') return { kind: 'auto', value: '' };
-  for (const k of ['level', 'group', 'prefix'] as const) if (id.startsWith(`${k}:`) && id.length > k.length + 1) return { kind: k, value: id.slice(k.length + 1) };
+  for (const k of ['level', 'group', 'prefix', 'root'] as const) if (id.startsWith(`${k}:`) && id.length > k.length + 1) return { kind: k, value: id.slice(k.length + 1) };
   return { kind: 'topic', value: '' };
 }
 
@@ -33,12 +33,13 @@ export interface Memberships {
 }
 export type FamilyNode = AreaNode & { level?: string | undefined; group?: string | undefined };
 
-/** Memberships of a tag family: `level:x` (nodes of that level), `group:x` (nodes with that group hint), `prefix:p` (tag ids starting with p, label = the rest). */
+/** Memberships of a tag family: `level:x` (nodes of that level), `group:x` (nodes with that group hint), `prefix:p` (tag ids starting with p, label = the rest), `root:r` (the values of level 1 under the family root r, D-505). */
 export function tagMemberships(ref: FamilyRef, nodes: readonly FamilyNode[], docs: readonly AreaDoc[]): Memberships {
   const live = new Map<string, FamilyNode>();
   for (const n of nodes) if (n.status !== 'deprecated') live.set(n.id, n);
   const prefix = ref.kind === 'prefix';
-  const member = (id: string): boolean => (prefix ? id.startsWith(ref.value) : ref.kind === 'level' ? live.get(id)?.level === ref.value : live.get(id)?.group === ref.value);
+  const member = (id: string): boolean =>
+    prefix ? id.startsWith(ref.value) : ref.kind === 'root' ? (live.get(id)?.parents ?? []).includes(ref.value) : ref.kind === 'level' ? live.get(id)?.level === ref.value : live.get(id)?.group === ref.value;
   const parentsOf = (id: string): string[] => (prefix ? [] : (live.get(id)?.parents ?? []).filter((p) => live.has(p) && p !== id));
   /** Members among the ancestors of `id` (itself included). */
   const above = (id: string): string[] => {

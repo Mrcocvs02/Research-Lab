@@ -12,7 +12,7 @@ import { aiSends, isToolPurpose, monthOf } from '../../ai/usage.js';
 import type { MainServices } from '../../ipc/handlers/services.js';
 import { cacheHash, chunk, costDecision } from '../ai/batch.js';
 import { readLiterature } from '../literature/store.js';
-import { cellFromNote, noteCells, rowLabel } from './cells.js';
+import { noteCells, rowLabel, splitCells } from './cells.js';
 import { listTables, readTable, removeTable, tableCsv, writeTable } from './table-store.js';
 
 /**
@@ -84,30 +84,10 @@ async function papersOf(ctx: AiCtx, docIds: readonly string[]): Promise<Paper[]>
 
 async function plan(s: MainServices, ctx: AiCtx, req: { docIds: string[]; columns: CompareColumn[]; existing?: CompareRow[] | undefined }, model: string): Promise<Plan> {
   const papers = await papersOf(ctx, req.docIds);
-  const have = new Map((req.existing ?? []).map((r) => [r.docId, r.cells]));
-  const ready = new Map<string, Record<string, CompareCell>>();
-  const missing = new Map<string, Paper[]>();
-  let fromNotes = 0;
-  let readyCount = 0;
-  let notEnabled = 0;
-  for (const p of papers) {
-    const cells: Record<string, CompareCell> = {};
-    for (const col of req.columns) {
-      const old = have.get(p.rec.id)?.[col.id];
-      const fromNote = old ? null : p.note ? cellFromNote(p.note, col, p.noteAi) : null;
-      if (old) {
-        cells[col.id] = old;
-        readyCount++;
-      } else if (fromNote) {
-        cells[col.id] = fromNote;
-        fromNotes++;
-      } else if (!p.enabled) {
-        cells[col.id] = { text: '', pages: [], source: 'none', ai: false, why: 'not-enabled' };
-        notEnabled++;
-      } else missing.set(col.id, [...(missing.get(col.id) ?? []), p]);
-    }
-    ready.set(p.rec.id, cells);
-  }
+  const split = splitCells(papers.map((p) => ({ id: p.rec.id, enabled: p.enabled, note: p.note, noteAi: p.noteAi })), req.columns, new Map((req.existing ?? []).map((r) => [r.docId, r.cells])));
+  const ready = split.ready;
+  const missing = new Map([...split.missing].map(([col, ids]) => [col, ids.map((id) => papers.find((p) => p.rec.id === id)!)]));
+  const { fromNotes, ready: readyCount, notEnabled } = split.count;
   const lang = ctx.cfg.language;
   const host = createToolsHost({ s, rt: ctx.rt, provider: ctx.cfg.ai.provider, model, confirmed: false });
   const texts = new Map<string, { text: string; last: number }>();

@@ -273,6 +273,11 @@
         "author": "Autori correlati",
         "topic": "Argomenti correlati"
       }
+    },
+    "timeline": {
+      "byYear": "Disponi per anno",
+      "label": "Per anno · Esc per uscire",
+      "noYear": "Senza anno"
     }
   }
 }

@@ -58,7 +58,12 @@
     "facetResourcesHint": "Show resources (code, data, web pages, notebooks, folders) instead of documents",
     "selExtend": "Extend the bibliography…",
     "selBridge": "Find a bridge",
-    "selBridgeNeeds": "Select 2 documents"
+    "selBridgeNeeds": "Select 2 documents",
+    "selCompare": "Comparison table…",
+    "selCompareNeeds": "Select 2 to {{max}} documents",
+    "selGroups": "Research group overview…",
+    "selGroupsNeeds": "Select at most {{max}} documents",
+    "selTimeline": "Timeline"
   },
   "selSideBySide": "Read side by side",
   "selSideReason": "Select 2 documents"

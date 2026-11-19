@@ -56,3 +56,42 @@ export function rowLabel(d: { title: string | null; authors: readonly string[]; 
   const who = surname ? (d.authors.length > 2 ? `${surname} et al.` : surname) : (d.title ?? d.path.split('/').pop() ?? '');
   return `${who}${d.year ? ` ${d.year}` : ''}`.slice(0, 200);
 }
+
+export interface CellSource {
+  id: string;
+  enabled: boolean;
+  note: ReadonlyMap<LiteratureKey, { text: string; pages: number[] }> | null;
+  noteAi: boolean;
+}
+
+/**
+ * Which cells need Claude. A cell already in the table stays; else the literature note of the paper gives it (no send); else a
+ * paper of a folder that may not be sent gets "not enabled" (nothing about it leaves); the rest is `missing`, per column.
+ */
+export function splitCells(papers: readonly CellSource[], columns: readonly CompareColumn[], existing: ReadonlyMap<string, Record<string, CompareCell>>) {
+  const ready = new Map<string, Record<string, CompareCell>>();
+  const missing = new Map<string, string[]>();
+  const count = { total: papers.length * columns.length, ready: 0, fromNotes: 0, notEnabled: 0, toWrite: 0 };
+  for (const p of papers) {
+    const cells: Record<string, CompareCell> = {};
+    for (const col of columns) {
+      const old = existing.get(p.id)?.[col.id];
+      const fromNote = old || !p.note ? null : cellFromNote(p.note, col, p.noteAi);
+      if (old) {
+        cells[col.id] = old;
+        count.ready++;
+      } else if (fromNote) {
+        cells[col.id] = fromNote;
+        count.fromNotes++;
+      } else if (!p.enabled) {
+        cells[col.id] = { text: '', pages: [], source: 'none', ai: false, why: 'not-enabled' };
+        count.notEnabled++;
+      } else {
+        missing.set(col.id, [...(missing.get(col.id) ?? []), p.id]);
+        count.toWrite++;
+      }
+    }
+    ready.set(p.id, cells);
+  }
+  return { ready, missing, count };
+}

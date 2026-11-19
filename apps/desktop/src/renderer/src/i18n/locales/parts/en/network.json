@@ -273,6 +273,11 @@
         "author": "Related authors",
         "topic": "Related topics"
       }
+    },
+    "timeline": {
+      "byYear": "Arrange by year",
+      "label": "By year · Esc to exit",
+      "noYear": "No year"
     }
   }
 }

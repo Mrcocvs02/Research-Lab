@@ -1,0 +1,23 @@
+{
+  "groups": {
+    "title": "Research group overview",
+    "what_one": "An overview of the authors, co-authors, topics and main works of {{count}} paper.",
+    "what_other": "An overview of the authors, co-authors, topics and main works of {{count}} papers.",
+    "notEnabled_one": "{{count}} paper is in a folder not enabled for Claude: it only appears in the data.",
+    "notEnabled_other": "{{count}} papers are in folders not enabled for Claude: they only appear in the data.",
+    "limit": "The limit of the day is reached. Try later or write only the data.",
+    "overview": "Overview",
+    "updated": "Updated {{date}}",
+    "written": "themes written by Claude",
+    "notWritten": "themes not written",
+    "none": "No overview yet for these papers.",
+    "dataOnly": "Data only",
+    "write": "Write the overview ✦",
+    "update": "Update ✦",
+    "noFolder": "No paper of the selection is in a folder enabled for Claude",
+    "sendWhat_one": "Title, authors, year, tags and description of {{count}} paper.",
+    "sendWhat_other": "Title, authors, year, tags and description of {{count}} papers.",
+    "done": "Overview written",
+    "doneData": "Overview saved without the themes"
+  }
+}

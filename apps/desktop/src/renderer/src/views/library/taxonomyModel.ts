@@ -44,7 +44,7 @@ export interface TreeRow {
 }
 
 /** The visible rows of the tree for the given expanded keys. `hide` leaves nodes (and their subtrees) out. */
-export function flattenTree(model: TaxonomyModel, expanded: ReadonlySet<string> | 'all', hide: (n: TaxonomyNodeView) => boolean = () => false): TreeRow[] {
+export function flattenTree(model: TaxonomyModel, expanded: ReadonlySet<string> | 'all', hide: (n: TaxonomyNodeView) => boolean = () => false, roots: readonly string[] = model.roots): TreeRow[] {
   const out: TreeRow[] = [];
   const walk = (id: string, parentId: string | null, depth: number, prefix: string, trail: string[]) => {
     const node = model.byId.get(id);
@@ -58,7 +58,7 @@ export function flattenTree(model: TaxonomyModel, expanded: ReadonlySet<string> 
     out.push({ key, id, parentId, depth, hasChildren: kids.length > 0, expanded: open });
     if (open) for (const c of kids) walk(c, id, depth + 1, key, [...trail, id]);
   };
-  for (const r of model.roots) walk(r, null, 0, '', []);
+  for (const r of roots) walk(r, null, 0, '', []);
   return out;
 }
 
@@ -152,29 +152,53 @@ export function parentsAfterDrop(node: Pick<TaxonomyNodeView, 'parents'>, fromPa
   return rest.includes(target) ? rest : [...rest, target];
 }
 
-/** Prefix of the grouping hint that makes a tag part of a user family of the Map (D-491): `extra:<Name>`. */
-export const FAMILY_PREFIX = 'extra:';
-
-export interface TagFamily {
-  name: string;
-  /** Ids of the live tags in the family. */
-  members: string[];
+/** The three parts of the tree (D-493): the families, the tags outside any family ("To sort"), and the flat Keywords family. */
+export interface TreeSections {
+  /** Family roots other than Keywords, by name. */
+  families: string[];
+  keywords: string | null;
+  /** Roots without a family (their subtrees are "To sort"). */
+  unsortedRoots: string[];
+  /** Every live tag of "To sort": under a root without family and not also inside a family. */
+  unsortedIds: string[];
 }
 
-/** The user families (grouping hint `extra:<Name>`) with their members, by name. Deprecated tags are left out. */
-export function tagFamilies(nodes: readonly TaxonomyNodeView[]): TagFamily[] {
-  const by = new Map<string, string[]>();
-  for (const n of nodes) {
-    const g = n.group;
-    if (!g || !g.startsWith(FAMILY_PREFIX) || g.length === FAMILY_PREFIX.length || n.status === 'deprecated') continue;
-    const name = g.slice(FAMILY_PREFIX.length);
-    by.set(name, [...(by.get(name) ?? []), n.id]);
+export function treeSections(model: TaxonomyModel): TreeSections {
+  const families: string[] = [];
+  const unsortedRoots: string[] = [];
+  let keywords: string | null = null;
+  const inFamily = new Set<string>();
+  for (const r of model.roots) {
+    const n = model.byId.get(r)!;
+    if (n.family === 'keywords') keywords ??= r;
+    else if (n.family) families.push(r);
+    else if (n.status !== 'deprecated') unsortedRoots.push(r);
+    if (n.family) for (const d of descendants(model, r)) inFamily.add(d);
   }
-  return [...by].map(([name, members]) => ({ name, members })).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
+  const unsortedIds = new Set<string>();
+  for (const r of unsortedRoots) for (const d of descendants(model, r)) if (!inFamily.has(d) && model.byId.get(d)?.status !== 'deprecated') unsortedIds.add(d);
+  return { families, keywords, unsortedRoots, unsortedIds: [...unsortedIds] };
 }
 
-/** Operations that put `ids` in family `name` (null: out of any family). Tags already there are skipped. */
-export function familyOps(model: Pick<TaxonomyModel, 'byId'>, ids: readonly string[], name: string | null): Array<{ op: 'setGroup'; id: string; group: string | null }> {
-  const group = name === null ? null : `${FAMILY_PREFIX}${name.trim().slice(0, 100 - FAMILY_PREFIX.length)}`;
-  return ids.filter((id) => model.byId.has(id) && (model.byId.get(id)!.group ?? null) !== group).map((id) => ({ op: 'setGroup', id, group }));
+/** Where a tag may be put: every family root and the nodes of a family up to level 2 (a child of those still fits the depth limit of 3). Keywords only as a flat root. */
+export interface PlaceTarget {
+  id: string;
+  path: string;
+  depth: number;
+}
+export function placeTargets(model: TaxonomyModel): PlaceTarget[] {
+  const out: PlaceTarget[] = [];
+  const walk = (id: string, depth: number, path: string, trail: string[]) => {
+    const n = model.byId.get(id);
+    if (!n || n.status === 'deprecated' || trail.includes(id)) return;
+    const here = path ? `${path} › ${n.label}` : n.label;
+    out.push({ id, path: here, depth });
+    if (depth < 2) for (const c of model.children.get(id) ?? []) walk(c, depth + 1, here, [...trail, id]);
+  };
+  for (const r of model.roots) {
+    const n = model.byId.get(r)!;
+    if (n.family === 'keywords') out.push({ id: r, path: n.label, depth: 0 });
+    else if (n.family) walk(r, 0, '', []);
+  }
+  return out;
 }

@@ -84,4 +84,27 @@ describe('classifyIncrement (D-350: the content of the revision, not who wrote i
     expect(r.d.get('Rect')).toBe('[1 2 3 4.5]');
     expect(readDict('<< /A [1 2', 0)).toBeNull();
   });
+
+  describe('the xref section of the added revision (M6)', () => {
+    const region = (full: Buffer, from: number, edit: (t: string) => string) => Buffer.concat([full.subarray(0, from), Buffer.from(edit(full.subarray(from).toString('latin1')), 'latin1')]);
+    const good = appendRevision(base, [[3, PAGE_WITH_ANNOTS('[5 0 R]')], [5, HIGHLIGHT('rl-abc')]]);
+
+    it('an entry that points into old content instead of the object it names is "content"', async () => {
+      const at = base.toString('latin1').indexOf('4 0 obj');
+      const bad = region(good, base.length, (t) => t.replace(/5 1\n\d{10} 00000 n/, `5 1\n${String(at).padStart(10, '0')} 00000 n`));
+      expect(await kind(good, base.length)).toBe('annotations');
+      expect(await kind(bad, base.length)).toBe('content');
+    });
+
+    it('freeing a content object is "content"; freeing an annotation is not', async () => {
+      expect(await kind(region(good, base.length, (t) => t.replace('xref\n', 'xref\n4 1\n0000000000 00001 f \n')), base.length)).toBe('content');
+      const v3 = appendRevision(good, [[3, PAGE_WITH_ANNOTS('[]')]]);
+      expect(await kind(region(v3, good.length, (t) => t.replace('xref\n', 'xref\n5 1\n0000000000 00001 f \n')), good.length)).toBe('annotations');
+    });
+
+    it('a changed or missing /Root in the new trailer is "content"', async () => {
+      expect(await kind(region(good, base.length, (t) => t.replace('/Root 1 0 R', '/Root 2 0 R')), base.length)).toBe('content');
+      expect(await kind(region(good, base.length, (t) => t.replace('/Root 1 0 R', '')), base.length)).toBe('content');
+    });
+  });
 });

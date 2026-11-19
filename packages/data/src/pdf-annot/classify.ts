@@ -150,7 +150,7 @@ function parseObjects(t: string): Obj[] | null {
         const len = /^\d+$/.test(r.d.get('Length') ?? '') ? Number(r.d.get('Length')) : -1;
         const to = len >= 0 && t.startsWith('endstream', from + len + (/^[\r\n]/.test(t[from + len] ?? '') ? t[from + len] === '\r' && t[from + len + 1] === '\n' ? 2 : 1 : 0)) ? from + len : t.indexOf('endstream', from);
         if (to < 0) return null;
-        if (nm(r.d, 'Type') === 'ObjStm') entry.stream = Buffer.from(t.slice(from, to), 'latin1');
+        if (nm(r.d, 'Type') === 'ObjStm' || nm(r.d, 'Type') === 'XRef') entry.stream = Buffer.from(t.slice(from, to), 'latin1');
         else entry.stream = Buffer.alloc(0);
         next = t.indexOf('endobj', to);
         head.lastIndex = Math.max(head.lastIndex, to);
@@ -190,7 +190,7 @@ function objStmObjects(e: Entry & { type: 'dict' }): Obj[] | null {
 /* ------------------------------------------------ the old revision ------------------------------------------------ */
 
 /** `/Size` of the last trailer of the first `end` bytes (classic trailer or xref stream dictionary). */
-async function sizeAt(src: Source, end: number): Promise<number | null> {
+async function trailerAt(src: Source, end: number): Promise<string | null> {
   const tail = (await src.read(Math.max(0, end - 1024), Math.min(end, 1024))).toString('latin1');
   const sx = [...tail.matchAll(/startxref\s+(\d+)/g)].pop();
   if (!sx) return null;
@@ -198,8 +198,16 @@ async function sizeAt(src: Source, end: number): Promise<number | null> {
   if (!(at >= 0 && at < end)) return null;
   const head = (await src.read(at, 2048)).toString('latin1');
   // Classic table: the trailer is the last one in the tail; xref stream: its dictionary sits at `startxref`.
-  const m = /\/Size\s+(\d+)/.exec(/^\s*xref/.test(head) ? tail.slice(tail.lastIndexOf('trailer')) : head);
+  return /^\s*xref/.test(head) ? tail.slice(tail.lastIndexOf('trailer')) : head;
+}
+async function sizeAt(src: Source, end: number): Promise<number | null> {
+  const m = /\/Size\s+(\d+)/.exec((await trailerAt(src, end)) ?? '');
   return m ? Number(m[1]) : null;
+}
+/** `/Root` of the last trailer of the first `end` bytes, as "n g". */
+async function rootAt(src: Source, end: number): Promise<string | null> {
+  const m = /\/Root\s+(\d+)\s+(\d+)\s+R/.exec((await trailerAt(src, end)) ?? '');
+  return m ? `${m[1]} ${m[2]}` : null;
 }
 
 /** Latest plain (not compressed) definition of each wanted object number in the first `end` bytes: number -> entry. */
@@ -224,6 +232,98 @@ async function oldEntries(src: Source, end: number, wanted: Set<number>): Promis
   const out = new Map<number, Entry | null>();
   for (const [num, at] of found) out.set(num, entryOf((await src.read(at, INCREMENT_LIMITS.oldBody)).toString('latin1')));
   return out;
+}
+
+/* ------------------------------------------------ the added xref sections ------------------------------------------------ */
+
+/** One entry of an added xref section: type 0 free, 1 at an offset, 2 inside an object stream. */
+interface Row { num: number; t: 0 | 1 | 2; a: number }
+const MAX_ROWS = 1_000_000;
+const rootOf = (v: string | undefined): string | null => {
+  const m = /^(\d+) (\d+) R$/.exec(v ?? '');
+  return m ? `${m[1]} ${m[2]}` : null;
+};
+
+/** Every classic `xref` section of the text: its rows and the `/Root` of its trailer; null when one cannot be read. */
+function tableSections(t: string): { rows: Row[]; roots: Array<string | null> } | null {
+  const rows: Row[] = [], roots: Array<string | null> = [];
+  const kw = /(?:^|[\r\n])xref[ \t]*[\r\n]/g;
+  for (let m = kw.exec(t); m; m = kw.exec(t)) {
+    let pos = m.index + m[0].length;
+    const sub = /\s*(\d+)\s+(\d+)[ \t]*[\r\n]/y, ent = /\s*(\d{1,10})\s+(\d{1,5})\s+([nf])/y;
+    for (;;) {
+      sub.lastIndex = pos;
+      const h = sub.exec(t);
+      if (!h) break;
+      const start = Number(h[1]), count = Number(h[2]);
+      pos = sub.lastIndex;
+      if (rows.length + count > MAX_ROWS) return null;
+      for (let i = 0; i < count; i++) {
+        ent.lastIndex = pos;
+        const e = ent.exec(t);
+        if (!e) return null;
+        rows.push({ num: start + i, t: e[3] === 'n' ? 1 : 0, a: Number(e[1]) });
+        pos = ent.lastIndex;
+      }
+    }
+    const tr = /\s*trailer/y;
+    tr.lastIndex = pos;
+    if (!tr.exec(t)) return null;
+    const d = readDict(t, tr.lastIndex);
+    if (!d) return null;
+    roots.push(rootOf(d.d.get('Root')));
+  }
+  return { rows, roots };
+}
+
+/** The rows of an xref stream (Flate or none; no predictor or the PNG ones None, Sub, Up); null when it cannot be read with certainty. */
+function streamRows(e: Entry & { type: 'dict' }): Row[] | null {
+  const w = (e.d.get('W') ?? '').match(/\d+/g)?.map(Number);
+  if (!w || w.length !== 3 || w.some((x) => x > 8)) return null;
+  const [w0, w1, w2] = w as [number, number, number];
+  const rl = w0 + w1 + w2;
+  let data = e.stream;
+  if (!data || rl === 0) return null;
+  const filter = e.d.get('Filter');
+  if (filter !== undefined) {
+    if (filter !== '/FlateDecode') return null;
+    try {
+      data = inflateSync(data, { maxOutputLength: INCREMENT_LIMITS.objStm });
+    } catch {
+      return null;
+    }
+  }
+  const dp = e.d.has('DecodeParms') ? readDict(e.d.get('DecodeParms')!, 0)?.d : undefined;
+  const pred = Number(dp?.get('Predictor') ?? 1);
+  if (pred >= 10) {
+    if (Number(dp?.get('Columns') ?? 1) !== rl) return null;
+    const n = Math.floor(data.length / (rl + 1));
+    const out = Buffer.alloc(n * rl);
+    for (let r = 0; r < n; r++) {
+      const f = data[r * (rl + 1)]!;
+      if (f > 2) return null;
+      for (let i = 0, o = r * rl; i < rl; i++, o++) out[o] = (data[r * (rl + 1) + 1 + i]! + (f === 1 && i ? out[o - 1]! : 0) + (f === 2 && r ? out[o - rl]! : 0)) & 255;
+    }
+    data = out;
+  } else if (pred !== 1) return null;
+  const idx = (e.d.get('Index') ?? `[0 ${e.d.get('Size') ?? 0}]`).match(/\d+/g)?.map(Number) ?? [];
+  const rows: Row[] = [];
+  let p = 0;
+  const rd = (n: number) => {
+    let v = 0;
+    for (let i = 0; i < n; i++) v = v * 256 + data![p++]!;
+    return v;
+  };
+  for (let k = 0; k + 1 < idx.length; k += 2) {
+    for (let i = 0; i < idx[k + 1]!; i++) {
+      if (p + rl > data.length || rows.length >= MAX_ROWS) return null;
+      const t = w0 ? rd(w0) : 1, a = rd(w1);
+      p += w2;
+      if (t > 2) return null;
+      rows.push({ num: idx[k]! + i, t: t as 0 | 1 | 2, a });
+    }
+  }
+  return rows;
 }
 
 /* ------------------------------------------------ the verdict ------------------------------------------------ */
@@ -275,9 +375,39 @@ export async function classifyIncrement(src: Source, oldSize: number): Promise<I
     if (size === null) return 'content';
     const aps = new Set<number>();
     for (const o of objs) if (o.entry.type === 'dict' && kindOf(o.entry, false) === 'annot') refsIn(o.entry.d.get('AP')).forEach((n) => aps.add(n));
-    const redefined = new Set(objs.filter((o) => o.num < size).map((o) => o.num));
+    // The added xref sections must not free or redirect anything that is not an annotation, a page, the catalog or metadata, and /Root stays.
+    const tbl = tableSections(t);
+    if (!tbl) return 'content';
+    const rows = [...tbl.rows], roots = [...tbl.roots];
+    for (const o of parsed) {
+      if (o.entry.type !== 'dict' || nm(o.entry.d, 'Type') !== 'XRef') continue;
+      const r = streamRows(o.entry);
+      if (!r) return 'content';
+      rows.push(...r);
+      roots.push(rootOf(o.entry.d.get('Root')));
+    }
+    const oldRoot = await rootAt(src, oldSize);
+    if (roots.length === 0 || !oldRoot || roots.some((r) => r !== oldRoot)) return 'content';
+    const heads = new Map<number, Array<[number, number]>>();
+    for (const m of t.matchAll(/(?:^|[\r\n])[ \t]*(\d{1,10})[ \t]+\d{1,5}[ \t]+obj\b/g)) {
+      const lo = oldSize + m.index, k = Number(m[1]);
+      heads.set(k, [...(heads.get(k) ?? []), [lo, lo + m[0].search(/\d/)]]);
+    }
+    const stmNums = new Set(parsed.filter((o) => o.entry.type === 'dict' && nm(o.entry.d, 'Type') === 'ObjStm').map((o) => o.num));
+    const innerNums = new Set(objs.map((o) => o.num));
+    const freed = new Set<number>();
+    for (const r of rows) {
+      if (r.t === 1 && !(heads.get(r.num) ?? []).some(([lo, hi]) => r.a >= lo && r.a <= hi)) return 'content';
+      if (r.t === 2 && !(stmNums.has(r.a) && innerNums.has(r.num))) return 'content';
+      if (r.t === 0 && r.num !== 0) freed.add(r.num);
+    }
+    const redefined = new Set([...objs.filter((o) => o.num < size).map((o) => o.num), ...freed]);
     const old = redefined.size ? await oldEntries(src, oldSize, redefined) : new Map<number, Entry | null>();
     if (!old) return 'content';
+    for (const n of freed) {
+      const before = old.get(n);
+      if (!before || !['annot', 'page', 'catalog', 'meta', 'info'].includes(kindOf(before, info.has(n)))) return 'content';
+    }
     for (const o of objs) {
       const k = kindOf(o.entry, info.has(o.num));
       const before = old.get(o.num);

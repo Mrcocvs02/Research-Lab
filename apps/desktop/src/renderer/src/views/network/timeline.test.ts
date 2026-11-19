@@ -7,7 +7,7 @@ function map(n: number): PreparedMap {
   const xs = new Float32Array(n).map((_, i) => (i % 5) * 10);
   const ys = new Float32Array(n).map((_, i) => Math.floor(i / 5) * 10);
   const bounds = boundsOf(xs, ys, n);
-  return { n, ids: Array.from({ length: n }, (_, i) => `d${i}`), xs, ys, bounds, grid: new PointGrid(xs, ys, n, bounds), indexOf: new Map(), levels: [], clusterById: new Map(), groups: [], seed: 1, builtAt: '', omitted: 0 };
+  return { n, ids: Array.from({ length: n }, (_, i) => `d${i}`), xs, ys, bounds, grid: new PointGrid(xs, ys, n, bounds), indexOf: new Map(), levels: [], clusterById: new Map(), groups: [], seed: 1, builtAt: '', omitted: 0, areas: [], ar: [], az: new Uint8Array(n), withArea: 0 };
 }
 
 describe('timeline layout', () => {

@@ -59,3 +59,14 @@ export function edgeAlpha(weight: number, dark: boolean): number {
   const a = 0.12 + 0.5 * Math.min(Math.max(weight, 0), 1);
   return dark ? Math.max(a, DARK_FLOOR) : a;
 }
+
+/**
+ * Widths by weight (section 18.3.2): a curved edge starts at `1.0 + 2.5 w` and ends at `0.4 + 0.6 w` (a citation 0.3 wider at
+ * the start); a straight one (past `MAX_CURVED`) is `0.6 + 1.4 w` px with its opacity times 0.8.
+ */
+export const edgeWidths = (weight: number, cites = false): { w0: number; w1: number } => {
+  const w = Math.min(Math.max(weight, 0), 1);
+  return { w0: 1.0 + 2.5 * w + (cites ? 0.3 : 0), w1: 0.4 + 0.6 * w };
+};
+export const straightWidth = (weight: number): number => 0.6 + 1.4 * Math.min(Math.max(weight, 0), 1);
+export const STRAIGHT_ALPHA = 0.8;

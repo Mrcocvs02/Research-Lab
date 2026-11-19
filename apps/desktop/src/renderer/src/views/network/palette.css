@@ -1,4 +1,7 @@
 /*
+ * Macro-area tints (D-483, section 18.3.5): seven hues with staggered lightness plus "other areas" and "no area"; every one is
+ * at least 3:1 on the view background in both themes (network.test.ts checks it). The --cat-* below stay for colouring by topic.
+ *
  * Categorical palette of the Map (D-367, D-379): ten tints, each at least 3:1 on the view background in both themes
  * (network.test.ts reads this file and checks it). The first six repeat the tokens of tokens.css; the light 3, 6 and 7
  * are darkened here because the prototype values were under 3:1 on --bg.
@@ -14,6 +17,15 @@
   --cat-8: #e5484d;
   --cat-9: #5b6b8c;
   --cat-10: #6e56cf;
+  --area-1: #195daa;
+  --area-2: #c8741d;
+  --area-3: #b95a93;
+  --area-4: #017460;
+  --area-5: #972e2d;
+  --area-6: #8d73d1;
+  --area-7: #857501;
+  --area-other: #5c6b7a;
+  --area-none: #696969;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
@@ -27,6 +39,15 @@
     --cat-8: #ff7f83;
     --cat-9: #8d9dbf;
     --cat-10: #9d8af0;
+    --area-1: #5d94da;
+    --area-2: #fec394;
+    --area-3: #ee97c9;
+    --area-4: #30b69a;
+    --area-5: #d87972;
+    --area-6: #c8b7ff;
+    --area-7: #d0bf5e;
+    --area-other: #9dadbe;
+    --area-none: #ababab;
   }
 }
 :root[data-theme='dark'] {
@@ -40,4 +61,13 @@
   --cat-8: #ff7f83;
   --cat-9: #8d9dbf;
   --cat-10: #9d8af0;
+  --area-1: #5d94da;
+  --area-2: #fec394;
+  --area-3: #ee97c9;
+  --area-4: #30b69a;
+  --area-5: #d87972;
+  --area-6: #c8b7ff;
+  --area-7: #d0bf5e;
+  --area-other: #9dadbe;
+  --area-none: #ababab;
 }

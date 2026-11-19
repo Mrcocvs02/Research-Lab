@@ -359,6 +359,24 @@
       "topics_one": "{{count}} topic",
       "topics_other": "{{count}} topics",
       "updated": "updated {{date}}"
+    },
+    "area": {
+      "colorMode": "Colours",
+      "colorAreas": "Macro-areas",
+      "colorTopics": "Topics",
+      "areaLegend": "Colours: macro-areas",
+      "areaOther_one": "Other {{count}} area",
+      "areaOther_other": "Other {{count}} areas",
+      "areaNone": "No tags",
+      "areaKey": "full: central in one area · faint: between several areas",
+      "areaCard": "Macro-areas: {{areas}}",
+      "areaNoTags": "No tags: the colours come from the topics",
+      "areaSingle": "One area only: the colours come from the topics",
+      "areaSparse_one": "Only {{count}} document has tags: the others are empty rings",
+      "areaSparse_other": "Only {{count}} documents have tags: the others are empty rings",
+      "areaByTopic": "Colour by topic",
+      "manageTags": "Manage tags",
+      "areaIsolate": "Isolate the area {{name}}"
     }
   }
 }

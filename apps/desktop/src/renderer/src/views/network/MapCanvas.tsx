@@ -8,10 +8,11 @@ import { Menu } from '../../components/Menu';
 import type { BridgePath } from './BridgePath';
 import { bridgeGeo, bridgeView, drawBridge } from './bridgeLayer';
 import { DocCard, HoverCard, useRestingHover } from './HoverCard';
-import { hullShape, inPolygon, type Pt } from './hulls';
+import { coreRadius } from './hulls';
+import { areaSummary, shareIn, type AreaDef } from './areaColors';
 import { pickLabels, placeTopicLabels, shortLabel, type LabelCandidate, type TopicLabelItem } from './labelsLod';
 import { firstNode, mapAction, nearestInDirection } from './mapKeyboard';
-import { clusterHulls, clusterText, nodeRadius, pointsInView, restingHulls, stepPoint, type PreparedMap } from './mapModel';
+import { clusterText, nodeRadius, paintPoints, pointsInView, stepPoint, type PointPaint, type PreparedMap } from './mapModel';
 import { peekTitle, wantTitles } from './titles';
 import { MiniMap } from './MiniMap';
 import { useCanvasView } from './useCanvasView';
@@ -33,6 +34,10 @@ export interface MapHandle {
   canvas(): HTMLCanvasElement | null;
   /** Lights a group (legend hover or focus) or none (null). */
   light(id: string | null): void;
+  /** Lights an area of the legend (nodes with less than 20 % in it fade to 25 %) or none. */
+  lightArea(area: number | null): void;
+  /** Isolates an area (the others fade to 15 %) or releases it. */
+  isolateArea(area: number | null): void;
 }
 
 interface Props {
@@ -51,6 +56,8 @@ interface Props {
   handle?: Ref<MapHandle>;
   /** Stable tint index (0..9) of each topic of the level and whether its outline is dashed (more than ten topics touching). */
   tints: { tint: number[]; dashed: boolean[] };
+  /** Colour by macro-area (D-483): the areas and the tint slot of each; null colours by topic. */
+  areas?: { defs: readonly AreaDef[]; slots: readonly number[] } | null;
   /** Documents that pass the filters (null: all); the others fade and shrink. */
   allow: ReadonlySet<string> | null;
   minimap: boolean;
@@ -92,12 +99,12 @@ function Announce({ docId, topic }: { docId: string; topic: string }) {
 
 /**
  * The Panorama on a canvas: one batched path per colour, culled to the viewport; hit testing through a grid; hulls of the
- * topics (convex hull, 16 px, two Chaikin passes) with their labels; a card on hover; the minimap; the camera of useCanvasView.
- * Double click on a hull opens the topic (its points spread out), Esc or a double click on the background closes it. Arrows go
+ * topics (no outline: their labels sit over the core) coloured by macro-area or by topic; a card on hover; the minimap; the camera of useCanvasView.
+ * Double click on a label or a point opens the topic (its points spread out), Esc or a double click on the background closes it. Arrows go
  * to the nearest point that way, `]` and `[` walk through the points in view, Enter selects, Shift+Enter reads, `L` opens Explore.
  * React renders only when the hovered or focused point changes, never per frame; nothing runs at rest.
  */
-export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, aiBadge, label, fitKey, handle, tints, allow, minimap, bridge = null, onBridge, overlay }: Props) {
+export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, aiBadge, label, fitKey, handle, tints, areas = null, allow, minimap, bridge = null, onBridge, overlay }: Props) {
   const { t } = useTranslation();
   const [hover, setHover, holdHover] = useRestingHover<{ idx: number; x: number; y: number }>(150, 250);
   const [menuFor, setMenuFor] = useState<number | null>(null);
@@ -129,16 +136,33 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
   selRef.current = selIdx;
   const lastLabel = useRef<string>('');
   const theme = useRef<MapTheme | null>(null);
-  const hulls = useMemo(() => clusterHulls(map, level), [map, level]);
-  /** Which hulls are filled at rest (§4.22) and the cluster of every point. */
-  const rest = useMemo(() => restingHulls(map, level), [map, level]);
+  /** Core circle of every topic (centre and 80th percentile radius): where its label goes. Nothing is outlined (D-482). */
+  const cores = useMemo(() => {
+    const g = map.groups[level];
+    return (map.levels[level] ?? []).map((_, s) => (g ? coreRadius(map.xs, map.ys, g.order, g.starts[s]!, g.starts[s + 1]!) : { cx: 0, cy: 0, r: 0 }));
+  }, [map, level]);
+  const areasRef = useRef(areas);
+  areasRef.current = areas;
+  const litArea = useRef(-1);
+  const isoArea = useRef(-1);
+  const paintRef = useRef<{ map: PreparedMap; areas: unknown; dark: boolean; paint: PointPaint } | null>(null);
+  /** The colours of the points by area for this map, palette and theme (null when colouring by topic). */
+  const areaPaint = (th: MapTheme): PointPaint | null => {
+    const a = areasRef.current;
+    if (!a) return null;
+    const c = paintRef.current;
+    if (c && c.map === map && c.areas === a && c.dark === th.dark) return c.paint;
+    const paint = paintPoints(map, a.slots, th.areas);
+    paintRef.current = { map, areas: a, dark: th.dark, paint };
+    return paint;
+  };
   const clusterOf = useMemo(() => {
     const g = map.groups[level];
     const of = new Int32Array(map.n);
     if (g) for (let s = 0; s + 1 < g.starts.length; s++) for (let j = g.starts[s]!; j < g.starts[s + 1]!; j++) of[g.order[j]!] = s;
     return of;
   }, [map, level]);
-  /** The cluster lit by the pointer or by the legend / keyboard (-1: none): its hull is full, the rest at 35%. */
+  /** The cluster lit by the pointer or by the legend / keyboard (-1: none): the other points go to 35 %, its own get a ring. */
   const lit = useRef(-1);
   const tintRef = useRef(tints);
   tintRef.current = tints;
@@ -188,89 +212,94 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
         f.t = Math.min(1, f.t + 16 / 240);
         animating = true;
       }
-      // Hulls and their labels first: behind the points.
+      // Labels of the topics: the box of the core of each one (no outline is drawn).
       const topicItems: TopicLabelItem[] = [];
       const texts: Array<{ text: string; ai: boolean; c: number }> = [];
       ctx.font = '600 13px system-ui, sans-serif';
       ctx.textBaseline = 'middle';
       clusters.forEach((c, s) => {
-        const hull = hulls[s];
-        if (!hull || hull.length === 0) return;
-        const screen = hull.map((p) => [toScreenX(v, p[0], w), toScreenY(v, p[1], h)] as Pt);
-        const minX = Math.min(...screen.map((p) => p[0]));
-        const maxX = Math.max(...screen.map((p) => p[0]));
-        const minY = Math.min(...screen.map((p) => p[1]));
-        const maxY = Math.max(...screen.map((p) => p[1]));
-        const tint = th.tints[tintRef.current.tint[s] ?? 0] ?? th.muted;
-        const isLit = s === litS;
-        // At rest only the isolated big groups are filled (5%, no outline); the lit one is full (12%, outline 1.5 px at 40%).
-        if ((isLit || rest.fill[s]) && maxX > -40 && minX < w + 40 && maxY > -40 && minY < h + 40) {
-          const shape = hullShape(screen, 16);
-          if (shape.length > 2) {
-            ctx.beginPath();
-            ctx.moveTo(shape[0]![0], shape[0]![1]);
-            for (let i = 1; i < shape.length; i++) ctx.lineTo(shape[i]![0], shape[i]![1]);
-            ctx.closePath();
-            ctx.globalAlpha = ease;
-            ctx.fillStyle = withAlpha(tint, isLit ? 0.12 : dark ? 0.08 : 0.05);
-            ctx.fill();
-            if (isLit) {
-              ctx.strokeStyle = withAlpha(tint, 0.4);
-              ctx.lineWidth = 1.5;
-              ctx.stroke();
-            }
-            ctx.globalAlpha = 1;
-          }
-        }
+        const core = cores[s];
+        if (!core || c.size === 0) return;
+        const r = core.r * v.k + 6;
+        const cx = toScreenX(v, core.cx, w);
+        const cy = toScreenY(v, core.cy, h);
         const text = clusterText(c);
         const label = shortLabel(text.text);
         if (label === '') return;
         const tw = ctx.measureText(label).width + (text.ai ? ctx.measureText(aiBadge).width + 16 : 0) + 10;
         texts.push({ text: label, ai: text.ai, c: s });
-        topicItems.push({ id: texts.length - 1, box: { x0: minX, y0: minY, x1: maxX, y1: maxY }, w: tw, size: c.size });
+        topicItems.push({ id: texts.length - 1, box: { x0: cx - r, y0: cy - r, x1: cx + r, y1: cy + r }, w: tw, size: c.size });
       });
-      // Points: one path per colour, culled to the viewport.
-      const groups = g ? clusters.length + 1 : 1;
+      // Points: one path per colour (the tint of a topic, or a bucket of area colours), culled to the viewport.
       const al = allowRef.current;
       const op = open.current;
+      const paint = areaPaint(th);
+      const areaLit = isoArea.current >= 0 ? isoArea.current : litArea.current;
+      const areaOn = paint !== null && areaLit >= 0;
+      const topicLit = !areaOn && litS >= 0;
+      const anyDim = areaOn || topicLit;
+      const dimAlpha = isoArea.current >= 0 ? 0.15 : areaOn ? 0.25 : 0.35;
+      const units: Array<{ color: string; none: boolean; from: number; to: number; at(j: number): number }> = [];
+      if (paint) for (const bk of paint.buckets) units.push({ color: bk.color, none: bk.none, from: 0, to: bk.idx.length, at: (j) => bk.idx[j]! });
+      else {
+        const groups = g ? clusters.length + 1 : 1;
+        for (let s = 0; s < groups; s++) {
+          const from = g ? g.starts[s]! : 0;
+          const to = g ? g.starts[s + 1]! : map.n;
+          if (from === to) continue;
+          units.push({ color: g && s < clusters.length ? (th.tints[tintRef.current.tint[s] ?? 0] ?? th.muted) : th.muted, none: false, from, to, at: (j) => (g ? g.order[j]! : j) });
+        }
+      }
+      const rings: number[] = [];
       let count = 0;
-      for (let s = 0; s < groups; s++) {
-        const from = g ? g.starts[s]! : 0;
-        const to = g ? g.starts[s + 1]! : map.n;
-        if (from === to) continue;
-        const color = g && s < clusters.length ? (th.tints[tintRef.current.tint[s] ?? 0] ?? th.muted) : th.muted;
-        const c0 = g && s < clusters.length ? clusters[s]!.centroid : null;
-        const rad = (round ? (c0 ? nodeRadius(clusters[s]!.size, cmax) : 3) : sq / 2) * grow;
-        const dim = litS >= 0 && s !== litS ? 0.35 : 1;
+      for (const u of units) {
         for (const pass of al ? [true, false] : [true]) {
-          ctx.fillStyle = color;
-          ctx.globalAlpha = (pass ? Math.max(ease, 0.001) : 0.08 + 0.92 * (1 - f.t)) * dim;
-          ctx.beginPath();
-          for (let j = from; j < to; j++) {
-            const i = g ? g.order[j]! : j;
-            if (al && al.has(map.ids[i]!) !== pass) continue;
-            if (op && op.cluster === s) continue;
-            let x = map.xs[i]!;
-            let y = map.ys[i]!;
-            if (c0 && ease < 1) {
-              x = c0.x + (x - c0.x) * ease;
-              y = c0.y + (y - c0.y) * ease;
+          for (const dimmed of anyDim ? [false, true] : [false]) {
+            ctx.fillStyle = u.none ? th.bg : u.color;
+            ctx.globalAlpha = (pass ? Math.max(ease, 0.001) : 0.08 + 0.92 * (1 - f.t)) * (dimmed ? dimAlpha : 1);
+            ctx.beginPath();
+            rings.length = 0;
+            for (let j = u.from; j < u.to; j++) {
+              const i = u.at(j);
+              if (al && al.has(map.ids[i]!) !== pass) continue;
+              const cs = clusterOf[i]!;
+              if (op && op.cluster === cs) continue;
+              if (anyDim && (areaOn ? shareIn(map.ar[i], areaLit) < 0.2 : cs !== litS) !== dimmed) continue;
+              const c0 = g && cs < clusters.length ? clusters[cs]!.centroid : null;
+              let x = map.xs[i]!;
+              let y = map.ys[i]!;
+              if (c0 && ease < 1) {
+                x = c0.x + (x - c0.x) * ease;
+                y = c0.y + (y - c0.y) * ease;
+              }
+              const sx = (x - v.cx) * v.k + w / 2;
+              const sy = (y - v.cy) * v.k + h / 2;
+              if (sx < -size || sy < -size || sx > w + size || sy > h + size) continue;
+              const rad = (round ? (c0 ? nodeRadius(clusters[cs]!.size, cmax) : 3) : sq / 2) * grow;
+              const hs = pass ? rad : rad * (0.5 + 0.5 * (1 - f.t));
+              if (round) {
+                ctx.moveTo(sx + hs, sy);
+                ctx.arc(sx, sy, hs, 0, Math.PI * 2);
+              } else ctx.rect(sx - hs, sy - hs, hs * 2, hs * 2);
+              if (topicLit && !dimmed) rings.push(sx, sy, hs);
+              count++;
             }
-            const sx = (x - v.cx) * v.k + w / 2;
-            const sy = (y - v.cy) * v.k + h / 2;
-            if (sx < -size || sy < -size || sx > w + size || sy > h + size) continue;
-            const hs = pass ? rad : rad * (0.5 + 0.5 * (1 - f.t));
-            if (round) {
-              ctx.moveTo(sx + hs, sy);
-              ctx.arc(sx, sy, hs, 0, Math.PI * 2);
-            } else ctx.rect(sx - hs, sy - hs, hs * 2, hs * 2);
-            count++;
-          }
-          ctx.fill();
-          if (round) {
-            ctx.strokeStyle = th.bg;
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
+            ctx.fill();
+            if (round || u.none) {
+              ctx.strokeStyle = u.none ? th.areas[8]! : th.bg;
+              ctx.lineWidth = u.none ? 1.5 : 1.5;
+              ctx.stroke();
+            }
+            if (rings.length > 0) {
+              ctx.strokeStyle = u.color;
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              for (let k = 0; k < rings.length; k += 3) {
+                ctx.moveTo(rings[k]! + rings[k + 2]! + 1.8, rings[k + 1]!);
+                ctx.arc(rings[k]!, rings[k + 1]!, rings[k + 2]! + 1.8, 0, Math.PI * 2);
+              }
+              ctx.stroke();
+            }
           }
         }
       }
@@ -281,17 +310,15 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
           op.t = Math.min(1, (now - op.at) / 300);
           animating = true;
         }
-        const ts = th.tints[tintRef.current.tint[op.cluster] ?? 0] ?? th.muted;
-        ctx.fillStyle = ts;
-        ctx.beginPath();
         for (const [i, [dx, dy]] of op.dx) {
+          ctx.fillStyle = pointColor(i, th);
           const x = toScreenX(v, map.xs[i]! + dx * op.t, w);
           const y = toScreenY(v, map.ys[i]! + dy * op.t, h);
-          ctx.moveTo(x + 4, y);
+          ctx.beginPath();
           ctx.arc(x, y, 4, 0, Math.PI * 2);
+          ctx.fill();
           count++;
         }
-        ctx.fill();
       }
       if (ctx.canvas.dataset['drawn'] !== String(count)) ctx.canvas.dataset['drawn'] = String(count);
       // Titles of the documents on a deep zoom (>= 2.5 times the fitted view): at most 30, the ones nearest the centre.
@@ -336,7 +363,7 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
       };
       const hi = hoverIdx.current;
       if (hi >= 0) {
-        const sprite = haloSprite(th.tints[tintRef.current.tint[clusterIndexOf(hi)] ?? 0] ?? th.accent);
+        const sprite = haloSprite(pointColor(hi, th));
         const hx = toScreenX(v, at(hi)[0], w);
         const hy = toScreenY(v, at(hi)[1], h);
         if (sprite) {
@@ -402,8 +429,8 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
       const spots = placeTopicLabels(topicItems, w, h);
       for (const [id, at] of spots) {
         const tx = texts[id]!;
-        const tint = th.tints[tintRef.current.tint[tx.c] ?? 0] ?? th.text;
-        const ink = mix(tint, th.text, dark ? 0.15 : 0.4);
+        const tint = areasRef.current ? th.muted : (th.tints[tintRef.current.tint[tx.c] ?? 0] ?? th.text);
+        const ink = areasRef.current ? mix(th.muted, th.text, 0.5) : mix(tint, th.text, dark ? 0.15 : 0.4);
         const tw = topicItems.find((it) => it.id === id)!.w;
         shown++;
         labelBoxes.current.push({ s: tx.c, x: at.x, y: at.y, w: tw });
@@ -450,10 +477,10 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
     onHover(idx, sx, sy) {
       if (view.canvas.current) view.canvas.current.style.cursor = idx !== null && idx <= -2 ? 'grab' : '';
       const i = idx !== null && idx >= 0 ? idx : -1;
-      // The group under the pointer (a point, its label or its hull) is lit; the legend or the keyboard may hold one lit (focusLit).
+      // The group under the pointer (a point or its label) is lit; the legend or the keyboard may hold one lit (focusLit).
       if (idx !== null) focusLit.current = false;
       if (!focusLit.current) {
-        const c = i >= 0 ? clusterOf[i]! : idx !== null && idx <= -2 ? -2 - idx : idx === null ? -1 : clusterAt(sx, sy);
+        const c = i >= 0 ? clusterOf[i]! : idx !== null && idx <= -2 ? -2 - idx : -1;
         if (c !== lit.current) {
           lit.current = c;
           view.requestDraw();
@@ -510,7 +537,11 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
       }
       c.centroid.x += dx;
       c.centroid.y += dy;
-      hulls[d.s] = (hulls[d.s] ?? []).map((p) => [p[0] + dx, p[1] + dy] as Pt);
+      const core = cores[d.s];
+      if (core) {
+        core.cx += dx;
+        core.cy += dy;
+      }
     },
     dragEnd() {
       if (drag.current?.kind === 'label') map.grid = new PointGrid(map.xs, map.ys, map.n, boundsOf(map.xs, map.ys, map.n));
@@ -518,13 +549,13 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
       if (view.canvas.current) view.canvas.current.style.cursor = '';
     },
     onDoubleClick(idx) {
-      if (idx !== null && idx >= 0) return false;
-      // A double click on a hull opens the topic; on the background it closes an open one (else the camera zooms in).
+      // A double click on a topic's label or on one of its points (the nearest within 12 px) opens the topic; on the background it closes an open one (else the camera zooms in).
       const v = view.view.current;
       const { w, h } = view.size.current;
       const pt = lastPointer.current;
-      const s = clusterAt(pt.x, pt.y, v, w, h);
-      if (s >= 0) {
+      const near = idx !== null && idx >= 0 ? idx : map.grid.nearest(toWorldX(v, pt.x, w), toWorldY(v, pt.y, h), 12 / v.k);
+      const s = idx !== null && idx <= -2 ? -2 - idx : near >= 0 ? clusterOf[near]! : -1;
+      if (s >= 0 && s < (map.levels[level]?.length ?? 0)) {
         openTopic(s);
         return true;
       }
@@ -544,20 +575,11 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
   /** True while the legend or the keyboard holds a group lit: the pointer does not change it until it leaves the canvas or Esc. */
   const focusLit = useRef(false);
 
-  /** The cluster whose hull contains the screen point (the smallest wins), or -1. */
-  function clusterAt(px: number, py: number, v = view.view.current, w = view.size.current.w, h = view.size.current.h): number {
-    let best = -1;
-    let bestSize = Infinity;
-    (map.levels[level] ?? []).forEach((c, s) => {
-      const hull = hulls[s];
-      if (!hull || hull.length === 0 || c.size >= bestSize) return;
-      const shape = hullShape(hull.map((p) => [toScreenX(v, p[0], w), toScreenY(v, p[1], h)] as Pt), 16);
-      if (shape.length > 2 && inPolygon(px, py, shape)) {
-        best = s;
-        bestSize = c.size;
-      }
-    });
-    return best;
+  /** Colour of a point: its area colour, or the tint of its topic. */
+  function pointColor(i: number, th: MapTheme): string {
+    const p = areaPaint(th);
+    if (p) return p.colors[i]!;
+    return th.tints[tintRef.current.tint[clusterIndexOf(i)] ?? 0] ?? th.muted;
   }
 
   /** Opens a topic: its points spread out with a collision pass, so they can be picked one by one (D-379). */
@@ -686,6 +708,8 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
         break;
       case 'escape':
         lit.current = -1;
+        litArea.current = -1;
+        isoArea.current = -1;
         focusLit.current = false;
         cursor.current = -1;
         setFocused(null);
@@ -742,6 +766,14 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
         focusLit.current = lit.current >= 0;
         view.requestDraw();
       },
+      lightArea(area) {
+        litArea.current = area ?? -1;
+        view.requestDraw();
+      },
+      isolateArea(area) {
+        isoArea.current = area ?? -1;
+        view.requestDraw();
+      },
       flyToDoc(docId) {
         const i = map.indexOf.get(docId);
         if (i === undefined) return;
@@ -771,13 +803,18 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
     view.requestDraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, level, selIdx, tints]);
+  useEffect(() => {
+    if (!areas) litArea.current = isoArea.current = -1;
+    view.requestDraw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areas]);
 
   const paintMini = useCallback(
     (ctx: CanvasRenderingContext2D, to: (x: number, y: number) => [number, number]) => {
       const th = theme.current;
       (map.levels[level] ?? []).forEach((c, s) => {
         const [x, y] = to(c.centroid.x, c.centroid.y);
-        ctx.fillStyle = th?.tints[tintRef.current.tint[s] ?? 0] ?? '#888';
+        ctx.fillStyle = areasRef.current ? (th?.muted ?? '#888') : (th?.tints[tintRef.current.tint[s] ?? 0] ?? '#888');
         ctx.globalAlpha = 0.55;
         ctx.beginPath();
         ctx.arc(x, y, 2 + Math.sqrt(c.size / Math.max(map.n, 1)) * 14, 0, Math.PI * 2);
@@ -814,10 +851,10 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
         }}
         onKeyDown={onKeyDown}
       />
-      {focused !== null && <Announce docId={map.ids[focused]!} topic={announceFor(focused)} />}
+      {focused !== null && <Announce docId={map.ids[focused]!} topic={`${announceFor(focused)}${areas ? ` · ${areaSummary(map.ar[focused], areas.defs)}` : ''}`} />}
       {hover && (
         <HoverCard x={hover.x} y={hover.y} width={view.size.current.w} height={view.size.current.h} testId="map-tooltip" live={onBridge ? { label: t('network.card.actions'), onEnter: () => holdHover(true), onLeave: () => menuFor === null && holdHover(false) } : undefined}>
-          <DocCard docId={map.ids[hover.idx]!} topic={hoverTopic} />
+          <DocCard docId={map.ids[hover.idx]!} topic={hoverTopic} area={areas ? areaSummary(map.ar[hover.idx], areas.defs) : undefined} />
           {onBridge && (
             <button ref={moreBtn} type="button" className="icon-button hc-more" aria-haspopup="menu" aria-label={t('network.more')} title={t('network.more')} onClick={() => setMenuFor(hover.idx)} data-testid="map-card-more">
               <span aria-hidden="true">⋯</span>
@@ -837,7 +874,7 @@ export function MapCanvas({ map, level, selected, onSelect, onRead, onExplore, a
       />
       {second !== null && <BridgePick docId={map.ids[second]!} onCancel={() => setSecond(null)} />}
       {overlay}
-      {minimap && map.n >= 30 && <MiniMap bounds={map.bounds} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={`${level}:${map.n}:${tints.tint.join(',')}`} />}
+      {minimap && map.n >= 30 && <MiniMap bounds={map.bounds} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={`${level}:${map.n}:${tints.tint.join(',')}:${areas ? 'a' : 't'}`} />}
     </div>
   );
 }

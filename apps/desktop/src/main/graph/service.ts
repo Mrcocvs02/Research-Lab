@@ -1,16 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
-import { AppError, GRAPH_LIMITS, contentHashOf, type DocumentId, type DocumentRecord } from '@rl/core';
+import { AppError, contentHashOf, type DocumentId, type DocumentRecord } from '@rl/core';
 import { readCachedText, createLibraryStore } from '@rl/data';
-import { STORE_K, countTerms, createPlacer, decodeModel, modelVector, neighborsOf, reasonsOf, sharedTerms, surprisingPairs, type GraphModel, type Reason } from '@rl/graph';
+import { STORE_K, type AreaSummary, countTerms, createPlacer, decodeModel, modelVector, neighborsOf, reasonsOf, sharedTerms, surprisingPairs, type GraphModel, type Reason } from '@rl/graph';
 import type { MainServices } from '../ipc/handlers/services.js';
 import type { LibraryRuntime } from '../library/library-runtime.js';
 import { createGraphEngine, type BuildProgress, type GraphEngine, type GraphStoreArgs, type SimilarItem } from './engine.js';
 import { GRAPH_PAGES, GRAPH_TEXT_CHARS, docSig, folderOfPath, toGraphDoc } from './inputs.js';
-import { readLabels } from './labels-store.js';
 import { readMeta } from './model-meta.js';
 import { graphPaths } from './paths.js';
-import { loadView, scopeIds, titleOf, type LibraryView } from './view.js';
+import { loadView, titleOf, type LibraryView } from './view.js';
 
 /** Seed of the first build (a rebuild keeps the seed of the model it replaces unless one is given). */
 export const DEFAULT_SEED = 1;
@@ -257,7 +256,6 @@ export async function whenBuilt(s: MainServices): Promise<void> {
 
 /* --------------------------------------------------- map --------------------------------------------------- */
 
-const clusterId = (m: GraphModel, c: number): string => (m.clusters[c] as { id: string }).id;
 
 async function counts(rt: LibraryRuntime, view: LibraryView, rec: DocumentRecord, light: boolean) {
   const cached = light ? null : await readCachedText(rt.textCacheDir, contentHashOf(rec), GRAPH_PAGES);
@@ -287,58 +285,8 @@ export async function placePending(s: MainServices, rt: LibraryRuntime, view: Li
   return out;
 }
 
-export async function map(s: MainServices, scope: { folder?: string | undefined; projectId?: string | undefined; tagId?: string | undefined } | undefined) {
-  const rt = await s.runtime.require();
-  const view = await loadView(rt);
-  const lm = await loadModel(s, rt);
-  if (!lm) throw noModel();
-  const m = lm.model;
-  const wanted = await scopeIds(rt, view, scope);
-  const points: Array<{ docId: string; x: number; y: number; clusters: string[] }> = [];
-  const stale = new Set<string>();
-  const { pending } = drift(view, m, lm.index);
-  for (const r of pending) stale.add(r.id);
-  for (let i = 0; i < m.ids.length; i++) {
-    const id = m.ids[i] as string;
-    if (stale.has(id) || !view.byId.has(id) || (wanted && !wanted.has(id))) continue;
-    points.push({ docId: id, x: m.x[i] as number, y: m.y[i] as number, clusters: (m.cl[i] as number[]).map((c) => clusterId(m, c)) });
-  }
-  const placed = await placePending(s, rt, view, lm, wanted ? pending.filter((r) => wanted.has(r.id)) : pending);
-  for (const [id, p] of placed) points.push({ docId: id, x: p.x, y: p.y, clusters: p.clusters.map((c) => clusterId(m, c)) });
-  // More documents than the reply may carry (60,000 can be built, 50,000 shown): the rest are counted so the view can say so.
-  const omitted = Math.max(0, points.length - GRAPH_LIMITS.mapPoints);
-  if (omitted > 0) points.length = GRAPH_LIMITS.mapPoints;
-
-  // Clusters: sizes and centroids from the points that are on the map (a scope or a placement changes them).
-  const acc = new Map<string, { n: number; sx: number; sy: number }>();
-  for (const p of points) {
-    for (const c of p.clusters) {
-      const a = acc.get(c) ?? { n: 0, sx: 0, sy: 0 };
-      a.n++;
-      a.sx += p.x;
-      a.sy += p.y;
-      acc.set(c, a);
-    }
-  }
-  const labels = await readLabels(s, rt, modelId(m));
-  const clusters = m.clusters.flatMap((c) => {
-    const a = acc.get(c.id);
-    if (!a) return [];
-    const label = labels[c.id];
-    return [
-      {
-        id: c.id,
-        parent: c.parent >= 0 ? clusterId(m, c.parent) : null,
-        level: c.level,
-        size: a.n,
-        topTerms: c.terms.slice(0, 12),
-        aiLabel: label ? { text: label.text, meta: label.meta } : null,
-        centroid: { x: Math.round((a.sx / a.n) * 1e4) / 1e4, y: Math.round((a.sy / a.n) * 1e4) / 1e4 },
-      },
-    ];
-  });
-  return { points, clusters, seed: m.seed, builtAt: m.builtAt, omitted };
-}
+/** `graph:map`: the work is in the lazy `map-run` chunk (it also adds the macro-areas, D-483). */
+export const map = (s: MainServices, scope: { folder?: string | undefined; projectId?: string | undefined; tagId?: string | undefined } | undefined) => import('./map-run.js').then((m) => m.map(s, scope));
 
 /* ------------------------------------------- similar, surprising, neighbours ------------------------------------------- */
 
@@ -408,6 +356,8 @@ interface OutNode {
   id: string;
   label: string;
   count?: number;
+  ar?: number[][] | undefined;
+  az?: number | undefined;
 }
 interface OutEdge {
   from: string;
@@ -424,7 +374,7 @@ const folderLabel = (f: string) => (f === '' ? '/' : f.slice(f.lastIndexOf('/') 
 export async function neighbors(
   s: MainServices,
   req: { node: { kind: NodeKind; id: string }; kinds: string[]; limit: number },
-): Promise<{ nodes: OutNode[]; edges: OutEdge[] }> {
+): Promise<{ nodes: OutNode[]; edges: OutEdge[]; areas?: AreaSummary[] }> {
   const rt = await s.runtime.require();
   const view = await loadView(rt);
   const nodes = new Map<string, OutNode>();
@@ -521,5 +471,5 @@ export async function neighbors(
       }
     }
   }
-  return { nodes: [...nodes.values()], edges };
+  return (await import('./areas-run.js')).withNeighborAreas(s, view, { nodes: [...nodes.values()], edges });
 }

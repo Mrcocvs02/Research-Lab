@@ -16,11 +16,14 @@ export interface EntityNode {
   years: number[];
   /** What the tint comes from: a topic id, a tag branch id, or `#rrggbb` (a colour the user gave to a tag). */
   colorKey: string;
-  /** Hull group: the tag branch, the parent topic, the author community. */
+  /** Group: the tag branch, the parent topic, the author community. */
   group: string;
   /** Other forms of the name (authors): more than one means a possible namesake. */
   variants?: string[];
-  /** Label of the group (the hull): "Group of <most central author>", the branch, the parent topic. */
+  /** Macro-area shares and centrality (D-483). */
+  ar?: ReadonlyArray<ReadonlyArray<number>> | undefined;
+  az?: number | undefined;
+  /** Label of the group: "Group of <most central author>", the branch, the parent topic. */
   groupLabel?: string;
 }
 
@@ -43,6 +46,8 @@ export interface EntityNetwork {
   truncated: boolean;
   /** First and last year of the ten bins. */
   yearRange?: [number, number] | undefined;
+  /** Macro-areas of the library (D-483), when the taxonomy has any. */
+  areas?: Array<{ id: string; label: string; count: number; branches: Array<{ id: string; count: number }> }> | undefined;
   /** Documents in the entity network (all the documents in the scope). */
   documents?: number | undefined;
 }

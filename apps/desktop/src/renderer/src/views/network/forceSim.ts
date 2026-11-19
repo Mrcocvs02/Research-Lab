@@ -30,6 +30,9 @@ export interface NetNode {
   entity?: EntityNode | undefined;
   group?: string | undefined;
   r?: number | undefined;
+  /** Macro-area shares and centrality of the node (D-483). */
+  ar?: ReadonlyArray<ReadonlyArray<number>> | undefined;
+  az?: number | undefined;
 }
 
 export interface NetEdge {
@@ -50,6 +53,8 @@ export interface RawNode {
   entity?: EntityNode;
   group?: string;
   r?: number;
+  ar?: ReadonlyArray<ReadonlyArray<number>> | undefined;
+  az?: number | undefined;
 }
 export interface RawEdge {
   from: string;
@@ -59,13 +64,23 @@ export interface RawEdge {
 }
 
 export const MAX_NET_NODES = 800;
-const REST = 70;
+export const REST = 70;
 const OLD_MOBILITY = 0.04;
 const THETA = 0.9;
 const REPEL = REST * REST * 0.9;
-const SPRING = 0.08;
-const GRAVITY = 0.012;
-const GROUP_PULL = 0.03;
+/** Rest length of an edge: `rho_i + rho_j + L_MIN + (L_MAX - L_MIN) * (1 - w)^1.5` (section 18.3.1). */
+const L_MIN = 0.45 * REST;
+const L_MAX = 1.7 * REST;
+/** Nothing pushes beyond this distance (far pieces do not fly off). */
+const REPEL_RANGE = 6 * REST;
+const GAP = 4;
+const DOC_RADIUS = 6;
+const GRAVITY = 0.02;
+const GROUP_PULL = 0.012;
+const MIN_GROUP = 3;
+const COLLIDE = 0.8;
+/** Weight of the edges that carry none (a tag or a folder holding a document). */
+const FLAT_WEIGHT = 0.3;
 const DAMP = 0.6;
 const MAX_SPEED = 40;
 /** The temperature decays from 1 to this in about 300 steps. */
@@ -78,7 +93,12 @@ interface Sim {
   list: NetNode[];
   ei: Int32Array;
   ej: Int32Array;
-  ew: Float64Array;
+  /** Rest length, stiffness and the share of the move that falls on `i` (0..2; `j` takes `2 - share`). */
+  el: Float64Array;
+  ek: Float64Array;
+  es: Float64Array;
+  rad: Float64Array;
+  rmax: number;
   xs: Float64Array;
   ys: Float64Array;
   fx: Float64Array;
@@ -86,9 +106,15 @@ interface Sim {
   tree: QuadTree;
 }
 
+/** The weight of an edge as the springs see it. */
+export const springWeight = (e: { kind: EdgeKind; weight: number }): number => (e.kind === 'tagged' || e.kind === 'contains' ? FLAT_WEIGHT : Math.min(Math.max(e.weight, 0), 1));
+
+/** Rest length of an edge of weight `w` between nodes of radius `ri` and `rj`: strong edges are short, weak ones long. */
+export const restLength = (w: number, ri: number, rj: number): number => ri + rj + L_MIN + (L_MAX - L_MIN) * Math.pow(1 - w, 1.5);
+
 export const keyOf = (kind: NodeKind, id: string): string => `${kind}:${id}`;
 
-const makeNode = (r: RawNode, via: string | null): NetNode => ({ key: keyOf(r.kind, r.id), kind: r.kind, id: r.id, label: r.label, count: r.count, x: r.x ?? 0, y: r.y ?? 0, vx: 0, vy: 0, mobility: 1, expanded: false, via, pinned: false, fixed: false, entity: r.entity, group: r.group, r: r.r });
+const makeNode = (r: RawNode, via: string | null): NetNode => ({ key: keyOf(r.kind, r.id), kind: r.kind, id: r.id, label: r.label, count: r.count, x: r.x ?? 0, y: r.y ?? 0, vx: 0, vy: 0, mobility: 1, expanded: false, via, pinned: false, fixed: false, entity: r.entity, group: r.group, r: r.r, ar: r.ar, az: r.az });
 
 export class Network {
   nodes = new Map<string, NetNode>();
@@ -281,22 +307,42 @@ export class Network {
     const ei: number[] = [];
     const ej: number[] = [];
     const ew: number[] = [];
+    const deg = new Int32Array(n);
     for (const e of this.edges) {
       const i = index.get(e.a);
       const j = index.get(e.b);
       if (i === undefined || j === undefined) continue;
       ei.push(i);
       ej.push(j);
-      ew.push(e.weight);
+      ew.push(springWeight(e));
+      deg[i]!++;
+      deg[j]!++;
     }
-    c = { version: this.version, n, list, ei: Int32Array.from(ei), ej: Int32Array.from(ej), ew: Float64Array.from(ew), xs: new Float64Array(n), ys: new Float64Array(n), fx: new Float64Array(n), fy: new Float64Array(n), tree: c?.tree ?? new QuadTree() };
+    const m = ei.length;
+    const rad = new Float64Array(n);
+    let rmax = 0;
+    for (let i = 0; i < n; i++) {
+      rad[i] = list[i]!.r ?? DOC_RADIUS;
+      if (rad[i]! > rmax) rmax = rad[i]!;
+    }
+    const el = new Float64Array(m);
+    const ek = new Float64Array(m);
+    const es = new Float64Array(m);
+    for (let k = 0; k < m; k++) {
+      const i = ei[k]!;
+      const j = ej[k]!;
+      el[k] = restLength(ew[k]!, rad[i]!, rad[j]!);
+      ek[k] = (0.02 + 0.1 * ew[k]!) / Math.min(deg[i]!, deg[j]!);
+      es[k] = (2 * deg[j]!) / (deg[i]! + deg[j]!);
+    }
+    c = { version: this.version, n, list, ei: Int32Array.from(ei), ej: Int32Array.from(ej), el, ek, es, rad, rmax, xs: new Float64Array(n), ys: new Float64Array(n), fx: new Float64Array(n), fy: new Float64Array(n), tree: c?.tree ?? new QuadTree() };
     this.cache = c;
     return c;
   }
 
   private step(): void {
     const c = this.sync();
-    const { list, xs, ys, fx, fy, n } = c;
+    const { list, xs, ys, fx, fy, n, rad } = c;
     for (let i = 0; i < n; i++) {
       xs[i] = list[i]!.x;
       ys[i] = list[i]!.y;
@@ -305,30 +351,37 @@ export class Network {
     }
     c.tree.build(xs, ys, n);
     const out = { x: 0, y: 0 };
+    const maxD2 = REPEL_RANGE * REPEL_RANGE;
     let cx = 0;
     let cy = 0;
+    let rsum = 0;
+    for (let i = 0; i < n; i++) rsum += rad[i]!;
+    const mean = rsum / Math.max(n, 1);
     for (let i = 0; i < n; i++) {
-      c.tree.repulse(i, xs[i]!, ys[i]!, THETA, REPEL, out);
+      const dmin = rad[i]! + mean + GAP;
+      c.tree.repulse(i, xs[i]!, ys[i]!, THETA, REPEL, out, 0.01, dmin * dmin, maxD2);
       fx[i]! += out.x;
       fy[i]! += out.y;
       cx += xs[i]!;
       cy += ys[i]!;
     }
+    // Springs: the force k (d - l) along the edge, shared by the degrees (a hub moves little and does not drag everything in).
     for (let k = 0; k < c.ei.length; k++) {
       const i = c.ei[k]!;
       const j = c.ej[k]!;
       const ex = xs[j]! - xs[i]!;
       const ey = ys[j]! - ys[i]!;
       const d = Math.sqrt(ex * ex + ey * ey) || 0.01;
-      const f = (d - REST * (1.3 - 0.5 * c.ew[k]!)) * SPRING;
-      fx[i]! += (ex / d) * f;
-      fy[i]! += (ey / d) * f;
-      fx[j]! -= (ex / d) * f;
-      fy[j]! -= (ey / d) * f;
+      const f = (d - c.el[k]!) * c.ek[k]!;
+      fx[i]! += (ex / d) * f * c.es[k]!;
+      fy[i]! += (ey / d) * f * c.es[k]!;
+      fx[j]! -= (ex / d) * f * (2 - c.es[k]!);
+      fy[j]! -= (ey / d) * f * (2 - c.es[k]!);
     }
-    // Gravity towards the centre of mass and, for entities, towards the centre of their group.
+    // Gravity only outside a free zone around the centre of mass, and the pull of a group of at least three nodes.
     cx /= Math.max(n, 1);
     cy /= Math.max(n, 1);
+    const free = 0.6 * REST * Math.sqrt(n);
     const groups = new Map<string, [number, number, number]>();
     for (let i = 0; i < n; i++) {
       const g = list[i]!.group;
@@ -343,10 +396,16 @@ export class Network {
     const a = this.alpha;
     for (let i = 0; i < n; i++) {
       const nd = list[i]!;
-      let gx = (cx - xs[i]!) * GRAVITY;
-      let gy = (cy - ys[i]!) * GRAVITY;
+      let gx = 0;
+      let gy = 0;
+      const dist = Math.hypot(cx - xs[i]!, cy - ys[i]!);
+      if (dist > free) {
+        const pull = (GRAVITY * (dist - free)) / dist;
+        gx = (cx - xs[i]!) * pull;
+        gy = (cy - ys[i]!) * pull;
+      }
       const g = nd.group !== undefined ? groups.get(nd.group) : undefined;
-      if (g && g[2] > 1) {
+      if (g && g[2] >= MIN_GROUP) {
         gx += (g[0] / g[2] - xs[i]!) * GROUP_PULL;
         gy += (g[1] / g[2] - ys[i]!) * GROUP_PULL;
       }
@@ -366,8 +425,55 @@ export class Network {
       nd.y += nd.vy;
       energy += nd.vx * nd.vx + nd.vy * nd.vy;
     }
+    this.collide(c);
     this.energy = energy / Math.max(n, 1);
     this.alpha *= 1 - ALPHA_DECAY;
+  }
+
+  /** The collision pass: two nodes closer than `rho_i + rho_j + 4` are pushed apart by 0.8 of the missing distance (a fixed node does not move, the other takes it all). */
+  private collide(c: Sim): void {
+    const { list, xs, ys, n, rad, tree } = c;
+    if (n < 2) return;
+    for (let i = 0; i < n; i++) {
+      xs[i] = list[i]!.x;
+      ys[i] = list[i]!.y;
+    }
+    tree.build(xs, ys, n);
+    const reach = c.rmax * 2 + GAP;
+    for (let i = 0; i < n; i++) {
+      const x = xs[i]!;
+      const y = ys[i]!;
+      tree.query(x - reach, y - reach, x + reach, y + reach, (j) => {
+        if (j <= i) return;
+        const need = rad[i]! + rad[j]! + GAP;
+        let dx = xs[j]! - xs[i]!;
+        let dy = ys[j]! - ys[i]!;
+        let d = Math.hypot(dx, dy);
+        if (d >= need) return;
+        if (d < 1e-9) {
+          const h = hash01(`${list[i]!.key}|${list[j]!.key}`) * Math.PI * 2;
+          dx = Math.cos(h);
+          dy = Math.sin(h);
+          d = 1;
+        }
+        const a = list[i]!;
+        const b = list[j]!;
+        const lockA = a.pinned || a.fixed;
+        const lockB = b.pinned || b.fixed;
+        if (lockA && lockB) return;
+        const push = (COLLIDE * (need - d)) / d;
+        const wa = lockA ? 0 : lockB ? 1 : 0.5;
+        const wb = lockB ? 0 : lockA ? 1 : 0.5;
+        a.x -= dx * push * wa;
+        a.y -= dy * push * wa;
+        b.x += dx * push * wb;
+        b.y += dy * push * wb;
+        xs[i] = a.x;
+        ys[i] = a.y;
+        xs[j] = b.x;
+        ys[j] = b.y;
+      });
+    }
   }
 
   /** Lets the network move again for a while (a node was dragged): a gentle temperature, so the neighbours follow like elastics. */

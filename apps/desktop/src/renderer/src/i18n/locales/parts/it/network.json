@@ -359,6 +359,24 @@
       "topics_one": "{{count}} argomento",
       "topics_other": "{{count}} argomenti",
       "updated": "aggiornata il {{date}}"
+    },
+    "area": {
+      "colorMode": "Colori",
+      "colorAreas": "Macro-aree",
+      "colorTopics": "Argomenti",
+      "areaLegend": "Colori: macro-aree",
+      "areaOther_one": "Altra {{count}} area",
+      "areaOther_other": "Altre {{count}} aree",
+      "areaNone": "Senza tag",
+      "areaKey": "pieno: centrale in un'area · tenue: tra più aree",
+      "areaCard": "Macro-aree: {{areas}}",
+      "areaNoTags": "Nessun tag: i colori vengono dagli argomenti",
+      "areaSingle": "Una sola area: i colori vengono dagli argomenti",
+      "areaSparse_one": "Solo {{count}} documento ha tag: gli altri sono anelli vuoti",
+      "areaSparse_other": "Solo {{count}} documenti hanno tag: gli altri sono anelli vuoti",
+      "areaByTopic": "Colora per argomento",
+      "manageTags": "Gestisci tag",
+      "areaIsolate": "Isola l'area {{name}}"
     }
   }
 }

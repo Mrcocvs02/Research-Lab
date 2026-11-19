@@ -268,7 +268,7 @@ function LibraryInner() {
             </section>
 
             {detailOpen && (
-              <aside className="detail-pane" aria-label={t('docs.details')} data-testid="detail-pane" onKeyDown={(e) => e.key === 'Escape' && setDetailOpen(false)}>
+              <aside className="detail-pane" aria-label={t('docs.details')} data-testid="detail-pane" onKeyDown={(e) => e.key === 'Escape' && !document.querySelector('.rl-popover') && setDetailOpen(false)}>
                 <Lazy>
                   {single ? (
                     <DocumentCard key={single} docId={single} onClose={() => setDetailOpen(false)} />

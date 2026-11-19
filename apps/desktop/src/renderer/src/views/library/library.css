@@ -657,7 +657,7 @@ button.page-chip {
   gap: 8px;
   margin-left: auto;
 }
-.library-head__nav {
+.library-head .library-head__nav {
   display: none;
 }
 .lib-pop-body {
@@ -801,7 +801,7 @@ button.page-chip {
   .library-grid {
     grid-template-columns: minmax(0, 1fr);
   }
-  .library-head__nav {
+  .library-head .library-head__nav {
     display: inline-flex;
   }
   .library-nav {

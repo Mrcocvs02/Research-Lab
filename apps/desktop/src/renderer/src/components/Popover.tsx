@@ -97,7 +97,18 @@ export function Popover({
 
   if (!open) return null;
   return createPortal(
-    <div ref={box} role={role} aria-label={label} className={cx('rl-popover', className)} style={{ width, top: pos?.top ?? 0, left: pos?.left ?? 0, visibility: pos ? 'visible' : 'hidden' }}>
+    <div
+      ref={box}
+      role={role}
+      aria-label={label}
+      // The popover is a portal: React still bubbles its keys through the owner's tree, so an Escape that only closes the popover must stop here.
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return;
+        e.stopPropagation();
+        onClose();
+        anchor.current?.focus();
+      }}
+      className={cx('rl-popover', className)} style={{ width, top: pos?.top ?? 0, left: pos?.left ?? 0, visibility: pos ? 'visible' : 'hidden' }}>
       {children}
     </div>,
     document.body,

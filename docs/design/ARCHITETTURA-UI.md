@@ -952,7 +952,7 @@ Corregge Z2, Z3, Z4, Z5, Z24 dell'audit finale (T2, solo `views/network/**`). Ri
 
 **Menu `⋯`** (≤ 7 voci, ≤ 3 gruppi): Panorama **6** · 3 = Opzioni del modello… · Ricostruisci la mappa ┃ Disponi per anno · ☐ Minimappa ┃ Esporta l'immagine · ✦ Etichette con Claude…; Documenti **6** · 3 = Azzera la rete · Libera i nodi fissati ┃ ☐ Minimappa · Esporta l'immagine ┃ Opzioni del modello… · Ricostruisci; entità **5** · 2 = Libera i nodi fissati · ☐ Minimappa · Esporta l'immagine ┃ Opzioni del modello… · Ricostruisci; Esplora e Vicini **2** · 1 = Opzioni del modello… · Ricostruisci. Rete di ▾ **4** · 1. Cartellino del nodo **1**; pannello del nodo (Documenti) **3**.
 
-**Panorama: involucri che non si sovrappongono (Z3)**
+**Panorama: involucri che non si sovrappongono (Z3)** — *involucri e contorni tolti da §18.3.3 (D-482); la separazione dei nuclei resta.*
 - **Separazione dei gruppi:** ogni argomento è approssimato da un cerchio (baricentro, raggio = 80° percentile delle distanze); 60 passi di repulsione tra cerchi (distacco 24 px del mondo, spostamento rigido dei loro punti), poi 2 passi di collisione tra punti sul quadtree (distanza minima = diametro + 2 px). Calcolo una volta per disposizione, in cache, in `hulls.ts` (`separateClusters`) e `quadtree.ts`; sopra 5000 punti solo la separazione dei gruppi. La "Disponi per anno" non la usa.
 - **Involucro dal nucleo:** inviluppo dei punti entro il raggio dell'80° percentile (i lontani non lo gonfiano), Chaikin come oggi.
 - **A riposo:** riempimento solo dei gruppi che dopo la separazione non toccano altri nuclei e sono tra gli 8 più grandi: 5 % (scuro 8 %), **nessun contorno**; gli altri senza involucro, solo punti ed etichetta. **Al passaggio o a fuoco** (anche dalla legenda o con la tastiera): involucro del gruppo 12 % e contorno 1,5 px al 40 %, il resto al 35 %.
@@ -2238,7 +2238,7 @@ La barra del lettore da 13 controlli (D-410, §4.3) è un criterio di **F4** (on
 
 | Id | Compito | Condizione | Budget |
 | --- | --- | --- | --- |
-| Z1 | Manoscritto ↔ fonti (49): valore "Manoscritto" della scheda Schema, titoli da `.md`, `.tex`, `.docx` (lettore ZIP minimo su `zlib`), vista Matrice, suggerimenti di citazione sui paragrafi del manoscritto | risposta dell'utente su D-399 scritta in DECISIONS | renderer 6-8 (chunk proprio); main lazy 3-4; tetti alzati con una decisione |
+| Z1 | *Sostituito da §18.1 e §18.5 (Z1a, Z1b, Z1c; D-478).* Manoscritto ↔ fonti (49): valore "Manoscritto" della scheda Schema, titoli da `.md`, `.tex`, `.docx` (lettore ZIP minimo su `zlib`), vista Matrice, suggerimenti di citazione sui paragrafi del manoscritto | risposta dell'utente su D-399 scritta in DECISIONS | renderer 6-8 (chunk proprio); main lazy 3-4; tetti alzati con una decisione |
 | Z2 | Esportazione RIS e CSL JSON, schema delle chiavi scelto dall'utente (13) | risposta dell'utente su D-391 (13) scritta in DECISIONS | renderer 1-2; main lazy 3-4 |
 
 ---
@@ -2735,6 +2735,8 @@ Progetto P › Note › Tabella: Metodi a confronto                         [Esp
 
 #### 17.4.13 Scheda Schema del progetto: schema della ricerca, domande e prove (40, 54; manoscritto 49 da confermare, D-411)
 
+*La parte Manoscritto è confermata e ridisegnata in §18.1 (D-478), che prevale su questa sezione.*
+
 ```
 Progetto P   [Documenti] [Piano di lettura] [Note] [Schema]                [[Aggiungi documenti…]] [⋯]
 Schema   ( Ricerca | Manoscritto · da confermare )                           [ Solo prove ☐ ]
@@ -3081,3 +3083,245 @@ Critica: `docs/design/AUDIT.md`, "Critica delle funzioni aggiunte (giro 4)" (1 b
 | D.4.5 Y1 e quota Claude | minore | accolto: libreria sintetica, risposte registrate e rigiocate | D-425, §17.4.21 |
 
 **Perché D.3.12 è accolto solo in parte.** Scrivere negli appunti a ogni ritaglio sostituisce senza chiedere quello che l'utente aveva copiato, ed è un effetto invisibile che la regola "nessuna sorpresa" (§1 principio 7) esclude. La parte giusta della critica, una sola destinazione predefinita detta con un toast, è accolta.
+
+---
+
+## 18. Onda 13 (dopo 1.0): manoscritto ↔ fonti, Trova collegamenti, Mappa a molle e colori per macro-area (D-478 … D-485)
+
+Richieste dell'utente del 19 nov 2026. Questa sezione **prevale** su §4.20-§4.22, §16.3, §17.4.13 e sulla riga Z1 dell'onda 12 dove li contraddice; regole dei menu (D-412), stati vuoti (§4.22 Z5), testi it/en e accessibilità (§12) restano. I testid sono fissati qui. Ogni compito rimanda solo a `CLAUDE.md` e alla sua sottosezione.
+
+### 18.1 Funzione 49: manoscritto ↔ fonti (D-399 approvato, D-478)
+
+**Dove.** Nella scheda **Schema** del progetto (§17.4.13, X7), che diventa:
+
+```
+Progetto P   [Documenti] [Piano di lettura] [Note] [Schema]                     [[Aggiungi documenti…]] [⋯]
+Schema ( Ricerca | Manoscritto )   [tesi.tex · letto alle 10:42 ↻]   ( Elenco | Matrice )   [☐ Solo i buchi]  [⋯]
+⚠ 3 sezioni senza fonti · 5 fonti non usate
+▾ 1 Introduzione                                   4 paper · 2 evidenziazioni · 1 affermazione   (+ Assegna)
+    1.1 Motivazione       ⚠ nessuna fonte                                                       (+ Assegna)
+  ▾ 1.2 Contributi        📄 A 2021 ✕ · 📄 B 2019 ✕ · ▌ «…errore cresce…» (B 2019 p. 7) ✕ · ◆ «Con meno di…» ✕
+▸ 2 Metodo                                         2 paper
+Senza sezione (2) · assegnazioni di sezioni sparite dal file                          (Riassegna…) (Togli)
+```
+
+- `Segmented` **Ricerca | Manoscritto** (`schema-mode`, valori `schema-mode-research`, `schema-mode-manuscript`): c'è sempre quando la scheda Schema c'è. La scheda compare anche al primo uso del manoscritto (D-411 invariata: al massimo 4 schede). Ingresso una tantum: stato vuoto delle Note ("Scrivi lo schema della ricerca o collega il manoscritto") e tavolozza ("Collega il manoscritto…").
+- **Manoscritto vuoto** (`ms-empty`, schema di §4.22 Z5): titolo "Collega le sezioni del tuo testo alle fonti" · una frase ("Le sezioni vengono dai titoli del file, che l'app legge e non modifica mai") · primario [[Scegli un file .md, .tex o .docx…]] (`ms-link-file`) · link "oppure scrivi le sezioni qui" (`ms-start-app`).
+- **Riga della vista** (in Manoscritto): chip della fonte (`ms-source`: "tesi.tex · letto alle 10:42", clic = rilegge, `ms-refresh`; per le sezioni scritte nell'app "Sezioni scritte qui · Modifica", `ms-edit-sections`), `Segmented` **Elenco | Matrice** (`ms-view`, `ms-view-list`, `ms-view-matrix`), casella "Solo i buchi" (`ms-gaps-only`), `⋯` (`ms-more`, 5 voci in 2 gruppi: Cambia file… · Scrivi le sezioni qui · Scollega il manoscritto ┃ ✦ Proponi le assegnazioni… · Esporta la matrice (CSV)).
+- **Riepilogo** (`ms-summary`, `--text-muted`, una riga, solo se c'è almeno un buco): "⚠ N sezioni senza fonti · M fonti non usate"; ogni parte è un link che accende "Solo i buchi".
+
+**Sezioni.**
+- *Scritte nell'app:* editor a una riga per sezione, livello con `#`, `##`, `###`, `####` all'inizio (come le caselle dello schema della ricerca); una riga solo riformulata conserva id e assegnazioni (regola di `schemaModel.ts` per le domande).
+- *Lette da un file* (sola lettura, mai scritto né spostato): scelta con il dialogo, nuovo scopo `manuscript-file` (filtri `.md`, `.tex`, `.docx`). Livelli 1-4 (i più profondi vanno al 4), ≤ 500 sezioni, titoli ≤ 200 caratteri.
+  - `.md`: titoli ATX `#…####` e setext; si saltano front matter e blocchi di codice recintati.
+  - `.tex`: `\part`, `\chapter`, `\section`, `\subsection`, `\subsubsection` (anche `*` e `[breve]`), dopo `\begin{document}` se c'è; commenti `%` tolti; comandi nel titolo ridotti al testo (`\emph{x}` → x). Segue `\input`, `\include`, `\subfile` **solo dentro la cartella del file scelto e le sue sottocartelle**, profondità ≤ 3, ≤ 50 file, ≤ 4 MB in tutto; oltre, sezioni parziali e avviso "Letti 50 file su 63".
+  - `.docx`: paragrafi di `word/document.xml` con livello da `w:outlineLvl` (nel paragrafo o nello stile, risolto in `styles.xml`), poi dai nomi di stile "heading N"/"Titolo N"; lettore ZIP già presente (`packages/data/src/extract/formats.ts`), nessuna dipendenza.
+- *Riallineamento* (all'apertura della scheda e al ritorno del fuoco sulla finestra, confrontando dimensione e data; nessun watcher): file cambiato → si rilegge da solo e una pillola dice "Sezioni aggiornate: 2 nuove · 1 rinominata · 1 sparita" (`ms-changes`). Corrispondenza vecchia → nuova: (titolo normalizzato, livello, occorrenza), poi solo titolo, poi stessa posizione sotto lo stesso padre con titoli simili (Dice sui bigrammi ≥ 0,6). Una sezione sparita con assegnazioni va in **Senza sezione** (`ms-orphans`): niente si perde; "Riassegna…" sceglie una sezione, "Togli" chiede conferma.
+- *File assente o illeggibile:* restano le sezioni dell'ultima lettura; chip in `--warning` "tesi.tex non trovato · Ritrova il file…" o "non leggibile · motivo".
+
+**Cosa si assegna.** Un riferimento è `doc` (paper), `ann` (evidenziazione: docId, annId, pagina), `note` (nota del file o di una pagina), `litnote` (nota di letteratura) o `claim` (affermazione del progetto, §17.4.15). Gesti:
+1. "+ Assegna" sulla riga della sezione (`ms-section-add`) apre il dialogo **Assegna** (`ms-assign-dialog`, chunk proprio): campo di ricerca, chip-filtro Paper · Evidenziazioni · Note · Affermazioni, elenco dei membri del progetto, delle loro evidenziazioni e note e delle affermazioni; caselle multiple, [[Assegna (n)]]; voce `ms-assign-item`.
+2. Nella **Matrice**, Spazio o clic su una cella attiva o toglie il paper intero.
+3. Scheda Documenti del progetto, `⋯` della riga: "Assegna a una sezione…" (sempre presente; senza manoscritto disattivata con il motivo "Collega o scrivi il manoscritto nella scheda Schema").
+4. Dialogo "Usa come prova…" (`UseAsEvidence.tsx`): campo facoltativo "Sezione del manoscritto", solo se il manoscritto esiste (nessun controllo nuovo nel lettore).
+Togliere: ✕ sulla voce (`ms-unassign`), annullabile con Ctrl+Z (Cronologia, §3.3).
+
+**Elenco** (`ms-section`, `data-section-id`, `data-gap`): sezioni rientrate per livello, apribili; chiusa mostra i conteggi per tipo, aperta le voci raggruppate (Paper, Evidenziazioni, Note, Affermazioni) con ✕. **Buco** = sezione senza voci, né sue né delle sottosezioni: badge `ms-gap` "⚠ nessuna fonte" (icona e testo, mai solo colore). **Fonte non usata** = paper del progetto senza alcuna voce in nessuna sezione.
+
+**Matrice** (`ms-matrix`, chunk proprio, `role="grid"`):
+
+```
+                        A 2021   B 2019   C 2018   D 2020a  D 2020b ┆ E 2017 (non usata)
+1 Introduzione            ●        ○2                               ┆
+  1.1 Motivazione  ⚠      ·        ·        ·        ·        ·     ┆   ·
+  1.2 Contributi          ●2       ●                                ┆
+2 Metodo                           ○1       ●                       ┆
+```
+
+- Righe = sezioni (prima colonna sticky 240 px, rientro per livello); colonne = paper del progetto più i paper raggiunti dalle assegnazioni (intestazione sticky 72 px, "Autore anno" con suffisso a/b per i doppioni, titolo intero in `title`). Ordine delle colonne: per prima sezione in cui il paper compare (si legge come una diagonale), le non usate in fondo dopo un separatore tratteggiato.
+- Cella (`ms-cell`, 28 × 28, `data-state`): `direct` ● paper assegnato (con il numero delle altre voci se > 0); `indirect` ○n solo tramite evidenziazioni, note o affermazioni di quel paper (un'affermazione conta per ogni paper delle sue prove); `empty`; `proposed` anello tratteggiato (proposta ✦ da accettare).
+- Buchi in evidenza: intestazione della riga-buco su `--warning-soft` con ⚠; colonna non usata (`ms-unused-source`) con intestazione corsiva `--text-muted` e bordo tratteggiato. "Solo i buchi" mostra solo righe-buco e colonne non usate.
+- Tastiera: frecce tra le celle (tabindex mobile), Spazio attiva o toglie il paper, Invio apre il popover della cella (voci di quella coppia, con ✕). `aria-label` della cella: "1.2 Contributi × A 2021: paper assegnato, 2 evidenziazioni".
+- Finestratura semplice (si disegnano solo righe e colonne visibili): 500 sezioni × 300 paper senza scatti.
+
+**Claude (facoltativo, D-416).** `⋯` › "✦ Proponi le assegnazioni…" invia **solo i titoli delle sezioni** e titolo + abstract dei paper nelle cartelle abilitate (mai il manoscritto), con il percorso esistente di anteprima e conferma (`aiPreviewSchema`, `AiCostPreview`, tetto mensile, registro); Haiku proposto. Le proposte sono celle `proposed`: si accettano per cella o con "Accetta tutte" nella pillola. "✦ Suggerisci citazioni…" su una sezione resta quello di §17.4.16 (consenso ai paragrafi, testo esatto, un paragrafo scelto).
+
+**Dati.** `projects/<id>/manuscript.json` (supera "outline.md + blocchi `lab:assign`" di §17.4.13):
+
+```
+{ schemaVersion, source: { kind: 'app' } | { kind: 'file', name, ext, size, mtimeMs, headingsHash },
+  sections: [{ id, title, level, order, gone?: true }],
+  assignments: [{ sectionId, ref: {kind:'doc',docId} | {kind:'ann',docId,annId,page} | {kind:'note',docId,page?}
+                  | {kind:'litnote',docId} | {kind:'claim',claimId}, origin: 'user'|'ai', at }] }
+```
+
+Il percorso assoluto del file è un dato della macchina: sta nello stato locale non sincronizzato (`<appData>/manuscripts.json`, chiave libreria + progetto); su un altro computer lo stato è "file non trovato · Ritrova il file…". Limiti: 500 sezioni, 20 000 assegnazioni.
+
+**Contratti** (gruppo `project`, schemi minimi, nessun `z.tuple`): `project:manuscript` {projectId} → {manuscript | null, file: {state: 'ok'|'missing'|'unreadable', name, read: {files, total}} | null, changes?: {added, renamed, removed}} (rilegge da solo se il file è cambiato); `project:setManuscript` {projectId, source: {kind:'app', sections:[{id?, title, level}]} | {kind:'file'} (il dialogo si apre nel main) | {kind:'none'}}; `project:assign` {projectId, sectionId, refs[], on}; `project:moveAssignments` {projectId, from, to | null}; con Z1c `project:previewAssignSuggest` e `project:assignSuggest`.
+
+### 18.2 Trova collegamenti (D-479, D-480)
+
+L'utente sceglie **un documento di partenza** e **un documento o un gruppo di destinazione**; l'app cerca i legami tra la partenza e ciascuna destinazione con i segnali che ha già, **senza forzare**: aggiunge come collegamenti solo quelli sopra una soglia normale, li mostra con motivo e peso, e si tolgono con un clic. **Nessuna chiamata a Claude.**
+
+**Dove sta il gesto** (D-480):
+- Libreria, `⋯` della **barra di selezione**: il gruppo "Scopri" diventa Estendi la bibliografia… · **Trova collegamenti…** (`selection-links`); "Trova un ponte" passa nel piede del dialogo (sotto). Il menu resta a 7 voci in 3 gruppi. Con 1 documento selezionato: partenza = quello, destinazioni da scegliere; con ≥ 2: partenza = il documento attivo (cambiabile nel dialogo), destinazioni = gli altri selezionati.
+- **Scheda del documento**, `⋯`: nuovo gruppo "Collegamenti" con Trova collegamenti… (`doc-links-find`): 4 voci in 3 gruppi.
+- **Mappa**: pannello del nodo (Collegamenti › Documenti) `⋯` da 3 a 4 voci (Comprimi · Rimuovi dalla rete · Trova un ponte con… · Trova collegamenti…, `net-links-find`); `⋯` del cartellino nel Panorama (`map-card-links`).
+- Tavolozza: "Trova collegamenti…" (sul documento attivo, o chiede di sceglierlo).
+
+**Dialogo** (`linkfinder`, chunk `LinkFinderDialog`):
+
+```
+Trova collegamenti                                                                    ✕
+Partenza   [A 2021 · Titolo del paper ▾]                                                       (lf-source)
+Cerca in   ( Selezione (4) | Progetto ▾ | Cartella ▾ | Tag ▾ | Tutta la libreria )             (lf-targets)
+Soglia     ( Rigorosa | Normale | Ampia )   0,27 · il peso tipico degli archi della Mappa     (lf-threshold)
+                                                                            [[Trova collegamenti]] (lf-run)
+── 5 collegamenti aggiunti su 212 documenti ──────────────────────────────────────────────
+ B 2019  Titolo…     ▮▮▮▮▯ 0,61   cita A · termini: sparse, lasso, rumore           ✕   (lf-result, lf-remove)
+ C 2018  Titolo…     ▮▮▮▯▯ 0,44   12 riferimenti in comune · tag: Stima robusta       ✕
+ ▸ 3 sotto la soglia (il migliore 0,22)                                                   (lf-below, lf-add)
+[Annulla questi 5]  [Mostra nella Mappa]           Cerchi un lavoro che li unisca? Trova un ponte (lf-bridge)
+```
+
+- Stati: pronto · in corso (barra "N su M", `Annulla`) · risultato · **nessuno sopra la soglia** (`lf-none`: "Nessun collegamento sopra la soglia: il più vicino è C 2018 (0,22) · Mostra i vicini"; la soglia non si abbassa mai da sola) · destinazioni vuote (pulsante disattivato con il motivo) · oltre 500 destinazioni senza mappa ("Costruisci la mappa per cercare in più di 500 documenti", primario `graph-build`).
+- `lf-bridge`: sempre presente; attivo con esattamente due documenti (partenza + una destinazione), altrimenti disattivato con "Scegli una sola destinazione"; porta a Scopri come oggi (D-420).
+- "Mostra nella Mappa" (`lf-show-map`) apre Collegamenti › Documenti con la partenza come nodo iniziale e i collegati espansi.
+
+**Punteggio** (main, chunk pigro `doclinks`; riusa `@rl/graph`, nessun codice di somiglianza nuovo). Per partenza *s* e destinazione *t*:
+- **T testo** = coseno dei vettori TF-IDF del modello (`modelVector`); senza modello, `analyze` su {s} ∪ destinazioni (≤ 500).
+- **C citazioni** = 1 se uno cita l'altro; altrimenti accoppiamento + co-citazione come `pair()` di `analysis.ts` (esportata come `pairSignals`); chiavi condivise da > 300 documenti ignorate.
+- **G tag** (D-447) = Σ sui tag condivisi di min(w_s, w_t) / min(Σ w_s, Σ w_t), esclusi i tag radice e quelli che coprono > 30 % della libreria.
+- **A autori** = min(1, autori in comune / 2), chiavi di `resolveAuthor` con gli alias, consorzi (> 30 autori) esclusi.
+- **S** = 0,9 · `combine`(T, C, G) + 0,1 · A (pesi 0,7 / 0,2 / 0,1 di `WEIGHTS`, invariati); con una citazione diretta S = max(S, 0,5).
+- **Soglia normale τ** = mediana dei punteggi dei vicini che la Mappa già disegna (primi `GRAPH_K` vicini di ogni documento nel modello), limitata a [0,15; 0,40]; senza modello 0,25. Rigorosa = min(τ + 0,1; 0,5); Ampia = max(τ − 0,07; 0,1).
+- **Niente forzature:** si aggiunge solo con S ≥ τ **e** almeno una prova forte: T ≥ 0,15, citazione diretta, C ≥ 0,2 con ≥ 3 riferimenti in comune, oppure un tag principale (w ≥ 0,6 in entrambi) non radice. Il resto va in "sotto la soglia", da cui "Aggiungi" (`lf-add`) lo aggiunge a mano (origine `user`).
+- **Motivi** salvati: testo (≤ 5 termini in comune), cita (con il verso) o riferimenti in comune (n), tag (≤ 3), autori (≤ 3). La riga li dice in una frase; il peso è barra + numero a due decimali.
+
+**Dati.** `<dataDir>/links/doc-links.json` (cartella dati sincronizzata; scrittura atomica e in serie): `{ schemaVersion, links: [{ id, a, b, weight, reasons, origin: 'finder'|'user', runId, at }], dismissed: [{ a, b, at }] }`; coppia non ordinata, un collegamento per coppia, ≤ 50 000. Togliere un collegamento lo mette in `dismissed`, così una nuova ricerca non lo rimette (torna solo con "Aggiungi"). Ogni ricerca è **una** voce di Cronologia ("7 collegamenti aggiunti", annullabile); "Annulla questi N" (`lf-undo-all`) fa lo stesso.
+
+**Dove si vedono e si tolgono.**
+- Nel dialogo (✕ per riga).
+- Nella scheda del documento, sezione **Collegamenti** (`doc-links`, chunk `DocLinks`, sotto le citazioni): righe `doc-link` con titolo, motivo in una frase, peso, ✕ (`doc-link-remove`); senza collegamenti la sezione non c'è.
+- Nella Mappa, Collegamenti › Documenti: nuovo tipo di arco `linked` (tinta `--accent`, peso → spessore e opacità come §18.3.2), compreso in "A ogni espansione" (chip "Collegamenti", `net-kind-links`, attivo di base); un clic su un arco apre il cartellino dell'arco (`net-edge-card`: tipo, motivo, peso; [Rimuovi] `net-edge-remove` solo per `linked`).
+
+**Contratti** (nuovo `packages/core/src/ipc/channels/doclinks.ts`): `doclinks:find` {sourceId, targets: {docIds[≤ 5000]} | {projectId} | {folder} | {tagId} | {all: true}, strictness: 'strict'|'normal'|'wide'} → {runId, threshold, added[], below[≤ 20], scanned, skipped: {dismissed, existing}}; `doclinks:list` {docId}; `doclinks:remove` {ids[]}; `doclinks:add` {a, b}. In `graph:neighbors`, `kinds` accetta `links` e gli archi `linked`.
+
+### 18.3 Mappa: molle pesate, niente contorni, colori per macro-area (D-481, D-482, D-483)
+
+Vale per Collegamenti (tutti e quattro i modi) e, per colori e contorni, anche per il Panorama. La disposizione del Panorama resta quella del main (punti fissi + `separateClusters`): non ha archi né molle.
+
+#### 18.3.1 Fisica (`forceSim.ts`)
+
+Per ogni arco *e* = (i, j) con peso w ∈ [0, 1] (`tagged` e `contains` usano w = 0,3 come oggi); ρ = raggio del nodo nel mondo (documenti 6, entità `r`); deg = numero di archi del nodo.
+- **Lunghezza a riposo:** ℓ = ρ_i + ρ_j + ℓ_min + (ℓ_max − ℓ_min) · (1 − w)^1,5, con ℓ_min = 0,45 · REST (≈ 32) e ℓ_max = 1,7 · REST (≈ 119). Archi forti corti, deboli lunghi.
+- **Rigidità:** k = (0,02 + 0,10 · w) / min(deg_i, deg_j). Forza k · (d − ℓ) lungo l'arco, divisa per grado: i si sposta della quota deg_j / (deg_i + deg_j), j del resto (i nodi molto collegati si spostano poco e non trascinano tutto in un punto).
+- **Repulsione:** Barnes-Hut come oggi (θ 0,9, Q = 0,9 · REST²), con d² mai sotto (ρ_i + ρ_j + 4)² e nessun effetto oltre 6 · REST (i pezzi lontani non volano via).
+- **Distanza minima (anti-collasso):** dopo ogni passo, un giro di collisione sullo stesso quadtree: se d < ρ_i + ρ_j + 4, i due si separano di 0,8 · (ρ_i + ρ_j + 4 − d), metà ciascuno (un nodo fissato non si muove e l'altro prende tutto); a d = 0 la direzione viene da `hash01` della coppia (deterministica).
+- **Gravità con zona libera:** nessuna attrazione entro R₀ = 0,6 · REST · √n dal baricentro; oltre, 0,02 · (distanza − R₀) verso il baricentro. Dentro il grafo è libero, fuori non si disperde.
+- **Attrazione di gruppo:** da 0,03 a 0,012, solo per gruppi con ≥ 3 nodi (gruppo del contratto nelle entità; macro-area dominante con purezza ≥ 0,6 nei documenti, §18.3.4).
+- Integrazione invariata: temperatura in ~300 passi, DAMP 0,6, MAX_SPEED 40, mobilità dei nodi vecchi, trascinamento elastico con `warm`.
+- **Prove unitarie** (`forceSim.test.ts`, seme fisso): (a) grafo completo di 50 nodi con w = 1 dopo 300 passi: ogni coppia a distanza ≥ ρ_i + ρ_j + 2, raggio dell'insieme ≥ 2 · REST; (b) grafo casuale pesato: lunghezza media degli archi con w ≥ 0,7 almeno 25 % sotto quella degli archi con w ≤ 0,3; (c) stella con 200 foglie: nessuna sovrapposizione, centro a meno di REST dal baricentro; (d) due componenti separate: baricentri a distanza tra la somma dei raggi e 8 · REST; (e) nessun NaN, temperatura a `ALPHA_MIN` entro 320 passi; (f) un passo con 800 nodi e 6400 archi ≤ 6 ms (solo misura, avviso oltre).
+
+#### 18.3.2 Archi: opacità e spessore dal peso
+
+- Opacità: `edgeAlpha(w)` invariata (0,12 + 0,5 w; scuro ≥ 0,3, D-453).
+- Archi curvi assottigliati: spessore iniziale 1,0 + 2,5 w, finale 0,4 + 0,6 w (`cites` + 0,3 all'inizio); archi dritti (oltre `MAX_CURVED`): 0,6 + 1,4 w px con opacità × 0,8.
+- Tinta neutra come oggi; `linked` (§18.2) in `--accent`. Al passaggio: opacità 0,9 e spessore + 1.
+
+#### 18.3.3 Contorni automatici tolti
+
+- **Panorama** (`MapCanvas.tsx`): nessun riempimento a riposo, nessun involucro né contorno al passaggio. Il gruppo acceso (puntatore, legenda, tastiera) si riconosce così: gli altri punti al 35 %, i suoi con un anello di 1 px della loro tinta sopra l'anello `--bg`. **Aprire un argomento:** doppio clic sulla sua etichetta o su un suo punto (il punto più vicino entro 12 px dà l'argomento); Esc o doppio clic sullo sfondo richiude. **Spostare un argomento:** si trascina la sua etichetta; la collisione tra gruppi usa i cerchi del nucleo, invisibili (`coreRadius` e `separateClusters` restano). Argomento aperto: pillola "Argomento aperto: X · Esc". Suggerimento del primo uso: "Trascina, rotella per lo zoom, doppio clic su un'etichetta per aprire l'argomento · ✕".
+- **Collegamenti › Documenti** (`GraphNet.tsx`) ed **entità** (`EntityNet.tsx`): niente involucri di argomento o di gruppo. Il nome del gruppo è un'etichetta al baricentro dei suoi nodi visibili (`--fs-small` semibold, `--text-muted`, alone `--bg` di 3 px), solo per gruppi con ≥ 3 nodi visibili, nella stessa anticollisione delle altre etichette (`labelsLod.ts`).
+- `hulls.ts` tiene solo ciò che serve a separazione, nuclei ed etichette (`convexHull`, `coreRadius`, `separateClusters`, `inPolygon`); `hullShape`, `growPolygon`, `chaikin`, `capsule`, `circleAt`, `restingFill` e `restingHulls`/`clusterHulls` di `mapModel.ts` si tolgono se non più usati. Le prove di m4/mapfix sugli involucri a riposo si tolgono; restano quelle sulla separazione dei nuclei e sulle etichette.
+
+#### 18.3.4 Colore per macro-area: la formula
+
+**Dati** (calcolo puro nel nuovo `packages/graph/src/areas.ts`, chiamato dal main nel chunk pigro `areas`): nodi della tassonomia non `deprecated`, tag dell'utente di ogni documento, peso w(d, x) del tag: il punteggio accettato (`suggestedTagScores`), 1,0 per un tag messo a mano senza punteggio, 0,9 / 0,5 se l'utente l'ha fissato principale / secondario (D-447).
+
+1. **Macro-aree A.** Si parte dalle radici. Se una radice copre ≥ 80 % dei documenti con tag dell'ambito e ha ≥ 2 figli attivi, la si sostituisce con i figli (al più due discese). I figli di ogni area sono i suoi **rami interni**.
+2. **Foglie del documento** L(d): i suoi tag che non sono antenati di un altro suo tag (gli antenati aggiunti dalla chiusura gerarchica non contano due volte).
+3. **Appartenenza.** Per ogni x ∈ L(d), A(x) = aree tra gli antenati di x (x compreso). Contributo w(d, x) / |A(x)| a ogni area di A(x) (in un DAG il peso si divide) e al ramo di quell'area sul percorso verso x. m_a(d) = somma dei contributi; M(d) = Σ_a m_a(d); M = 0 → nodo **senza area**.
+4. **Quote.** p_a = m_a / M; si tengono le 3 aree con p maggiore, ripesate a somma 1.
+5. **Purezza e centralità.** π = max p_a; K = numero di aree con p_a ≥ 0,1; u = 1 se K ≤ 1, altrimenti (π − 1/K) / (1 − 1/K). z = min(1, max_a m_a / 1,2).
+6. **Croma.** k = 0,2 + 0,8 · u · (0,55 + 0,45 · z): centrale in un'area → pieno; tra più aree o con soli tag deboli → tenue.
+7. **Colore** (OKLab, funzioni in `colors.ts`, nessuna libreria): colore dell'area c_a dal token, ruotato di δ per ramo (rami ordinati per documenti: 0°, +12°, −12°, +24°, −24°; dal sesto 0°) e mescolato tra i rami con le loro quote. Poi L = Σ p_a L_a; (ā, b̄) = Σ p_a (a_a, b_a); h = atan2(b̄, ā); C = k · Σ p_a C_a; se |(ā, b̄)| < 0,01 (tinte opposte che si annullano) C = 0. Da OKLCh a sRGB, riducendo C finché il colore sta nella gamma.
+- **Nodi di gruppo** (argomenti, autori, etichette dei gruppi): p = media dei p(d) dei documenti con tag del gruppo; copertura κ = documenti con tag / documenti; κ < 0,3 → senza area; z = media di z(d) · κ.
+- **Nodi tag** (modo Tag): p dalle aree di A(x) in parti uguali, z = 1, rotazione del ramo; le aree stesse piene.
+- **Stabilità:** le aree prendono le tinte in ordine di documenti, con memoria per libreria (`rl.map.areaHues` in localStorage, in try/catch) perché un'area tenga la tinta tra una ricostruzione e l'altra. Un colore scelto dall'utente sul nodo dell'area vince, portato in OKLCh entro [L_min, L_max] della palette con C ≤ 0,16, poi `readableColor` (≥ 3:1).
+- **Contratti:** `graph:map` aggiunge `areas: [{id, label, count, branches: [{id, count}]}]` e per ogni punto `ar` (≤ 3 terne intere [area, ramo, quota×100]) e `az` (z×100); `graph:neighbors` e `graph:entityNetwork` aggiungono `ar` e `az` ai nodi (`areas` nella risposta). Il renderer (`views/network/areaColors.ts`) fa solo il passo 7, con cache per nodo e tema.
+
+#### 18.3.5 Palette (token in `views/network/palette.css`, il file di D-452 e D-453)
+
+Sette tinte con luminosità sfalsata (così restano distinguibili anche con deuteranopia e protanopia), più "altre aree" e "senza area". Misure (OKLab; simulazione di Machado 2009, severità 1): le prime 4 a coppie ΔE ≥ 0,075 in deuteranopia e protanopia e ≥ 0,15 in visione normale; tutte e 7 ≥ 0,098 in visione normale; ogni tinta ≥ 3:1 su `--bg` in entrambi i temi.
+
+| Token | Chiaro | Scuro | Tinta (OKLCh h; L chiaro / scuro) |
+| --- | --- | --- | --- |
+| `--area-1` | `#195daa` | `#5d94da` | blu 255°; 0,48 / 0,66 |
+| `--area-2` | `#c8741d` | `#fec394` | arancio 60°; 0,64 / 0,86 |
+| `--area-3` | `#b95a93` | `#ee97c9` | magenta 345°; 0,60 / 0,78 |
+| `--area-4` | `#017460` | `#30b69a` | verde acqua 175°; 0,50 / 0,70 |
+| `--area-5` | `#972e2d` | `#d87972` | rosso 25°; 0,46 / 0,68 |
+| `--area-6` | `#8d73d1` | `#c8b7ff` | viola 295°; 0,62 / 0,82 |
+| `--area-7` | `#857501` | `#d0bf5e` | oliva 100°; 0,56 / 0,80 |
+| `--area-other` | `#5c6b7a` | `#9dadbe` | grigio-blu, C 0,03 |
+| `--area-none` | `#696969` | `#ababab` | neutro (solo anello) |
+
+Gli stessi valori stanno in `colors.ts` (`AREA_LIGHT`, `AREA_DARK`) come ripiego del primo fotogramma, letti con `readAreas` come `readTints`. Scuro con i due blocchi già usati per i `--cat-*` (`@media (prefers-color-scheme: dark)` con `:root:not([data-theme='light'])`, e `:root[data-theme='dark']`). I `--cat-*` restano per i colori per argomento. `network.test.ts` verifica contrasti e ΔE di questa tabella.
+
+#### 18.3.6 Legenda, daltonismo, tema scuro, ripieghi
+
+- **Modo del colore:** Filtri ▾ › Aspetto, `Segmented` **Macro-aree | Argomenti** (`map-color-mode`), predefinito Macro-aree; vale per Panorama e Collegamenti, ricordato per libreria. In Argomenti tutto resta come oggi (D-379).
+- **Legenda** (sovrapposta in basso a sinistra, 240 px, §4.22): titolo "Colori: macro-aree" (`area-legend`); ≤ 7 righe di area (`area-item`: pallino 10 px, nome con ellissi, conteggio), "Altre N aree" (`area-other`, `title` con i nomi), "Senza tag" con l'anello vuoto (`area-none`); sotto, una riga con la striscia da pieno a tenue e "pieno: centrale in un'area · tenue: tra più aree". Passaggio su una riga: i nodi con quota < 0,2 in quell'area al 25 %; clic: isola l'area (`aria-pressed`, gli altri al 15 %); secondo clic o Esc la libera. In modo Argomenti la legenda è quella di oggi (`cluster-legend`, `cluster-item`, `cluster-more`); in modo Macro-aree le azioni dell'argomento (Esporta, Rinomina) stanno nel `⋯` del cartellino che si apre con un clic sull'etichetta dell'argomento.
+- **Daltonismo:** palette sfalsata (sopra); l'informazione non è mai solo nel colore: il cartellino al passaggio dice "Macro-aree: Fisica quantistica 70 % · Informatica 30 %", la legenda isola un'area, l'elenco accessibile (`L`) e l'annuncio `aria-live` dicono l'area principale. La tritanopia non è ottimizzata (rischio 4).
+- **Tema scuro:** token propri; la luminosità di un mix sta tra quelle delle tinte, quindi anche i nodi tenui restano ≥ 3:1 (prova: per ogni L tra L_min e L_max delle tinte, il grigio a C = 0 è ≥ 3:1 su `--bg` in entrambi i temi); anello `--bg` invariato.
+- **Ripieghi:**
+  - nessun tag nell'ambito → colori per argomento in automatico; Macro-aree disattivato con il motivo "Nessun tag: i colori vengono dagli argomenti"; pillola una volta (`map-color-note`) con il link "Gestisci tag"; senza modello (Documenti) `--accent` come oggi;
+  - meno del 20 % dei documenti con tag → resta Macro-aree, pillola "Solo N documenti hanno tag: gli altri sono anelli vuoti · Colora per argomento";
+  - più di 7 aree → le 7 con più documenti hanno una tinta, le altre `--area-other` (anche nel mix);
+  - una sola area anche dopo le discese → colori per argomento, con la pillola;
+  - nodo senza area → anello vuoto di 1,5 px `--area-none`, riempimento `--bg`;
+  - tag sotto più aree (DAG) → peso diviso (passo 3).
+
+### 18.4 Lacune di M4 (HANDOFF §5) dopo la rimozione dei contorni (D-485)
+
+| Lacuna | Esito | Cosa si fa |
+| --- | --- | --- |
+| Trascinamento di etichette e punti in un tema aperto | ripresa | in un argomento aperto i punti si trascinano (posizione locale, persa alla chiusura) e l'etichetta sposta l'intero argomento; Esc chiude |
+| Contorni e colore dei temi in modalità Documenti | contorni **obsoleti**; colore ripreso | colore per macro-area (§18.3.4) o per argomento, con le etichette di gruppo di §18.3.3 |
+| `⋯` "Dimensione per" e "Mostra temi in comune" | ripresa | in Filtri ▾ › Aspetto come da §4.22 (`ent-size-by`, `ent-themes-toggle`), nessuna voce nel `⋯` |
+| "Vai a" per i nodi oltre il tetto di 800 | ripresa | Documenti: il documento entra come nodo di partenza; al tetto, pillola "Tetto di 800 raggiunto · Azzera e parti da qui". Entità: `graph:entityNetwork` riceve `focus` (id) e restituisce quel nodo con i vicini più pesanti entro il tetto; pillola "Vicinato di X · Torna alla rete intera" |
+| "Ultimo letto" come documento di partenza | ripresa | Collegamenti › Documenti parte dal documento di `resume:get`, se esiste ed è nell'ambito; altrimenti dal più collegato (D-379) |
+| Volo reale di 300 ms | ripresa | `flyTo` animato 300 ms (ease-in-out) per Vai a, legenda, Sorprendimi e Mostra nella Mappa; con movimento ridotto salto immediato |
+| Probe di fps pesanti (`RL_HEAVY_TESTS=1`) | ripresa, solo alla fine | dopo la verifica finale, da soli e mai insieme ad altre e2e; senza involucri il disegno costa meno, soglie di D-379 invariate |
+
+### 18.5 Compiti, file e budget (D-484)
+
+Al massimo 2 compiti insieme, su file disgiunti; durante l'onda solo typecheck, build, check:budget e check:generality; test e revisioni alla fine (D-443). Nei conflitti di elenchi di canali e gestori si tengono entrambi i lati.
+
+| Passo | Compito | File di proprietà | Budget |
+| --- | --- | --- | --- |
+| 13a | **K1 · Mappa: molle, archi, niente contorni, colori per macro-area** (§18.3) | `views/network/**` (`forceSim.ts`, `edges.ts`, `hulls.ts`, `mapModel.ts`, `MapCanvas.tsx`, `GraphNet.tsx`, `EntityNet.tsx`, `MapPanel.tsx`, `colors.ts`, nuovo `areaColors.ts`, `palette.css`, test); nuovo `packages/graph/src/areas.ts` (+test); `packages/core/src/ipc/channels/graph.ts` (`ar`, `az`, `areas`); `main/graph/service.ts`, `main/graph/entity-run.ts`, nuovo chunk `main/graph/areas-run.ts`; i18n `network` | chunk `NetworkView` ≤ +4 KiB netti (il codice degli involucri tolto compensa); main lazy `areas` ≤ 6 KiB; entry del main ≤ +0,5 KiB |
+| 13a ∥ | **Z1a · Manoscritto: main e contratti** (§18.1: Sezioni, Dati, Contratti) | `packages/core/src/ipc/channels/project.ts` e lo scopo `manuscript-file` in `dialog.ts`; nuovo `main/features/manuscript/**` (lettori `.md`, `.tex`, `.docx`, riallineamento, archivio, stato locale del percorso; test con file sintetici) | main lazy `manuscript` ≤ 20 KiB; entry ≤ +1,5 KiB |
+| 13b | **Z1b · Manoscritto: interfaccia** (§18.1) | nuovi `views/projects/manuscript/ManuscriptView.tsx`, `ManuscriptMatrix.tsx`, `AssignDialog.tsx`, `manuscriptModel.ts` (+test: buchi, colonne, celle); `SchemaTab.tsx` (`Segmented`); `ProjectDetailView.tsx` (voce del `⋯` della riga); `UseAsEvidence.tsx` (campo Sezione); i18n `projects` | nuovi chunk `ManuscriptView`, `ManuscriptMatrix`, `AssignDialog`, ognuno ≤ 16 KiB in `renderer.chunkCapsKB` (attesi 11-13, 8-11, 4-6) |
+| 13b ∥ | **L1 · Trova collegamenti** (§18.2), dopo il merge di K1 | nuovo `packages/core/src/ipc/channels/doclinks.ts`; `graph.ts` (`links`, `linked`); `packages/graph/src/analysis.ts` (solo l'esportazione di `pairSignals`); nuovo `main/features/doclinks/**` (+test: soglia, regola della prova, `dismissed`, coppia non ordinata); `main/graph/service.ts` (`neighbors` con `links`); nuovi `views/links/LinkFinderDialog.tsx`, `views/library/docpanel/DocLinks.tsx`, `views/library/selection/actions/links.ts`; `SelectionBar.tsx`, `DocPanel.tsx`; in `views/network/` solo `GraphNet.tsx` (arco `linked`, cartellino dell'arco, voce del pannello), `forceSim.ts` (`EdgeKind`), `MapPanel.tsx` (voce del cartellino); i18n `library`, `network`, nuova parte `links` | chunk `LinkFinderDialog` ≤ 16 KiB (attesi 7-9), `DocLinks` ≤ 16 KiB (2-3); main lazy `doclinks` ≤ 12 KiB; entry ≤ +1,2 KiB |
+| 13c | **K2 · Lacune M4** (§18.4), dopo L1 | `views/network/**`; `graph.ts` (`focus`); `main/graph/entity-run.ts`, `packages/graph/src/entity-network.ts` (vicinato) | `NetworkView` ≤ +3 KiB; main lazy ≤ +1 KiB |
+| 13c ∥ | **Z1c · ✦ Proponi le assegnazioni, citazioni sulle sezioni** (facoltativo; primo da rinunciare) | `main/features/manuscript/ai.ts`; `views/projects/manuscript/**` | dentro i chunk di Z1b; main lazy +3-4 KiB |
+| fine | Test (unitari; e2e una alla volta: nuove `project-manuscript.spec.ts`, `link-finder.spec.ts`; `ui-map` e `crowding.spec.ts` aggiornate), revisione, coppia di design su dati reali, poi `test:e2e:heavy` da solo | — | — |
+
+Totali stimati: renderer +45-55 KiB (tutto pigro), main lazy +40 KiB (≈ 418/430), entry del main ≤ +3,2 KiB (≈ 1106/1110). **Tetti di avvio mai alzati** (JS iniziale del renderer 396 KiB, entry del main 1110 KiB); i totali del renderer si alzano una volta per l'onda (D-484). e2e da aggiornare dall'agente principale: `selection-bridge` non è più nel `⋯` della selezione (ora `lf-bridge` nel dialogo); nessun test cerca involucri; `net-kind-links` nel popover Partenza; `count-map-*` invariati.
+
+### 18.6 Rischi aperti per il revisore avversario (su dati reali)
+
+1. **Soglia τ:** sulla libreria vera, quanti collegamenti per partenza? Una rassegna non deve collegarsi a metà libreria; un paper isolato deve dare "nessuno" senza forzare. Provare 5 partenze diverse e i tre livelli.
+2. **Tag larghi:** un tag di secondo livello che copre il 25-30 % gonfia G e i colori: controllare la regola del 30 % e la discesa dall'80 %.
+3. **Mix di colori:** arancio + blu → grigio, rosso + verde acqua → oliva spento: i nodi tenui si confondono con i "senza area" (anello vuoto)? Devono leggersi come "tra due aree", non come errori.
+4. **Daltonismo:** schermate simulate (deuteranopia, protanopia, tritanopia) con ≥ 5 aree; oltre la quarta si conta sulla legenda.
+5. **Fisica:** rete di tag con 800 nodi e 6400 archi: niente palla compatta, niente tremolio a riposo, trascinamento elastico, ≥ 30 fps durante l'assestamento; componenti piccole non lontane dallo schermo.
+6. **Senza contorni:** nel Panorama gli argomenti si leggono ancora? Doppio clic e trascinamento dell'etichetta si scoprono dal suggerimento?
+7. **Manoscritto vero:** `.tex` con `\input` annidati, comandi di sezione definiti dalla classe, titoli con macro; `.docx` con stili localizzati ("Titolo 1") e numerazione automatica; rinomina di sezioni senza perdere assegnazioni.
+8. **Matrice grande:** 150 sezioni × 300 paper: scorrimento, etichette "Autore anno" doppie, buchi visibili a colpo d'occhio a 1024×700.
+9. **Entry del main** a ~1106/1110 KiB dopo i contratti nuovi: se si sfora, si snelliscono gli schemi, mai il tetto.
+10. **"Trova un ponte" spostato** nel piede del dialogo: si trova ancora (tavolozza, Scopri, Mappa)?
+11. **Sincronizzazione** di `doc-links.json` e `manuscript.json` tra due computer: ricerche in parallelo, collegamenti tolti su uno e rimessi sull'altro.
+12. **Annulla e coerenza:** una ricerca = una voce di Cronologia; togliere un collegamento dalla Mappa aggiorna la scheda del documento e viceversa.

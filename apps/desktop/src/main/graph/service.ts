@@ -10,7 +10,7 @@ import { GRAPH_PAGES, GRAPH_TEXT_CHARS, docSig, folderOfPath, toGraphDoc } from 
 import { readMeta } from './model-meta.js';
 import { graphPaths } from './paths.js';
 import { TOP_TAGS, topTags } from './tag-top.js';
-import { loadView, titleOf, type LibraryView } from './view.js';
+import { keywordTagIds, loadView, titleOf, type LibraryView } from './view.js';
 
 /** Seed of the first build (a rebuild keeps the seed of the model it replaces unless one is given). */
 export const DEFAULT_SEED = 1;
@@ -295,7 +295,8 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 function similarFromModel(view: LibraryView, lm: LoadedModel, rec: DocumentRecord, i: number, limit: number): SimilarItem[] {
   const m = lm.model;
-  const mine = new Set(view.tagsOf(rec));
+  const kw = keywordTagIds(view.tax);
+  const mine = new Set(view.tagsOf(rec).filter((t) => !kw.has(t)));
   const vec = (k: number) => modelVector(m, k);
   const vi = vec(i);
   const items: SimilarItem[] = [];
@@ -325,7 +326,8 @@ export async function similar(s: MainServices, docId: string, limit: number): Pr
   const { deviceId } = await s.settings.get();
   const args: GraphStoreArgs & { docId: string; limit: number } = { rootPath: rt.store.rootPath, dataDir: rt.store.dataDir, deviceId, docId, limit };
   const items = await engineOf(s).similar(args);
-  return items.filter((it) => view.byId.has(it.docId));
+  const kw = keywordTagIds(view.tax);
+  return items.filter((it) => view.byId.has(it.docId)).map((it) => (kw.size === 0 ? it : { ...it, shared: { ...it.shared, tags: it.shared.tags.filter((t) => !kw.has(t)) } }));
 }
 
 export async function surprising(s: MainServices, docId: string | undefined, limit: number) {

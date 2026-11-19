@@ -264,7 +264,15 @@
     "writeHere": "Write the sections here",
     "unlink": "Unlink the manuscript",
     "propose": "✦ Propose the assignments…",
-    "proposeSoon": "Not available yet",
+    "suggest": {
+      "title": "Propose the assignments",
+      "what": "The titles of the sections and the title and abstract of {{count}} papers are sent (never your manuscript text).",
+      "nothing": "Nothing to propose: the manuscript needs sections and the project papers in enabled folders.",
+      "none": "No clear match found.",
+      "accept": "Accept",
+      "acceptAll": "Accept all ({{count}})",
+      "accepted": "Assigned."
+    },
     "exportCsv": "Copy the matrix (CSV)",
     "csvCopied": "Matrix copied as CSV.",
     "summaryGaps_one": "{{count}} section without sources",

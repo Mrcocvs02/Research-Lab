@@ -21,17 +21,17 @@ const startOfLocalDay = (): string => {
   d.setHours(0, 0, 0, 0);
   return d.toISOString();
 };
-const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n)}…` : t);
-const oneLine = (t: string) => t.replace(/\s+/g, ' ').trim();
+export const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n)}…` : t);
+export const oneLine = (t: string) => t.replace(/\s+/g, ' ').trim();
 
-const modelOf = (ctx: AiCtx, wanted?: string): string => {
+export const modelOf = (ctx: AiCtx, wanted?: string): string => {
   const model = wanted ?? ctx.cfg.ai.defaultModel;
   if (!ctx.cfg.ai.models.some((m) => m.id === model)) throw new AppError('INVALID_REQUEST', 'Unknown model');
   return model;
 };
 
 /** Tokens and cost of one send; the dialog is always shown (text of the user, D-416). */
-async function costs(ctx: AiCtx, model: string, chars: number, outTokens: number) {
+export async function costs(ctx: AiCtx, model: string, chars: number, outTokens: number) {
   const { rt, cfg } = ctx;
   const tokens = approxTokens(chars);
   const since = startOfLocalDay();
@@ -44,7 +44,7 @@ async function costs(ctx: AiCtx, model: string, chars: number, outTokens: number
 }
 
 /** The folders of the documents that leave, so the log and the first-send check see them. */
-async function foldersOf(ctx: AiCtx, docIds: string[]): Promise<string[]> {
+export async function foldersOf(ctx: AiCtx, docIds: string[]): Promise<string[]> {
   const out = new Set<string>();
   for (const id of docIds) {
     const rec = await ctx.rt.store.documents.get(id as DocumentId);
@@ -53,7 +53,7 @@ async function foldersOf(ctx: AiCtx, docIds: string[]): Promise<string[]> {
   return [...out];
 }
 
-async function send<T>(s: MainServices, ctx: AiCtx, input: { purpose: string; model: string; system: string; prompt: string; schema: import('zod').ZodType<T>; docIds: string[] }, tokens: { overDailyCap: boolean }, confirmed: boolean): Promise<T> {
+export async function send<T>(s: MainServices, ctx: AiCtx, input: { purpose: string; model: string; system: string; prompt: string; schema: import('zod').ZodType<T>; docIds: string[] }, tokens: { overDailyCap: boolean }, confirmed: boolean): Promise<T> {
   const { rt, cfg } = ctx;
   if (tokens.overDailyCap) throw new AppError('AI_BUDGET_EXCEEDED', 'The daily token cap is reached', { reason: 'daily-cap' });
   const cap = cfg.ai.usageCap.monthlyUsd;

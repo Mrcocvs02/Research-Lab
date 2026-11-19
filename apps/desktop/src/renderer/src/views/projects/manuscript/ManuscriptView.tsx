@@ -19,6 +19,7 @@ import './manuscript.css';
 
 const ManuscriptMatrix = lazyView(() => import('./ManuscriptMatrix'), ['projects']);
 const AssignDialog = lazyView(() => import('./AssignDialog'), ['projects']);
+const AssignSuggestDialog = lazyView(() => import('./AssignSuggestDialog'), ['projects']);
 
 export type ManuscriptState = ResponseOf<Channels, 'project:manuscript'>;
 type Confirm = { kind: 'unlink' } | { kind: 'drop'; sectionId: string; count: number } | null;
@@ -37,6 +38,7 @@ export default function ManuscriptView({ projectId, papers, claims, onChanged }:
   const [reassign, setReassign] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [menu, setMenu] = useState(false);
+  const [suggest, setSuggest] = useState(false);
   const anchor = useRef<HTMLSpanElement>(null);
   const alive = useRef(true);
   const changed = useRef(onChanged);
@@ -146,7 +148,7 @@ export default function ManuscriptView({ projectId, papers, claims, onChanged }:
     {
       id: 'more',
       items: [
-        { id: 'propose', testId: 'ms-propose', label: t('ms.propose'), disabled: true, disabledReason: t('ms.proposeSoon'), onSelect: () => undefined },
+        { id: 'propose', testId: 'ms-propose', label: t('ms.propose'), onSelect: () => setSuggest(true) },
         {
           id: 'csv',
           testId: 'ms-export-csv',
@@ -314,6 +316,11 @@ export default function ManuscriptView({ projectId, papers, claims, onChanged }:
             );
           })}
         </section>
+      )}
+      {suggest && (
+        <Lazy>
+          <AssignSuggestDialog projectId={projectId} sections={new Map(liveSections(m).map((x) => [x.id, x.title]))} titles={titles} onClose={() => setSuggest(false)} onDone={(manuscript) => (setState((x) => (x ? { ...x, manuscript } : x)), onChanged())} />
+        </Lazy>
       )}
       {assign !== null && (
         <Lazy>

@@ -104,6 +104,7 @@ const sendCosts = {
   needsDialog: z.boolean(),
   overDailyCap: z.boolean(),
 };
+const previewShape = z.object({ text: z.string(), candidates: z.number().int().nonnegative(), ...sendCosts });
 
 export const projectSchemaChannels = defineChannels('project', {
   /** The schema tab of a project: the outline (null until it is written), the claims, the reports, the paragraph consent. */
@@ -133,9 +134,13 @@ export const projectSchemaChannels = defineChannels('project', {
   /** Up to three candidates for one paragraph: local retrieval, then Claude reorders them (needs the project consent). */
   citeRun: { request: projectId.extend({ text: z.string().trim().min(1).max(OUTLINE_LIMITS.paragraph), model: z.string().min(1).max(100).optional(), confirmed: z.boolean().default(false) }), response: z.object({ items: z.array(candidateSchema).max(3) }) },
   /** The exact text "Find evidence" would send for a claim (its text and the best local passages); nothing leaves. */
-  evidencePreview: { request: projectId.extend({ claimId: itemIdSchema, model: z.string().min(1).max(100).optional() }), response: z.object({ text: z.string(), candidates: z.number().int().nonnegative(), ...sendCosts }) },
+  evidencePreview: { request: projectId.extend({ claimId: itemIdSchema, model: z.string().min(1).max(100).optional() }), response: previewShape },
   /** Local search in the index, then Claude (Haiku) sorts the best passages into supports, contradicts or not relevant; each stays a proposal until the user accepts it. */
   evidenceRun: { request: projectId.extend({ claimId: itemIdSchema, model: z.string().min(1).max(100).optional(), confirmed: z.boolean().default(false) }), response: z.object({ items: z.array(evidenceItemSchema).max(10) }) },
+  /** The exact text "✦ Propose the assignments" would send (section titles and title + abstract of the papers in enabled folders; never the manuscript); nothing leaves. */
+  previewAssignSuggest: { request: projectId.extend({ model: z.string().min(1).max(100).optional() }), response: previewShape },
+  /** Claude proposes papers for sections; nothing is written, each proposal is accepted by the user (`project:assign`, origin `ai`). */
+  assignSuggest: { request: projectId.extend({ model: z.string().min(1).max(100).optional(), confirmed: z.boolean().default(false) }), response: z.object({ items: z.array(z.object({ sectionId: sectionIdSchema, docId: documentIdSchema })) }) },
   /** An accepted suggestion: the paper becomes a source of the question in the outline. */
   assignCitation: { request: projectId.extend({ questionId: questionIdSchema, docId: documentIdSchema }), response: z.object({ outline: outlineSchema }) },
   /** The manuscript of the project; a linked file that changed since the last read is read again here (sections realigned, nothing lost). */

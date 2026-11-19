@@ -780,12 +780,12 @@ button.page-chip {
   justify-content: center;
 }
 /* The card sits beside the list when there is room for the list (420 px) as well; otherwise it is a drawer over it. */
-@container (min-width: 1052px) {
+@container (min-width: 960px) {
   .library-grid.with-detail {
     grid-template-columns: 240px minmax(0, 1fr) 360px;
   }
 }
-@container (max-width: 1051px) {
+@container (max-width: 959px) {
   .detail-pane {
     position: absolute;
     top: 0;

@@ -266,6 +266,7 @@
     },
     "cost": {
       "title": "Send to Claude?",
+      "titleFor": "{{name}}: send to Claude?",
       "ready": "Ready, nothing sent",
       "inButton": "≈ {{tokens}} tokens · {{model}}",
       "today": "Today: {{pct}} % of the cap used",

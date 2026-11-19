@@ -118,10 +118,13 @@ export function DiscoverView() {
       setTab('readnext');
     }, reportError);
 
+  // Two lines per entry (§17.3): the name, then a sentence in muted text (styled in discover.css); no group headings.
   const newMenu: MenuGroups = [
-    { id: 'question', label: t('discover.new.hint_question'), items: [{ id: 'question', testId: 'new-search-question', label: t('discover.new.kind_question'), onSelect: () => setAsking('question') }] },
-    { id: 'extend', label: t('discover.new.hint_extend'), items: [{ id: 'extend', testId: 'new-search-extend', label: t('discover.new.kind_extend'), onSelect: () => setAsking('extend') }] },
-    { id: 'bridge', label: t('discover.new.hint_bridge'), items: [{ id: 'bridge', testId: 'new-search-bridge', label: t('discover.new.kind_bridge'), onSelect: () => setAsking('bridge') }] },
+    {
+      id: 'new',
+      items: (['question', 'extend', 'bridge'] as const).map((k) => ({ id: k, testId: `new-search-${k}`, label: `${t(`discover.new.kind_${k}`)}
+${t(`discover.new.hint_${k}`).replace(/^[^:]*:\s*/, '')}`, onSelect: () => setAsking(k) })),
+    },
   ];
 
   const more: MenuGroups = [

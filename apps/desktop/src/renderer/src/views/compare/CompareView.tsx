@@ -298,7 +298,7 @@ export function CompareView({ docIds, onClose }: { docIds: string[]; onClose(): 
         </table>
       </div>
       {dialog && est && (
-        <AiCostPreview what={t('compare.what', { count: est.cells.toWrite })} requests={est.requests} estimate={est as CostEstimate} modelLabel={label(est.model)} models={models} model={model || est.model} onModel={setModel} onConfirm={() => void fill(true)} onCancel={() => setDialog(false)} />
+        <AiCostPreview title={t('compare.title')} what={t('compare.what', { count: est.cells.toWrite })} requests={est.requests} estimate={est as CostEstimate} modelLabel={label(est.model)} models={models} model={model || est.model} onModel={setModel} onConfirm={() => void fill(true)} onCancel={() => setDialog(false)} />
       )}
       {saveOpen && <SaveDialog onCancel={() => setSaveOpen(false)} onSave={save} title={title} />}
     </div>

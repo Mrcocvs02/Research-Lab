@@ -1,8 +1,18 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { Channels, ResponseOf } from '@rl/core';
-import { formatTokens, formatUsd } from '../views/chat/format';
+import { formatTokens } from '../views/chat/format';
 import { Dialog } from './Dialog';
+
+/** Money and tokens of the dialog in the language of the app (Intl): "6,2k token" and "0,00 USD" in Italian, "6.2k" and "$0.00" in English. */
+function tokensText(n: number, lang: string): string {
+  if (n < 1000) return new Intl.NumberFormat(lang).format(n);
+  return `${new Intl.NumberFormat(lang, { maximumFractionDigits: n < 10_000 ? 1 : 0 }).format(n / 1000)}k`;
+}
+function usdText(usd: number, lang: string): string {
+  const f = new Intl.NumberFormat(lang, { style: 'currency', currency: 'USD' });
+  return usd > 0 && usd < 0.01 ? `<${f.format(0.01)}` : f.format(usd);
+}
 
 /**
  * The one rule of cost of every Claude function (D-416, §17.2). The estimate comes from main (`explain:estimate`, and in the
@@ -37,6 +47,8 @@ export function dayShareText(t: TFunction, e: CostEstimate): string | null {
 }
 
 interface Props {
+  /** The function asking ("Comparison table"): the title then says which function wants to send. */
+  title?: string;
   /** What goes, in one line ("The selected text and the paragraph around it"). */
   what: string;
   requests: number;
@@ -50,23 +62,24 @@ interface Props {
   onCancel(): void;
 }
 
-export function AiCostPreview({ what, requests, estimate: e, modelLabel, models, model, onModel, onConfirm, onCancel }: Props) {
-  const { t } = useTranslation();
+export function AiCostPreview({ title, what, requests, estimate: e, modelLabel, models, model, onModel, onConfirm, onCancel }: Props) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
   const blocked = e.overDailyCap;
   const day = dayShareText(t, e);
   return (
-    <Dialog title={t('reader.cost.title')} onClose={onCancel} testId="ai-cost-dialog">
+    <Dialog title={title ? t('reader.cost.titleFor', { name: title }) : t('reader.cost.title')} onClose={onCancel} testId="ai-cost-dialog">
       <div className="dlg-scroll">
         <p data-testid="ai-cost-what">{what}</p>
         <ul className="hint" data-testid="ai-cost-facts">
           <li>{t('reader.cost.requests', { count: requests })}</li>
           <li data-testid="ai-cost-tokens">
-            {t('reader.cost.tokens', { tokens: formatTokens(e.approxTokens) })} · {e.estimatedUsd === null ? t('reader.cost.noPrice') : t('reader.cost.usd', { usd: formatUsd(e.estimatedUsd) })}
+            {t('reader.cost.tokens', { tokens: tokensText(e.approxTokens, lang) })} · {e.estimatedUsd === null ? t('reader.cost.noPrice') : t('reader.cost.usd', { usd: usdText(e.estimatedUsd, lang) })}
           </li>
           {day && <li data-testid="ai-cost-today">{day}</li>}
         </ul>
         {e.firstFolderSend && <p className="callout" data-testid="ai-cost-first">{t('reader.cost.first')}</p>}
-        {!blocked && e.approxTokens > e.thresholdTokens && <p className="callout" data-testid="ai-cost-over">{t('reader.cost.over', { threshold: formatTokens(e.thresholdTokens) })}</p>}
+        {!blocked && e.approxTokens > e.thresholdTokens && <p className="callout" data-testid="ai-cost-over">{t('reader.cost.over', { threshold: tokensText(e.thresholdTokens, lang) })}</p>}
         {blocked && (
           <p className="callout" role="alert" data-testid="ai-cost-cap">
             {t('reader.cost.cap')}

@@ -266,6 +266,7 @@
     },
     "cost": {
       "title": "Inviare a Claude?",
+      "titleFor": "{{name}}: inviare a Claude?",
       "ready": "Già pronto, 0 invii",
       "inButton": "≈ {{tokens}} token · {{model}}",
       "today": "Oggi: {{pct}} % del tetto usato",

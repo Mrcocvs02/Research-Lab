@@ -1,0 +1,35 @@
+/* manuscript (Z1b): list, matrix, editor */
+.ms-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.ms-source { background: none; border: 1px solid var(--border); border-radius: 12px; padding: 2px 10px; color: var(--text); font: inherit; }
+button.ms-source { cursor: pointer; }
+.ms-summary { margin: 0 0 8px; }
+.ms-list, .ms-entries, .ms-assign-list { list-style: none; margin: 0; padding: 0; }
+.ms-section { border-bottom: 1px solid var(--border); padding-top: 2px; padding-bottom: 2px; }
+.ms-section__head { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.ms-toggle { background: none; border: 0; color: var(--text); font: inherit; cursor: pointer; text-align: left; padding: 2px 4px; }
+.ms-toggle:disabled { cursor: default; }
+.ms-entries { padding: 0 0 4px 22px; }
+.ms-entries li { display: flex; gap: 8px; align-items: baseline; }
+.ms-orphans { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 8px; }
+.ms-orphan { display: flex; align-items: center; gap: 8px; }
+.ms-editor textarea { width: 100%; font-family: var(--font-mono, monospace); }
+.ms-chips { display: flex; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
+.ms-assign-list { max-height: 320px; overflow: auto; }
+.ms-assign-list li { padding: 3px 0; }
+.ms-matrix { position: relative; overflow: auto; max-height: 60vh; border: 1px solid var(--border); border-radius: 6px; }
+.ms-matrix__head { position: sticky; top: 0; z-index: 3; background: var(--surface, var(--bg)); border-bottom: 1px solid var(--border); }
+.ms-matrix__corner { position: sticky; left: 0; z-index: 4; height: 100%; background: var(--surface, var(--bg)); }
+.ms-matrix__col { position: absolute; top: 0; height: 100%; padding: 4px; box-sizing: border-box; font-size: 12px; overflow: hidden; display: flex; align-items: flex-end; word-break: break-word; }
+.ms-matrix__col.is-unused { font-style: italic; color: var(--text-muted); }
+.is-first-unused { border-left: 1px dashed var(--border); }
+.ms-matrix__row { position: absolute; left: 0; right: 0; }
+.ms-matrix__side { position: sticky; left: 0; z-index: 2; box-sizing: border-box; height: 100%; display: flex; align-items: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; background: var(--surface, var(--bg)); font-size: 13px; }
+.ms-matrix__side.is-gap { background: var(--warning-soft); }
+.ms-matrix__cellbox { position: absolute; top: 0; height: 100%; display: flex; align-items: center; justify-content: center; }
+.ms-cell { width: 28px; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 4px; background: none; color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.ms-cell:hover { background: var(--hover, rgba(128, 128, 128, 0.15)); }
+.ms-cell:focus-visible { outline: 2px solid var(--accent); }
+.ms-cell[data-state='direct'] { color: var(--accent); }
+.ms-cell[data-state='empty'] { color: var(--text-muted); }
+.ms-cell[data-state='proposed'] { border: 1px dashed var(--accent); }
+.ms-cell-pop { margin-top: 8px; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; }

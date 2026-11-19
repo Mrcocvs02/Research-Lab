@@ -6,7 +6,8 @@ import { Button } from '../../components/Button';
 import { Chip } from '../../components/Chip';
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
-import { IconChevronDown, IconPlus } from '../../components/icons';
+import { IconChevronDown, IconMore, IconPlus } from '../../components/icons';
+import { IconButton } from '../../components/IconButton';
 import { IconProject } from '../../components/icons-shell';
 import { Menu, type MenuGroups } from '../../components/Menu';
 import { Segmented } from '../../components/Segmented';
@@ -31,6 +32,7 @@ import '../notes/notes.css';
 /** At most four tabs (D-411): Schema appears once the project has a research outline or a claim (§17.4.13). */
 type Tab = 'members' | 'plan' | 'notes' | 'schema';
 type SchemaInfo = ResponseOf<Channels, 'project:schema'>;
+type ManuscriptInfo = ResponseOf<Channels, 'project:manuscript'>;
 const STATES: StudyState[] = ['to-read', 'reading', 'read'];
 
 // The Markdown renderer is loaded when the preview is first shown; the add-documents dialog when it is first asked for.
@@ -38,6 +40,7 @@ const Markdown = lazyRetry(() => import('../../lib/markdown').then((m) => ({ def
 const AddDocuments = lazyView(() => import('./AddDocumentsDialog'), ['projects']);
 // The Schema tab, the report and the citation suggestions: three lazy chunks, loaded when first shown (X7).
 const SchemaTab = lazyView(() => import('./SchemaTab'), ['projects']);
+const AssignDialog = lazyView(() => import('./manuscript/AssignDialog'), ['projects']);
 const ReportDialog = lazyView(() => import('./ReportDialog'), ['projects']);
 const CiteDialog = lazyView(() => import('./CiteDialog'), ['projects']);
 const PrismaDialog = lazyView(() => import('./PrismaDialog'), ['projects', 'discover', 'export']);
@@ -157,6 +160,23 @@ function StatusBadge({ project, onChange }: { project: ProjectDetail['project'];
 }
 
 /** A project: crumbs "Projects > Name" in the top bar, a status badge, the documents with their study state, the reading plan, and notes. */
+/** The `⋯` of a member row (§18.1): "Assign to a section…", always there; without a manuscript it is disabled and says why. */
+function MemberMenu({ title, enabled, onAssign }: { title: string; enabled: boolean; onAssign(): void }) {
+  const { t } = useTranslation();
+  const anchor = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+  const item = { id: 'assign', testId: 'member-assign', label: t('ms.assignToSection'), onSelect: onAssign };
+  const groups: MenuGroups = [{ id: 'ms', items: [enabled ? item : { ...item, disabled: true as const, disabledReason: t('ms.needManuscript') }] }];
+  return (
+    <span ref={anchor}>
+      <IconButton label={t('projects.moreOf', { name: title })} size="sm" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)} data-testid="member-more">
+        <IconMore size={16} />
+      </IconButton>
+      <Menu anchor={anchor} open={open} onClose={() => setOpen(false)} groups={groups} label={t('projects.moreOf', { name: title })} />
+    </span>
+  );
+}
+
 export function ProjectDetailView({ id }: { id: string }) {
   const { t } = useTranslation();
   const { invalidate } = useLibraryEvents();
@@ -176,7 +196,10 @@ export function ProjectDetailView({ id }: { id: string }) {
   const [schema, setSchema] = useState<SchemaInfo | null>(null);
   /** The Schema tab was asked for ("Write it now") before there is an outline to show. */
   const [schemaOpen, setSchemaOpen] = useState(false);
-  const [dialog, setDialog] = useState<{ kind: 'report'; open?: string } | { kind: 'cite' } | { kind: 'prisma' } | null>(null);
+  /** The Schema tab opens on the manuscript (from the Notes invitation); otherwise on the research outline unless only a manuscript exists. */
+  const [schemaMode, setSchemaMode] = useState<'research' | 'manuscript' | null>(null);
+  const [manuscript, setManuscript] = useState<ManuscriptInfo | null>(null);
+  const [dialog, setDialog] = useState<{ kind: 'report'; open?: string } | { kind: 'cite' } | { kind: 'prisma' } | { kind: 'assign'; docId: string } | null>(null);
   const detailRef = useRef<ProjectDetail | null>(null);
   /** The ref is what writes read their revision from; it moves with the state, never back to an older render. */
   const setDetail = useCallback((d: ProjectDetail) => {
@@ -228,6 +251,15 @@ export function ProjectDetailView({ id }: { id: string }) {
       alive = false;
     };
   }, [id, pushed]);
+
+  // Whether the project has a manuscript (the Schema tab shows for it; the row menu of the documents needs it): read when the tab changes.
+  useEffect(() => {
+    let alive = true;
+    rl.invoke('project:manuscript', { projectId: id }).then((r) => alive && setManuscript(r), () => alive && setManuscript(null));
+    return () => {
+      alive = false;
+    };
+  }, [id, tab]);
 
   // The last crumb of the top bar is the project's name.
   const title = detail?.project.name;
@@ -307,8 +339,9 @@ export function ProjectDetailView({ id }: { id: string }) {
     { id: 'members', label: t('projects.tabs.members') },
     { id: 'plan', label: t('projects.tabs.plan') },
     { id: 'notes', label: t('projects.tabs.notes') },
-    ...(schemaOpen || (schema && (schema.outline !== null || schema.claims.length > 0)) ? [{ id: 'schema', label: t('schema.tab') }] : []),
+    ...(schemaOpen || manuscript?.manuscript || (schema && (schema.outline !== null || schema.claims.length > 0)) ? [{ id: 'schema', label: t('schema.tab') }] : []),
   ];
+  const papers = detail.members.map((m) => ({ docId: m.docId, title: m.title ?? m.docId, authors: m.authors, year: m.year ?? null }));
   const hasOutline = !!schema?.outline && schema.outline.idea.trim() !== '';
   const addButton = (variant: 'primary' | 'secondary', testId: string) => (
     <Button variant={variant} icon={<IconPlus size={16} />} disabled={archived} disabledReason={t('projects.archivedNoAdd')} onClick={() => setAdding(true)} data-testid={testId}>
@@ -394,6 +427,9 @@ export function ProjectDetailView({ id }: { id: string }) {
                       <th scope="col">{t('doc.year')}</th>
                       <th scope="col">{t('doc.studyState')}</th>
                       <th scope="col">{t('doc.path')}</th>
+                      <th scope="col">
+                        <span className="sr-only">{t('projects.more')}</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -434,6 +470,9 @@ export function ProjectDetailView({ id }: { id: string }) {
                           )}
                         </td>
                         <td className="result-path">{m.path ? safeText(m.path) : ''}</td>
+                        <td>
+                          <MemberMenu title={safeText(m.title ?? m.docId)} enabled={!!manuscript?.manuscript} onAssign={() => setDialog({ kind: 'assign', docId: m.docId })} />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -447,8 +486,11 @@ export function ProjectDetailView({ id }: { id: string }) {
             {schema && schema.outline === null && (
               <div className="callout schema-invite" data-testid="notes-outline-invite">
                 <p>{t('schema.invite')}</p>
-                <Button size="sm" onClick={() => (setSchemaOpen(true), setTab('schema'))} data-testid="notes-write-outline">
+                <Button size="sm" onClick={() => (setSchemaOpen(true), setSchemaMode('research'), setTab('schema'))} data-testid="notes-write-outline">
                   {t('schema.writeNow')}
+                </Button>{' '}
+                <Button size="sm" onClick={() => (setSchemaOpen(true), setSchemaMode('manuscript'), setTab('schema'))} data-testid="notes-link-manuscript">
+                  {t('ms.linkManuscript')}
                 </Button>
               </div>
             )}
@@ -471,7 +513,7 @@ export function ProjectDetailView({ id }: { id: string }) {
         )}
         {tab === 'schema' && schema && (
           <Lazy>
-            <SchemaTab projectId={id} info={schema} titles={new Map(detail.members.map((m) => [m.docId, m.title ?? m.docId]))} onChanged={() => setPushed((n) => n + 1)} />
+            <SchemaTab projectId={id} info={schema} titles={new Map(detail.members.map((m) => [m.docId, m.title ?? m.docId]))} papers={papers} initialMode={schemaMode ?? (manuscript?.manuscript && schema.outline === null && schema.claims.length === 0 ? 'manuscript' : 'research')} onChanged={() => setPushed((n) => n + 1)} />
           </Lazy>
         )}
         {tab === 'plan' && <ReadingPlanPanel detail={detail} onChange={(items) => void savePlan(items)} onStudyState={(docId, state) => void setDocState(docId, state)} />}
@@ -490,6 +532,11 @@ export function ProjectDetailView({ id }: { id: string }) {
       {dialog?.kind === 'cite' && (
         <Lazy>
           <CiteDialog projectId={id} notes={p.notes} outline={schema?.outline ?? null} onClose={() => setDialog(null)} onAssigned={() => setPushed((n) => n + 1)} />
+        </Lazy>
+      )}
+      {dialog?.kind === 'assign' && (
+        <Lazy>
+          <AssignDialog projectId={id} papers={papers} claims={[]} docId={dialog.docId} onClose={() => setDialog(null)} onDone={() => setPushed((n) => n + 1)} />
         </Lazy>
       )}
       {renaming && <RenameDialog project={p} onSave={update} onClose={() => setRenaming(false)} />}

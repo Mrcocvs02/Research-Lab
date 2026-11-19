@@ -68,7 +68,8 @@
       "copied": "Copiato",
       "commentShort": "Commento",
       "to_highlight": "Trasforma in evidenziazione",
-      "to_underline": "Trasforma in sottolineatura"
+      "to_underline": "Trasforma in sottolineatura",
+      "useAsEvidence": "Usa come prova"
     },
     "notesList": {
       "empty": "Ancora nessuna nota su questo documento.",

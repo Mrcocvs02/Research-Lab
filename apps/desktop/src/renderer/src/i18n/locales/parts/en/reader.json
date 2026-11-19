@@ -68,7 +68,8 @@
       "copied": "Copied",
       "commentShort": "Comment",
       "to_highlight": "Change to a highlight",
-      "to_underline": "Change to an underline"
+      "to_underline": "Change to an underline",
+      "useAsEvidence": "Use as evidence"
     },
     "notesList": {
       "empty": "No notes on this document yet.",

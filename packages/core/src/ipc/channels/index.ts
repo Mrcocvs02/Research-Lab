@@ -72,6 +72,7 @@ export { annotationColorSchema, annotationInputSchema, externalItemSchema, pdfRe
 export { CROP_BASE64_MAX, explainResultSchema, type ExplainResult } from './readertools.js';
 export { OUTLINE_LIMITS, REPORT_AUDIENCES, REPORT_PARTS, claimSchema, evidenceSchema, outlineSchema, type Claim, type Evidence, type Outline } from './project.js';
 export { DISCOVER_LIMITS, DISCOVER_SUMMARY_CHOICES, discoverReasonSchema, discoverRunSchema, discoverSummarySchema, type DiscoverOutcome, type DiscoverCandidate, type DiscoverKind, type DiscoverReason, type DiscoverRun, type DiscoverRunSummary, type DiscoverSummary } from './discover.js';
+export type { PrismaCounts, PrismaState } from './bib.js';
 export { LITERATURE_KEYS, LITERATURE_MAX_DOCS, TEMPLATE_LIMITS, type LiteratureKey, type LiteratureNote } from './literature.js';
 export { thumbItemSchema } from './thumbs.js';
 export { aiAccountSchema, aiAuthSchema, aiPreviewSchema, aiSendViewSchema, aiStatusSchema, type AiAccount, type AiTokenUsage, aiTokenUsageSchema } from './ai.js';

@@ -25,7 +25,7 @@ import {
 } from '@rl/core';
 import { sha256File } from '@rl/core/node';
 import type { PlanAnnot } from '@rl/data/pdf-annot';
-import { isInsideLibrary } from '../export/target.js';
+import { isInsideLibrary, moveNew } from '../export/target.js';
 import type { LibraryRuntime } from '../library/library-runtime.js';
 import type { MainServices } from '../ipc/handlers/services.js';
 import { fingerprint, sameFingerprint, writeTempWithAppend, type Journal } from './pdf-files.js';
@@ -45,8 +45,8 @@ export interface CopyContext {
   destination: string;
 }
 
-/** `Name (annotated).pdf`, then `Name (annotated 2).pdf`...: the first name that does not exist in the folder. */
-async function freeName(dir: string, original: string): Promise<string> {
+/** `Name (annotated).pdf`, then `Name (annotated 2).pdf`...: the candidate names, in order. */
+export function copyNames(original: string): string[] {
   const base =
     path
       .basename(original)
@@ -55,9 +55,13 @@ async function freeName(dir: string, original: string): Promise<string> {
       .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
       .replace(/[. ]+$/, '')
       .slice(0, 120) || 'document';
-  for (let i = 1; i < 100; i++) {
-    const name = `${base} (annotated${i > 1 ? ` ${i}` : ''}).pdf`;
-    if (!(await stat(path.join(dir, name)).then(() => true, () => false))) return name;
+  return Array.from({ length: 99 }, (_, i) => `${base} (annotated${i > 0 ? ` ${i + 1}` : ''}).pdf`);
+}
+
+/** Puts the finished `out` into `dir` under the first free name, created exclusively: a file made meanwhile is never replaced. */
+export async function placeNew(dir: string, original: string, out: string): Promise<string> {
+  for (const name of copyNames(original)) {
+    if (await moveNew(out, path.join(dir, name))) return name;
   }
   throw new AppError('CONFLICT', 'Too many copies with this name in the folder', { reason: 'name-taken' });
 }
@@ -89,6 +93,8 @@ export async function exportCopy(c: CopyContext): Promise<{ file: string; annota
   const tmp = path.join(c.dir, `.copy-${stamp}.pdf.rl-${stamp}.tmp`);
   const out = path.join(dest, `.${randomUUID().slice(0, 8)}.pdf.rl-${stamp}.tmp`);
   await c.journal.add({ tmp, docId: rec.id, libraryId: rt.libraryId, at: new Date().toISOString() });
+  // The hidden temporary in the user's folder is listed too, so that a stop does not leave it there.
+  await c.journal.add({ tmp: out, docId: rec.id, libraryId: rt.libraryId, at: new Date().toISOString(), approved: true });
   try {
     let finalHash = hash;
     if (plan.update) {
@@ -119,13 +125,13 @@ export async function exportCopy(c: CopyContext): Promise<{ file: string; annota
       });
     });
     if ((await sha256File(out)) !== finalHash) throw new AppError('IO_ERROR', 'The copy was not written correctly', { reason: 'verify-failed' });
-    const file = await freeName(dest, rec.path);
-    await rename(out, path.join(dest, file));
+    const file = await placeNew(dest, rec.path, out);
     return { file, annotations: c.plan.length, skipped: c.skipped };
   } finally {
     await unlink(tmp).catch(() => {});
     await unlink(out).catch(() => {});
     await c.journal.remove(tmp);
+    await c.journal.remove(out);
   }
 }
 

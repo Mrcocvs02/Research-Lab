@@ -38,7 +38,7 @@ export const sameFingerprint = (a: Fingerprint, b: Fingerprint) => a.size === b.
 export const tempNameFor = (abs: string) => path.join(path.dirname(abs), `.${path.basename(abs)}.rl-${randomBytes(4).toString('hex')}.tmp`);
 
 /** Temporaries that exist right now (journal of §8.3.3 step 5): written atomically so that a stop leaves a trace of every one. */
-export interface JournalEntry { tmp: string; docId: string; libraryId: string; at: string }
+export interface JournalEntry { tmp: string; docId: string; libraryId: string; at: string; /** A temporary in a folder the user approved for an export (outside the usual roots). */ approved?: boolean }
 export class Journal {
   private entries: JournalEntry[] | null = null;
   constructor(private readonly file: string) {}
@@ -76,7 +76,7 @@ export class Journal {
     const list = await this.load();
     let n = 0;
     for (const e of list) {
-      if (TMP.test(path.basename(e.tmp)) && roots.some((r) => isInside(r, e.tmp))) {
+      if (TMP.test(path.basename(e.tmp)) && (e.approved === true || roots.some((r) => isInside(r, e.tmp)))) {
         if (await unlink(e.tmp).then(() => true, () => false)) n++;
       }
     }

@@ -1,4 +1,6 @@
-import { copyFile, lstat, mkdir, readFile, readdir, realpath, rename, stat } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
+import { constants } from 'node:fs';
+import { copyFile, link, lstat, mkdir, readFile, readdir, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError } from '@rl/core';
 import { atomicWriteFile, isInside } from '@rl/core/node';
@@ -17,6 +19,28 @@ const notFound = (e: unknown) => ['ENOENT', 'ENOTDIR'].includes((e as NodeJS.Err
  * (the folder itself included) refuses the operation. Nothing is ever deleted; a file is replaced only by an atomic rename
  * of a complete new file, and callers decide which files they may replace.
  */
+/**
+ * Puts the finished file `from` at `to` only if `to` does not exist: a hard link (atomic, fails with EEXIST), or an exclusive
+ * copy where links are not supported (some synced or FAT volumes). `from` is removed afterwards. Returns false when `to` exists.
+ */
+export async function moveNew(from: string, to: string): Promise<boolean> {
+  try {
+    await link(from, to);
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === 'EEXIST') return false;
+    if (!['EPERM', 'ENOSYS', 'EXDEV', 'EMLINK', 'ENOTSUP', 'EOPNOTSUPP', 'EACCES'].includes(code ?? '')) throw e;
+    try {
+      await copyFile(from, to, constants.COPYFILE_EXCL);
+    } catch (x) {
+      if ((x as NodeJS.ErrnoException).code === 'EEXIST') return false;
+      throw x;
+    }
+  }
+  await unlink(from).catch(() => {});
+  return true;
+}
+
 export class ExportTarget {
   constructor(readonly dir: string) {}
 
@@ -60,6 +84,24 @@ export class ExportTarget {
     const abs = this.resolve(rel);
     await this.checkWalk(abs);
     await atomicWriteFile(abs, text);
+  }
+
+  /**
+   * Writes `text` as a NEW file: it never replaces one that exists, even one created a moment ago by someone else (the
+   * complete file is made under a temporary name and linked into place). Returns false when the name is taken.
+   */
+  async writeNew(rel: string, text: string): Promise<boolean> {
+    const abs = this.resolve(rel);
+    await this.checkWalk(path.dirname(abs));
+    await mkdir(path.dirname(abs), { recursive: true });
+    if (await this.checkWalk(abs)) return false;
+    const tmp = `${abs}.${randomBytes(4).toString('hex')}.part`;
+    await writeFile(tmp, text, { encoding: 'utf8', flag: 'wx' });
+    try {
+      return await moveNew(tmp, abs);
+    } finally {
+      await unlink(tmp).catch(() => {});
+    }
   }
 
   /**

@@ -898,6 +898,95 @@ In ogni modo valgono stile, livelli di dettaglio, cartellino, volo, percorso pi�
 - Renderer: +5-7 KiB nel chunk pigro della Mappa (selettore del modo, stili dei nodi entità e della vista bipartita, cartellino e scheda dell'entità, passaggio animato, Sorprendimi per modo). Main: +4-6 KiB (`packages/graph/src/entity-network.ts`, alias degli autori, gestore del canale).
 - Prove: unitarie per la costruzione (pesi di co-occorrenza e coautorialità, consorzi esclusi dagli archi, unione e separazione degli autori, alias, tetto e top-k, anni), per la colorazione dei tag (colori dell'utente sotto 3:1 → tinta vicina) e per la propagazione delle etichette; e2e `network.spec.ts`: cambio dei quattro modi, cartellino di un autore, clic che apre la Libreria con il filtro dell'autore, doppio clic su un tag che apre i documenti, `M` e movimento ridotto; prova di costruzione con 10 000 documenti sintetici in `test:e2e:heavy`.
 
+### 4.22 Mappa semplificata (giro 6)
+
+Corregge Z2, Z3, Z4, Z5, Z24 dell'audit finale (T2, solo `views/network/**`). Riferimento: P0 (`P0-map-light-1280x800.png`, 12 controlli). Prevale su §4.20 e §4.21 dove li contraddice; stile, movimento, quattro modi e prestazioni restano quelli. Principio: **una riga sola sopra una tela a tutta altezza**; quello che non si usa a ogni visita sta in un chip con popover o nel `⋯`; avvisi e conteggi sono sovrapposti alla tela, mai paragrafi che la spingono giù.
+
+**Composizione (tutte le schede)**
+
+```
+| Mappa  220 documenti · 7 argomenti · aggiornata il 19 nov, 00:57          [[Aggiorna la mappa]]  [⋯] |  ← primario solo se manca o è vecchia
+| (Panorama|Collegamenti|Esplora|Vicini inattesi) [Rete di: Autori ▾] [⌕ Vai a…] [Filtri ▾]   [✧][✦][⤢] |  ← una riga; ✧ ✦ ⤢ solo nelle schede con la tela
++-------------------------------------------------------------------------------------------------------+
+| (pillola di stato, in alto a sinistra)                                                                |
+|                       tela a tutta altezza (≥ 70 % della finestra a 1280×800)                          |
+| [legenda sovrapposta, in basso a sinistra, 240 px]                              [minimappa 160×120]  |
++-------------------------------------------------------------------------------------------------------+
+```
+
+- **Intestazione:** titolo + sottotitolo + al più un pulsante + `⋯`. Sottotitolo: conteggi e "aggiornata il …" con `Intl.DateTimeFormat` (`dateStyle: 'medium', timeStyle: 'short'`), senza punto né seme; "vecchia" = "12 documenti nuovi · [[Aggiorna la mappa]]" (primario, `graph-build`); aggiornata = **nessun pulsante** ("Ricostruisci" è nel `⋯`); in costruzione = fasi + `Annulla` (`graph-cancel`); modello assente = nessun pulsante in testa (il solo primario è nel corpo, `graph-build-empty`).
+- **Seme** fuori dalla testa: `⋯` › "Opzioni del modello…" apre un dialogo (Seme `graph-seed`, livelli, [[Ricostruisci]] `graph-build-options`). Il seme resta solo in `data-seed` di `map-info`.
+- **Schede** come `Segmented` a sinistra della riga (P0), `role=tab`, testid `net-tab-*` invariati. La riga è la stessa in ogni scheda con la tela: cambiano solo i chip.
+- **Un solo `⋯`**, nell'intestazione, con le voci della scheda e del modo correnti; testid secondo il contesto: `map-more` (Panorama), `net-more` (Collegamenti › Documenti), `ent-more` (Tag, Argomenti, Autori), `map-more` anche in Esplora e Vicini (solo il gruppo del modello).
+- **Pillola di stato** (`.map-pill`, una alla volta, priorità: scelta del ponte › nota del ponte › Sorprendimi › filtri attivi › tetto o omessi › suggerimento del primo uso): sostituisce `map-surprise-note`, `map-timeline-label`, `map-bridge-note`, `map-omitted`, `net-note`, `ent-note`, `net-surprise-note`, `ent-surprise-note` (testid invariati sull'elemento della pillola), con al più un link e `✕`. Il conteggio della tela ("22 nodi", "7 argomenti · 220 documenti") va in `net-count`/`ent-count`, testo nella legenda.
+- **Istruzioni:** il paragrafo di due righe sparisce; il suggerimento del primo uso è una pillola ("Trascina, rotella per lo zoom, doppio clic per aprire · ✕") mostrata una volta per installazione (`localStorage` in try/catch); i tasti sono nella pagina Mappa dell'Aiuto (F1).
+
+**Controlli visibili per scheda e modo** (1280×800 e 1024×700; ⋯ conta 1)
+
+| Zona | Prima | Dopo | Elenco |
+| --- | --- | --- | --- |
+| Modello assente (ogni scheda) | 7 (Costruisci ×2, Seme) | **6** | ⋯, 4 schede, [[Costruisci la mappa]] nel corpo |
+| Panorama | 16 | **11** (10 aggiornata) | Aggiorna, ⋯, 4 schede, Vai a, Filtri ▾, ✧ ✦ ⤢ |
+| Collegamenti › Documenti | 31 | **12** (11) | Aggiorna, ⋯, 4 schede, Rete di ▾, Vai a, Partenza ▾, ✧ ✦ ⤢ |
+| Collegamenti › Tag · Argomenti · Autori | 22 | **12** (11) | Aggiorna, ⋯, 4 schede, Rete di ▾, Vai a, Filtri ▾, ✧ ✦ ⤢ |
+| Esplora | 13 (4 disattivati) | **9**, 10 in profondità | Aggiorna, ⋯, 4 schede, Temi · Autori · Riviste; Indietro solo sotto la radice |
+| Vicini inattesi | 6 + 2 link sottolineati per riga | **6** + righe | Aggiorna, ⋯, 4 schede |
+
+**Cosa si sposta dove**
+
+| Controllo di oggi | Dove va | Testid |
+| --- | --- | --- |
+| Seme, Ricostruisci | `⋯` › Opzioni del modello… (dialogo) · `⋯` › Ricostruisci la mappa | `graph-seed`, `graph-build-options`, `map-rebuild` (nuovo) |
+| Ambito (2 select), Anni (2 cursori) | chip **Filtri ▾** (popover): Ambito, Anni; sezione "Aspetto": Colora per livello | `map-filters` (nuovo), `map-scope-kind`, `map-scope-value`, `map-years`, `map-year-from/to`, `map-level` |
+| Etichetta i cluster con Claude | `⋯` › ✦ Etichette con Claude… | `map-label-clusters` |
+| Esporta (link per riga della legenda) | `⋯` del cartellino del cluster: Esporta come secondo cervello…, Rinomina | `cluster-export` |
+| Rete di (4 pulsanti) + "M cambia modo" | chip **Rete di: Documenti ▾**: menu a 4 voci radio, ognuna con una frase, `M` scritto a destra | `net-mode` (nuovo), voci `net-mode-<m>` |
+| Parti dal documento / da cartella / da tag, Vicini, 6 caselle Espandi per | chip **Partenza ▾** (popover in due sezioni: "Parti da" documento scelto · cartella · tag; "A ogni espansione" vicini 10/25/50 + 6 chip a scelta) | `net-start` (nuovo), `net-start-doc/folder/tag`, `net-limit`, `net-kinds`, `net-kind-*` |
+| Espandi, Comprimi, Rimuovi nodo | pannello del nodo: [Leggi] [Espandi] + ⋯ (Comprimi · Rimuovi dalla rete · Trova un ponte con…); doppio clic sul nodo resta "espandi" | `net-expand`, `net-collapse`, `net-remove` |
+| Azzera, Libera i nodi fissati, Minimappa | `⋯` della vista | `net-reset`, `net-unpin-all`, `net-minimap-toggle` |
+| Almeno N documenti, Legami, Livello, Rami | chip **Filtri ▾** (entità); il chip dice "Filtri · 2" se non predefiniti | `ent-filters` (nuovo), `ent-min-docs`, `ent-min-weight`, `ent-level`, `ent-tag-scope`, `ent-years` |
+| Dimensione per, Mostra temi in comune | Filtri ▾ › sezione "Aspetto" (Segmented Documenti · Citazioni · Uguale; casella temi solo in Autori) | `ent-size-by`, `ent-themes-toggle` |
+| Disponi per anno, Minimappa (Panorama) | `⋯` della vista | `map-timeline-toggle`, `map-minimap-toggle` |
+| Trova un ponte | resta nel `⋯` del cartellino; la scelta del secondo nodo e il risultato sono pillole | `map-card-more`, `map-bridge-pick`, `map-bridge-note`, `map-bridge-close` |
+| Legenda a destra (Panorama), legenda in riga (Documenti) | sovrapposta in basso a sinistra, 240 px, ≤ 8 righe + "altri N", ellissi con `title`, mai scorrimento orizzontale | `cluster-legend`, `cluster-item`, `net-legend` |
+
+**Menu `⋯`** (≤ 7 voci, ≤ 3 gruppi): Panorama **6** · 3 = Opzioni del modello… · Ricostruisci la mappa ┃ Disponi per anno · ☐ Minimappa ┃ Esporta l'immagine · ✦ Etichette con Claude…; Documenti **6** · 3 = Azzera la rete · Libera i nodi fissati ┃ ☐ Minimappa · Esporta l'immagine ┃ Opzioni del modello… · Ricostruisci; entità **5** · 2 = Libera i nodi fissati · ☐ Minimappa · Esporta l'immagine ┃ Opzioni del modello… · Ricostruisci; Esplora e Vicini **2** · 1 = Opzioni del modello… · Ricostruisci. Rete di ▾ **4** · 1. Cartellino del nodo **1**; pannello del nodo (Documenti) **3**.
+
+**Panorama: involucri che non si sovrappongono (Z3)**
+- **Separazione dei gruppi:** ogni argomento è approssimato da un cerchio (baricentro, raggio = 80° percentile delle distanze); 60 passi di repulsione tra cerchi (distacco 24 px del mondo, spostamento rigido dei loro punti), poi 2 passi di collisione tra punti sul quadtree (distanza minima = diametro + 2 px). Calcolo una volta per disposizione, in cache, in `hulls.ts` (`separateClusters`) e `quadtree.ts`; sopra 5000 punti solo la separazione dei gruppi. La "Disponi per anno" non la usa.
+- **Involucro dal nucleo:** inviluppo dei punti entro il raggio dell'80° percentile (i lontani non lo gonfiano), Chaikin come oggi.
+- **A riposo:** riempimento solo dei gruppi che dopo la separazione non toccano altri nuclei e sono tra gli 8 più grandi: 5 % (scuro 8 %), **nessun contorno**; gli altri senza involucro, solo punti ed etichetta. **Al passaggio o a fuoco** (anche dalla legenda o con la tastiera): involucro del gruppo 12 % e contorno 1,5 px al 40 %, il resto al 35 %.
+- **Nodi:** cerchi, raggio `3 + 3·√(c/cmax)` px dello schermo (6-12 px di diametro), anello 1,5 px `--bg`; mai quadratini sotto i 5000 punti visibili.
+- **Etichette:** ogni argomento ha l'etichetta nel suo colore (testo con alone `--bg` 3 px), posta sopra il nucleo; anticollisione tra etichette di argomento provando sopra · sotto · destra · sinistra, poi si nasconde la più piccola fino allo zoom successivo; ≤ 12 argomenti = tutte visibili ad "Adatta". Titoli dei documenti solo da zoom ≥ 2,5, ≤ 30 alla volta, griglia di `labelsLod.ts`; tronca a 28 caratteri.
+- **Minimappa:** `--surface` all'85 %, bordo `--border`, `--r-md`, macchie dei gruppi e rettangolo della vista; nascosta sotto 900 px e sotto 30 documenti.
+- **Divertente:** ingresso di 400 ms (punti dal baricentro, poi l'assestamento della separazione visibile); con movimento ridotto si disegna il risultato.
+
+**Collegamenti (Z2, Z24):** la tela prende tutta l'altezza; dopo ogni espansione o cambio di modo "Adatta" animato (400 ms); etichette con la stessa anticollisione e tutte visibili sotto i 30 nodi; cursori nei popover con `accent-color: var(--accent)`; la riga non va mai a capo (a 1024 "Vai a" diventa un'icona che si apre in campo, sempre 1 controllo).
+
+**Stati vuoti (Z5): uno schema solo** — `EmptyState` **al posto** della tela o dell'elenco (la tela è `hidden`, mai sotto o sopra), con illustrazione "mappa da costruire", titolo, una frase col motivo, **un** primario, al più un link secondario.
+
+| Caso | Titolo · motivo | Azione | Testid |
+| --- | --- | --- | --- |
+| Modello assente (Panorama, Argomenti, Esplora › Temi, Vicini) | Costruisci la mappa dei tuoi documenti · stima del tempo, nulla va online | [[Costruisci la mappa]] | `graph-empty`, `graph-build-empty` (in ogni scheda lo stesso) |
+| Meno di 3 documenti | Servono almeno 3 documenti | [+ Aggiungi PDF] | `map-few` |
+| Autori con filtri predefiniti < 3 nodi | nessuno stato: si abbassa una volta "Almeno N" a 1 e la pillola lo dice ("Mostro anche gli autori con 1 documento") | — | `ent-note` |
+| Filtri dell'utente < 3 nodi | Nessun <autore/tag/argomento> con questi filtri · "con almeno 2 documenti ce ne sono 2" | [Togli i filtri] | `ent-clear-filters` |
+| Tag assenti · autori assenti | Non ci sono ancora tag · I documenti non hanno autori | [[Gestisci tag]] · [[Completa i dati]] | `ent-empty-tags`, `ent-empty-review` |
+| Esplora, dimensione vuota | Nessun tema: i temi vengono dai tag · Nessuna rivista nei dati | [[Crea i primi tag]] / [[Completa i dati]], link "Esplora per autori" | `explore-empty` |
+| Vicini inattesi vuoto | Nessun vicino inatteso · servono documenti con testo | [Torna al Panorama] | `surprising-empty` |
+
+- **Esplora:** si apre sulla prima dimensione non vuota (Temi › Autori › Riviste); "Ingrandisci" e "Mostra correlati" non sono più una barra disattivata in fondo ma azioni della riga selezionata (compaiono al passaggio e sulla riga attiva); "Indietro" solo sotto la radice. Testid invariati (`explore-zoom`, `explore-related-*`, `explore-back`, `explore-actions` sulla riga).
+- **Vicini inattesi:** titolo o nome del file, **mai l'id** (senza entrambi: "Documento senza titolo"); righe a due livelli: "Titolo A ↔ Titolo B" `--fs-body` senza sottolineatura a riposo, "39 %" a destra; sotto, in `--text-muted`, "Parole in comune: …" (≤ 5); al passaggio "Mostra nella mappa" porta al Panorama ed esegue la stessa evidenziazione di Sorprendimi. Testid `surprising-pair`, `surprising-all`.
+
+**Prove di accettazione** (giro "final", `RL_DESIGN_AUDIT_OUT=run9`, e unitarie)
+- `count-map-head` ≤ 11 e `count-map-network` ≤ 12 in **ognuno** dei quattro modi, a 1280×800 e 1024×700, chiaro e scuro; Esplora ≤ 10, Vicini ≤ 6 escluse le righe; modello assente ≤ 6 con **un solo** elemento visibile che contiene "Costruisci".
+- Ogni `⋯`, `Rete di ▾` e cartellino entro i numeri sopra (`countMenu`); nessun testo "Seme" visibile fuori dal dialogo; sottotitolo senza `T`, senza ". ·" e senza seme.
+- Tela ≥ 70 % dell'altezza della finestra in Panorama e Collegamenti; legenda con `scrollWidth ≤ clientWidth`; riga dei controlli alta una riga (nessun a capo) a 1024.
+- Unitarie (`m4.test.ts`/`mapfix.test.ts`): dopo `separateClusters` nessuna coppia di nuclei si sovrappone (gruppi sintetici intrecciati); l'insieme degli involucri a riposo è a coppie disgiunto; con ≤ 12 argomenti tutte le etichette piazzate senza collisioni; raggio dei nodi tra 3 e 6 px.
+- Stati: mai `ent-empty-*`, `ent-clear-filters` o `explore-empty` insieme a una tela o a un elenco visibili; nessuna riga di Vicini con testo `/^[0-9a-f]{8}$/`; Esplora non mostra mai "Qui non c'è nulla".
+- e2e da aggiornare (agente principale, fuori da `views/network/**`): aprire `net-mode` prima di `net-mode-<m>`, `net-start` prima di `net-start-folder`/`net-limit`, `ent-filters` prima di `ent-min-docs`, `map-more` prima di `map-label-clusters`, `net-more` prima di `net-reset`, il dialogo delle opzioni prima di `graph-seed`.
+- Peso: ≤ +3 KiB nel chunk pigro (separazione, pillola, popover), nessuna dipendenza nuova; `check:budget` verde.
+
 ---
 
 ## 5. Sistema visivo

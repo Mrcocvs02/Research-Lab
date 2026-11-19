@@ -128,6 +128,23 @@
     "errors": {
       "noModel": "Il modello della rete non è ancora costruito, quindi i cluster non si possono esportare. Costruiscilo nella sezione Rete o togli i cluster.",
       "tooMany": "La selezione contiene troppi documenti. Restringila e riprova."
+    },
+    "format": {
+      "label": "Cosa esportare",
+      "secondBrain": "Un secondo cervello (cartella di Markdown)",
+      "bibtex": "Riferimenti: BibTeX (.bib)",
+      "ris": "Riferimenti: RIS (.ris)",
+      "csl": "Riferimenti: CSL JSON (.json)"
+    },
+    "refs": {
+      "intro": "Scrive un file con i riferimenti della selezione, con le chiavi di citazione di Impostazioni › Libreria. Un file esistente non viene mai sovrascritto: il nome prende un numero.",
+      "file": "Nome del file",
+      "run": "Esporta i riferimenti",
+      "done": "{{count}} riferimenti scritti in {{file}}.",
+      "copy": "Copia BibTeX negli appunti",
+      "copied": "Riferimenti BibTeX copiati negli appunti ({{count}}).",
+      "copyNote": "Solo per un progetto o per documenti scelti.",
+      "choose": "Scegli prima una cartella."
     }
   }
 }

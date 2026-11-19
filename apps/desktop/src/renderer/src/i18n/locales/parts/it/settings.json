@@ -22,7 +22,11 @@
     "library": {
       "excluded": "Cartelle escluse",
       "excludedHint": "Queste cartelle non vengono scansionate né indicizzate.",
-      "thisOne": "Questa libreria"
+      "thisOne": "Questa libreria",
+      "citeKey": "Chiavi di citazione",
+      "citeKeyHelp": "Usate quando i riferimenti vengono esportati o copiati. Le chiavi che un documento ha già, assegnate o importate, non vengono mai cambiate.",
+      "citeKeyAuthorYear": "Autore e anno (rossi2020)",
+      "citeKeyAuthorYearTitle": "Autore, anno e una parola del titolo (rossi2020attenzione)"
     },
     "network": {
       "title": "Fonti online",
@@ -132,7 +136,8 @@
       "colorMeanings": "Significato dei colori|evidenziazioni legenda nomi",
       "costThreshold": "Soglia dell'anteprima del costo|token dialogo stima invio",
       "dailyTokenCap": "Tetto di token al giorno|limite giorno budget token",
-      "noteTemplates": "Modelli di nota|modello letteratura segnaposto markdown"
+      "noteTemplates": "Modelli di nota|modello letteratura segnaposto markdown",
+      "citeKeySchema": "Chiavi di citazione|bibtex ris csl riferimenti chiave cite autore anno"
     },
     "search": {
       "label": "Cerca nelle impostazioni",

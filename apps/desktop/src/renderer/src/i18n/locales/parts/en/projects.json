@@ -187,5 +187,40 @@
       "stance": "The evidence",
       "saved": "Evidence saved in the outline of the project."
     }
+  },
+  "prisma": {
+    "menu": "PRISMA flow diagram…",
+    "title": "PRISMA flow diagram · {{name}}",
+    "loading": "Reading the counts…",
+    "hint": "Counted by the app while you extend the bibliography of this project. Steps done outside the app can be typed under \"Edit counts\".",
+    "hintEdited": "Some counts were typed by you for steps done outside the app.",
+    "identification": "Identification",
+    "screening": "Screening",
+    "included": "Included",
+    "identified": "Records identified from",
+    "removedBefore": "Records removed before screening",
+    "duplicates": "Duplicate records",
+    "screened": "Records screened (title and abstract)",
+    "excluded": "Records excluded",
+    "assessed": "Full texts assessed for eligibility",
+    "excludedFull": "Full texts excluded, with reasons",
+    "includedBox": "Studies included in the review",
+    "source": {
+      "openalex-cited": "OpenAlex (works cited)",
+      "openalex-citing": "OpenAlex (works citing)"
+    },
+    "edit": "Edit counts",
+    "editHint": "Type the numbers of steps done outside the app (other databases, full-text reading). The app keeps its own counts and adds yours.",
+    "addSource": "Add a source (name)",
+    "add": "Add",
+    "addReason": "Add a reason",
+    "reasonText": "Reason",
+    "n": "Number",
+    "save": "Save counts",
+    "saved": "Counts saved.",
+    "exportSvg": "Export SVG…",
+    "exportMd": "Export Markdown…",
+    "exported": "Saved as {{file}}.",
+    "step": "Step"
   }
 }

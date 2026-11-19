@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { libraryConfigSchema, type Language, type LibraryProfile, type ScanReport } from '@rl/core';
+import { libraryConfigSchema, type CiteKeySchema, type Language, type LibraryProfile, type ScanReport } from '@rl/core';
 import { Button } from '../components/Button';
 import { Dialog } from '../components/Dialog';
 import { FolderTree, type FolderEntry } from '../components/FolderTree';
@@ -161,6 +161,7 @@ export function LibraryConfigSection({ onNewLibrary }: { onNewLibrary(): void })
   const libraryId = app.activeLibraryId;
   const patch = useLibraryPatch();
   const lang = useAutoSave();
+  const keys = useAutoSave();
   const excl = useAutoSave();
   const [error, setError] = useState<unknown>(null);
 
@@ -238,6 +239,20 @@ export function LibraryConfigSection({ onNewLibrary }: { onNewLibrary(): void })
               >
                 <option value="it">{t('languages.it')}</option>
                 <option value="en">{t('languages.en')}</option>
+              </select>
+            </Row>
+            <Row sid="citeKeySchema" label={t('settings.library.citeKey')} help={t('settings.library.citeKeyHelp')} htmlFor="config-cite-key" save={keys}>
+              <select
+                id="config-cite-key"
+                value={config.citeKeySchema}
+                onChange={(e) => {
+                  const next = e.target.value as CiteKeySchema;
+                  void keys.run(() => patch({ citeKeySchema: next }));
+                }}
+                data-testid="config-cite-key"
+              >
+                <option value="author-year">{t('settings.library.citeKeyAuthorYear')}</option>
+                <option value="author-year-title">{t('settings.library.citeKeyAuthorYearTitle')}</option>
               </select>
             </Row>
             <Row sid="excludedFolders" label={t('settings.library.excluded')} help={t('settings.library.excludedHint')} save={excl}>

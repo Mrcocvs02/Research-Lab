@@ -187,5 +187,40 @@
       "stance": "La prova",
       "saved": "Prova salvata nello schema del progetto."
     }
+  },
+  "prisma": {
+    "menu": "Diagramma PRISMA…",
+    "title": "Diagramma di flusso PRISMA · {{name}}",
+    "loading": "Lettura dei conteggi…",
+    "hint": "Contato dall'app mentre estendi la bibliografia di questo progetto. I passaggi fatti fuori dall'app si scrivono in \"Modifica i conteggi\".",
+    "hintEdited": "Alcuni conteggi li hai scritti tu, per passaggi fatti fuori dall'app.",
+    "identification": "Identificazione",
+    "screening": "Selezione",
+    "included": "Inclusi",
+    "identified": "Record identificati da",
+    "removedBefore": "Record rimossi prima della selezione",
+    "duplicates": "Record duplicati",
+    "screened": "Record valutati (titolo e abstract)",
+    "excluded": "Record esclusi",
+    "assessed": "Testi integrali valutati per l'idoneità",
+    "excludedFull": "Testi integrali esclusi, con i motivi",
+    "includedBox": "Studi inclusi nella revisione",
+    "source": {
+      "openalex-cited": "OpenAlex (opere citate)",
+      "openalex-citing": "OpenAlex (opere che citano)"
+    },
+    "edit": "Modifica i conteggi",
+    "editHint": "Scrivi i numeri dei passaggi fatti fuori dall'app (altre banche dati, lettura dei testi integrali). L'app tiene i suoi conteggi e aggiunge i tuoi.",
+    "addSource": "Aggiungi una fonte (nome)",
+    "add": "Aggiungi",
+    "addReason": "Aggiungi un motivo",
+    "reasonText": "Motivo",
+    "n": "Numero",
+    "save": "Salva i conteggi",
+    "saved": "Conteggi salvati.",
+    "exportSvg": "Esporta SVG…",
+    "exportMd": "Esporta Markdown…",
+    "exported": "Salvato come {{file}}.",
+    "step": "Passaggio"
   }
 }

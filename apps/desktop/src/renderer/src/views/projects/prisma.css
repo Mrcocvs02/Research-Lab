@@ -1,0 +1,67 @@
+.rl-dialog:has(.prisma) {
+  width: min(760px, 94vw);
+  max-height: 90vh;
+}
+.prisma {
+  display: grid;
+  gap: var(--space-3);
+}
+.prisma-svg {
+  width: 100%;
+  height: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.prisma-bx {
+  fill: var(--surface);
+  stroke: var(--border-strong);
+}
+.prisma-bh {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+}
+.prisma-tx {
+  fill: var(--text);
+}
+.prisma-ph {
+  fill: var(--text-muted);
+  font-size: 12px;
+}
+.prisma-ar {
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+  fill: none;
+}
+.prisma-ah {
+  fill: var(--border-strong);
+}
+.prisma-edit fieldset {
+  border: 0;
+  margin: var(--space-2) 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.prisma-num {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 2px 0;
+}
+.prisma-num input,
+.prisma-reason input[type='number'] {
+  width: 110px;
+}
+.prisma-reason,
+.prisma-add {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.prisma-reason input:first-child,
+.prisma-add input {
+  flex: 1;
+}

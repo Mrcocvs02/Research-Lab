@@ -35,6 +35,7 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   e('libraries', 'library', 'libraries', ['libraries[]', 'libraries[].rootPath', 'activeLibraryId']),
   e('libraryName', 'library', 'thisOne', ['name']),
   e('libraryLanguage', 'library', 'thisOne', ['language']),
+  e('citeKeySchema', 'library', 'thisOne', ['citeKeySchema']),
   e('excludedFolders', 'library', 'thisOne', ['excludedFolders']),
   e('scanNow', 'library', 'thisOne', ['scan:start']),
   e('annotWrite', 'library', 'annotations', ['annotations.writeToPdf']),

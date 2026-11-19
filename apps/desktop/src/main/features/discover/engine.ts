@@ -24,6 +24,8 @@ export interface Deps {
   net: Pick<Net, 'json'>;
   owned: OwnedIndex;
   signal?: AbortSignal | undefined;
+  /** Filled by `extend` for the PRISMA counts of a project (D-439). */
+  stats?: { cited: number; citing: number; duplicates: number } | undefined;
   now?: () => Date;
 }
 
@@ -89,7 +91,10 @@ function make(deps: Deps, w: Obj, score: number, reasons: DiscoverReason[], weak
   const key = link.externalId;
   if (!key || !/^W\d{1,15}$/.test(key) || !link.title) return null;
   // Already in the library: not a candidate (by DOI, arXiv id, or title with year and author).
-  if (findOwned(deps.owned, link)) return null;
+  if (findOwned(deps.owned, link)) {
+    if (deps.stats) deps.stats.duplicates++;
+    return null;
+  }
   return {
     key,
     title: link.title,
@@ -135,6 +140,12 @@ export async function extend(deps: Deps, ids: string[]): Promise<DiscoverCandida
   const side = await readSide(deps, ids);
   const n = ids.length;
   const all = new Set([...side.refs.keys(), ...side.citing.keys()]);
+  if (deps.stats) {
+    const both = [...side.refs.keys()].filter((id) => side.citing.has(id) && !side.ids.has(id)).length;
+    deps.stats.cited = [...side.refs.keys()].filter((id) => !side.ids.has(id)).length;
+    deps.stats.citing = [...side.citing.keys()].filter((id) => !side.ids.has(id)).length;
+    deps.stats.duplicates += both;
+  }
   const ranked = [...all]
     .filter((id) => !side.ids.has(id))
     .map((id) => {

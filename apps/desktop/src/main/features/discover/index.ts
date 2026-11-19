@@ -11,6 +11,7 @@ import type { MainServices } from '../../ipc/handlers/services.js';
 import type { LibraryRuntime } from '../../library/library-runtime.js';
 import { cacheHash, chunk, costDecision } from '../ai/batch.js';
 import { abstracts, bridge, extend, question, resolveSeed, type Deps, type Seed } from './engine.js';
+import { newStats, recordDecision, recordRun, type ExtendStats } from './prisma.js';
 import { listRuns, pruneRuns, readRun, removeRun, writeRun } from './store.js';
 import { cleanSummaries, readCachedSummary, SUMMARY_BLOCK, SUMMARY_TOKENS, SUMMARY_VERSION, summaryAnswerSchema, summaryPrompt, summarySystem } from './summary.js';
 
@@ -66,6 +67,8 @@ interface Params {
   b: DocumentRecord[];
   /** The name shown for an extend or bridge run (a project or the documents). */
   label: string;
+  /** Set for an extension of a project: filled with the counts of the PRISMA flow. */
+  stats?: ExtendStats | undefined;
 }
 
 async function execute(s: MainServices, p: Params, signal: AbortSignal): Promise<Omit<DiscoverRun, 'id' | 'createdAt'>> {
@@ -81,7 +84,7 @@ async function execute(s: MainServices, p: Params, signal: AbortSignal): Promise
   let deps: Deps;
   try {
     const o = await online(s);
-    deps = { net: o.net, owned: await ownedIndex(rt, true), signal };
+    deps = { net: o.net, owned: await ownedIndex(rt, true), signal, stats: p.stats };
   } catch (e) {
     if (isOffline(e)) return done('offline', [], { local });
     throw e;
@@ -132,9 +135,13 @@ export async function startDiscover(s: MainServices, req: { token: string; kind:
   if (req.kind === 'bridge' && b.length === 0) throw new AppError('INVALID_REQUEST', 'A bridge needs two sides');
   const project = req.a?.projectId ? await rt.store.projects.get(itemIdSchema.parse(req.a.projectId)) : null;
   const label = project?.name ?? a.slice(0, 3).map(titleOf).join(' · ');
-  const out = await guarded(req.token, (signal) => execute(s, { kind: req.kind, query: req.query?.trim() ?? '', a, b, label }, signal));
-  const run: DiscoverRun = { ...out, id: randomUUID(), createdAt: new Date().toISOString() };
-  if (persisted(run.outcome)) await writeRun(rt.store.dataDir, run);
+  const stats = req.kind === 'extend' && project ? newStats() : undefined;
+  const out = await guarded(req.token, (signal) => execute(s, { kind: req.kind, query: req.query?.trim() ?? '', a, b, label, stats }, signal));
+  const run: DiscoverRun = { ...out, id: randomUUID(), createdAt: new Date().toISOString(), ...(stats && project ? { projectId: project.id } : {}) };
+  if (persisted(run.outcome)) {
+    await writeRun(rt.store.dataDir, run);
+    if (stats) await recordRun(s, run, stats);
+  }
   return { run };
 }
 
@@ -145,7 +152,8 @@ export async function rerunDiscover(s: MainServices, req: { token: string; id: s
   const refetch = async (side: ReadonlyArray<{ docId: string }> | undefined) => (await docsOf(rt, { docIds: (side ?? []).map((d) => d.docId) }));
   const params: Params = { kind: old.kind, query: old.title, a: await refetch(old.sides[0]), b: await refetch(old.sides[1]), label: old.title };
   if (old.kind !== 'question' && (params.a.length === 0 || (old.kind === 'bridge' && params.b.length === 0))) throw new AppError('NOT_FOUND', 'The documents of this search are no longer in the library');
-  const out = await guarded(req.token, (signal) => execute(s, params, signal));
+  const stats = old.projectId ? newStats() : undefined;
+  const out = await guarded(req.token, (signal) => execute(s, { ...params, stats }, signal));
   if (!persisted(out.outcome)) return { run: { ...out, id: old.id, createdAt: old.createdAt } };
   const before = new Map(old.items.map((c) => [c.key, c]));
   // What was seen before keeps the user's choice and its summary; what was not is new.
@@ -153,8 +161,9 @@ export async function rerunDiscover(s: MainServices, req: { token: string; id: s
     const was = before.get(c.key);
     return was ? { ...c, state: was.state, summary: was.summary, fresh: false } : { ...c, fresh: old.items.length > 0 };
   });
-  const run: DiscoverRun = { ...out, items, fresh: items.filter((c) => c.fresh).length, id: old.id, createdAt: old.createdAt, summarizedWith: old.summarizedWith };
+  const run: DiscoverRun = { ...out, items, fresh: items.filter((c) => c.fresh).length, id: old.id, createdAt: old.createdAt, summarizedWith: old.summarizedWith, ...(old.projectId ? { projectId: old.projectId } : {}) };
   await writeRun(rt.store.dataDir, run);
+  if (stats) await recordRun(s, run, stats);
   return { run };
 }
 
@@ -173,11 +182,12 @@ export async function getDiscover(s: MainServices, req: { id: string }): Promise
   return { run };
 }
 
-export async function markDiscover(s: MainServices, req: { id: string; key: string; state: DiscoverCandidate['state'] }): Promise<{ ok: true }> {
+export async function markDiscover(s: MainServices, req: { id: string; key: string; state: DiscoverCandidate['state']; reason?: string | undefined }): Promise<{ ok: true }> {
   const dir = (await s.runtime.require()).store.dataDir;
   const run = await readRun(dir, req.id);
   if (!run) throw new AppError('NOT_FOUND', 'Unknown search');
   await writeRun(dir, { ...run, items: run.items.map((c) => (c.key === req.key ? { ...c, state: req.state } : c)) });
+  await recordDecision(s, run, req.key, req.state, req.reason);
   return { ok: true };
 }
 

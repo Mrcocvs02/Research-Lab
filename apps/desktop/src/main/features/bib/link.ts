@@ -1,12 +1,11 @@
 import path from 'node:path';
 import { AppError, type DocumentRecord, type Project } from '@rl/core';
 import { createHash } from 'node:crypto';
-import { baseCitekey } from '@rl/export';
 import { ExportTarget, isInsideLibrary } from '../../export/target.js';
 import type { MainServices } from '../../ipc/handlers/services.js';
 import type { LibraryRuntime } from '../../library/library-runtime.js';
 import { bibtexFile, GENERATED_LINE } from './bibtex-write.js';
-import { freeKey } from './keys.js';
+import { freeKey, newKey } from './keys.js';
 
 export interface BibStatus {
   linked: boolean;
@@ -20,9 +19,10 @@ const RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)$/i;
 const NAME_OK = /^[^<>:"/\\|?*\u0000-\u001f]+$/;
 const unlinked: BibStatus = { linked: false, file: null, state: 'ok', at: null };
 
-/** Records of `ids`, each with a cite key: a document that has none gets one now and keeps it for good (stable keys). */
-async function withKeys(rt: LibraryRuntime, ids: readonly string[]): Promise<Array<{ doc: DocumentRecord; key: string }>> {
+/** Records of `ids`, each with a cite key: a document that has none gets one now, by the library's key schema, and keeps it for good (stable keys). */
+export async function withKeys(rt: LibraryRuntime, ids: readonly string[]): Promise<Array<{ doc: DocumentRecord; key: string }>> {
   const store = rt.store;
+  const schema = (await store.readConfig()).citeKeySchema;
   const all = await store.documents.list();
   const used = new Set(all.flatMap((d) => (d.citeKey ? [d.citeKey] : [])));
   const wanted = new Set(ids);
@@ -32,7 +32,7 @@ async function withKeys(rt: LibraryRuntime, ids: readonly string[]): Promise<Arr
       out.push({ doc: d, key: d.citeKey });
       continue;
     }
-    const key = freeKey(baseCitekey(d), used);
+    const key = freeKey(newKey(d, schema), used);
     used.add(key);
     const saved = await store.documents.update(d.id, (cur) => {
       if (!cur) throw new AppError('NOT_FOUND', 'Unknown document');

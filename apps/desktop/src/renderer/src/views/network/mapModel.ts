@@ -109,7 +109,7 @@ export function prepareMap(r: MapResponse): PreparedMap {
     });
     relaxSmall(xs, ys, n, cx, cy);
   }
-  // Groups that do not overlap (ง4.22): once per layout, in the coarsest level; then a light collision pass between points.
+  // Groups that do not overlap (ยง4.22): once per layout, in the coarsest level; then a light collision pass between points.
   const g0 = groups[0];
   if (g0 && n > 3) {
     const b0 = boundsOf(xs, ys, n);
@@ -188,7 +188,7 @@ export function tintGroups(map: PreparedMap, level: number): TintGroup[] {
   });
 }
 
-/** Core circles (centroid, 80th percentile radius) of the clusters of a level and which of them are filled at rest (ง4.22). */
+/** Core circles (centroid, 80th percentile radius) of the clusters of a level and which of them are filled at rest (ยง4.22). */
 export function restingHulls(map: PreparedMap, level: number): { circles: Array<{ cx: number; cy: number; r: number }>; fill: boolean[] } {
   const g = map.groups[level];
   const clusters = map.levels[level] ?? [];

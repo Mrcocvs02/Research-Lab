@@ -4,6 +4,7 @@ import { applyTaxonomyOps } from './taxonomy-ops.js';
 import { applyDocEdit, opsExt, retagWithOrigin, type DocEdit } from './taxonomy-ops-ext.js';
 
 export { applyDocEdit, mergeOps, type DocEdit };
+import { GENERIC_MIN_DOCS } from './tag-health.js';
 import { buildIndex, conventionName, mergeOps, reviewTags, type Proposal, type ReviewDoc, type ReviewInput, type ReviewResult } from './tag-review.js';
 
 /**
@@ -117,6 +118,9 @@ function familiesPlan(input: CleanupInput, proposals: readonly Proposal[]): Clea
   };
   const hasChild = new Set(input.nodes.flatMap((n) => n.parents));
   const nDocs = input.docs.length;
+  // A value on more than half of the papers says nothing about any of them (the "generic" health check): as a macro it would swallow
+  // the Topic blocks of the Map, so it is offered as a family of its own (or Keywords) rather than as a Topic value (D-508, W11).
+  const generic = (id: string): boolean => nDocs >= GENERIC_MIN_DOCS && docsOf(id).size / nDocs > 0.5;
 
   let topicId: string | undefined = input.nodes.find((n) => n.family === 'many' && n.parents.length === 0 && normalizeName(n.label) === normalizeName(TOPIC))?.id;
   let kwId: string | undefined = input.nodes.find((n) => n.family === 'keywords')?.id;
@@ -175,17 +179,30 @@ function familiesPlan(input: CleanupInput, proposals: readonly Proposal[]): Clea
   const parentProposals = proposals.filter((p) => p.kind === 'parent');
   for (const n of roots) {
     if (n.group?.startsWith('extra:') && !keywordLike.has(n.id)) continue;
-    if (n.group === 'macro') push(n.id, 'place', [n.id], [{ op: 'move', id: n.id, parents: [needTopic()] }]);
+    if (n.group === 'macro' && generic(n.id)) {
+      const own: TaxonomyOp[] = [{ op: 'setFamily', id: n.id, family: 'many' }];
+      push(n.id, 'generic', [n.id], own, {
+        marked: true,
+        variants: {
+          default: { ops: own, docEdits: [] },
+          topic: { ops: [{ op: 'move', id: n.id, parents: [needTopic()] }], docEdits: [] },
+          keywords: { ops: [{ op: 'move', id: n.id, parents: [needKeywords()] }], docEdits: [] },
+        },
+      });
+    } else if (n.group === 'macro') push(n.id, 'place', [n.id], [{ op: 'move', id: n.id, parents: [needTopic()] }]);
     else if (n.group === 'micro') {
-      // The macro that holds most of its papers; on a tie the smaller macro (the more specific one, the higher lift), then the id.
-      let best: { id: string; p: number; size: number } | undefined;
+      // Among the macros that hold at least half of its papers, the one with the highest lift P(macro | micro) / P(macro): the most
+      // specific, not the biggest (a big macro holds everything); on a tie the smaller macro, then the id (D-508, W16).
+      let best: { id: string; p: number; lift: number; size: number } | undefined;
       const mine = docsOf(n.id).size;
       for (const m of macros) {
         const p = mine === 0 ? 0 : common(n.id, m.id) / mine;
         const size = docsOf(m.id).size;
-        if (p > (best?.p ?? 0) || (best && p === best.p && (size < best.size || (size === best.size && m.id < best.id)))) best = { id: m.id, p, size };
+        if (p < 0.5 || size === 0) continue;
+        const lift = p / (size / Math.max(1, nDocs));
+        if (!best || lift > best.lift || (lift === best.lift && (size < best.size || (size === best.size && m.id < best.id)))) best = { id: m.id, p, lift, size };
       }
-      if (best && best.p >= 0.5) push(n.id, 'place', [n.id], [{ op: 'move', id: n.id, parents: [best.id] }]);
+      if (best) push(n.id, 'place', [n.id], [{ op: 'move', id: n.id, parents: [best.id] }]);
       else push(n.id, 'place', [n.id], [{ op: 'move', id: n.id, parents: [needTopic()] }], { marked: true });
     } else if (n.group === 'extra' || keywordLike.has(n.id)) {
       // Only an inclusion found by name and by papers (R8 likely) makes a keyword a detail of a topic.
@@ -266,6 +283,11 @@ function namesAndMetadata(input: CleanupInput, proposals: readonly Proposal[]): 
       let remains = false;
       for (const d of input.docs) {
         if (!d.tags.includes(id)) continue;
+        // An author name: the document already lists its authors, the tag only goes away.
+        if (p.meta.field === 'author') {
+          edits.push({ docId: d.id, removeTags: [id] });
+          continue;
+        }
         const cur = p.meta.field === 'venue' ? (d.venueId ?? null) : d.status && d.status !== 'unknown' ? d.status : null;
         if (cur === null) edits.push({ docId: d.id, removeTags: [id], ...(p.meta.field === 'venue' ? { venueId: p.meta.value } : { status: p.meta.value }) });
         else if (cur === p.meta.value) edits.push({ docId: d.id, removeTags: [id] });

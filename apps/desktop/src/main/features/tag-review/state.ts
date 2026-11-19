@@ -48,7 +48,7 @@ export async function load(s: MainServices): Promise<{ rt: Awaited<ReturnType<Ma
   const records = (await rt.store.documents.list()).filter((d) => !d.missing);
   const input: CleanupInput = {
     nodes: tax.nodes,
-    docs: records.map((d) => ({ id: d.id, tags: d.tags, type: d.type, venueId: d.ref.venueId ?? null, status: d.publication.status })),
+    docs: records.map((d) => ({ id: d.id, tags: d.tags, authors: d.authors, type: d.type, venueId: d.ref.venueId ?? null, status: d.publication.status })),
     distinct: tax.distinct,
     venues: tax.venues,
     documentTypes: tax.documentTypes,

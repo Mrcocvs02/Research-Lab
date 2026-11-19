@@ -21,6 +21,8 @@ export interface ReviewNode {
 export interface ReviewDoc {
   id: string;
   tags: readonly string[];
+  /** Authors as the document lists them (`Surname, Given` or `Given Surname`): lets the detector spot author names used as tags. */
+  authors?: readonly string[] | undefined;
 }
 export interface ReviewInput {
   nodes: readonly ReviewNode[];
@@ -51,7 +53,7 @@ export interface Proposal {
   /** Twins: what to do by default. */
   action?: 'merge' | 'keywords' | undefined;
   /** Metadata: the field the tag really is. */
-  meta?: { field: 'venue' | 'status'; value: string } | undefined;
+  meta?: { field: 'venue' | 'status' | 'author'; value: string } | undefined;
   evidence: Evidence;
 }
 
@@ -89,6 +91,11 @@ export function splitAcronymName(label: string): { name: string; acro: string } 
 export const isSigla = (label: string): boolean => /^[\p{Lu}\p{N}]{2,8}$/u.test(label.trim()) && /\p{Lu}/u.test(label);
 /** A sigla as old keyword lists write it: one lower-case token of 2-5 letters (`abc`, `xy`); weaker evidence than capitals. */
 const isLowerSigla = (label: string): boolean => /^\p{Ll}{2,5}$/u.test(label.trim());
+/** A capital sigla with a plural `s` ("GNUs"): the sigla without the `s`. */
+const pluralSigla = (label: string): string | null => {
+  const m = /^([\p{Lu}\p{N}]{2,8})s$/u.exec(label.trim());
+  return m && /\p{Lu}/u.test(m[1] as string) ? (m[1] as string) : null;
+};
 
 /** English plural of one token to its singular, or the token itself. */
 function enSingular(t: string): string {
@@ -179,6 +186,8 @@ export interface Index {
   /** Roots (family or not) of every node. */
   rootOf: Map<string, string>;
   keywordIds: Set<string>;
+  /** Id of each document, in the order `docsOf` indexes them. */
+  docIds: string[];
 }
 
 export function buildIndex(input: ReviewInput): Index {
@@ -214,7 +223,7 @@ export function buildIndex(input: ReviewInput): Index {
   for (const n of input.nodes) rootFor(n.id);
   const keywordIds = new Set<string>();
   for (const n of input.nodes) if (byId.get(rootOf.get(n.id) as string)?.family === 'keywords') keywordIds.add(n.id);
-  return { nodes: [...input.nodes], byId, docsOf, rootOf, keywordIds };
+  return { nodes: [...input.nodes], byId, docsOf, rootOf, keywordIds, docIds: input.docs.map((d) => d.id) };
 }
 
 const countOf = (ix: Index, id: string): number => ix.docsOf.get(id)?.size ?? 0;
@@ -310,6 +319,22 @@ function namePairs(ix: Index, active: ReviewNode[], excluded: (a: string, b: str
     },
   );
 
+  // R2b joined stems ("pre-trained model" / "pretrained models", "data_set" / "datasets": the same letters once the plurals go) are
+  // sure; the same words in another order or with other stop words ("transfer learning" / "learning transfer", "analysis of variance"
+  // / "variance analysis", "A and B" / "A & B") are likely.
+  const singular = (f: string): string[] => tokensOf(f).map(enSingular);
+  const bag = (f: string): string => singular(f).filter((t) => !STOP.has(t)).sort().join(' ');
+  eachPair(
+    buckets((n) => forms(n).map((f) => singular(f).join(''))),
+    (a, b) => put(a.id, b.id, 'plural', 'sure'),
+  );
+  eachPair(
+    buckets((n) => forms(n).map(bag).filter((k) => k.includes(' '))),
+    (a, b) => {
+      for (const fa of forms(a)) for (const fb of forms(b)) if (bag(fa) === bag(fb) && bag(fa).includes(' ') && digitsOf(fa) === digitsOf(fb)) put(a.id, b.id, 'word-order', 'likely');
+    },
+  );
+
   // R3 acronym in the name: "X (S)" with another label equal to S or X.
   const byForm = new Map<string, string[]>();
   for (const n of active) for (const f of forms(n)) (byForm.get(formKey(f)) ?? byForm.set(formKey(f), []).get(formKey(f)) ?? []).push(n.id);
@@ -331,6 +356,7 @@ function namePairs(ix: Index, active: ReviewNode[], excluded: (a: string, b: str
   };
   for (const n of active) {
     if (isSigla(n.label)) addSigla(formKey(n.label), n.id, 'upper');
+    else if (pluralSigla(n.label)) addSigla(formKey(pluralSigla(n.label) as string), n.id, 'upper');
     else if (isLowerSigla(n.label)) addSigla(formKey(n.label), n.id, 'lower');
     else {
       for (const f of forms(n)) {
@@ -401,7 +427,12 @@ function namePairs(ix: Index, active: ReviewNode[], excluded: (a: string, b: str
           const diff = ta.filter((t, x) => t !== tb[x]);
           if (diff.length === 1 && Math.max(diff[0]?.length ?? 0, (tb[at] ?? '').length) <= 2) continue;
         }
-        put(ia, ib, 'spelling', overlap(ix, ia, ib).jaccard >= 0.5 ? 'likely' : 'maybe');
+        // A long word with one letter off ("reinforcment") or a long one-word regional spelling ("modelling") is a likely slip even
+        // with no paper in common; the rest wait for evidence.
+        const oneWord = ta.length === 1 && tb.length === 1 && Math.min(fa.length, fb.length) >= 8;
+        const diffs = ta.map((t, x) => [t, tb[x] ?? ''] as const).filter(([t, u]) => t !== u);
+        const slip = !regionalSame && ta.length === tb.length && diffs.length === 1 && Math.min((diffs[0] as readonly [string, string])[0].length, (diffs[0] as readonly [string, string])[1].length) >= 8 && distance(fa, fb, 1) <= 1;
+        put(ia, ib, 'spelling', overlap(ix, ia, ib).jaccard >= 0.5 || slip || (regionalSame && oneWord) ? 'likely' : 'maybe');
       }
     }
   }
@@ -488,6 +519,41 @@ export function mergeOps(nodes: ReadonlyArray<Pick<ReviewNode, 'id' | 'label' | 
   const aliases = [...new Set(names)].filter((a) => normalizeName(a) !== normalizeName(target));
   if (aliases.length > 0) ops.push({ op: 'setAliases', id: keep, aliases: aliases.slice(0, 200) });
   return ops;
+}
+
+/* ------------------------------------------------------------------ author names used as tags */
+
+/** `surname initial` keys of the authors of each document, normalised: "Doe, Jane Q." and "Jane Q. Doe" give `doe j` and `doe jq`. */
+function authorKeysOf(docs: readonly ReviewDoc[]): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const d of docs) {
+    const keys = new Set<string>();
+    for (const a of d.authors ?? []) {
+      const comma = a.indexOf(',');
+      const words = a.trim().split(/\s+/);
+      const surname = comma >= 0 ? a.slice(0, comma) : (words.at(-1) ?? '');
+      const given = comma >= 0 ? a.slice(comma + 1) : words.slice(0, -1).join(' ');
+      const s = tokensOf(surname).join('');
+      const initials = tokensOf(given).map((t) => t.charAt(0));
+      if (s.length < 2 || initials.length === 0) continue;
+      keys.add(`${s} ${initials[0]}`);
+      keys.add(`${s} ${initials.join('')}`);
+    }
+    out.set(d.id, keys);
+  }
+  return out;
+}
+
+/** The label of a tag that spells an author ("surname_j", "j surname") when most documents carrying it list that author (D-508). */
+function authorTag(ix: Index, n: ReviewNode, keys: ReadonlyMap<string, ReadonlySet<string>>): string | null {
+  const t = tokensOf(n.label);
+  if (keys.size === 0 || t.length !== 2) return null;
+  const [first, second] = t as [string, string];
+  const cand = first.length <= 2 && second.length > 2 ? `${second} ${first}` : second.length <= 2 && first.length > 2 ? `${first} ${second}` : null;
+  const carrying = [...(ix.docsOf.get(n.id) ?? [])];
+  if (cand === null || carrying.length === 0) return null;
+  const hit = carrying.filter((i) => keys.get(ix.docIds[i] as string)?.has(cand)).length;
+  return hit / carrying.length >= 0.5 ? n.label : null;
 }
 
 /* ------------------------------------------------------------------ the detector */
@@ -653,8 +719,14 @@ export function reviewTags(input: ReviewInput): ReviewResult {
   // --- metadata: tags that are a venue or a publication status
   const venueOf = new Map<string, string>();
   for (const v of input.venues ?? []) for (const x of [v.name, ...v.aliases]) venueOf.set(normalizeName(x), v.id);
+  const authorKeys = authorKeysOf(input.docs);
   for (const n of live) {
     if (n.family !== undefined) continue;
+    const author = authorTag(ix, n, authorKeys);
+    if (author !== null) {
+      proposals.push({ id: proposalId('metadata', [n.id]), kind: 'metadata', tags: [n.id], keep: n.id, confidence: 'likely', reason: 'author', meta: { field: 'author', value: author }, evidence: evidenceOf(ix, [n.id]) });
+      continue;
+    }
     for (const f of forms(n)) {
       const k = normalizeName(f);
       const venue = venueOf.get(k);

@@ -21,12 +21,12 @@ export interface TagProposal {
   /** The label the survivor gets (naming convention applied, or the built "Extended (ACR)"); absent = unchanged. */
   label?: string;
   confidence: TagConfidence;
-  /** The rules that fired, comma separated: `form`, `plural`, `alias`, `acronym-in-name`, `acronym-expansion`, `spelling`, `twins`, `inclusion`, `cooccurrence`, `venue`, `status`, `underscore`, `case`, `long`. */
+  /** The rules that fired, comma separated: `form`, `plural`, `alias`, `acronym-in-name`, `acronym-expansion`, `spelling`, `twins`, `inclusion`, `cooccurrence`, `venue`, `status`, `author`, `underscore`, `case`, `long`. */
   reason: string;
   /** Twins: what to do by default. */
   action?: 'merge' | 'keywords';
   /** Metadata: the document field the tag really is. */
-  meta?: { field: 'venue' | 'status'; value: string };
+  meta?: { field: 'venue' | 'status' | 'author'; value: string };
   evidence: { papers: Record<string, number>; shared: number; jaccard: number };
   /** Answer of the optional AI confirmation, with one line. */
   ai?: { verdict: TagAiVerdict; note: string };

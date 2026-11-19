@@ -31,7 +31,7 @@ export function ReaderMenu({ anchor, open, onClose, groups, label, width = 240, 
   const list = useRef<HTMLDivElement>(null);
   const items = () => [...(list.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])];
   useEffect(() => {
-    if (open) setTimeout(() => items()[0]?.focus(), 0);
+    if (open) setTimeout(() => (items().find((el) => el.getAttribute('aria-disabled') !== 'true') ?? items()[0])?.focus(), 0);
   }, [open]);
   const onKeyDown = (e: KeyboardEvent) => {
     const all = items();

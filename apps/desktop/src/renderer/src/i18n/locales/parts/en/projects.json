@@ -94,7 +94,7 @@
     "remove": "Remove {{title}} from the plan",
     "moved": "{{title}} is now number {{position}} of {{total}}",
     "addAll": "Add all {{count}} documents not in the plan",
-    "addOne": "Add: {{title}}"
+    "addOne": "Add {{title}}"
   },
   "schema": {
     "tab": "Schema",
@@ -107,7 +107,7 @@
     "hypotheses_other": "Hypotheses ({{count}})",
     "plan": "Plan",
     "question": "Question {{n}}",
-    "noClaims": "No claim · in the reader: highlight popover › Use as evidence",
+    "noClaims": "No claim · in the reader: click a highlight › Use as evidence",
     "noEvidence": "No evidence",
     "disputed": "Disputed",
     "supports": "supports",
@@ -118,7 +118,7 @@
     "emptyHyp": "No hypotheses yet.",
     "emptyPlan": "Describe the plan.",
     "emptyEvidenceTitle": "No evidence yet",
-    "emptyEvidence": "Link highlights to questions: in the reader, highlight popover › Use as evidence",
+    "emptyEvidence": "Link highlights to questions: in the reader: click a highlight › Use as evidence",
     "ideaLabel": "Idea",
     "questionsLabel": "Questions (one per line)",
     "hypothesesLabel": "Hypotheses (one per line)",
@@ -204,6 +204,7 @@
     "excluded": "Records excluded",
     "assessed": "Full texts assessed for eligibility",
     "excludedFull": "Full texts excluded, with reasons",
+    "sourceFallback": "from OpenAlex and the library",
     "includedBox": "Studies included in the review",
     "source": {
       "openalex-cited": "OpenAlex (works cited)",

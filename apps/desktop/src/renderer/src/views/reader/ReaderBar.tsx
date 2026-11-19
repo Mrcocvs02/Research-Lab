@@ -117,7 +117,6 @@ export function ReaderBar(p: Props) {
   const close = () => setOpen(null);
   const colorName = ANNOTATION_COLORS[p.color - 1]!;
   const meanings = useColorMeanings();
-  const later = t('reader.later');
 
   const zoomGroups: RGroup[] = [
     {
@@ -138,7 +137,6 @@ export function ReaderBar(p: Props) {
       heading: t('reader.studyState'),
       items: [
         ...STUDY.map((s) => ({ id: s, label: t(`study.${s}`), checked: study?.state === s, testId: `reader-study-${s}`, onSelect: () => p.onStudy(s) })),
-        { id: 'ul', label: t('doc.underlined'), checked: study?.underlined.value ?? false, testId: 'reader-underlined', onSelect: () => p.onUnderlined(!(study?.underlined.value ?? false)) },
       ],
     },
     pdfGroup,
@@ -157,7 +155,7 @@ export function ReaderBar(p: Props) {
       items: [
         { id: 'open', label: t('reader.openDefault'), testId: 'reader-open-file', onSelect: p.onOpenFile },
         { id: 'reveal', label: t('reader.reveal'), testId: 'reader-reveal', onSelect: p.onReveal },
-        { id: 'export', label: t('reader.exportCopy'), testId: 'reader-export-copy', disabled: later, onSelect: () => {} },
+        { id: 'export', label: t('reader.exportCopy'), testId: 'reader-export-copy', ...(p.pdf.busy ? { disabled: t('reader.pdf.busy') } : {}), onSelect: () => void p.pdf.exportCopy() },
       ],
     },
     // The guide checkbox exists only while Experimental features is on; with it off the menu has no trace of it.

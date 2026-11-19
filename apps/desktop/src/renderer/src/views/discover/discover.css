@@ -36,3 +36,15 @@
   gap: var(--space-2);
   max-width: 520px;
 }
+
+/* "New search" menu: name in body weight 600, the sentence below in muted small text (first line vs rest of the label). */
+.rl-menu:has([data-testid^='new-search-']) .rl-menu__label {
+  white-space: pre-line;
+  color: var(--text-muted);
+  font-size: var(--fs-small, 12px);
+}
+.rl-menu:has([data-testid^='new-search-']) .rl-menu__label::first-line {
+  color: var(--text);
+  font-size: var(--fs-body, 14px);
+  font-weight: 600;
+}

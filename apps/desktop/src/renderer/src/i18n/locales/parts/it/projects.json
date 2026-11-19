@@ -94,7 +94,7 @@
     "remove": "Togli {{title}} dal piano",
     "moved": "{{title}} è ora il numero {{position}} di {{total}}",
     "addAll": "Aggiungi i {{count}} documenti non nel piano",
-    "addOne": "Aggiungi: {{title}}"
+    "addOne": "Aggiungi {{title}}"
   },
   "schema": {
     "tab": "Schema",
@@ -107,7 +107,7 @@
     "hypotheses_other": "Ipotesi ({{count}})",
     "plan": "Piano",
     "question": "Domanda {{n}}",
-    "noClaims": "Nessuna affermazione · nel lettore: popover dell'evidenziazione › Usa come prova",
+    "noClaims": "Nessuna affermazione · nel lettore: clic su un'evidenziazione › Usa come prova",
     "noEvidence": "Senza prove",
     "disputed": "In discussione",
     "supports": "sostiene",
@@ -118,7 +118,7 @@
     "emptyHyp": "Nessuna ipotesi ancora.",
     "emptyPlan": "Descrivi il piano.",
     "emptyEvidenceTitle": "Ancora nessuna prova",
-    "emptyEvidence": "Collega le evidenziazioni alle domande: nel lettore, popover dell'evidenziazione › Usa come prova",
+    "emptyEvidence": "Collega le evidenziazioni alle domande: nel lettore: clic su un'evidenziazione › Usa come prova",
     "ideaLabel": "Idea",
     "questionsLabel": "Domande (una per riga)",
     "hypothesesLabel": "Ipotesi (una per riga)",
@@ -205,6 +205,7 @@
     "assessed": "Testi integrali valutati per l'idoneità",
     "excludedFull": "Testi integrali esclusi, con i motivi",
     "includedBox": "Studi inclusi nella revisione",
+    "sourceFallback": "da OpenAlex e dalla libreria",
     "source": {
       "openalex-cited": "OpenAlex (opere citate)",
       "openalex-citing": "OpenAlex (opere che citano)"

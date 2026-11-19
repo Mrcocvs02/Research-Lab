@@ -5,6 +5,7 @@ import type { Channels, ExportPreset, ResponseOf } from '@rl/core';
 import { Dialog } from '../../components/Dialog';
 import { FolderTree, type FolderEntry } from '../../components/FolderTree';
 import { Banner } from '../../components/Banner';
+import { Segmented } from '../../components/Segmented';
 import { CheckField, ErrorNote, ProgressBar, SelectField, TextField } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { useAiUi, type ExportInit } from '../../lib/aiUi';
@@ -468,12 +469,17 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
           </div>
         ) : (
           <>
-            <SelectField label={t('secondBrain.format.label')} value={format} onChange={(e) => (setFormat(e.target.value as typeof format), setRefsDone(null), setConflict(null))} data-testid="export-format">
-              <option value="sb">{t('secondBrain.format.secondBrain')}</option>
-              <option value="bibtex">{t('secondBrain.format.bibtex')}</option>
-              <option value="ris">{t('secondBrain.format.ris')}</option>
-              <option value="csl">{t('secondBrain.format.csl')}</option>
-            </SelectField>
+            <Segmented
+              label={t('secondBrain.format.label')}
+              value={format}
+              onChange={(v) => (setFormat(v), setRefsDone(null), setConflict(null))}
+              options={[
+                { value: 'sb', label: t('secondBrain.format.short.sb'), testId: 'export-format-sb' },
+                { value: 'bibtex', label: t('secondBrain.format.short.bibtex'), testId: 'export-format-bibtex' },
+                { value: 'ris', label: t('secondBrain.format.short.ris'), testId: 'export-format-ris' },
+                { value: 'csl', label: t('secondBrain.format.short.csl'), testId: 'export-format-csl' },
+              ]}
+            />
             <p className="hint">{refs ? t('secondBrain.refs.intro') : t('secondBrain.intro')}</p>
             {!refs && past.length > 0 && (
               <div className="group" data-testid="export-past">
@@ -522,47 +528,6 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
               )}
             </div>
 
-            {!refs && (
-            <div className="group" data-testid="export-options">
-              <h3>{t('secondBrain.options.title')}</h3>
-              {presets.length > 0 && (
-                <SelectField
-                  label={t('secondBrain.options.preset')}
-                  value={presetId}
-                  onChange={(e) => {
-                    setPresetId(e.target.value);
-                    const p = presets.find((x) => x.id === e.target.value);
-                    if (p) edit(applyPreset(draft, p));
-                  }}
-                  data-testid="export-preset"
-                >
-                  <option value="">{t('secondBrain.options.presetNone')}</option>
-                  {presets.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {safeText(p.name)}
-                    </option>
-                  ))}
-                </SelectField>
-              )}
-              <CheckField label={t('secondBrain.options.cited')} hint={t('secondBrain.options.citedHint')} checked={draft.includeCited} onChange={(e) => edit({ includeCited: e.target.checked })} data-testid="export-cited" />
-              {draft.includeCited && (
-                <SelectField label={t('secondBrain.options.depth')} value={String(draft.citedDepth)} onChange={(e) => edit({ citedDepth: Number(e.target.value) })} data-testid="export-depth">
-                  {[0, 1, 2, 3].map((d) => (
-                    <option key={d} value={d}>
-                      {t('secondBrain.options.depthValue', { count: d })}
-                    </option>
-                  ))}
-                </SelectField>
-              )}
-              <SelectField label={t('secondBrain.options.sources')} hint={t(`secondBrain.options.sourcesHint_${draft.sources}`)} value={draft.sources} onChange={(e) => edit({ sources: e.target.value as Draft['sources'] })} data-testid="export-sources">
-                <option value="none">{t('secondBrain.options.sourcesNone')}</option>
-                <option value="paths">{t('secondBrain.options.sourcesPaths')}</option>
-                <option value="copies">{t('secondBrain.options.sourcesCopies')}</option>
-              </SelectField>
-              <CheckField label={t('secondBrain.options.notes')} checked={draft.includeNotes} onChange={(e) => edit({ includeNotes: e.target.checked })} data-testid="export-notes" />
-              <CheckField label={t('secondBrain.options.annotations')} checked={draft.includeAnnotations} onChange={(e) => edit({ includeAnnotations: e.target.checked })} data-testid="export-annotations" />
-            </div>
-            )}
 
             <div className="group" data-testid="export-destination">
               <h3>{t('secondBrain.destination.title')}</h3>
@@ -602,6 +567,49 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
               />
               )}
             </div>
+
+            {!refs && (
+            <details className="group sb-advanced" data-testid="export-options">
+              <summary>{t('secondBrain.options.title')}</summary>
+              {presets.length > 0 && (
+                <SelectField
+                  label={t('secondBrain.options.preset')}
+                  value={presetId}
+                  onChange={(e) => {
+                    setPresetId(e.target.value);
+                    const p = presets.find((x) => x.id === e.target.value);
+                    if (p) edit(applyPreset(draft, p));
+                  }}
+                  data-testid="export-preset"
+                >
+                  <option value="">{t('secondBrain.options.presetNone')}</option>
+                  {presets.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {safeText(p.name)}
+                    </option>
+                  ))}
+                </SelectField>
+              )}
+
+              <CheckField label={t('secondBrain.options.cited')} hint={t('secondBrain.options.citedHint')} checked={draft.includeCited} onChange={(e) => edit({ includeCited: e.target.checked })} data-testid="export-cited" />
+              {draft.includeCited && (
+                <SelectField label={t('secondBrain.options.depth')} value={String(draft.citedDepth)} onChange={(e) => edit({ citedDepth: Number(e.target.value) })} data-testid="export-depth">
+                  {[0, 1, 2, 3].map((d) => (
+                    <option key={d} value={d}>
+                      {t('secondBrain.options.depthValue', { count: d })}
+                    </option>
+                  ))}
+                </SelectField>
+              )}
+              <SelectField label={t('secondBrain.options.sources')} hint={t(`secondBrain.options.sourcesHint_${draft.sources}`)} value={draft.sources} onChange={(e) => edit({ sources: e.target.value as Draft['sources'] })} data-testid="export-sources">
+                <option value="none">{t('secondBrain.options.sourcesNone')}</option>
+                <option value="paths">{t('secondBrain.options.sourcesPaths')}</option>
+                <option value="copies">{t('secondBrain.options.sourcesCopies')}</option>
+              </SelectField>
+              <CheckField label={t('secondBrain.options.notes')} checked={draft.includeNotes} onChange={(e) => edit({ includeNotes: e.target.checked })} data-testid="export-notes" />
+              <CheckField label={t('secondBrain.options.annotations')} checked={draft.includeAnnotations} onChange={(e) => edit({ includeAnnotations: e.target.checked })} data-testid="export-annotations" />
+            </details>
+            )}
 
             {valid && !refs && <EstimateBlock est={est} loading={estLoading} error={estError} />}
             {!refs && <TargetNote est={est} name={folderName} />}

@@ -64,7 +64,7 @@ export function ReviewHub({ tab, onTab }: { tab: Tab; onTab(t: Tab): void }) {
       <div className="view rh-page" data-testid="section-inbox">
         <header className="rh-head">
           <h1>{t('sections.inbox')}</h1>
-          {inbox.count > 0 && <span className="rh-count">{t('inbox.hubCount', { count: inbox.count })}</span>}
+          {tab === 'arrivals' && inbox.count > 0 && <span className="rh-count">{t('inbox.hubCount', { count: inbox.count })}</span>}
           <div className="rh-head__acts">
             {tab === 'arrivals' && (
               <>

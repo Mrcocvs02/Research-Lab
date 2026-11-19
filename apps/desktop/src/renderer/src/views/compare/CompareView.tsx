@@ -1,9 +1,12 @@
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, CompareColumn, CompareRow, ResponseOf } from '@rl/core';
 import { AiCostPreview, costGate, costLabel, type CostEstimate } from '../../components/AiCostPreview';
 import { Button } from '../../components/Button';
 import { Dialog } from '../../components/Dialog';
+import { IconButton } from '../../components/IconButton';
+import { IconClose } from '../../components/icons';
 import { IconClaude } from '../../components/icons-shell';
 import { ErrorNote } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
@@ -37,6 +40,17 @@ export function CompareView({ docIds, onClose }: { docIds: string[]; onClose(): 
   const { info, reportError } = useNotify();
   const { openReader } = useReader();
   const models = config?.ai.models ?? [];
+  // The table is a view inside the content area: the sidebar and the top bar stay (principle 6), so it sits over #main only.
+  const [frame, setFrame] = useState<CSSProperties>({});
+  useEffect(() => {
+    const place = () => {
+      const r = document.getElementById('main')?.getBoundingClientRect();
+      if (r) setFrame({ top: r.top, left: r.left, right: window.innerWidth - r.right, maxHeight: r.height });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, []);
   const label = (id: string) => models.find((m) => m.id === id)?.label || id;
   const [columns, setColumns] = useState<CompareColumn[]>(() => defaultColumns((k) => t(`compare.col.${k}`)));
   const [rows, setRows] = useState<CompareRow[] | null>(null);
@@ -153,11 +167,11 @@ export function CompareView({ docIds, onClose }: { docIds: string[]; onClose(): 
   const preview = useMemo(() => {
     if (!est) return null;
     const ready = est.cells.ready + est.cells.fromNotes;
-    return t('compare.preview', { ready, toWrite: est.cells.toWrite, requests: est.requests });
+    return t('compare.preview', { ready, toWrite: est.cells.toWrite, count: est.requests });
   }, [est, t]);
 
   return (
-    <div className="cmp-page" role="region" aria-label={t('compare.title')} data-testid="compare-view" onKeyDown={(e) => e.key === 'Escape' && !edit && !dialog && !saveOpen && onClose()}>
+    <div className="cmp-page" style={frame} role="region" aria-label={t('compare.title')} data-testid="compare-view" onKeyDown={(e) => e.key === 'Escape' && !edit && !dialog && !saveOpen && onClose()}>
       <header className="cmp-head">
         <nav aria-label={t('compare.crumbs')} className="cmp-crumbs">
           <span>{saved ? safeText(saved.projectName) : t('compare.library')}</span>
@@ -171,9 +185,9 @@ export function CompareView({ docIds, onClose }: { docIds: string[]; onClose(): 
           <Button size="sm" onClick={exportCsv} disabled={!saved} disabledReason={t('compare.csvNeedsSave')} data-testid="compare-csv">
             {t('compare.csv')}
           </Button>
-          <Button size="sm" variant="ghost" onClick={onClose} data-testid="compare-close">
-            {t('common.close')}
-          </Button>
+          <IconButton label={t('common.close')} size="sm" onClick={onClose} data-testid="compare-close">
+            <IconClose size={16} />
+          </IconButton>
         </span>
       </header>
       <div className="cmp-bar" data-testid="compare-bar">
@@ -284,7 +298,7 @@ export function CompareView({ docIds, onClose }: { docIds: string[]; onClose(): 
         </table>
       </div>
       {dialog && est && (
-        <AiCostPreview what={t('compare.what', { cells: est.cells.toWrite })} requests={est.requests} estimate={est as CostEstimate} modelLabel={label(est.model)} models={models} model={model || est.model} onModel={setModel} onConfirm={() => void fill(true)} onCancel={() => setDialog(false)} />
+        <AiCostPreview title={t('compare.title')} what={t('compare.what', { count: est.cells.toWrite })} requests={est.requests} estimate={est as CostEstimate} modelLabel={label(est.model)} models={models} model={model || est.model} onModel={setModel} onConfirm={() => void fill(true)} onCancel={() => setDialog(false)} />
       )}
       {saveOpen && <SaveDialog onCancel={() => setSaveOpen(false)} onSave={save} title={title} />}
     </div>

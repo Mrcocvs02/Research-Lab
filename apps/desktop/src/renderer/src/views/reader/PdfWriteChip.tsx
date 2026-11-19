@@ -162,8 +162,7 @@ export function usePdfGroup(pdf: PdfWrite): RGroup {
   ];
   if (writing && st && (st.state === 'pending' || st.state === 'refused')) items.push({ id: 'now', label: t('reader.pdf.writeNow'), testId: 'reader-pdf-write-now', onSelect: () => void pdf.writeNow() });
   items.push({ id: 'remove', label: t('reader.pdfRemove'), testId: 'reader-pdf-remove', ...(off ? { disabled: off } : {}), onSelect: () => pdf.setAsk('remove') });
-  // Works while writing into the PDFs is off or refused: it writes only the copy (§8.3.14).
-  items.push({ id: 'export', label: t('reader.pdf.exportCopy'), testId: 'reader-pdf-export', ...(pdf.busy ? { disabled: t('reader.pdf.busy') } : {}), onSelect: () => void pdf.exportCopy() });
+  // The annotated copy is exported from the More menu of the bar (one place, one state), not from here.
   return { id: 'pdf', heading: text(st), headingId: 'reader-pdf-status', items };
 }
 

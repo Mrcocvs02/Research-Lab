@@ -135,6 +135,7 @@ function SummaryBar({ run, onRun }: { run: DiscoverRun; onRun(r: DiscoverRun): v
       )}
       {dialog && est && (
         <AiCostPreview
+          title={t('discover.title')}
           what={t('discover.searches.sumWhat', { count })}
           requests={est.requests}
           estimate={est as CostEstimate}

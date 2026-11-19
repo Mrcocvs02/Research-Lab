@@ -184,6 +184,7 @@ export function ExplainCard({ docId, request, anchor, onClose }: { docId: string
       </Floating>
       {phase === 'dialog' && est && (
         <AiCostPreview
+          title={t('reader.explain.title')}
           what={t(request.from === 'crop' ? 'reader.explain.whatCrop' : 'reader.explain.whatSelection')}
           requests={1}
           estimate={est}

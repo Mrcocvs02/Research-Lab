@@ -120,9 +120,13 @@ export function AnnotationList({
   return (
     <div className="ann-list" data-testid="annotation-list">
       <div className="ann-list__head">
-        {filter && (
+        {filter ? (
           <span className="ann-list__filter" data-testid="annotation-filter-label">
             {colorName(t, filter, meanings)}
+          </span>
+        ) : (
+          <span className="ann-list__filter" data-testid="annotation-count">
+            {t('reader.ann.count', { count: annotations.length })}
           </span>
         )}
         <button ref={filterBtn} type="button" className="ann-more" aria-label={t('reader.colorMeaning.menu')} aria-expanded={filterMenu} onClick={() => setFilterMenu(!filterMenu)} data-testid="annotation-panel-more">

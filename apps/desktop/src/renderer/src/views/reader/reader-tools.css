@@ -64,6 +64,8 @@
   justify-content: flex-end;
   align-items: center;
   gap: var(--space-2);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--border);
 }
 .ann-list__filter {
   margin-right: auto;

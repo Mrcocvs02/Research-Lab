@@ -466,9 +466,11 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
       <div className="card-underlined">
         <input id={`${venueListId}-ul`} type="checkbox" checked={doc.study.underlined.value} onChange={(e) => save({ underlined: e.target.checked })} data-testid="field-underlined" />
         <label htmlFor={`${venueListId}-ul`}>{t('doc.underlined')}</label>
-        <span className="badge" data-testid="underlined-origin" data-origin={doc.study.underlined.origin}>
-          {doc.study.underlined.origin === 'annotations' ? t('reader.underlinedOrigin_annotations') : t('reader.underlinedOrigin_manual')}
-        </span>
+        {doc.study.underlined.value && (
+          <span className="badge" data-testid="underlined-origin" data-origin={doc.study.underlined.origin}>
+            {doc.study.underlined.origin === 'annotations' ? t('reader.underlinedOrigin_annotations') : t('reader.underlinedOrigin_manual')}
+          </span>
+        )}
       </div>
       {doc.study.underlined.origin === 'annotations' && <p className="hint">{t('doc.underlinedFromAnnotations')}</p>}
 

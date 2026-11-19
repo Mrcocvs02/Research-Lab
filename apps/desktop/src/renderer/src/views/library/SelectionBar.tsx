@@ -126,7 +126,7 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
           <IconChevronDown size={16} />
         </Button>
       </span>
-      <Menu anchor={claudeAnchor} open={claudeOpen} onClose={() => setClaudeOpen(false)} groups={claude} label={t('library.selClaude')} placement="bottom-start" width={260} />
+      <Menu anchor={claudeAnchor} open={claudeOpen} onClose={() => setClaudeOpen(false)} groups={claude} label={t('library.selClaude')} placement="bottom-start" width={340} />
       <span ref={moreAnchor}>
         <IconButton label={t('library.rowMore')} variant="secondary" size="sm" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)} data-testid="selection-more">
         <IconMore size={16} />

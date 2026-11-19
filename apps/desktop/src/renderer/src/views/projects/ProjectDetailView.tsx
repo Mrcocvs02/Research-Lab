@@ -324,7 +324,7 @@ export function ProjectDetailView({ id }: { id: string }) {
         sub={
           <>
             <StatusBadge project={p} onChange={(status) => void update({ status })} />
-            <span>{t(`projects.kind.${p.kind}`)}</span>
+            {p.kind !== 'project' && <span>{t(`projects.kind.${p.kind}`)}</span>}
             <span data-testid="project-counts">
               {t('projects.counts', { total: p.counts.total, toRead: p.counts.toRead, reading: p.counts.reading, read: p.counts.read })}
               {p.counts.missing > 0 && ` · ${t('projects.missingCount', { count: p.counts.missing })}`}

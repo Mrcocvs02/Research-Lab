@@ -45,9 +45,9 @@ Configurata in `.claude/settings.local.json` (non versionato) della cartella di 
 
 ## Compact instructions
 Quando compatti il contesto conserva, in quest'ordine:
-- fase e onda correnti (onda 9 in corso: X5 e X6; onde 4, 5, 7 e 8 unite), ultimo commit su `main` (`2cce6b4`) e tag di fase già creati (`phase-0`..`phase-3`, `phase-6`, `phase-7`; `phase-4`, `phase-5`, `phase-8` senza tag);
-- subagent in corso e rami non ancora uniti: `x5` (worktree `C:\dev\rl-wt\x5`) e `x6` (worktree `C:\dev\rl-wt\x6`), onda 9;
-- difetti aperti dalle revisioni e lavoro non verificato (test rimandati alla verifica finale, D-443);
+- fase e onda correnti (fase 8: prova di installazione in corso; ondate 1–12 unite, verifica finale fatta), ultimo commit su `main` (`6d2018e`) e tag di fase già creati (`phase-0`..`phase-3`, `phase-6`, `phase-7`; `phase-4`, `phase-5`, `phase-8` senza tag; poi `phase-8` e `v1.0.0`);
+- nessun subagent in corso e nessun ramo non unito; funzione 49 rinviata dopo 1.0 (D-472, D-475);
+- difetti aperti dalle revisioni (lacune di M4, X7, X8, w12 in `docs/HANDOFF.md`, sezione 5);
 - preferenze dell'utente: subagent Sonnet per logica, interfacce, revisioni e sicurezza; Haiku per il lavoro meccanico (worktree, controlli, docs di stato, traduzioni); coppia Opus solo per il design; al massimo 2 subagent insieme; test solo alla fine, quelli pesanti uno alla volta; niente coautore Claude nei commit, identità locale, push a ogni passo; nessuna domanda bloccante; app leggera ma senza togliere funzioni utili;
 - decisioni prese nella sessione ma non ancora scritte in `docs/DECISIONS.md`.
 Tralascia l'output completo di test, diff e log: restano in git e nei file `docs/`.

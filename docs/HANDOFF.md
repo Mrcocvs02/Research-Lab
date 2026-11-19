@@ -9,7 +9,7 @@ Stato di passaggio per riprendere il lavoro. Prima di fare qualunque cosa, legge
 1. `CLAUDE.md` (regole di lavoro, modelli per compito, commit, comandi);
 2. `docs/STATUS.md` (fase, onda, fatto, in corso, bloccato, prossimo);
 3. `docs/HANDOFF.md` (questo file);
-4. `docs/DECISIONS.md` (le ultime voci: D-446..D-469);
+4. `docs/DECISIONS.md` (le ultime voci: D-466..D-475);
 5. `docs/design/ARCHITETTURA-UI.md` §14 e §14.1 (ondate di implementazione e funzioni nuove);
 6. `docs/HISTORY.md` (facoltativo: cronologia).
 
@@ -18,9 +18,9 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 ## 2. Aggiornato
 
 - Data: 2026-11-19.
-- HEAD di codice su `main`: `dabc8b7` (w12, pubblicato). Ultimo merge su `main`: `dabc8b7` (w12). Il commit di documentazione di questo aggiornamento viene dopo `dabc8b7`.
-- Branch uniti e pubblicati: `h0`, `r0`, `s1`, `s2`, `w1-contracts`, `a1`, `b1`, `c2`, `a2`, `audit2`, `r2`, `fix-real`, `f4`, `tokcap`, `d3`, `g4b`, `e3`, `g4a`, `m4`, `g4c`, `n4`, `h5`, `i5`, `j5`, `t1`, `x1`, `x2`, `x4`, `slim`, `x3`, `x5`, `x6`, `mapfix`, `x7`, `x8`, `w12`.
-- Ondate 9, 10 e 12 unite; nessun lavoro di ondata in corso. Verifica finale in corso (sezione 5).
+- HEAD di codice su `main`: `6d2018e` (efix3, pubblicato). Ultimo merge su `main`: `6d2018e`. Il commit di documentazione di questo aggiornamento viene dopo `6d2018e`.
+- Branch uniti e pubblicati: `h0`, `r0`, `s1`, `s2`, `w1-contracts`, `a1`, `b1`, `c2`, `a2`, `audit2`, `r2`, `fix-real`, `f4`, `tokcap`, `d3`, `g4b`, `e3`, `g4a`, `m4`, `g4c`, `n4`, `h5`, `i5`, `j5`, `t1`, `x1`, `x2`, `x4`, `slim`, `x3`, `x5`, `x6`, `mapfix`, `x7`, `x8`, `w12`, `efix1`, `efix2`, `pdfw`, `efix3`.
+- Ondate 1–12 unite. Nessun lavoro di ondata in corso. Verifica finale fatta (sezione 4). In corso: prova di installazione della fase 8 (sezione 5).
 - Worktree ancora su disco sotto `C:\dev\rl-wt` (circa 35 vecchi): tutti rimuovibili, inclusi `x5` e `x6` ora uniti. Non cancellare mai una junction `node_modules`.
 - Tag: `phase-0`..`phase-3`, `phase-6`, `phase-7` pubblicati; `phase-4`, `phase-5`, `phase-8` senza tag.
 - Installer di rilascio costruito prima della riprogettazione (131 MB, non firmato): da rifare dopo le ondate.
@@ -53,7 +53,8 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 
 ## 4. Test: eseguiti
 
-- Dal D-443 nessun test è stato eseguito (anche i test scritti in G4a, G4c, N4 e nelle ondate 7-8, vedi sotto). Durante le ondate si eseguono solo `npm run typecheck`, `npm run build`, `npm run check:budget` e `npm run check:generality`. I task scrivono i test ma non li eseguono.
+- **Verifica finale (D-443), su `main` a `6d2018e`:** unitari 2708 passati, 1 instabile (`export.test.ts` "cancelled or failed", passa da solo); e2e uno alla volta 40 su 42 verdi, con `qa-budget` `firstContentMs` instabile (534, 604 contro 530, non alzato); heavy tutti verdi (6 file unitari, `qa-search-perf`, `security-hostile-scan`). Le sezioni seguenti descrivono lo stato prima di questa verifica e restano come storia dei punti di revisione.
+- Prima della verifica finale, dal D-443 nessun test era stato eseguito (anche i test scritti in G4a, G4c, N4 e nelle ondate 7-8, vedi sotto). Durante le ondate si eseguono solo `npm run typecheck`, `npm run build`, `npm run check:budget` e `npm run check:generality`. I task scrivono i test ma non li eseguono.
 - Ultimi test noti, su `main` dopo H0 (2026-11-18): unitari 1707 passati, 12 saltati, 1 fallimento instabile in `McpSection.test.ts` (PORT_IN_USE con poca RAM; passa 17/17 da solo); e2e `reader-geometry` 4/4, `study-ui` 1/1, `smoke` 4/4.
 - Problemi noti da chiudere nella verifica finale (D-429, D-443, D-444): `McpSection` PORT_IN_USE; `export.test` sotto poca RAM; `ui-library.spec.ts` si blocca; 2 test di `reader.test.ts` rotti da D3; `design-audit.spec.ts` con testid cambiati; `firstContentMs` da rimisurare su macchina scarica.
 - G4a (D-449..D-451), da verificare nel passaggio finale: test scritti e non eseguiti (scrittore: oggetti, doc, geometria, scrittura con la proprietà del prefisso, riconciliazione, rifiuti, 500 mutazioni ostili; `pdf-sync.test.ts`; asserzioni di handler e procedura guidata; `e2e/pdf-annot.spec.ts`). Punti aperti: riscrittura completa di un PDF da un altro programma con lo stesso testo (D-445, regola 3) non gestita, trattata come cambiata (sicuro); lista "Da controllare" in Attività mancante (le scelte stanno nel pannello Info del lettore); `expectedWrites` riempito ma non letto; dubbi: l'e2e del pixel in una BrowserWindow nascosta può non disegnare (salta con nota), soglie del test ostile stimate, file ibridi e con predittore PNG affidati alla lettura dell'aggiornamento da parte di pdf.js.
@@ -81,16 +82,14 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 
 ## 5. Stato e prossimi passi
 
-Ondate 9, 10 e 12 unite su `main` a `dabc8b7` (X5, X6, mapfix, X7, X8, w12). Verifica finale in corso.
+Ondate 1–12 unite su `main` a `6d2018e`. Verifica finale fatta (sezione 4). `PDF_WRITE_ENABLED` è acceso (D-473); nei test e2e di sviluppo resta spento salvo `RL_E2E_PDF_WRITE=1`.
 
 Passi, in ordine:
-1. Verifica finale, una sola volta (D-443): Y1 audit visivo (Opus); revisione indipendente e di sicurezza di G4a, G4b, G4c, J5, X4 e scrittura dei `.bib`; correzioni; test completi, quelli pesanti uno alla volta.
-2. Y2: budget e suite completa. Nessun test di w12 è stato scritto: aggiungerli qui.
-3. Lacune di M4 e revisione a vista della coppia di design (D-379): trascinamento dell'etichetta di un tema e dei punti in un tema aperto; contorni e colore dei temi in modalità documenti; ⋯ "Dimensione per" e "Mostra temi in comune"; "Vai a" per i nodi tagliati dal limite di 800; "ultimo letto" come documento di partenza; volo reale di 300 ms tra le modalità (ora la simulazione si assesta dai centroidi del Panorama); probe di fps pesanti (solo con `RL_HEAVY_TESTS=1`).
-4. Funzione 49 (Z1, manoscritto ↔ fonti): solo dopo conferma dell'utente. PDF_WRITE_ENABLED si attiva solo dopo la revisione di sicurezza (punto 1); i punti da verificare sono in sezione 4 (G4a, G4c, N4, M4, H5, J5, I5, T1, ondate 7-8).
-5. Fase 8: prova di installazione fatta dall'agente (installazione silenziosa in cartella temporanea, avvio, disinstallazione, controllo dei dati, con le impostazioni dell'account dell'utente salvate e ripristinate prima). Poi tag `phase-8` e versione 1.0.0 (D-262).
+1. Fase 8: prova di installazione, in corso (installazione silenziosa in cartella temporanea, avvio, disinstallazione, controllo dei dati, con le impostazioni dell'account dell'utente salvate e ripristinate prima). L'installer non include l'eseguibile di Claude Code (D-474).
+2. Tag `phase-8` e versione 1.0.0 (D-262).
+3. Dopo 1.0: feedback dell'utente sui miglioramenti (D-475); funzione 49 (Z1, manoscritto ↔ fonti) da discutere insieme con il feedback (D-399, D-472). Non si fa prima.
 
-Stima data all'utente: 6–9 ore di lavoro degli agenti, più le pause per il limite d'uso. La verifica finale è il blocco più grande e meno certo.
+Lacune note (non riprese nella verifica finale, da riesaminare con il feedback dopo 1.0): M4 (trascinamento di etichette e punti in un tema aperto, contorni e colore dei temi in modalità documenti, ⋯ "Dimensione per" e "Mostra temi in comune", "Vai a" per i nodi oltre il limite di 800, "ultimo letto" come documento di partenza, volo reale di 300 ms, probe di fps pesanti con `RL_HEAVY_TESTS=1`); X7 ("✦ Cerca prove", PDF del resoconto, scelta del modello); X8 (istituzioni nel gruppo, ⋯ per i gruppi); w12 (motivo di esclusione in `Searches.tsx`, oggi "other"; test mancanti).
 
 Lasciti per task (non ancora fatti):
 - X1: scelta BibTeX in "Esporta…"; voce nella tavolozza; avanzamento nel chip Attività.
@@ -131,15 +130,10 @@ Non bloccanti: decidere quanto possibile e registrare.
 
 - Confermati dall'utente (D-448): accento Petrolio; nessun nome autore nelle annotazioni PDF; copia di sicurezza nella cartella dati sincronizzata; Esc non chiude il lettore. Tag pesati e senza limite di numero (D-447).
 - Ancora provvisorio: nell'Account Claude il consumo del mese mostra la libreria attiva (totale di tutte le librerie al clic).
-- Funzione 49 (Z1, manoscritto ↔ fonti): non implementata; attende la conferma dell'utente (D-399, D-422). Non blocca la verifica finale.
+- Funzione 49 (Z1, manoscritto ↔ fonti): non implementata; rinviata dopo 1.0 e da discutere con il feedback dell'utente (D-399, D-422, D-472, D-475).
 - Funzione 26 (operatori di ricerca): da decidere.
-- Fase 4, criteri su dati reali (poi tag `phase-4`):
-  - 5 paper campione con almeno l'80% dei tag accettati (lavoro AI con Claude vero e revisione);
-  - un PDF vero trascinato nella cartella di arrivo in meno di un minuto, con i metadati giusti;
-  - prova della chat su una cartella reale della libreria, scelta dall'utente.
-- Fase 5 (poi tag `phase-5`): prova sulla libreria reale. Il consenso a mandare i DOI a OpenAlex è dato (D-440); la prova resta da fare.
 - Fase 7, facoltativa: prova con Claude Code vero (export aperto da Claude Code e server MCP aggiunto con la riga copiata). Usa l'account dell'utente: chiedere prima.
-- Installer (fase 8): includere o no l'eseguibile di Claude Code da ~356 MB dell'Agent SDK (D-203, D-261). Non includerlo senza conferma. Nella cartella di rilascio, `default_app.asar` di Electron è innocuo e si può escludere.
+- Nella cartella di rilascio, `default_app.asar` di Electron è innocuo e si può escludere.
 - Aperte da prima: certificato di firma, icona definitiva, cifratura dei backup.
 
 Nota: con Haiku a ragionamento basso, una domanda breve in inglese può ricevere risposta in italiano; controllare la lingua.

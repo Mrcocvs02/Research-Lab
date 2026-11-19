@@ -29,7 +29,8 @@
       "DocLinks": 16,
       "TagReview": 16,
       "TagCleanup": 16,
-      "TagAiConfirm": 16
+      "TagAiConfirm": 16,
+      "SelectionSummary": 16
     }
   },
   "main": {

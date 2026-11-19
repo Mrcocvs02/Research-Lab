@@ -14,6 +14,9 @@ export const graphHandlers = (s: MainServices): DomainHandlers<'graph'> => ({
   'graph:neighbors': (req) => neighbors(s, req),
   // Computed in a chunk of its own, loaded on first use: the start of the app does not carry it (D-449).
   'graph:family': async (req) => (await import('../../graph/family-run.js')).runFamily(s, req),
+  'graph:evidence': async (req) => (await import('../../graph/evidence-run.js')).runEvidence(s, req),
+  'graph:path': async (req) => (await import('../../graph/evidence-run.js')).runPath(s, req),
+  'graph:vocabLinks': async (req) => (await import('../../graph/family-run.js')).runVocabLinks(s, req),
   'graph:previewFamilyNames': async (req) => (await import('../../graph/family-names.js')).previewFamilyNames(s, req),
   'graph:nameFamily': async (req) => (await import('../../graph/family-names.js')).nameFamily(s, req),
   'graph:acceptFamilyName': async (req) => (await import('../../graph/family-names.js')).acceptFamilyName(s, req),

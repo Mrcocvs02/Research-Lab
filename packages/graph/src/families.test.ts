@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FAMILY_TOP, OTHER_CLUSTER, autoMemberships, familyModel, parseFamily, tagMemberships } from './families.js';
+import { FAMILY_TOP, OTHER_CLUSTER, autoMemberships, familyEligibility, familyModel, mainValue, parseFamily, tagMemberships, vocabLinks } from './families.js';
 
 const node = (id: string, extra: { level?: string; parents?: string[]; group?: string } = {}) => ({ id, label: id.toUpperCase(), parents: extra.parents ?? [], level: extra.level, group: extra.group });
 
@@ -90,5 +90,68 @@ describe('autoMemberships', () => {
     const m = autoMemberships(['a', 'b', 'c'], [{ a: 0, b: 1, w: 1 }], () => [], (t) => t, 'Cluster');
     expect([...m.docs.keys()].sort()).toEqual(['a', 'b']);
     expect([...m.labels.values()]).toEqual(['Cluster 1']);
+  });
+});
+
+describe('familyEligibility', () => {
+  const clear = (v: string) => [{ v, w: 1 }];
+  const docs = (n: number, f: (i: number) => string) => Array.from({ length: n }, (_, i) => clear(f(i)));
+  it('passes a family with good coverage, clear papers and 2 to 12 values', () => {
+    const e = familyEligibility(docs(20, (i) => `v${i % 4}`), 24);
+    expect(e).toMatchObject({ eligible: true, values: 4 });
+    expect(e.coverage).toBeCloseTo(0.833, 3);
+    expect(e.clarity).toBe(1);
+  });
+  it('fails on coverage under 0.6 and says so', () => {
+    const e = familyEligibility(docs(8, (i) => `v${i % 3}`), 25);
+    expect(e.eligible).toBe(false);
+    expect(e.coverage).toBe(0.32);
+  });
+  it('fails on clarity under 0.7: papers whose main value holds less than 0.6 of their weight', () => {
+    const blurry = Array.from({ length: 10 }, (_, i) => [{ v: `v${i % 2}`, w: 0.55 }, { v: `v${(i + 1) % 2}`, w: 0.45 }]);
+    expect(familyEligibility(blurry, 10).eligible).toBe(false);
+    expect(familyEligibility(blurry, 10).clarity).toBe(0);
+    expect(familyEligibility(blurry, 10, { one: true }).eligible).toBe(true);
+    const mixed = [...docs(8, (i) => `v${i % 2}`), ...[0, 1].map(() => [{ v: 'a', w: 0.5 }, { v: 'b', w: 0.5 }])];
+    expect(familyEligibility(mixed, 10).clarity).toBe(0.8);
+  });
+  it('needs at least 2 values; allows more than 12 only when the 12 biggest hold 80%', () => {
+    expect(familyEligibility(docs(10, () => 'a'), 10).eligible).toBe(false);
+    const many = familyEligibility(docs(100, (i) => (i < 90 ? `v${i % 12}` : `r${i}`)), 100);
+    expect(many.values).toBe(22);
+    expect(many.eligible).toBe(true);
+    expect(familyEligibility(docs(40, (i) => `v${i}`), 40).eligible).toBe(false);
+  });
+  it('never passes the keywords family, and ignores papers with no value', () => {
+    expect(familyEligibility(docs(10, (i) => `v${i % 3}`), 10, { keywords: true }).eligible).toBe(false);
+    expect(familyEligibility([...docs(6, (i) => `v${i % 2}`), [], [{ v: 'x', w: 0 }]], 8).coverage).toBe(0.75);
+    expect(familyEligibility([], 0)).toMatchObject({ eligible: false, coverage: 0, values: 0 });
+  });
+  it('mainValue breaks ties by id', () => {
+    expect(mainValue([{ v: 'b', w: 1 }, { v: 'a', w: 1 }])).toBe('a');
+    expect(mainValue([])).toBeNull();
+  });
+});
+
+describe('vocabLinks', () => {
+  it('links nodes that go together at least 2 times above chance, at most 2 per node', () => {
+    const papers = [...Array.from({ length: 4 }, () => ['x', 'y']), ['x'], ['y'], ...Array.from({ length: 20 }, (_, i) => [`z${i}`]), ['y', 'w'], ['y', 'w']];
+    const out = vocabLinks(papers);
+    const x = out.find((l) => l.a === 'x' && l.b === 'y')!;
+    expect(x.shared).toBe(4);
+    expect(x.lift).toBeGreaterThanOrEqual(2);
+    const deg = new Map<string, number>();
+    for (const l of out) for (const k of [l.a, l.b]) deg.set(k, (deg.get(k) ?? 0) + 1);
+    expect(Math.max(...deg.values())).toBeLessThanOrEqual(2);
+  });
+  it('needs 2 shared papers and lift 2, and honours skip', () => {
+    expect(vocabLinks([['a', 'b'], ['a'], ['b'], ['c'], ['c']])).toEqual([]);
+    const together = [['a', 'b'], ['a', 'b'], ['c'], ['d'], ['e'], ['f']];
+    expect(vocabLinks(together).length).toBe(1);
+    expect(vocabLinks(together, (a, b) => a === 'a' && b === 'b')).toEqual([]);
+  });
+  it('keeps the biggest lifts when a node has more than 2', () => {
+    const papers = [['h', 'a'], ['h', 'a'], ['h', 'b'], ['h', 'b'], ['h', 'c'], ['h', 'c'], ...Array.from({ length: 30 }, (_, i) => [`o${i}`])];
+    expect(vocabLinks(papers).filter((l) => l.a === 'h' || l.b === 'h').length).toBe(2);
   });
 });

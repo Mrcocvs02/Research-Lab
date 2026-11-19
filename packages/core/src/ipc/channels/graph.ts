@@ -30,6 +30,9 @@ export const graphStatusSchema = z.object({
 /** Macro-areas (D-483): `ar` up to 3 triples [area, branch, share x 100], `az` the centrality x 100; `areas` is `{ id, label, count, branches }[]`. Built by the lazy `areas` chunk of the main process. */
 const A = { ar: z.array(z.array(z.number())).optional(), az: z.number().optional() };
 const areas = z.array(z.any()).optional();
+const familyReason = z.object({ coverage: z.number(), clarity: z.number(), values: z.number() });
+const strictnessSchema = z.enum(['strict', 'normal', 'wide']).default('normal');
+const evidenceEdgeSchema = z.object({ a: documentIdSchema, b: documentIdSchema, e: z.number(), kinds: z.array(z.enum(['cites', 'linked', 'similar'])).min(1).max(3), w: z.number().optional() });
 const familyScope = z.object({ folder: relativePathSchema.optional(), projectId: z.string().max(100).optional(), tagId: itemIdSchema.optional() }).optional();
 
 export const clusterViewSchema = z.object({
@@ -125,12 +128,34 @@ export const graphChannels = defineChannels('graph', {
       family: z.string().max(200).optional(),
       scope: z.object({ folder: relativePathSchema.optional(), projectId: z.string().max(100).optional(), tagId: itemIdSchema.optional() }).optional(),
       docIds: z.array(documentIdSchema).max(GRAPH_LIMITS.mapPoints).optional(),
+      /** Width over height of the canvas, for the blocks (D-498). */
+      aspect: z.number().min(0.2).max(10).optional(),
     }),
     response: z.object({
-      families: z.array(z.object({ id: z.string().max(200), label: z.string().max(200), count: z.number().int().nonnegative() })),
+      families: z.array(z.object({ id: z.string().max(200), label: z.string().max(200), count: z.number().int().nonnegative(), eligible: z.boolean().optional(), reason: familyReason.optional() })),
       areas,
-      items: z.array(z.object({ id: documentIdSchema, ...A })).max(GRAPH_LIMITS.mapPoints),
+      items: z.array(z.object({ id: documentIdSchema, cell: z.array(z.number()).length(2).optional(), block: z.string().max(200).optional(), others: z.array(z.string().max(200)).max(2).optional(), ...A })).max(GRAPH_LIMITS.mapPoints),
+      /** With a family: whether it passes the test of the blocks, and the numbers behind it. */
+      eligible: z.boolean().optional(),
+      reason: familyReason.optional(),
+      /** Blocks (world units) of an eligible family or of the automatic one; each paper's `cell` is its top-left corner. */
+      blocks: z.array(z.object({ id: z.string().max(200), label: z.string().max(300), count: z.number().int().nonnegative(), x: z.number(), y: z.number(), w: z.number(), h: z.number(), sub: z.array(z.object({ id: z.string().max(200), label: z.string().max(300), y: z.number() })) })).optional(),
     }),
+  },
+  /** Evidence edges between papers (citations, links of the user, similarity from the library threshold tau), at most 5 per paper (D-499). Without a model only citations and links. */
+  evidence: {
+    request: z.object({ scope: familyScope, strictness: strictnessSchema }),
+    response: z.object({ tau: z.number(), edges: z.array(evidenceEdgeSchema).max(5 * GRAPH_LIMITS.mapPoints) }),
+  },
+  /** Shortest chain of evidence between two papers (Dijkstra, similarity from 0.75 tau, at most 6 steps); `steps` empty when there is none. */
+  path: {
+    request: z.object({ a: documentIdSchema, b: documentIdSchema, strictness: strictnessSchema }),
+    response: z.object({ tau: z.number(), steps: z.array(evidenceEdgeSchema).max(6) }),
+  },
+  /** Cross links of the vocabulary tree of a family: pairs of nodes that go together (lift >= 2, at least 2 papers), at most 2 per node. */
+  vocabLinks: {
+    request: z.object({ family: z.string().max(200) }),
+    response: z.object({ links: z.array(z.object({ a: z.string().max(500), b: z.string().max(500), lift: z.number(), shared: z.number().int().nonnegative() })).max(2000) }),
   },
   /** The exact text "Dai un nome con Claude" would send for the clusters of the automatic family (top tags and titles of papers in enabled folders); nothing leaves. */
   previewFamilyNames: {

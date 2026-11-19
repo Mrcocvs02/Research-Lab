@@ -1,5 +1,5 @@
 import { visibleGroupTags, type DocumentRecord } from '@rl/core';
-import { autoMemberships, familyModel, neighborsOf, parseFamily, tagMemberships, type AreaModel, type AreaSummary, type FamilyNode, type Memberships } from '@rl/graph';
+import { autoMemberships, familyEligibility, familyModel, layoutBlocks, mainValue, neighborsOf, parseFamily, tagMemberships, vocabLinks, type AreaModel, type AreaSummary, type Block, type Eligibility, type FamilyNode, type Memberships, type VocabLink } from '@rl/graph';
 import type { MainServices } from '../ipc/handlers/services.js';
 import { areaModel, weightsOf } from './areas-run.js';
 import { readNames } from './family-names-store.js';
@@ -14,6 +14,9 @@ import { loadView, scopeIds, type LibraryView } from './view.js';
 type Scope = { folder?: string | undefined; projectId?: string | undefined; tagId?: string | undefined } | undefined;
 interface Item {
   id: string;
+  cell?: [number, number] | undefined;
+  block?: string | undefined;
+  others?: string[] | undefined;
   ar?: number[][] | undefined;
   az?: number | undefined;
 }
@@ -24,12 +27,83 @@ export const scopeKey = (scope: Scope): string => JSON.stringify(scope ?? null);
 
 const docTags = (rec: DocumentRecord, withGroups: boolean): Array<{ id: string; w: number }> => (withGroups ? [...weightsOf(rec), ...visibleGroupTags(rec).map((id) => ({ id, w: 1 }))] : weightsOf(rec));
 
-/** The families this library offers, with how many documents each covers (0 when not worth computing: `auto`). */
-async function listFamilies(s: MainServices, view: LibraryView, scope: Scope): Promise<Array<{ id: string; label: string; count: number }>> {
-  const out: Array<{ id: string; label: string; count: number }> = [];
+interface Values {
+  /** Weighted values of level 1 of each paper that has any. */
+  docs: Map<string, Array<{ v: string; w: number }>>;
+  labels: Map<string, string>;
+  /** Level 2 value of a paper inside its main value. */
+  sub: (docId: string, value: string) => string | null;
+  /** Every top value is of kind `one` / of the keywords kind (D-493). */
+  one: boolean;
+  keywords: boolean;
+}
+type Reason = Pick<Eligibility, 'coverage' | 'clarity' | 'values'>;
+interface Offer {
+  id: string;
+  label: string;
+  count: number;
+  eligible?: boolean;
+  reason?: Reason;
+}
+const reasonOf = (e: Eligibility): Reason => ({ coverage: e.coverage, clarity: e.clarity, values: e.values });
+
+/** The values of level 1 and 2 of a tag family or of the topic (the macro-areas and their branches), as the blocks and the test read them. */
+async function valuesOf(s: MainServices, view: LibraryView, scope: Scope, family: string, recs: DocumentRecord[]): Promise<Values> {
+  const ref = parseFamily(family);
+  const nodes = (view.tax?.nodes ?? []) as Array<FamilyNode & { family?: string }>;
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  if (ref.kind === 'topic') {
+    const m = await areaModel(await s.runtime.require(), view, scope);
+    const docs = new Map<string, Array<{ v: string; w: number }>>();
+    const branch = new Map<string, string>();
+    for (const [id, sh] of m.docs) {
+      if (sh.ar.length === 0) continue;
+      docs.set(id, sh.ar.map(([a, , q]) => ({ v: m.areas[a]!.id, w: q })));
+      const [a, b] = sh.ar[0]!;
+      if (b >= 0) branch.set(id, m.areas[a]!.branches[b]!.id);
+    }
+    const labels = new Map(m.areas.map((a) => [a.id, a.label]));
+    for (const a of m.areas) for (const b of a.branches) labels.set(b.id, view.lookup.tagLabel(b.id) ?? b.id);
+    return { docs, labels, sub: (id) => branch.get(id) ?? null, one: false, keywords: false };
+  }
+  if (ref.kind === 'auto') {
+    const mem = await autoModel(s, view, scope);
+    return { docs: new Map([...(mem?.docs ?? [])].map(([id, l]) => [id, l.map((e) => ({ v: e.cluster, w: e.w }))])), labels: mem?.labels ?? new Map(), sub: () => null, one: true, keywords: false };
+  }
+  const prefix = ref.kind === 'prefix';
+  const tagged = recs.map((r) => ({ id: r.id, tags: docTags(r, prefix) }));
+  const mem = tagMemberships(ref, nodes, tagged);
+  const labels = new Map(mem.labels);
+  const kids = new Map<string, string[]>();
+  if (!prefix) for (const n of nodes) for (const p of n.parents) if (mem.labels.has(p)) (kids.get(p) ?? kids.set(p, []).get(p)!).push(n.id);
+  const tagsById = new Map(tagged.map((d) => [d.id, d.tags]));
+  const tops = [...mem.labels.keys()];
+  return {
+    docs: new Map([...mem.docs].map(([id, l]) => [id, l.map((e) => ({ v: e.cluster, w: e.w }))])),
+    labels,
+    sub(id, value) {
+      const kid = new Set(kids.get(value) ?? []);
+      let best: { id: string; w: number } | null = null;
+      for (const t of tagsById.get(id) ?? []) if (kid.has(t.id) && (!best || t.w > best.w || (t.w === best.w && t.id < best.id))) best = t;
+      if (best && !labels.has(best.id)) labels.set(best.id, view.lookup.tagLabel(best.id) ?? best.id);
+      return best?.id ?? null;
+    },
+    one: tops.length > 0 && tops.every((t) => byId.get(t)?.family === 'one'),
+    keywords: tops.length > 0 && tops.every((t) => byId.get(t)?.family === 'keywords'),
+  };
+}
+
+/** The families this library offers, with how many documents each covers (0 when not worth computing: `auto`) and whether each passes the test of the blocks. */
+async function listFamilies(s: MainServices, view: LibraryView, scope: Scope, recs: DocumentRecord[]): Promise<Offer[]> {
+  const out: Offer[] = [];
   const topic = await areaModel(await s.runtime.require(), view, scope);
-  out.push({ id: 'topic', label: 'Topic', count: topic.tagged });
   const nodes = (view.tax?.nodes ?? []) as FamilyNode[];
+  const check = async (o: { id: string; label: string }, count: number): Promise<void> => {
+    const v = await valuesOf(s, view, scope, o.id, recs);
+    const e = familyEligibility(v.docs.values(), recs.length, { one: v.one, keywords: v.keywords });
+    out.push({ ...o, count, eligible: e.eligible, reason: reasonOf(e) });
+  };
+  await check({ id: 'topic', label: 'Topic' }, topic.tagged);
   const docs = view.records.map((r) => ({ id: r.id, tags: docTags(r, true) }));
   const offers: Array<{ id: string; label: string }> = [];
   if (nodes.some((n) => n.level === 'method' && n.status !== 'deprecated')) offers.push({ id: 'level:method', label: 'Method' });
@@ -37,9 +111,9 @@ async function listFamilies(s: MainServices, view: LibraryView, scope: Scope): P
   offers.push({ id: 'prefix:grp:', label: 'Group' });
   for (const o of offers) {
     const count = tagMemberships(parseFamily(o.id), nodes, docs).docs.size;
-    if (count > 0) out.push({ ...o, count });
+    if (count > 0) await check(o, count);
   }
-  out.push({ id: 'auto', label: 'Automatic', count: 0 });
+  out.push({ id: 'auto', label: 'Automatic', count: 0, eligible: true });
   return out;
 }
 
@@ -87,17 +161,79 @@ async function familyAreas(s: MainServices, view: LibraryView, scope: Scope, fam
   return model;
 }
 
-/** `graph:family`: the list of families and, when one is asked for, its clusters and the shares of the documents. */
-export async function runFamily(s: MainServices, req: { family?: string | undefined; scope?: Scope; docIds?: string[] | undefined }): Promise<{ families: Array<{ id: string; label: string; count: number }>; areas?: AreaSummary[]; items: Item[] }> {
-  const view = await loadView(await s.runtime.require());
-  const families = await listFamilies(s, view, req.scope);
+/** The blocks of a family: its values as blocks, every paper of the scope in a cell (papers with no value in the last block). */
+async function blocksOf(s: MainServices, v: Values, recs: DocumentRecord[], aspect: number): Promise<ReturnType<typeof layoutBlocks>> {
+  const lm = await loadModel(s, await s.runtime.require());
+  const pos = (id: string): { x?: number; y?: number } => {
+    const i = lm?.index.get(id);
+    return i === undefined || !lm ? {} : { x: lm.model.x[i] as number, y: lm.model.y[i] as number };
+  };
+  const docs = recs
+    .map((r) => {
+      const list = v.docs.get(r.id) ?? [];
+      const main = mainValue(list);
+      return { id: r.id, value: main, sub: main === null ? null : v.sub(r.id, main), others: list.filter((e) => e.v !== main).sort((a, b) => b.w - a.w || (a.v < b.v ? -1 : 1)).map((e) => e.v), ...pos(r.id) };
+    })
+    .sort((a, b) => (a.id < b.id ? -1 : 1));
+  return layoutBlocks({ docs, labels: v.labels, aspect, otherLabel: 'Other', noneLabel: 'No value' });
+}
+
+/** `graph:family`: the list of families and, when one is asked for, its clusters, the shares of the documents, and the blocks when it passes the test. */
+export async function runFamily(s: MainServices, req: { family?: string | undefined; scope?: Scope; docIds?: string[] | undefined; aspect?: number | undefined }): Promise<{
+  families: Offer[];
+  areas?: AreaSummary[];
+  items: Item[];
+  eligible?: boolean;
+  reason?: Reason;
+  blocks?: Block[];
+}> {
+  const rt = await s.runtime.require();
+  const view = await loadView(rt);
+  const wanted = await scopeIds(rt, view, req.scope);
+  const recs = view.records.filter((r) => !wanted || wanted.has(r.id));
+  const families = await listFamilies(s, view, req.scope, recs);
   if (!req.family) return { families, items: [] };
   const m = await familyAreas(s, view, req.scope, req.family);
   const ids = req.docIds ?? [...m.docs.keys()];
+  const offer = families.find((f) => f.id === req.family);
+  const laid = offer?.eligible === false ? null : await blocksOf(s, await valuesOf(s, view, req.scope, req.family, recs), recs, req.aspect ?? 1.6);
   const items: Item[] = [];
   for (const id of ids) {
     const sh = m.docs.get(id);
-    if (sh && sh.ar.length > 0) items.push({ id, ar: sh.ar, az: sh.az });
+    const c = laid?.cells.get(id);
+    const b = laid?.blockOf.get(id);
+    if ((sh && sh.ar.length > 0) || c) items.push({ id, ...(sh && sh.ar.length > 0 ? { ar: sh.ar, az: sh.az } : {}), ...(c && b ? { cell: c, block: b.block, others: b.others } : {}) });
   }
-  return { families, ...(m.areas.length > 0 ? { areas: m.areas } : {}), items };
+  return {
+    families,
+    ...(m.areas.length > 0 ? { areas: m.areas } : {}),
+    items,
+    ...(offer?.eligible !== undefined ? { eligible: offer.eligible } : {}),
+    ...(offer?.reason ? { reason: offer.reason } : {}),
+    ...(laid ? { blocks: laid.blocks } : {}),
+  };
+}
+
+/** `graph:vocabLinks`: nodes of levels 1 and 2 of a family that go together (nothing for the keywords family, nor for a family with no tree). */
+export async function runVocabLinks(s: MainServices, req: { family: string }): Promise<{ links: VocabLink[] }> {
+  const ref = parseFamily(req.family);
+  if (ref.kind === 'auto' || ref.kind === 'prefix') return { links: [] };
+  const rt = await s.runtime.require();
+  const view = await loadView(rt);
+  const nodes = (view.tax?.nodes ?? []) as Array<FamilyNode & { family?: string }>;
+  const top = new Set<string>();
+  if (ref.kind === 'topic') for (const a of (await areaModel(rt, view, undefined)).areas) top.add(a.id);
+  else for (const id of tagMemberships(ref, nodes, view.records.map((r) => ({ id: r.id, tags: docTags(r, false) }))).labels.keys()) top.add(id);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  if ([...top].some((t) => byId.get(t)?.family === 'keywords')) return { links: [] };
+  const parentOf = new Map<string, string>();
+  const shown = new Set(top);
+  for (const n of nodes) {
+    const p = n.parents.find((x) => top.has(x));
+    if (p && n.status !== 'deprecated') {
+      shown.add(n.id);
+      parentOf.set(n.id, p);
+    }
+  }
+  return { links: vocabLinks(view.records.map((r) => view.tagsOf(r).filter((t) => shown.has(t))), (a, b) => parentOf.get(a) === b || parentOf.get(b) === a) };
 }

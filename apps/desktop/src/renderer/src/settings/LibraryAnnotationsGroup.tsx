@@ -61,7 +61,7 @@ export function LibraryAnnotationsGroup() {
   };
   const start = (kind: 'migrate' | 'restore') =>
     guard(async () => {
-      const r = await rl.invoke(kind === 'migrate' ? 'annotations:migrate' : 'annotations:restoreAll', {});
+      const r = await (kind === 'migrate' ? rl.invoke('annotations:migrate', {}) : rl.invoke('annotations:restoreAll', { confirmed: true }));
       setJob({ id: r.jobId, kind, done: 0, total: 0, state: 'running' });
     });
   const close = () => setAsk(null);

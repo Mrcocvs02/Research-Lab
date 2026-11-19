@@ -254,7 +254,7 @@ export const annotationsHandlers = (s: MainServices): DomainHandlers<'annotation
     'annotations:restoreOriginal': async ({ docId }) => pdf.restoreOriginal(docId),
     'annotations:resolveMissing': async ({ docId, choice, ids }) => pdf.resolveMissing(docId, choice, ids),
     'annotations:migrate': async () => pdf.migrate(),
-    'annotations:restoreAll': async () => pdf.restoreAll(),
+    'annotations:restoreAll': async ({ confirmed }) => pdf.restoreAll(confirmed === true),
     'annotations:jobCancel': async ({ jobId }) => (pdf.cancel(jobId), {}),
     'annotations:backups': async () => pdf.backups(),
     'annotations:deleteBackups': async () => pdf.deleteBackups(),

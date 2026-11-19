@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createElement, type ReactElement } from 'react';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -8,6 +8,7 @@ import { AppError, type LibraryProfile } from '@rl/core';
 import i18n from '../../i18n';
 import { LibraryEventsProvider } from '../../lib/events';
 import { NotifyProvider } from '../../lib/notify';
+import { setSearchText } from '../../lib/librarySearch';
 import { ReaderProvider, useReader } from '../../lib/reader';
 import { AppProvider } from '../../state/app-context';
 import { makeDocs, memoryLibrary } from '../../testing/memoryLibrary';
@@ -36,6 +37,10 @@ const fake = vi.hoisted(() => {
     readFindMatch: vi.fn((): any => ({ pieces: [], skipped: 0 })),
     pointAt: vi.fn((): any => null),
     locateText: vi.fn(async (): Promise<any> => ({ status: 'none' })),
+    renderCrop: vi.fn(async (): Promise<any> => null),
+    textNear: vi.fn(() => ({ inside: '', around: '' })),
+    paragraphAround: vi.fn(() => ''),
+    pageSize: vi.fn((): any => null),
     destroy: vi.fn(),
   };
   const createViewer = vi.fn(async (_c: unknown, _v: unknown, handlers: unknown) => {
@@ -693,7 +698,8 @@ describe('Opening the reader from the library and the search', () => {
     lib.state.hitExtra.set(makeDocs(2)[1]!.docId, { field: 'annotation', page: 5, snippet: 'in a \u0001mark\u0002' });
     library(lib);
     await screen.findAllByTestId('search-result');
-    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'paper' } });
+    // The search box lives in the top bar (D-441): the Library view reads the text from the shared store.
+    act(() => setSearchText('paper'));
     await waitFor(() => expect(screen.getAllByTestId('hit-field')).toHaveLength(2));
     const labels = screen.getAllByTestId('hit-field');
     expect(labels.map((l) => [l.getAttribute('data-field'), l.textContent])).toEqual([
@@ -720,9 +726,12 @@ describe('The document card', () => {
     render(wrap(createElement('div', null, createElement(LibraryView), createElement(Probe))));
     const rows = await screen.findAllByTestId('search-result');
     fireEvent.click(rows[0]!);
-    fireEvent.click(await screen.findByTestId('selection-details'));
+    // The card opens from the keyboard (Shift+Enter on the list): the old Details button is gone.
+    fireEvent.keyDown(screen.getByTestId('search-results'), { key: 'Enter', shiftKey: true });
     await screen.findByTestId('doc-panel');
     expect((await screen.findByTestId('underlined-origin')).getAttribute('data-origin')).toBe('annotations');
+    // The sections of the card start folded: open Notes.
+    fireEvent.click(within(await screen.findByTestId('doc-notes')).getAllByRole('button')[0]!);
     const box = await screen.findByTestId('card-note-input');
     fireEvent.change(box, { target: { value: 'file note from the card' } });
     fireEvent.click(screen.getByTestId('card-note-save'));
@@ -755,13 +764,13 @@ describe('ReaderView: the bar and the tools', () => {
       'reader-more',
     ]);
     expect(controls).toHaveLength(13);
-    // The toolbar is a toolbar with the five tools and the dot; Crop has its place but says why it does nothing yet.
+    // The toolbar is a toolbar with the five tools and the dot; Crop (R) is a working tool (X2).
     expect(screen.getByTestId('reader-toolbar').getAttribute('role')).toBe('toolbar');
     const crop = screen.getByTestId('reader-tool-crop');
-    expect(crop.getAttribute('aria-disabled')).toBe('true');
-    expect(crop.getAttribute('title')).toMatch(/later version/);
+    expect(crop.getAttribute('aria-disabled')).toBeNull();
     fireEvent.click(crop);
-    expect(screen.getByTestId('reader-tool-select').getAttribute('aria-pressed')).toBe('true');
+    expect(crop.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByTestId('reader-tool-select').getAttribute('aria-pressed')).toBe('false');
   });
 
   it('the page field follows the viewer and takes digits only', async () => {
@@ -880,14 +889,17 @@ describe('ReaderView: the bar and the tools', () => {
     expect(screen.queryByTestId('annotation-bar')).toBeNull();
   });
 
-  it('the More menu has Undo, History and the file actions; entries that do not exist yet are disabled with a reason, never hidden', async () => {
+  it('the More menu has Undo, History and the file actions; the experimental guide entry appears only with the setting', async () => {
     setup();
     await ready();
     fireEvent.click(screen.getByTestId('reader-more'));
     await screen.findByTestId('reader-history');
-    for (const id of ['reader-undo', 'reader-history', 'reader-side-by-side', 'reader-open-file', 'reader-reveal', 'reader-export-copy', 'reader-guide']) expect(screen.getByTestId(id)).toBeTruthy();
-    expect(screen.getByTestId('reader-side-by-side').getAttribute('aria-disabled')).toBe('true');
-    expect(screen.getByTestId('reader-export-copy').getAttribute('title')).toBeTruthy();
+    for (const id of ['reader-undo', 'reader-history', 'reader-side-by-side', 'reader-open-file', 'reader-reveal', 'reader-export-copy']) expect(screen.getByTestId(id)).toBeTruthy();
+    // The guide margin is experimental: its entry is there only when the setting is on.
+    expect(screen.queryByTestId('reader-guide')).toBeNull();
+    // Side by side and the copy with the changes work now: enabled (a busy export disables the copy with a reason).
+    expect(screen.getByTestId('reader-side-by-side').getAttribute('aria-disabled')).toBeNull();
+    expect(screen.getByTestId('reader-export-copy').getAttribute('aria-disabled')).toBeNull();
     fireEvent.click(screen.getByTestId('reader-reveal'));
     await waitFor(() => expect(callsTo('documents:reveal')).toEqual([{ docId: DOC }]));
   });

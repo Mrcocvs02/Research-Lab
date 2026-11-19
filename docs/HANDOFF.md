@@ -9,7 +9,7 @@ Stato di passaggio per riprendere il lavoro. Prima di fare qualunque cosa, legge
 1. `CLAUDE.md` (regole di lavoro, modelli per compito, commit, comandi);
 2. `docs/STATUS.md` (fase, onda, fatto, in corso, bloccato, prossimo);
 3. `docs/HANDOFF.md` (questo file);
-4. `docs/DECISIONS.md` (le ultime voci: D-466..D-475);
+4. `docs/DECISIONS.md` (le ultime voci: D-476..D-491);
 5. `docs/design/ARCHITETTURA-UI.md` §14 e §14.1 (ondate di implementazione e funzioni nuove);
 6. `docs/HISTORY.md` (facoltativo: cronologia).
 
@@ -18,12 +18,11 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 ## 2. Aggiornato
 
 - Data: 2026-11-19.
-- HEAD di codice su `main`: `6d2018e` (efix3, pubblicato). Ultimo merge su `main`: `6d2018e`. Il commit di documentazione di questo aggiornamento viene dopo `6d2018e`.
-- Branch uniti e pubblicati: `h0`, `r0`, `s1`, `s2`, `w1-contracts`, `a1`, `b1`, `c2`, `a2`, `audit2`, `r2`, `fix-real`, `f4`, `tokcap`, `d3`, `g4b`, `e3`, `g4a`, `m4`, `g4c`, `n4`, `h5`, `i5`, `j5`, `t1`, `x1`, `x2`, `x4`, `slim`, `x3`, `x5`, `x6`, `mapfix`, `x7`, `x8`, `w12`, `efix1`, `efix2`, `pdfw`, `efix3`.
-- Ondate 1–12 unite. Nessun lavoro di ondata in corso. Verifica finale fatta (sezione 4). In corso: prova di installazione della fase 8 (sezione 5).
-- Worktree ancora su disco sotto `C:\dev\rl-wt` (circa 35 vecchi): tutti rimuovibili, inclusi `x5` e `x6` ora uniti. Non cancellare mai una junction `node_modules`.
-- Tag: `phase-0`..`phase-3`, `phase-6`, `phase-7` pubblicati; `phase-4`, `phase-5`, `phase-8` senza tag.
-- Installer di rilascio costruito prima della riprogettazione (131 MB, non firmato): da rifare dopo le ondate.
+- HEAD di codice su `main`: `c2ce253` (ondata 13, pubblicato). Il commit di documentazione di questo aggiornamento viene dopo `c2ce253`.
+- Branch dell'ondata 13 uniti. Ondate 1–13 unite. Nessun lavoro di ondata in corso. Fase 8 completa con tag `phase-8`.
+- Worktree vecchi ancora su disco: rimuovibili. Non cancellare mai una junction `node_modules`.
+- Tag: `phase-0`..`phase-3`, `phase-6`, `phase-7`, `phase-8` pubblicati; `phase-4`, `phase-5` senza tag.
+- Installer di prova della fase 8 (116 MB, senza eseguibile di Claude): da rifare per la versione 1.0.0.
 
 ## 3. Cosa è successo in questa sessione
 
@@ -49,11 +48,13 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
   - SLIM unita (`slim`, feature `277d8b7`, merge `023981e`): backup e manutenzione caricati in modo pigro; poi tetto del main abbassato a 1110 KiB (`22e2213`).
   - X3 unita (`x3`, merge `c20886d`): note di letteratura, modelli, LaTeX, collegamenti per identificatore.
 - Budget: `88e9ca1` (tetti del main per le ondate rimanenti), `2cce6b4` (totali per le ondate 9-10), `renderer.chunkCapsKB` (D-465). Numeri in sezione 5.
+- Ondata 13 unita (D-477..D-491): gap di X7, X8, w12; funzione 49 (Z1a–Z1c) fatta; Mappa K1, L1, K2; gruppi di ricerca come tag `grp:` (D-488); "Raggruppa per" con famiglie (D-489); audit su copia di dati reali (D-490); famiglie di tag (D-491). Budget non più vincolanti (D-487).
 - Revisioni e test rimandati alla verifica finale (D-443).
 
 ## 4. Test: eseguiti
 
 - **Verifica finale (D-443), su `main` a `6d2018e`:** unitari 2708 passati, 1 instabile (`export.test.ts` "cancelled or failed", passa da solo); e2e uno alla volta 40 su 42 verdi, con `qa-budget` `firstContentMs` instabile (534, 604 contro 530, non alzato); heavy tutti verdi (6 file unitari, `qa-search-perf`, `security-hostile-scan`). Le sezioni seguenti descrivono lo stato prima di questa verifica e restano come storia dei punti di revisione.
+- Ondata 13: unitari ed e2e verdi tranne `qa-budget` `firstContentMs` (instabile, noto); heavy verdi.
 - Prima della verifica finale, dal D-443 nessun test era stato eseguito (anche i test scritti in G4a, G4c, N4 e nelle ondate 7-8, vedi sotto). Durante le ondate si eseguono solo `npm run typecheck`, `npm run build`, `npm run check:budget` e `npm run check:generality`. I task scrivono i test ma non li eseguono.
 - Ultimi test noti, su `main` dopo H0 (2026-11-18): unitari 1707 passati, 12 saltati, 1 fallimento instabile in `McpSection.test.ts` (PORT_IN_USE con poca RAM; passa 17/17 da solo); e2e `reader-geometry` 4/4, `study-ui` 1/1, `smoke` 4/4.
 - Problemi noti da chiudere nella verifica finale (D-429, D-443, D-444): `McpSection` PORT_IN_USE; `export.test` sotto poca RAM; `ui-library.spec.ts` si blocca; 2 test di `reader.test.ts` rotti da D3; `design-audit.spec.ts` con testid cambiati; `firstContentMs` da rimisurare su macchina scarica.
@@ -82,14 +83,15 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 
 ## 5. Stato e prossimi passi
 
-Ondate 1–12 unite su `main` a `6d2018e`. Verifica finale fatta (sezione 4). `PDF_WRITE_ENABLED` è acceso (D-473); nei test e2e di sviluppo resta spento salvo `RL_E2E_PDF_WRITE=1`.
+Ondate 1–13 unite su `main` a `c2ce253`. Fase 8 completa con tag `phase-8`. `PDF_WRITE_ENABLED` è acceso (D-473); nei test e2e di sviluppo resta spento salvo `RL_E2E_PDF_WRITE=1`.
 
 Passi, in ordine:
-1. Fase 8: prova di installazione, in corso (installazione silenziosa in cartella temporanea, avvio, disinstallazione, controllo dei dati, con le impostazioni dell'account dell'utente salvate e ripristinate prima). L'installer non include l'eseguibile di Claude Code (D-474).
-2. Tag `phase-8` e versione 1.0.0 (D-262).
-3. Dopo 1.0: feedback dell'utente sui miglioramenti (D-475); funzione 49 (Z1, manoscritto ↔ fonti) da discutere insieme con il feedback (D-399, D-472). Non si fa prima.
+1. Installer finale: rifare `npm run dist` con la versione finale, senza eseguibile di Claude Code (D-474).
+2. Versione 1.0.0 (D-262), sul commit `14a19e0` del ramo `p8`.
+3. Tag `v1.0.0`.
+4. Dopo 1.0: feedback dell'utente sui miglioramenti (D-475).
 
-Lacune note (non riprese nella verifica finale, da riesaminare con il feedback dopo 1.0): M4 (trascinamento di etichette e punti in un tema aperto, contorni e colore dei temi in modalità documenti, ⋯ "Dimensione per" e "Mostra temi in comune", "Vai a" per i nodi oltre il limite di 800, "ultimo letto" come documento di partenza, volo reale di 300 ms, probe di fps pesanti con `RL_HEAVY_TESTS=1`); X7 ("✦ Cerca prove", PDF del resoconto, scelta del modello); X8 (istituzioni nel gruppo, ⋯ per i gruppi); w12 (motivo di esclusione in `Searches.tsx`, oggi "other"; test mancanti).
+Piccole lacune note, da chiudere dopo 1.0 con il feedback (non bloccano la 1.0): Rinomina sulla scheda del tema (manca un canale di rinomina del tema); voce in Cronologia per i collegamenti aggiunti; "✦ Suggerisci famiglie" (serve un nuovo prompt AI); il selettore delle famiglie di tag aggiunge un tag alla volta.
 
 Lasciti per task (non ancora fatti):
 - X1: scelta BibTeX in "Esporta…"; voce nella tavolozza; avanzamento nel chip Attività.
@@ -98,7 +100,7 @@ Lasciti per task (non ancora fatti):
 - X3: estrazione delle immagini incorporate nel PDF (messaggio del worker); "Rigenera una sezione"; chip Attività (la coda di selezione sta nella sua finestra).
 - X5, X6: lasciti da leggere nei rapporti dei subagent quando arrivano.
 
-Budget (`check:budget` verde, dopo X3): JS iniziale del renderer 358,6/396 KiB; JS totale 1989,4/2110 KiB (totale del renderer con tetto 2230 KiB); entry del main 1079,3/1110 KiB; lazy del main 268,2/340 KiB; ogni nuovo chunk del renderer ha un tetto di 16 KiB in `renderer.chunkCapsKB` (NoteRich 12,7, LiteratureNote 9,1, IncomingLinks 1,2); preload sotto 8 KiB.
+Budget: i tetti di `CLAUDE.md` non sono più vincolanti (D-487); misure da rilevare con `check:budget`. Ogni nuovo chunk del renderer ha un tetto di 16 KiB in `renderer.chunkCapsKB` (D-465); preload sotto 8 KiB.
 
 ## 6. Come lavorare (regole di lavoro dell'utente)
 
@@ -112,7 +114,7 @@ Budget (`check:budget` verde, dopo X3): JS iniziale del renderer 358,6/396 KiB; 
 - Worktree in `C:\dev\rl-wt\<ramo>`. `node_modules` è una junction verso il repository principale (`New-Item -ItemType Junction`): non cancellarla mai. `node_modules/@rl/*` punta ai pacchetti del repository principale: un task che cambia `packages/*` verifica con alias temporanei che poi rimuove.
 - Conflitti di merge in elenchi di canali o di handler: il supervisore tiene entrambi i lati.
 - Test (D-443): durante le ondate solo typecheck, build, check:budget e check:generality. Verifica finale una sola volta, pesanti uno alla volta, RAM libera controllata; dopo gli e2e chiudere gli `electron.exe` rimasti da `C:\dev\research-lab\node_modules\electron`.
-- Budget: alzare un tetto richiede una voce in `docs/DECISIONS.md`. I tetti si alzano una volta per le ondate rimanenti, non a ogni merge. I tetti di avvio (JS iniziale del renderer 396 KiB, entry del main 1110 KiB) non si alzano mai. Ogni nuovo chunk del renderer ha una voce di 16 KiB in `renderer.chunkCapsKB`. Una modifica di budget di una riga non richiede altri controlli. Funzionalità prima della leggerezza, ma avvio (JS iniziale) e memoria a riposo non devono crescere: il codice nuovo si carica in modo pigro.
+- Budget: alzare un tetto richiede una voce in `docs/DECISIONS.md` (D-487: i tetti non sono più vincolanti, si alzano quando serve). Ogni nuovo chunk del renderer ha una voce di 16 KiB in `renderer.chunkCapsKB`. Una modifica di budget di una riga non richiede altri controlli. Funzionalità prima della leggerezza, ma avvio (JS iniziale) e memoria a riposo non devono crescere: il codice nuovo si carica in modo pigro.
 - Nessuna domanda bloccante: decidere, registrare in `docs/DECISIONS.md`, proseguire.
 - Commit: nessun `Co-Authored-By` e nessun coautore Claude; identità git locale; push su `origin main` a ogni passo. I subagent non fanno mai push.
 - Non togliere funzioni per fare spazio alla leggerezza.
@@ -130,7 +132,6 @@ Non bloccanti: decidere quanto possibile e registrare.
 
 - Confermati dall'utente (D-448): accento Petrolio; nessun nome autore nelle annotazioni PDF; copia di sicurezza nella cartella dati sincronizzata; Esc non chiude il lettore. Tag pesati e senza limite di numero (D-447).
 - Ancora provvisorio: nell'Account Claude il consumo del mese mostra la libreria attiva (totale di tutte le librerie al clic).
-- Funzione 49 (Z1, manoscritto ↔ fonti): non implementata; rinviata dopo 1.0 e da discutere con il feedback dell'utente (D-399, D-422, D-472, D-475).
 - Funzione 26 (operatori di ricerca): da decidere.
 - Fase 7, facoltativa: prova con Claude Code vero (export aperto da Claude Code e server MCP aggiunto con la riga copiata). Usa l'account dell'utente: chiedere prima.
 - Nella cartella di rilascio, `default_app.asar` di Electron è innocuo e si può escludere.

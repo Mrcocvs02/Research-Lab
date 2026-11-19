@@ -58,6 +58,8 @@
       "comment": "Commento (facoltativo)",
       "saveComment": "Salva il commento",
       "delete": "Elimina",
+      "count_one": "{{count}} annotazione",
+      "count_other": "{{count}} annotazioni",
       "empty": "Ancora nessuna evidenziazione o sottolineatura. Seleziona del testo nel documento per aggiungerne una.",
       "pageHeading": "Pagina {{page}}",
       "jump": "Vai a: {{kind}} a pagina {{page}}",

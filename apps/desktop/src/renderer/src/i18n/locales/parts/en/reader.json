@@ -58,6 +58,8 @@
       "comment": "Comment (optional)",
       "saveComment": "Save comment",
       "delete": "Delete",
+      "count_one": "{{count}} annotation",
+      "count_other": "{{count}} annotations",
       "empty": "No highlights or underlines yet. Select text in the document to add one.",
       "pageHeading": "Page {{page}}",
       "jump": "Go to the {{kind}} on page {{page}}",

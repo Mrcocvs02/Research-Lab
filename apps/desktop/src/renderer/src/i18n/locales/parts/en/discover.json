@@ -193,6 +193,16 @@
       "sum_limits": "Limits",
       "notStated": "not stated in the abstract",
       "showOnMap": "Show on the map"
+    },
+    "reject": {
+      "title": "Why not?",
+      "off-topic": "Not relevant to the topic",
+      "wrong-type": "Wrong type of publication",
+      "wrong-language": "Wrong language",
+      "already-known": "Already known",
+      "other": "Other reason",
+      "otherPlaceholder": "Reason (optional)",
+      "confirm": "Reject"
     }
   }
 }

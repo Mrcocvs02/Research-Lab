@@ -14,9 +14,9 @@ interface Props {
   /** Absent in the list (the name is edited in the project). */
   onRename?: (() => void) | undefined;
   onToggleArchive(): void;
-  /** "Link a .bib file" and "Copy BibTeX" (project page only). */
+  /** "Link a .bib file" and "PRISMA flow diagram…" (project page only). */
   onLinkBib?: (() => void) | undefined;
-  onCopyBib?: (() => void) | undefined;
+  onPrisma?: (() => void) | undefined;
   /** Tooltip of the link entry: what it is linked to and when it was updated. */
   bibTitle?: string | undefined;
   /** "With Claude ✦" (X7): the report of the period (`reportDisabled` says why it cannot be made) and citation suggestions. Project page only. */
@@ -27,22 +27,23 @@ interface Props {
 }
 
 /**
- * The menu of a project (1.1, D-412): "Export…" (second brain and bibliography), then Rename and Archive. Later waves add their
- * entries here (link a .bib file, Claude's report, comparison table, citation suggestions) up to seven in three groups.
+ * The menu of a project (1.1, D-412): "Export…" (second brain and references: BibTeX, RIS, CSL JSON, also to the clipboard), then
+ * Rename and Archive. Later waves add their entries here (link a .bib file, PRISMA diagram, Claude's report, comparison table,
+ * citation suggestions) up to seven in three groups.
  */
-export function ProjectMoreMenu({ archived, testId, label, onExport, onRename, onToggleArchive, onLinkBib, onCopyBib, bibTitle, onReport, reportDisabled, onCite, size = 'md' }: Props) {
+export function ProjectMoreMenu({ archived, testId, label, onExport, onRename, onToggleArchive, onLinkBib, onPrisma, bibTitle, onReport, reportDisabled, onCite, size = 'md' }: Props) {
   const { t } = useTranslation();
   const anchor = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
   const archive: MenuItem = { id: 'archive', testId: archived ? 'project-restore' : 'project-archive', label: archived ? t('projects.restore') : t('projects.archive'), onSelect: onToggleArchive };
   const exportGroup: MenuGroup = { id: 'export', items: [{ id: 'export', testId: 'project-export', label: t('secondBrain.button'), onSelect: onExport }] };
   const bibGroup: MenuGroup | null =
-    onRename && onLinkBib && onCopyBib
+    onRename && onLinkBib && onPrisma
       ? {
           id: 'bib',
           items: [
-            { id: 'copy-bib', testId: 'project-copy-bib', label: t('projects.bib.copy'), onSelect: onCopyBib },
             { id: 'link-bib', testId: 'project-link-bib', label: t('projects.bib.link'), ...(bibTitle ? { title: bibTitle } : {}), onSelect: onLinkBib },
+            { id: 'prisma', testId: 'project-prisma', label: t('prisma.menu'), onSelect: onPrisma },
           ],
         }
       : null;

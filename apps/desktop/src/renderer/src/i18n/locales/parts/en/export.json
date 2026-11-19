@@ -128,6 +128,23 @@
     "errors": {
       "noModel": "The network model is not built yet, so clusters cannot be exported. Build it in the Network section or remove the clusters.",
       "tooMany": "The selection holds too many documents. Narrow it down and try again."
+    },
+    "format": {
+      "label": "What to export",
+      "secondBrain": "A second brain (folder of Markdown)",
+      "bibtex": "References: BibTeX (.bib)",
+      "ris": "References: RIS (.ris)",
+      "csl": "References: CSL JSON (.json)"
+    },
+    "refs": {
+      "intro": "Writes one file with the references of the selection, with the citation keys of Settings › Library. An existing file is never overwritten: the name gets a number.",
+      "file": "File name",
+      "run": "Export references",
+      "done": "{{count}} references written to {{file}}.",
+      "copy": "Copy BibTeX to the clipboard",
+      "copied": "BibTeX references copied to the clipboard ({{count}}).",
+      "copyNote": "Only for a project or for chosen documents.",
+      "choose": "Choose a folder first."
     }
   }
 }

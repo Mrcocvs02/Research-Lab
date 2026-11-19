@@ -46,7 +46,7 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
   const { t } = useTranslation();
   const { openExport, setChatOpen } = useAiUi();
   const citationJob = useCitationJob();
-  const { info, reportError } = useNotify();
+  const { reportError } = useNotify();
   const { navigate } = useNav();
   const { openReader } = useReader();
   const tagAnchor = useRef<HTMLSpanElement>(null);
@@ -84,16 +84,6 @@ export function SelectionBar({ ids, tagEditor, onProject, onPropose, onLiteratur
           ? { id: 'citations', label: t('citations.bulk'), disabled: true, disabledReason: t('citations.alreadyRunning'), onSelect: () => {} }
           : { id: 'citations', label: t('citations.bulk'), onSelect: () => void citationJob.start(ids) },
         { id: 'export', label: t('secondBrain.button'), onSelect: () => openExport({ docIds: ids }) },
-        {
-          id: 'bibtex',
-          testId: 'selection-copy-bib',
-          label: t('library.copyBib'),
-          onSelect: () =>
-            void rl
-              .invoke('bib:copy', { docIds: ids })
-              .then((r) => info(t('library.copiedBib', { count: r.count })))
-              .catch(reportError),
-        },
         tooMany
           ? { id: 'open', label: t('library.openDefault'), disabled: true, disabledReason: t('library.openManyMax', { count: OPEN_MANY_MAX }), onSelect: () => {} }
           : {

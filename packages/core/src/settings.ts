@@ -281,6 +281,9 @@ export const annotationsConfigSchema = z.object({
 });
 export type AnnotationsConfig = z.infer<typeof annotationsConfigSchema>;
 
+export const citeKeySchemaSchema = z.enum(['author-year', 'author-year-title']);
+export type CiteKeySchema = z.infer<typeof citeKeySchemaSchema>;
+
 const mcpFields = { enabled: z.boolean(), writeEnabled: z.boolean() };
 
 export const libraryConfigSchema = z
@@ -296,6 +299,8 @@ export const libraryConfigSchema = z
     scan: scanConfigSchema.prefault({}),
     annotations: annotationsConfigSchema.prefault({}),
     exportPresets: z.array(exportPresetSchema).default([]),
+    /** How a new citation key is built (Z2). Keys a document already has (assigned or imported) are never changed. */
+    citeKeySchema: citeKeySchemaSchema.default('author-year'),
     mcp: z
       .object({
         enabled: mcpFields.enabled.default(false),
@@ -327,6 +332,7 @@ export const libraryConfigPatchSchema = z.object({
   /** `writeToPdfConfirmedAt` is not here: only the consent channel sets it. */
   annotations: annotationsConfigSchema.pick({ writeToPdf: true, author: true, backupLocation: true, colorMeanings: true }).partial().optional(),
   exportPresets: z.array(exportPresetSchema).optional(),
+  citeKeySchema: citeKeySchemaSchema.optional(),
   mcp: z.object({ enabled: mcpFields.enabled.optional(), writeEnabled: mcpFields.writeEnabled.optional() }).optional(),
 });
 export type LibraryConfigPatch = z.infer<typeof libraryConfigPatchSchema>;

@@ -22,7 +22,11 @@
     "library": {
       "excluded": "Excluded folders",
       "excludedHint": "These folders are not scanned or indexed.",
-      "thisOne": "This library"
+      "thisOne": "This library",
+      "citeKey": "Citation keys",
+      "citeKeyHelp": "Used when references are exported or copied. Keys a document already has, assigned or imported, are never changed.",
+      "citeKeyAuthorYear": "Author and year (smith2020)",
+      "citeKeyAuthorYearTitle": "Author, year and a word of the title (smith2020attention)"
     },
     "network": {
       "title": "Online sources",
@@ -132,7 +136,8 @@
       "colorMeanings": "Colour meanings|highlight colours legend names",
       "costThreshold": "Cost preview threshold|tokens dialog estimate send",
       "dailyTokenCap": "Daily token cap|limit day budget tokens",
-      "noteTemplates": "Note templates|template literature placeholders markdown"
+      "noteTemplates": "Note templates|template literature placeholders markdown",
+      "citeKeySchema": "Citation keys|bibtex ris csl references cite key author year"
     },
     "search": {
       "label": "Search settings",

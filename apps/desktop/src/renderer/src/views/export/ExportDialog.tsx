@@ -264,6 +264,12 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
   const [job, setJob] = useState<{ id: string; status: JobStatus | null } | null>(null);
   const [presetId, setPresetId] = useState('');
   const [needDestination, setNeedDestination] = useState(false);
+  // References (Z2): BibTeX, RIS or CSL JSON of the selection to one file, instead of the second-brain folder.
+  const [format, setFormat] = useState<'sb' | 'bibtex' | 'ris' | 'csl'>('sb');
+  const [fileName, setFileName] = useState('references');
+  const [refsBusy, setRefsBusy] = useState(false);
+  const [refsDone, setRefsDone] = useState<string | null>(null);
+  const refs = format !== 'sb';
   const ticket = useRef(0);
   const edit = (patch: Partial<Draft>) => {
     setDraft((d) => ({ ...d, ...patch }));
@@ -278,7 +284,7 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
 
   // The estimate follows the selection and the target (after a short pause while typing).
   useEffect(() => {
-    if (!valid || job) return;
+    if (!valid || job || refs) return;
     const mine = ++ticket.current;
     setEstLoading(true);
     const id = setTimeout(() => {
@@ -306,7 +312,7 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
       );
     }, 250);
     return () => clearTimeout(id);
-  }, [selectionKey, target, valid, job]);
+  }, [selectionKey, target, valid, job, refs]);
 
   const choose = useCallback(async () => {
     setError(null);
@@ -381,6 +387,36 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status?.state]);
 
+  const exportRefs = async () => {
+    if (!dest || format === 'sb') return;
+    setError(null);
+    setRefsDone(null);
+    setRefsBusy(true);
+    try {
+      const r = await rl.invoke('bib:export', { selection: toSelection(draft), format, destination: dest.path, fileName: fileName.trim() || 'references' });
+      setRefsDone(t('secondBrain.refs.done', { count: r.count, file: safeText(r.file) }));
+    } catch (e) {
+      if (destinationGone(e)) {
+        setDest(null);
+        setNeedDestination(true);
+      } else if (conflictReason(e) === 'inside-library') setConflict('inside-library');
+      else setError(e);
+    } finally {
+      setRefsBusy(false);
+    }
+  };
+  // The clipboard copy (BibTeX) is for a project or for chosen documents, as it was in the project menu and the selection bar.
+  const canCopy = valid && draft.folders.length + draft.tagIds.length + draft.clusters.length === 0 && (draft.projectId !== '') !== (draft.docIds.length > 0);
+  const copyBib = async () => {
+    setError(null);
+    try {
+      const r = await rl.invoke('bib:copy', draft.projectId ? { projectId: draft.projectId } : { docIds: draft.docIds });
+      setRefsDone(t('secondBrain.refs.copied', { count: r.count }));
+    } catch (e) {
+      setError(e);
+    }
+  };
+
   const cancel = () => {
     if (job) void rl.invoke('export:cancel', { jobId: job.id }).catch(() => {});
   };
@@ -432,8 +468,14 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
           </div>
         ) : (
           <>
-            <p className="hint">{t('secondBrain.intro')}</p>
-            {past.length > 0 && (
+            <SelectField label={t('secondBrain.format.label')} value={format} onChange={(e) => (setFormat(e.target.value as typeof format), setRefsDone(null), setConflict(null))} data-testid="export-format">
+              <option value="sb">{t('secondBrain.format.secondBrain')}</option>
+              <option value="bibtex">{t('secondBrain.format.bibtex')}</option>
+              <option value="ris">{t('secondBrain.format.ris')}</option>
+              <option value="csl">{t('secondBrain.format.csl')}</option>
+            </SelectField>
+            <p className="hint">{refs ? t('secondBrain.refs.intro') : t('secondBrain.intro')}</p>
+            {!refs && past.length > 0 && (
               <div className="group" data-testid="export-past">
                 <h3>{t('secondBrain.previous.title')}</h3>
                 <p className="hint">{t('secondBrain.previous.hint')}</p>
@@ -480,6 +522,7 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
               )}
             </div>
 
+            {!refs && (
             <div className="group" data-testid="export-options">
               <h3>{t('secondBrain.options.title')}</h3>
               {presets.length > 0 && (
@@ -519,10 +562,11 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
               <CheckField label={t('secondBrain.options.notes')} checked={draft.includeNotes} onChange={(e) => edit({ includeNotes: e.target.checked })} data-testid="export-notes" />
               <CheckField label={t('secondBrain.options.annotations')} checked={draft.includeAnnotations} onChange={(e) => edit({ includeAnnotations: e.target.checked })} data-testid="export-annotations" />
             </div>
+            )}
 
             <div className="group" data-testid="export-destination">
               <h3>{t('secondBrain.destination.title')}</h3>
-              <p className="hint">{t('secondBrain.destination.hint')}</p>
+              {!refs && <p className="hint">{t('secondBrain.destination.hint')}</p>}
               <p>
                 {dest ? (
                   <code data-testid="export-dest-path" title={safeText(`${dest.path}/${folderName.trim()}`)}>
@@ -540,6 +584,9 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
                   {t('secondBrain.destination.pickAgain')}
                 </p>
               )}
+              {refs ? (
+                <TextField label={t('secondBrain.refs.file')} value={fileName} maxLength={100} onChange={(e) => setFileName(e.target.value)} data-testid="export-file-name" />
+              ) : (
               <TextField
                 label={t('secondBrain.destination.folderName')}
                 hint={t('secondBrain.destination.folderNameHint')}
@@ -553,10 +600,16 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
                 onBlur={() => nameOk || setFolderName((n) => sanitizeFolderName(n) || 'second-brain')}
                 data-testid="export-folder-name"
               />
+              )}
             </div>
 
-            {valid && <EstimateBlock est={est} loading={estLoading} error={estError} />}
-            <TargetNote est={est} name={folderName} />
+            {valid && !refs && <EstimateBlock est={est} loading={estLoading} error={estError} />}
+            {!refs && <TargetNote est={est} name={folderName} />}
+            {refsDone && (
+              <p className="callout" role="status" data-testid="export-refs-done">
+                {refsDone}
+              </p>
+            )}
             {conflict && (
               <p className="callout warn" role="alert" data-testid="export-conflict" data-reason={conflict}>
                 {t(`secondBrain.conflict.${KNOWN_CONFLICTS.has(conflict) ? conflict : 'busy'}`)}
@@ -602,7 +655,22 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
             </button>
           </>
         )}
-        {!job && confirm === null && (
+        {!job && refs && (
+          <>
+            <button type="button" onClick={close}>
+              {t('common.close')}
+            </button>
+            {canCopy && (
+              <button type="button" onClick={() => void copyBib()} title={t('secondBrain.refs.copyNote')} data-testid="export-copy-bib">
+                {t('secondBrain.refs.copy')}
+              </button>
+            )}
+            <button type="button" className="primary" disabled={!valid || dest === null || refsBusy || (conflict !== null && KNOWN_CONFLICTS.has(conflict))} onClick={() => void exportRefs()} data-testid="export-refs-run" data-autofocus>
+              {t('secondBrain.refs.run')}
+            </button>
+          </>
+        )}
+        {!job && !refs && confirm === null && (
           <>
             <button type="button" onClick={close}>
               {t('common.cancel')}

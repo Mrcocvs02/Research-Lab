@@ -193,6 +193,16 @@
       "sum_limits": "Limiti",
       "notStated": "non dichiarato nell’abstract",
       "showOnMap": "Mostra sulla mappa"
+    },
+    "reject": {
+      "title": "Perché no?",
+      "off-topic": "Non pertinente al tema",
+      "wrong-type": "Tipo di pubblicazione non adatto",
+      "wrong-language": "Lingua non adatta",
+      "already-known": "Già nota",
+      "other": "Altro motivo",
+      "otherPlaceholder": "Motivo (facoltativo)",
+      "confirm": "Scarta"
     }
   }
 }

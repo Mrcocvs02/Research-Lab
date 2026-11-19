@@ -71,6 +71,8 @@ export const discoverRunSchema = discoverRunSummarySchema.extend({
   items: z.array(discoverCandidateSchema).max(DISCOVER_LIMITS.candidates),
   /** The model that wrote the last "✦ Sintesi", if any. */
   summarizedWith: z.string().nullable(),
+  /** The project an "extend" search started from (its PRISMA counts, D-439). */
+  projectId: itemIdSchema.optional(),
 });
 export type DiscoverRun = z.infer<typeof discoverRunSchema>;
 
@@ -94,7 +96,7 @@ export const discoverChannels = defineChannels('discover', {
   /** The same search again; the candidates not seen before are marked `fresh`. */
   rerun: { request: z.object({ token, id: itemIdSchema }), response: z.object({ run: discoverRunSchema }) },
   cancel: { request: z.object({ token }), response: z.object({ ok: z.literal(true) }) },
-  mark: { request: z.object({ id: itemIdSchema, key: z.string().max(20), state: z.enum(['new', 'later', 'dismissed', 'imported']) }), response: z.object({ ok: z.literal(true) }) },
+  mark: { request: z.object({ id: itemIdSchema, key: z.string().max(20), state: z.enum(['new', 'later', 'dismissed', 'imported']), /** Why a candidate was rejected (a code of the short list, or free text): kept for the PRISMA diagram. */ reason: z.string().trim().max(200).optional() }), response: z.object({ ok: z.literal(true) }) },
   remove: { request: runId, response: z.object({ removed: z.boolean() }) },
   /** Searches older than `days` (90): `dryRun` only counts them, so the dialog can say how many. */
   prune: { request: z.object({ days: z.number().int().min(1).max(3650).default(90), dryRun: z.boolean().default(false) }), response: z.object({ count: z.number().int().nonnegative() }) },

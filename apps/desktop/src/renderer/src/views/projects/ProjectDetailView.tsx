@@ -40,6 +40,7 @@ const AddDocuments = lazyRetry(() => import('./AddDocumentsDialog'));
 const SchemaTab = lazyView(() => import('./SchemaTab'), ['projects']);
 const ReportDialog = lazyView(() => import('./ReportDialog'), ['projects']);
 const CiteDialog = lazyView(() => import('./CiteDialog'), ['projects']);
+const PrismaDialog = lazyView(() => import('./PrismaDialog'), ['projects', 'discover', 'export']);
 const LinkBibDialog = lazyView(() => import('../import/LinkBibDialog'), ['import']);
 
 /** Notes in Markdown: a plain text box, a preview next to it (rendered without any raw HTML), saved on demand or on leaving the box. */
@@ -175,7 +176,7 @@ export function ProjectDetailView({ id }: { id: string }) {
   const [schema, setSchema] = useState<SchemaInfo | null>(null);
   /** The Schema tab was asked for ("Write it now") before there is an outline to show. */
   const [schemaOpen, setSchemaOpen] = useState(false);
-  const [dialog, setDialog] = useState<{ kind: 'report'; open?: string } | { kind: 'cite' } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: 'report'; open?: string } | { kind: 'cite' } | { kind: 'prisma' } | null>(null);
   const detailRef = useRef<ProjectDetail | null>(null);
   /** The ref is what writes read their revision from; it moves with the state, never back to an older render. */
   const setDetail = useCallback((d: ProjectDetail) => {
@@ -287,14 +288,6 @@ export function ProjectDetailView({ id }: { id: string }) {
     const ok = await run(() => rl.invoke('projects:removeMembers', { projectId: id, docIds }));
     if (ok) info(t('projects.removed', { count: docIds.length }));
   };
-  const copyBib = async () => {
-    try {
-      const r = await rl.invoke('bib:copy', { projectId: id });
-      info(t('projects.bib.copied', { count: r.count }));
-    } catch (e) {
-      reportError(e);
-    }
-  };
   const toggleArchive = async () => {
     try {
       await rl.invoke(detailRef.current?.project.status === 'archived' ? 'projects:restore' : 'projects:delete', { id });
@@ -340,7 +333,7 @@ export function ProjectDetailView({ id }: { id: string }) {
         }
       >
         {addButton('primary', 'project-add-docs')}
-        <ProjectMoreMenu archived={archived} testId="project-more" label={t('projects.more')} onExport={() => openExport({ projectId: id, name: p.name })} onRename={() => setRenaming(true)} onReport={() => setDialog({ kind: 'report' })} reportDisabled={hasOutline ? undefined : t('schema.report.needOutline')} onCite={() => setDialog({ kind: 'cite' })} onToggleArchive={() => void toggleArchive()} onLinkBib={() => setLinking(true)} onCopyBib={() => void copyBib()} bibTitle={bib?.linked ? t('projects.bib.linkedTo', { file: bib.file, time: new Date(bib.at ?? 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }) : undefined} />
+        <ProjectMoreMenu archived={archived} testId="project-more" label={t('projects.more')} onExport={() => openExport({ projectId: id, name: p.name })} onRename={() => setRenaming(true)} onReport={() => setDialog({ kind: 'report' })} reportDisabled={hasOutline ? undefined : t('schema.report.needOutline')} onCite={() => setDialog({ kind: 'cite' })} onToggleArchive={() => void toggleArchive()} onLinkBib={() => setLinking(true)} onPrisma={() => setDialog({ kind: 'prisma' })} bibTitle={bib?.linked ? t('projects.bib.linkedTo', { file: bib.file, time: new Date(bib.at ?? 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }) : undefined} />
       </ViewHead>
       <BibBanner projectId={id} status={bib} />
       {linking && (
@@ -487,6 +480,11 @@ export function ProjectDetailView({ id }: { id: string }) {
       {dialog?.kind === 'report' && (
         <Lazy>
           <ReportDialog projectId={id} {...(dialog.open ? { open: dialog.open } : {})} onClose={() => setDialog(null)} onSaved={() => setPushed((n) => n + 1)} />
+        </Lazy>
+      )}
+      {dialog?.kind === 'prisma' && (
+        <Lazy>
+          <PrismaDialog projectId={id} projectName={p.name} onClose={() => setDialog(null)} />
         </Lazy>
       )}
       {dialog?.kind === 'cite' && (

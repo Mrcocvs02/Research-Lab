@@ -2101,7 +2101,8 @@ async function discoverFinal(a: Audit, pdfs: string[], full: boolean): Promise<v
     await w.getByTestId('selection-more').click();
     await w.waitForTimeout(400);
     await a.shot('selection-more-two', 4);
-    await w.getByTestId('selection-bridge').click();
+    await w.getByTestId('selection-links').click();
+    await w.getByTestId('lf-bridge').click();
     await expect(w.getByTestId('discover-searches')).toBeVisible({ timeout: 30_000 });
     await w.waitForTimeout(6000);
     await a.shot('discover-bridge-run', 5);

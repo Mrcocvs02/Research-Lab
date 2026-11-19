@@ -528,25 +528,6 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
               )}
             </div>
 
-              <CheckField label={t('secondBrain.options.cited')} hint={t('secondBrain.options.citedHint')} checked={draft.includeCited} onChange={(e) => edit({ includeCited: e.target.checked })} data-testid="export-cited" />
-              {draft.includeCited && (
-                <SelectField label={t('secondBrain.options.depth')} value={String(draft.citedDepth)} onChange={(e) => edit({ citedDepth: Number(e.target.value) })} data-testid="export-depth">
-                  {[0, 1, 2, 3].map((d) => (
-                    <option key={d} value={d}>
-                      {t('secondBrain.options.depthValue', { count: d })}
-                    </option>
-                  ))}
-                </SelectField>
-              )}
-              <SelectField label={t('secondBrain.options.sources')} hint={t(`secondBrain.options.sourcesHint_${draft.sources}`)} value={draft.sources} onChange={(e) => edit({ sources: e.target.value as Draft['sources'] })} data-testid="export-sources">
-                <option value="none">{t('secondBrain.options.sourcesNone')}</option>
-                <option value="paths">{t('secondBrain.options.sourcesPaths')}</option>
-                <option value="copies">{t('secondBrain.options.sourcesCopies')}</option>
-              </SelectField>
-              <CheckField label={t('secondBrain.options.notes')} checked={draft.includeNotes} onChange={(e) => edit({ includeNotes: e.target.checked })} data-testid="export-notes" />
-              <CheckField label={t('secondBrain.options.annotations')} checked={draft.includeAnnotations} onChange={(e) => edit({ includeAnnotations: e.target.checked })} data-testid="export-annotations" />
-            </div>
-            )}
 
             <div className="group" data-testid="export-destination">
               <h3>{t('secondBrain.destination.title')}</h3>
@@ -609,6 +590,26 @@ export function ExportDialog({ init, onClose }: { init: ExportInit; onClose(): v
                   ))}
                 </SelectField>
               )}
+
+              <CheckField label={t('secondBrain.options.cited')} hint={t('secondBrain.options.citedHint')} checked={draft.includeCited} onChange={(e) => edit({ includeCited: e.target.checked })} data-testid="export-cited" />
+              {draft.includeCited && (
+                <SelectField label={t('secondBrain.options.depth')} value={String(draft.citedDepth)} onChange={(e) => edit({ citedDepth: Number(e.target.value) })} data-testid="export-depth">
+                  {[0, 1, 2, 3].map((d) => (
+                    <option key={d} value={d}>
+                      {t('secondBrain.options.depthValue', { count: d })}
+                    </option>
+                  ))}
+                </SelectField>
+              )}
+              <SelectField label={t('secondBrain.options.sources')} hint={t(`secondBrain.options.sourcesHint_${draft.sources}`)} value={draft.sources} onChange={(e) => edit({ sources: e.target.value as Draft['sources'] })} data-testid="export-sources">
+                <option value="none">{t('secondBrain.options.sourcesNone')}</option>
+                <option value="paths">{t('secondBrain.options.sourcesPaths')}</option>
+                <option value="copies">{t('secondBrain.options.sourcesCopies')}</option>
+              </SelectField>
+              <CheckField label={t('secondBrain.options.notes')} checked={draft.includeNotes} onChange={(e) => edit({ includeNotes: e.target.checked })} data-testid="export-notes" />
+              <CheckField label={t('secondBrain.options.annotations')} checked={draft.includeAnnotations} onChange={(e) => edit({ includeAnnotations: e.target.checked })} data-testid="export-annotations" />
+            </details>
+            )}
 
             {valid && !refs && <EstimateBlock est={est} loading={estLoading} error={estError} />}
             {!refs && <TargetNote est={est} name={folderName} />}

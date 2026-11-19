@@ -259,7 +259,7 @@ export function InboxCard({ item, folders, model, reasoning, models, onItem, onG
           <Button size="sm" disabled={busy} onClick={() => void dismiss()} title={dropped ? t('inbox.dismissDroppedHint') : t('inbox.dismissLibraryHint')} data-testid="inbox-dismiss">
             {t('inbox.dismiss')}
           </Button>
-          <Button variant="primary" size="sm" disabled={!canConfirm} onClick={() => void confirm()} data-testid="inbox-confirm">
+          <Button variant="secondary" size="sm" disabled={!canConfirm} onClick={() => void confirm()} data-testid="inbox-confirm">
             {needsAllow ? t('inbox.addAnyway') : dropped ? t('inbox.confirmAdd') : t('inbox.confirmAccept')}
           </Button>
         </div>

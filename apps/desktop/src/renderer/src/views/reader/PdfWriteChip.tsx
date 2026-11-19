@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Channels, ResponseOf } from '@rl/core';
 import { Button } from '../../components/Button';
 import { Dialog } from '../../components/Dialog';
-import { Lazy, lazyRetry } from '../../components/Lazy';
+import { Lazy, lazyView } from '../../components/Lazy';
 import { useChangeVersion } from '../../lib/events';
 import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
@@ -11,7 +11,7 @@ import { RlError } from '../../lib/rl-error';
 import type { RGroup, RItem } from './ReaderMenu';
 
 // The list of the annotations made by other programs and their import (J5): loaded when the user opens it.
-const ExternalAnnotations = lazyRetry(() => import('./ExternalAnnotations'));
+const ExternalAnnotations = lazyView(() => import('./ExternalAnnotations'), ['reader']);
 
 export type PdfState = ResponseOf<Channels, 'annotations:pdfState'>;
 type Ask = null | 'consent' | 'remove' | 'restore' | 'external';

@@ -183,6 +183,25 @@
       "tokens": "About {{tokens}} input tokens",
       "noPrice": "cost not estimated",
       "cost": "estimated cost {{usd}}"
+    },
+    "tool": {
+      "search_library": "Library search",
+      "get_document": "Opening a document",
+      "read_pages": "Reading pages",
+      "list_notes": "Listing notes",
+      "read_note": "Reading a note",
+      "write_ai_field": "Proposing a field",
+      "failed": "It did not work.",
+      "details": "Technical details",
+      "aDoc": "a document",
+      "result": {
+        "search_library": "Documents found: {{count}}",
+        "get_document": "Opened “{{doc}}”",
+        "read_pages": "Read pages of “{{doc}}”",
+        "list_notes": "Listed the notes of “{{doc}}”",
+        "read_note": "Read a note of “{{doc}}”",
+        "write_ai_field": "Wrote a proposal for “{{doc}}”: you decide it in To review."
+      }
     }
   },
   "status": {
@@ -408,7 +427,31 @@
   },
   "reader": {
     "annotationsLimit": "This document already has the most highlights it can hold ({{limit}}).",
-    "annotationsSize": "The highlights of this document take up too much space to add more. Delete some first."
+    "annotationsSize": "The highlights of this document take up too much space to add more. Delete some first.",
+    "cost": {
+      "title": "Send to Claude?",
+      "titleFor": "{{name}}: send to Claude?",
+      "ready": "Ready, nothing sent",
+      "inButton": "≈ {{tokens}} tokens · {{model}}",
+      "today": "Today: {{pct}} % of the cap used",
+      "requests_one": "{{count}} request",
+      "requests_other": "{{count}} requests",
+      "tokens": "≈ {{tokens}} tokens",
+      "noPrice": "no price for this model",
+      "usd": "≈ {{usd}}",
+      "first": "This is the first time the text of this folder is sent to Claude.",
+      "over": "This send is larger than {{threshold}} tokens, your threshold for asking first.",
+      "cap": "The daily limit is reached: nothing is sent. Choose less text or a cheaper model.",
+      "send": "Send to {{model}}",
+      "model": "Model"
+    },
+    "colors": {
+      "yellow": "Yellow",
+      "green": "Green",
+      "blue": "Blue",
+      "pink": "Pink",
+      "orange": "Orange"
+    }
   },
   "inbox": {
     "badge_one": "{{count}} file in the inbox",
@@ -467,7 +510,16 @@
     "idle": "Nothing running",
     "attention_one": "{{count}} to check",
     "attention_other": "{{count}} to check",
-    "see": "See in Activity"
+    "see": "See in Activity",
+    "chip": {
+      "progress": "Running {{pct}}%",
+      "scanning": "Running",
+      "ready": "Up to date",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "proposals": "Proposals {{done}}/{{total}}",
+      "citations": "Citations {{done}}/{{total}}"
+    }
   },
   "resume": {
     "banner": "The reader closed while you were reading {{title}}{{where}}.",

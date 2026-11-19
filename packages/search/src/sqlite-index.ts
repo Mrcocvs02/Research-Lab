@@ -120,7 +120,7 @@ function buildWhere(f: SearchFilters | undefined, t: TextFilters | undefined): W
   }
   if (f?.docIds !== undefined) {
     // One JSON parameter: a topic can hold thousands of documents, more than a statement has placeholders for.
-    cond.push('d.id IN (SELECT value FROM json_each(?))');
+    cond.push('d.doc_id IN (SELECT value FROM json_each(?))');
     params.push(JSON.stringify(f.docIds));
   }
   const from = Math.max(f?.yearFrom ?? -Infinity, t?.yearFrom ?? -Infinity);

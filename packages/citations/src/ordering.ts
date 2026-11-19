@@ -40,7 +40,7 @@ function mentionPatterns(l: CitationLink): RegExp | null {
   const first = lastName(l.authors[0]);
   if (!first || first.length < 2 || !l.year) return null;
   const surname = first.replace(/[^\p{L}\p{N} ]/gu, '').split(' ').join('\\s+');
-  return new RegExp(`\\b${surname}\\b[^.\\n]{0,60}?\\(?\\b${l.year}[a-z]?\\b`, 'giu');
+  return new RegExp(`\\b${surname}\\b(?:[^.\\n]|\\bet\\s+al\\.){0,60}?\\(?\\b${l.year}[a-z]?\\b`, 'giu');
 }
 
 const tokens = (t: string) => new Set(titleKey(t).split(' ').filter((w) => w.length > 3));

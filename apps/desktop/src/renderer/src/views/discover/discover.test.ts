@@ -78,7 +78,8 @@ describe('Discover: tabs and the network', () => {
     await mount(memoryCitations(), { 'documents:ids': () => ({ total: 2, ids: ['d1', 'd2'] }) });
     expect(callsTo('citations:refreshMany')).toEqual([]);
     fireEvent.click(screen.getByTestId('discover-more'));
-    expect(screen.getAllByRole('menuitem')).toHaveLength(1);
+    // The refresh and the removal of old items (pruneOld) are the entries of the menu.
+    expect(screen.getAllByRole('menuitem')).toHaveLength(2);
     fireEvent.click(screen.getByTestId('discover-refresh'));
     await waitFor(() => expect(callsTo('citations:refreshMany')).toEqual([{ docIds: ['d1', 'd2'] }]));
   });

@@ -91,7 +91,8 @@ describe('McpSection', () => {
     expect(problem.textContent).toContain('Another program is using port 45678');
     expect(screen.getByTestId('mcp-state').textContent).toBe('Not running');
     const port = screen.getByTestId('mcp-port') as HTMLInputElement;
-    expect(port.value).toBe('45678');
+    // The field takes the port in use in an effect after the status renders.
+    await waitFor(() => expect(port.value).toBe('45678'));
     expect((screen.getByTestId('mcp-port-apply') as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(port, { target: { value: '80' } });
     expect(screen.getByText(/whole number between 1024 and 65535/)).toBeTruthy();

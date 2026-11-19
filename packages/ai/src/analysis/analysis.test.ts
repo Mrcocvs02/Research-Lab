@@ -25,7 +25,7 @@ describe('closure', () => {
     expect(w['synthesis']!.origin).toBe('ai');
     expect(w['circuits']).toMatchObject({ origin: 'ancestor', weight: 0.7 });
     expect(w['quantum']!.weight).toBeCloseTo(0.49, 2);
-    expect(w['physics']!.weight).toBeCloseTo(0.343, 2);
+    expect(w['physics']!.weight).toBeCloseTo(0.35, 2); // via info (0.5 x 0.7) beats via synthesis (0.343): the maximum is kept
     expect(r[0]!.id).toBe('synthesis');
   });
   it('survives a cycle', () => {

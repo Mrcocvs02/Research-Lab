@@ -28,6 +28,8 @@ const ROWS_6_2 = [
   'mcp.enabled', 'mcp.writeEnabled', 'mcp.port', 'mcp.copy', 'mcp.rotateToken', 'mcp.log',
   'backup.destination', 'backup.auto', 'backup.keep', 'backup.includeLocal', 'backup:create', 'restore', 'backup.list', 'shortcuts[]', 'maintenance', 'limits',
   'annotations.writeToPdf', 'annotations.author', 'annotations.backupLocation', 'annotations.copies', 'pdfMode',
+  // Added after the map: the cite-key schema (Z2) and the monthly token cap (the Claude Code account).
+  'citeKeySchema', 'ai.tokenCap.monthlyTokens', 'ai:tokenUsage',
   ...HIDDEN_ROWS,
   ...PENDING_ROWS,
 ];

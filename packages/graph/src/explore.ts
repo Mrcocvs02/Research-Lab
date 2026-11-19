@@ -96,7 +96,10 @@ export const NO_ALIASES: AuthorAliases = { merge: {}, split: [] };
 export function resolveAuthor(name: string, aliases: AuthorAliases = NO_ALIASES): string {
   const k = authorKey(name);
   if (k === '') return '';
-  const split = aliases.split.includes(k) ? `${k}|${fold(name)}` : k;
+  // "Surname, Given" and "Given Surname" are one written form once reordered.
+  const comma = name.indexOf(',');
+  const form = fold(comma >= 0 ? `${name.slice(comma + 1)} ${name.slice(0, comma)}` : name);
+  const split = aliases.split.includes(k) ? `${k}|${form}` : k;
   return Object.hasOwn(aliases.merge, split) ? (aliases.merge[split] as string) : split;
 }
 

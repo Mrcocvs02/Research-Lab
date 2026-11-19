@@ -187,9 +187,10 @@ describe('cap and top-k', () => {
     const star: EntityEdge[] = Array.from({ length: 20 }, (_, i) => ({ a: 'hub', b: `n${i}`, w: (i + 1) / 40, n: i }));
     // Every leaf has one edge and keeps it: nothing is lost.
     expect(topEdges(star, 0)).toHaveLength(20);
-    // With a heavier ring edge per leaf, the hub's own edges are wanted by nobody once each node keeps one.
+    // With a heavier ring edge per leaf and one edge kept per node, the leaves want their ring edges: only the hub's own heaviest edge survives.
     const ring: EntityEdge[] = Array.from({ length: 20 }, (_, i) => ({ a: `n${i}`, b: `n${(i + 1) % 20}`, w: 1, n: 1 }));
-    expect(topEdges([...star, ...ring], 0, 1).filter((e) => e.a === 'hub')).toHaveLength(0);
+    const hub = topEdges([...star, ...ring], 0, 1).filter((e) => e.a === 'hub');
+    expect(hub.map((e) => e.b)).toEqual(['n19']);
     expect(topEdges(star, 0.3).every((e) => e.w >= 0.3)).toBe(true);
   });
 

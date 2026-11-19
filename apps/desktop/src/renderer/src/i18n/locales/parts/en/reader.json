@@ -43,13 +43,6 @@
       "underline": "Underline",
       "area": "Crop"
     },
-    "colors": {
-      "yellow": "Yellow",
-      "green": "Green",
-      "blue": "Blue",
-      "pink": "Pink",
-      "orange": "Orange"
-    },
     "ann": {
       "newLabel": "Highlight or underline the selected text",
       "editLabel": "Change this annotation",
@@ -265,23 +258,6 @@
       "cropNoText": "Write a caption to explain this crop",
       "whatSelection": "The selected text and the paragraph around it.",
       "whatCrop": "The caption of the crop, the text in it and the text around it."
-    },
-    "cost": {
-      "title": "Send to Claude?",
-      "titleFor": "{{name}}: send to Claude?",
-      "ready": "Ready, nothing sent",
-      "inButton": "≈ {{tokens}} tokens · {{model}}",
-      "today": "Today: {{pct}} % of the cap used",
-      "requests_one": "{{count}} request",
-      "requests_other": "{{count}} requests",
-      "tokens": "≈ {{tokens}} tokens",
-      "noPrice": "no price for this model",
-      "usd": "≈ {{usd}}",
-      "first": "This is the first time the text of this folder is sent to Claude.",
-      "over": "This send is larger than {{threshold}} tokens, your threshold for asking first.",
-      "cap": "The daily limit is reached: nothing is sent. Choose less text or a cheaper model.",
-      "send": "Send to {{model}}",
-      "model": "Model"
     },
     "colorMeaning": {
       "tip": "{{color}}: {{meaning}}",

@@ -12,15 +12,6 @@
     "scanSummary": "+{{added}} nuovi · {{changed}} cambiati · {{missing}} mancanti",
     "scanRunning": "Una scansione è già in corso",
     "needsLibrary": "Apri prima una libreria",
-    "seeReport": "Vedi il rapporto",
-    "chip": {
-      "progress": "In corso {{pct}} %",
-      "scanning": "In corso",
-      "ready": "Aggiornata",
-      "failed": "Non riuscita",
-      "cancelled": "Annullata",
-      "proposals": "Proposte {{done}}/{{total}}",
-      "citations": "Citazioni {{done}}/{{total}}"
-    }
+    "seeReport": "Vedi il rapporto"
   }
 }

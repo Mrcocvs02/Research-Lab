@@ -226,7 +226,8 @@ describe('Search', () => {
   it('finds a setting by a synonym and opens its section with the focus on the control', async () => {
     setup();
     fireEvent.change(await screen.findByTestId('settings-search'), { target: { value: 'budget' } });
-    const hit = await screen.findByTestId('settings-result');
+    // Several settings talk about a budget (the token caps too): the money cap is the closest and comes first.
+    const hit = (await screen.findAllByTestId('settings-result'))[0]!;
     expect(hit.getAttribute('data-entry')).toBe('monthlyCap');
     expect(hit.textContent).toContain('Claude › Model and spending');
     fireEvent.click(hit);

@@ -537,7 +537,7 @@ describe('command palette', () => {
     const palette = await screen.findByTestId('command-palette');
     const ids = () => within(palette).getAllByTestId('palette-item').map((i) => i.getAttribute('data-command'));
     // Without text: the go-to group, then the actions (3.4); no commands for Claude, no documents.
-    expect(ids()).toEqual(['app-goLibrary', 'app-goReview', 'app-goProjects', 'app-goDiscover', 'app-goMap', 'app-goSettings', 'app-openActivity', 'app-scanNow', 'app-backupNow', 'app-addPdf', 'app-newLibrary', 'app-undo', 'app-redo', 'app-theme', 'app-switchLanguage', 'app-openGuide', 'app-showShortcuts']);
+    expect(ids()).toEqual(['app-goLibrary', 'app-goReview', 'app-goProjects', 'app-goDiscover', 'app-goMap', 'app-goSettings', 'app-openActivity', 'app-scanNow', 'app-backupNow', 'app-addPdf', 'app-addFromId', 'app-addResource', 'app-newLibrary', 'app-undo', 'app-redo', 'app-theme', 'app-switchLanguage', 'app-openGuide', 'app-showShortcuts']);
     expect(within(palette).getAllByRole('listbox')[0]!.querySelectorAll('.palette-group')).toHaveLength(2);
     type('describe');
     const items = within(palette).getAllByTestId('palette-item');
@@ -553,8 +553,8 @@ describe('command palette', () => {
     setup({ palette: true, commands: [{ id: 'mine', label: 'My own command', prompt: 'Do my thing' }] });
     await ready();
     const box = await screen.findByTestId('palette-input');
-    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(17));
-    fireEvent.change(box, { target: { value: 'own' } });
+    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(19));
+    fireEvent.change(box, { target: { value: 'my own' } });
     await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(1));
     const only = screen.getAllByTestId('palette-item');
     expect(only[0]!.textContent).toContain('My own command');
@@ -617,6 +617,8 @@ describe('chat: a turn running while the view changes (review 13)', () => {
     expect(screen.getByTestId('chat-busy-other')).toBeTruthy();
     fireEvent.click(screen.getByTestId('chat-more'));
     expect(((await screen.findByTestId('chat-new')) as HTMLElement).getAttribute('aria-disabled')).toBeNull();
+    fireEvent.click(screen.getByTestId('chat-more')); // close the menu again: moreItem opens it
+    await waitFor(() => expect(screen.queryByTestId('chat-new')).toBeNull());
     act(() => ai.emit('conv-1', 'turn-1', { type: 'text-delta', text: 'Part two' }));
     expect(screen.queryByText(/Part two/)).toBeNull();
     // Sending from here is refused with a clear message, nothing is added to the view.

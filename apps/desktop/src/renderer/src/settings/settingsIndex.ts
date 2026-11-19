@@ -117,7 +117,7 @@ export function entryText(entry: SettingsEntry, t: T): { label: string; synonyms
 export function searchSettings(query: string, t: T, limit = 8): SettingsMatch[] {
   const words = fold(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
-  const scored: Array<SettingsMatch & { score: number }> = [];
+  const scored: Array<SettingsMatch & { score: number; length: number }> = [];
   for (const entry of SETTINGS_ENTRIES) {
     const { label, synonyms } = entryText(entry, t);
     const section = t(`settings.sec.${entry.section}`);
@@ -126,7 +126,8 @@ export function searchSettings(query: string, t: T, limit = 8): SettingsMatch[] 
     if (!words.every((w) => hay.includes(w))) continue;
     const l = fold(label);
     const score = words.every((w) => l.startsWith(w) || l.includes(` ${w}`)) ? 0 : words.every((w) => l.includes(w)) ? 1 : 2;
-    scored.push({ entry, label, where: `${section} › ${group}`, score });
+    scored.push({ entry, label, where: `${section} › ${group}`, score, length: label.length });
   }
-  return scored.sort((a, b) => a.score - b.score).slice(0, limit).map(({ score: _s, ...m }) => m);
+  // Closer matches first; among equals the shorter label ("Monthly cap" before "Monthly token cap").
+  return scored.sort((a, b) => a.score - b.score || a.length - b.length).slice(0, limit).map(({ score: _s, length: _l, ...m }) => m);
 }

@@ -52,9 +52,10 @@ export function YearBars({ years, range }: { years: readonly number[]; range?: r
 
 /**
  * The card that follows a hovered node (§4.20): `--surface`, `--e-2`, `--r-md`, 280 px, kept inside the view. It does not catch
- * the pointer. The caller shows it after the pointer rested 150 ms (see `useRestingHover`).
+ * the pointer, unless it is `live` (a card with a menu): then it takes the pointer, and `onEnter` / `onLeave` keep it open while
+ * the pointer is on it. The caller shows it after the pointer rested 150 ms (see `useRestingHover`).
  */
-export function HoverCard({ x, y, width, height, testId, children }: { x: number; y: number; width: number; height: number; testId: string; children: ReactNode }) {
+export function HoverCard({ x, y, width, height, testId, children, live }: { x: number; y: number; width: number; height: number; testId: string; children: ReactNode; live?: { label: string; onEnter(): void; onLeave(): void } }) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 280, h: 90 });
   useEffect(() => {
@@ -67,23 +68,32 @@ export function HoverCard({ x, y, width, height, testId, children }: { x: number
   const left = Math.max(4, Math.min(x + 14, width - size.w - 4));
   const top = Math.max(4, Math.min(y + 14, height - size.h - 4));
   return (
-    <div ref={ref} className="hovercard" role="tooltip" style={{ left, top }} data-testid={testId}>
+    <div ref={ref} className={live ? 'hovercard hc-live' : 'hovercard'} role={live ? 'group' : 'tooltip'} aria-label={live?.label} style={{ left, top }} data-testid={testId} onPointerEnter={live?.onEnter} onPointerLeave={live?.onLeave}>
       {children}
     </div>
   );
 }
 
-/** Hover that settles: `set(h)` shows `h` after 150 ms of rest, and `set(null)` hides at once. */
-export function useRestingHover<T>(ms = 150): [T | null, (h: T | null) => void] {
+/**
+ * Hover that settles: `set(h)` shows `h` after 150 ms of rest, and `set(null)` hides at once (after `grace` ms when a card with
+ * a menu has to be reachable: `hold(true)` while the pointer is on the card cancels that, `hold(false)` hides it).
+ */
+export function useRestingHover<T>(ms = 150, grace = 0): [T | null, (h: T | null) => void, (on: boolean) => void] {
   const [shown, setShown] = useState<T | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   const set = (h: T | null) => {
     clearTimeout(timer.current);
-    if (h === null) setShown(null);
-    else timer.current = setTimeout(() => setShown(h), ms);
+    if (h === null) {
+      if (grace > 0) timer.current = setTimeout(() => setShown(null), grace);
+      else setShown(null);
+    } else timer.current = setTimeout(() => setShown(h), ms);
   };
-  return [shown, set];
+  const hold = (on: boolean) => {
+    clearTimeout(timer.current);
+    if (!on) setShown(null);
+  };
+  return [shown, set, hold];
 }
 
 /** The card of a document: title (two lines), authors and year, the topic. */

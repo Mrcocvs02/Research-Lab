@@ -163,7 +163,8 @@
       "doc": "{{title}}, {{topic}}"
     },
     "card": {
-      "topic": "Topic: {{topic}}"
+      "topic": "Topic: {{topic}}",
+      "actions": "Document actions"
     },
     "minimap": "Show the minimap",
     "minimapLabel": "Minimap: drag the rectangle to move the view",
@@ -272,7 +273,19 @@
       "related": {
         "author": "Related authors",
         "topic": "Related topics"
-      }
+      },
+      "sizeBy": "Size by",
+      "sizeBy_docs": "Documents",
+      "sizeBy_links": "Links",
+      "sizeBy_equal": "All the same",
+      "sharedThemes": "Show shared themes",
+      "cutHint": "beyond the limit",
+      "cutShown": "Shown without its links: it is beyond the {{limit}} nodes the network can carry."
+    },
+    "bridge": {
+      "find": "Find a bridge…",
+      "pickSecond": "Click the second document for a bridge with “{{title}}”",
+      "note": "Bridge: {{a}} ⇢ work ⇢ {{b}}"
     }
   }
 }

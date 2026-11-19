@@ -18,10 +18,10 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 ## 2. Aggiornato
 
 - Data: 2026-11-19.
-- HEAD di codice su `main`: `2cce6b4` (budget per le ondate 9-10, pubblicato). Ultimo merge su `main`: `c20886d` (X3). Il commit di documentazione di questo aggiornamento viene dopo `2cce6b4`.
-- Branch uniti e pubblicati: `h0`, `r0`, `s1`, `s2`, `w1-contracts`, `a1`, `b1`, `c2`, `a2`, `audit2`, `r2`, `fix-real`, `f4`, `tokcap`, `d3`, `g4b`, `e3`, `g4a`, `m4`, `g4c`, `n4`, `h5`, `i5`, `j5`, `t1`, `x1`, `x2`, `x4`, `slim`, `x3`.
-- In corso, ondata 9, nessun merge ancora: `x5` (worktree `C:\dev\rl-wt\x5`) e `x6` (worktree `C:\dev\rl-wt\x6`). Lo stato dei due subagent non è registrato in questo file: verificarlo con `git status` e `git log` nei due worktree prima di riprendere.
-- Worktree ancora su disco sotto `C:\dev\rl-wt` (circa 35 vecchi): tutti rimuovibili tranne `x5` e `x6`. Non cancellare mai una junction `node_modules`.
+- HEAD di codice su `main`: `dabc8b7` (w12, pubblicato). Ultimo merge su `main`: `dabc8b7` (w12). Il commit di documentazione di questo aggiornamento viene dopo `dabc8b7`.
+- Branch uniti e pubblicati: `h0`, `r0`, `s1`, `s2`, `w1-contracts`, `a1`, `b1`, `c2`, `a2`, `audit2`, `r2`, `fix-real`, `f4`, `tokcap`, `d3`, `g4b`, `e3`, `g4a`, `m4`, `g4c`, `n4`, `h5`, `i5`, `j5`, `t1`, `x1`, `x2`, `x4`, `slim`, `x3`, `x5`, `x6`, `mapfix`, `x7`, `x8`, `w12`.
+- Ondate 9, 10 e 12 unite; nessun lavoro di ondata in corso. Verifica finale in corso (sezione 5).
+- Worktree ancora su disco sotto `C:\dev\rl-wt` (circa 35 vecchi): tutti rimuovibili, inclusi `x5` e `x6` ora uniti. Non cancellare mai una junction `node_modules`.
 - Tag: `phase-0`..`phase-3`, `phase-6`, `phase-7` pubblicati; `phase-4`, `phase-5`, `phase-8` senza tag.
 - Installer di rilascio costruito prima della riprogettazione (131 MB, non firmato): da rifare dopo le ondate.
 
@@ -81,16 +81,14 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 
 ## 5. Stato e prossimi passi
 
-In corso, ondata 9 (avviata dopo `2cce6b4`): X5 (lettura affiancata, schede di citazione, evidenziazioni della guida) in un subagent Sonnet, worktree `C:\dev\rl-wt\x5`, branch `x5`; X6 (motore di scoperta: Estendi la bibliografia, ricerca profonda, Trova un ponte) in un subagent Sonnet, worktree `C:\dev\rl-wt\x6`, branch `x6`. Briefs in `docs/design/ARCHITETTURA-UI.md`, sezione "Onda 9". Nessun merge ancora. Verificare lo stato dei due worktree prima di riprendere (sezione 2).
+Ondate 9, 10 e 12 unite su `main` a `dabc8b7` (X5, X6, mapfix, X7, X8, w12). Verifica finale in corso.
 
 Passi, in ordine:
-1. Onda 9 (in corso): X5 ∥ X6, poi merge su `main` (solo typecheck, build, check:budget, check:generality).
-2. Onda 10: X7 (contorno del progetto, evidenze e suggerimenti di citazione) ∥ X8 (tabella di confronto, gruppi di ricerca, contesto delle citazioni, cronologia).
+1. Verifica finale, una sola volta (D-443): Y1 audit visivo (Opus); revisione indipendente e di sicurezza di G4a, G4b, G4c, J5, X4 e scrittura dei `.bib`; correzioni; test completi, quelli pesanti uno alla volta.
+2. Y2: budget e suite completa. Nessun test di w12 è stato scritto: aggiungerli qui.
 3. Lacune di M4 e revisione a vista della coppia di design (D-379): trascinamento dell'etichetta di un tema e dei punti in un tema aperto; contorni e colore dei temi in modalità documenti; ⋯ "Dimensione per" e "Mostra temi in comune"; "Vai a" per i nodi tagliati dal limite di 800; "ultimo letto" come documento di partenza; volo reale di 300 ms tra le modalità (ora la simulazione si assesta dai centroidi del Panorama); probe di fps pesanti (solo con `RL_HEAVY_TESTS=1`).
-4. Ondata 11: Y1 (designer avversario) e Y2 (budget e suite completa).
-5. Ondata 12: funzioni confermate (PRISMA, D-439; copia BibTeX/RIS, D-436; funzione 49), solo dopo conferma dell'utente.
-6. Verifica finale, una sola volta: revisione indipendente e revisione di sicurezza dedicata a G4a, G4b, G4c e X4; correzioni; poi attivare `PDF_WRITE_ENABLED`; tutti i test, quelli pesanti uno alla volta, con RAM libera controllata (sezione 4). Punti da verificare: l'elenco completo è in sezione 4 (G4a, G4c, N4, M4, H5, J5, I5, T1, ondate 7-8).
-7. Fase 8: prova di installazione fatta dall'agente (installazione silenziosa in cartella temporanea, avvio, disinstallazione, controllo dei dati, con le impostazioni dell'account dell'utente salvate e ripristinate prima). Poi tag `phase-8` e versione 1.0.0 (D-262).
+4. Funzione 49 (Z1, manoscritto ↔ fonti): solo dopo conferma dell'utente. PDF_WRITE_ENABLED si attiva solo dopo la revisione di sicurezza (punto 1); i punti da verificare sono in sezione 4 (G4a, G4c, N4, M4, H5, J5, I5, T1, ondate 7-8).
+5. Fase 8: prova di installazione fatta dall'agente (installazione silenziosa in cartella temporanea, avvio, disinstallazione, controllo dei dati, con le impostazioni dell'account dell'utente salvate e ripristinate prima). Poi tag `phase-8` e versione 1.0.0 (D-262).
 
 Stima data all'utente: 6–9 ore di lavoro degli agenti, più le pause per il limite d'uso. La verifica finale è il blocco più grande e meno certo.
 
@@ -133,7 +131,7 @@ Non bloccanti: decidere quanto possibile e registrare.
 
 - Confermati dall'utente (D-448): accento Petrolio; nessun nome autore nelle annotazioni PDF; copia di sicurezza nella cartella dati sincronizzata; Esc non chiude il lettore. Tag pesati e senza limite di numero (D-447).
 - Ancora provvisorio: nell'Account Claude il consumo del mese mostra la libreria attiva (totale di tutte le librerie al clic).
-- Funzione 49 generalizzata oltre la tesi: confermare (D-399, D-422).
+- Funzione 49 (Z1, manoscritto ↔ fonti): non implementata; attende la conferma dell'utente (D-399, D-422). Non blocca la verifica finale.
 - Funzione 26 (operatori di ricerca): da decidere.
 - Fase 4, criteri su dati reali (poi tag `phase-4`):
   - 5 paper campione con almeno l'80% dei tag accettati (lavoro AI con Claude vero e revisione);

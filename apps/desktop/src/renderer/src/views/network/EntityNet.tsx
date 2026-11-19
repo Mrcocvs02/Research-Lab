@@ -14,8 +14,10 @@ import { assignKeyTints, haloSprite, mix, readableColor, readTheme, withAlpha, t
 import { controlPoint, edgeAlpha, fillTapered, MAX_CURVED } from './edges';
 import { authorKey, fetchEntityNetwork } from './entityData';
 import { layoutAnchors, nodeRadius } from './entityLayout';
+import { beginModeFlight, stepModeFlight, type ModeFlight } from './modeFlight';
 import type { EntityMode, EntityNetwork, EntityNode } from './entityTypes';
-import { MAX_NET_NODES, Network, type NetNode, type RawEdge, type RawNode } from './forceSim';
+import { degrees, missingMatches, sizedRadius, SIZE_BY, themeEdges, type SizeBy } from './entityExtras';
+import { MAX_NET_NODES, Network, type EdgeKind, type NetNode, type RawEdge, type RawNode } from './forceSim';
 import { boundsOf, toScreenX, toScreenY, type Bounds } from './geometry';
 import { HoverCard, useRestingHover, YearBars } from './HoverCard';
 import { convexHull, centroidOf, hullShape, type Pt } from './hulls';
@@ -87,6 +89,10 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
   const [drilled, setDrilled] = useState(0);
   const [pathKeys, setPathKeys] = useState<string[] | null>(null);
   const [focusKey, setFocusKey] = useState<string | null>(null);
+  const [sizeBy, setSizeBy] = useState<SizeBy>('docs');
+  const [themes, setThemes] = useState(false);
+  const flight = useRef<ModeFlight | null>(null);
+  const facets = useRef<{ key: string; tags: Array<{ id: string; label: string; count: number }>; authors: Array<{ id: string; label: string; count: number }> } | null>(null);
   const theme = useRef<MapTheme | null>(null);
   const tintOf = useRef(new Map<string, string>());
   const keyTints = useRef(new Map<string, number>());
@@ -189,7 +195,7 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
         }
       }
       // Edges: curved and tapered below 3000, straight lines above.
-      const visible: Array<{ a: NetNode; b: NetNode; w: number; implies: boolean }> = [];
+      const visible: Array<{ a: NetNode; b: NetNode; w: number; implies: boolean; theme: boolean }> = [];
       for (const e of net.edges) {
         const a = net.nodes.get(e.a);
         const b = net.nodes.get(e.b);
@@ -199,7 +205,7 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
         const bx = sx(b.x);
         const by = sy(b.y);
         if ((ax < -50 && bx < -50) || (ay < -50 && by < -50) || (ax > w + 50 && bx > w + 50) || (ay > h + 50 && by > h + 50)) continue;
-        visible.push({ a, b, w: e.weight, implies: e.kind === 'implies' });
+        visible.push({ a, b, w: e.weight, implies: e.kind === 'implies', theme: e.kind === 'theme' });
       }
       const curved = visible.length <= MAX_CURVED;
       const onPath = new Set<string>();
@@ -213,10 +219,10 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
         const dim = lit !== null && !incident ? 0.35 : focusSet && !(focusSet.has(e.a.key) && focusSet.has(e.b.key)) ? 0.12 : 1;
         const onP = onPath.has(`${e.a.key}|${e.b.key}`);
         const base = mix(colorOf(e.a, th), th.muted, 0.5);
-        if (e.implies) {
-          ctx.setLineDash([5, 4]);
+        if (e.implies || e.theme) {
+          ctx.setLineDash(e.theme ? [2, 4] : [5, 4]);
           ctx.strokeStyle = base;
-          ctx.globalAlpha = 0.3 * dim;
+          ctx.globalAlpha = (e.theme ? 0.22 : 0.3) * dim;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(ax, ay);
@@ -371,8 +377,16 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
     },
     bounds: getBounds,
     maxFit: () => 40 / 14,
-    tick: () => net.tick() && net.heat > 0,
+    tick: () => {
+      const f = flight.current;
+      if (f) {
+        if (stepModeFlight(net, f, performance.now())) return true;
+        flight.current = null;
+      }
+      return net.tick() && net.heat > 0;
+    },
     dragStart(n, wx, wy) {
+      flight.current = null;
       n.pinned = true;
       n.x = wx;
       n.y = wy;
@@ -530,7 +544,15 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reqKey, mapReady]);
 
-  function show(d: EntityNetwork): void {
+  /** Radii of the nodes for the chosen measure (documents, links or equal). */
+  function applySize(by: SizeBy, d: EntityNetwork | null = data): void {
+    if (!d) return;
+    const deg = degrees(d.edges);
+    const maxLinks = Math.max(1, ...deg.values());
+    for (const n of net.nodes.values()) if (n.entity) n.r = sizedRadius(by, n.entity.count, deg.get(n.entity.id) ?? 0, maxCount.current, maxLinks);
+  }
+
+  function show(d: EntityNetwork, fly = true): void {
     setData(d);
     onData?.(d);
     levelOf.current.clear();
@@ -540,8 +562,13 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
     const pos = layoutAnchors(d.nodes, centroids.current);
     const raws: RawNode[] = d.nodes.map((n) => ({ kind: 'entity', id: n.id, label: n.label, count: n.count, x: pos.get(n.id)!.x, y: pos.get(n.id)!.y, entity: n, group: n.group || undefined, r: nodeRadius(n.count, maxCount.current) }));
     for (const n of d.nodes) levelOf.current.set(`entity:${n.id}`, level);
-    net.load(raws, d.edges.map((e) => ({ a: `entity:${e.a}`, b: `entity:${e.b}`, kind: e.implies ? ('implies' as const) : ('link' as const), weight: e.w })), prevMode.current === mode && count > 0 ? 0.3 : 0.6);
+    const links: Array<{ a: string; b: string; kind: EdgeKind; weight: number }> = d.edges.map((e) => ({ a: `entity:${e.a}`, b: `entity:${e.b}`, kind: e.implies ? 'implies' : 'link', weight: e.w }));
+    if (themes && mode === 'author') for (const e of themeEdges(d.nodes, d.edges)) links.push({ a: `entity:${e.a}`, b: `entity:${e.b}`, kind: 'theme', weight: e.w });
+    const first = prevMode.current !== mode;
+    net.load(raws, links, !first && count > 0 ? 0.3 : 0.6);
     prevMode.current = mode;
+    applySize(sizeBy, d);
+    flight.current = null;
     setCount(net.size);
     setDrilled(0);
     setPathKeys(null);
@@ -550,8 +577,56 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
     setCursor(null);
     setNote(null);
     if (reducedMotion()) settle();
+    else if (first && fly && net.size > 0) {
+      // The nodes fly from their places in the Panorama to where the layout settles (300 ms); the camera is fitted to the end.
+      const f = beginModeFlight(net, performance.now());
+      view.fit(false);
+      stepModeFlight(net, f, f.last);
+      flight.current = f;
+      return view.requestDraw();
+    }
     view.fit(false);
     view.requestDraw();
+  }
+
+  // "Show shared themes" adds or removes light edges without loading again; "Size by" only changes the radii.
+  const themesSeen = useRef(themes);
+  useEffect(() => {
+    if (themesSeen.current === themes) return;
+    themesSeen.current = themes;
+    if (data) show(data, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [themes]);
+  useEffect(() => {
+    applySize(sizeBy);
+    view.requestDraw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sizeBy]);
+
+  /** Entities the network left out (the cap of 800) that match the text: tags from the facets, authors from the facets. */
+  async function cutMatches(text: string): Promise<Array<{ id: string; label: string; count: number }>> {
+    if (mode === 'topic') return [];
+    const key = `${lib}|${docsVersion}|${taxVersion}`;
+    if (facets.current?.key !== key) {
+      const f = await rl.invoke('search:facets', { text: '' });
+      facets.current = {
+        key,
+        tags: f.tags.map((b) => ({ id: b.value, label: b.label ?? b.value, count: b.count })),
+        authors: f.authors.map((b) => ({ id: `author:${authorKey(b.value)}`, label: b.value, count: b.count })),
+      };
+    }
+    const present = new Set([...net.nodes.values()].filter((n) => n.kind === 'entity').map((n) => n.id));
+    return missingMatches(mode === 'tag' ? facets.current.tags : facets.current.authors, present, text);
+  }
+
+  /** Brings an entity from beyond the cap into the network, alone (its links are not known), and flies to it. */
+  function addCut(c: { id: string; label: string; count: number }): void {
+    const entity: EntityNode = { id: c.id, label: c.label, count: c.count, years: Array.from({ length: 10 }, () => 0), colorKey: '', group: '' };
+    const n = net.seed({ kind: 'entity', id: c.id, label: c.label, count: c.count, entity, r: nodeRadius(c.count, maxCount.current) });
+    setCount(net.size);
+    setNote(t('network.ent.cutShown', { limit: MAX_NET_NODES }));
+    view.flyTo(n.x, n.y, Math.max(view.view.current.k, 1.6));
+    pick(n);
   }
 
   const ascend = () => {
@@ -693,11 +768,15 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
           testId="ent-search"
           label={t('network.search.go')}
           placeholder={t('network.search.goEntity', { kind: kindName })}
-          suggest={(q) => {
+          suggest={async (q) => {
             const f = q.toLowerCase();
-            return [...net.nodes.values()].filter((n) => n.kind === 'entity' && n.label.toLowerCase().includes(f)).sort((a, b) => (b.count ?? 0) - (a.count ?? 0)).map((n) => ({ id: n.key, label: n.label, hint: String(n.count ?? '') }));
+            const own = [...net.nodes.values()].filter((n) => n.kind === 'entity' && n.label.toLowerCase().includes(f)).sort((a, b) => (b.count ?? 0) - (a.count ?? 0)).map((n) => ({ id: n.key, label: n.label, hint: String(n.count ?? '') }));
+            if (!data?.truncated || own.length >= 8) return own;
+            const cut = await cutMatches(q).catch(() => []);
+            return [...own, ...cut.map((c) => ({ id: `cut:${JSON.stringify(c)}`, label: c.label, hint: `${c.count} · ${t('network.ent.cutHint')}` }))];
           }}
           onPick={(it) => {
+            if (it.id.startsWith('cut:')) return addCut(JSON.parse(it.id.slice(4)));
             const n = nodeAt(it.id);
             if (!n) return;
             view.flyTo(n.x, n.y, Math.max(view.view.current.k, 1.6));
@@ -764,6 +843,22 @@ export function EntityNet({ mode, scopes, selectedId, onSelect, onSelectDoc, onE
                 <input type="checkbox" checked={mini} onChange={(e) => setMini(e.target.checked)} data-testid="ent-minimap-toggle" />
                 {t('network.minimap')}
               </label>
+              <label className="net-field">
+                <span>{t('network.ent.sizeBy')}</span>
+                <select value={sizeBy} onChange={(e) => setSizeBy(e.target.value as SizeBy)} data-testid="ent-size-by">
+                  {SIZE_BY.map((s) => (
+                    <option key={s} value={s}>
+                      {t(`network.ent.sizeBy_${s}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {mode === 'author' && (
+                <label className="check-inline">
+                  <input type="checkbox" checked={themes} onChange={(e) => setThemes(e.target.checked)} data-testid="ent-themes-toggle" />
+                  {t('network.ent.sharedThemes')}
+                </label>
+              )}
               <button
                 type="button"
                 className="link"

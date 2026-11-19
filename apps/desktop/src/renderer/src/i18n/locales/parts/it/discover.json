@@ -191,7 +191,8 @@
       "sum_results": "Risultati",
       "sum_data": "Dati",
       "sum_limits": "Limiti",
-      "notStated": "non dichiarato nell’abstract"
+      "notStated": "non dichiarato nell’abstract",
+      "showOnMap": "Mostra sulla mappa"
     }
   }
 }

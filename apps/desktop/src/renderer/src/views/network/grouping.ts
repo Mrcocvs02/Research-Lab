@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { rl } from '../../lib/rl';
-import { OTHER_CLUSTER_ID, type AreaDef, type AreaTriples } from './areaColors';
+import { OTHER_CLUSTER_ID, mainArea, type AreaDef, type AreaTriples } from './areaColors';
 import type { PreparedMap } from './mapModel';
 
 /**
@@ -111,7 +111,32 @@ export function withFamilyShares(map: PreparedMap, fam: FamilyShares): PreparedM
     az[i] = it.az ?? 0;
     withArea++;
   }
-  return { ...map, areas: fam.areas, ar, az, withArea };
+  const out = { ...map, areas: fam.areas, ar, az, withArea };
+  return nameByFamily(out);
+}
+
+/**
+ * One naming source while a family is on (D-491): each cluster of the map is called after the area of the family that holds most of its
+ * points, so the canvas labels and the legend say the same thing. Clusters whose points have no area keep their own terms.
+ */
+export function nameByFamily(map: PreparedMap): PreparedMap {
+  const levels = map.levels.map((list, L) => {
+    const g = map.groups[L];
+    if (!g) return list;
+    return list.map((c, s) => {
+      const count = new Map<number, number>();
+      for (let j = g.starts[s]!; j < g.starts[s + 1]!; j++) {
+        const a = mainArea(map.ar[g.order[j]!]);
+        if (a >= 0) count.set(a, (count.get(a) ?? 0) + 1);
+      }
+      let best = -1;
+      let q = 0;
+      for (const [a, n] of count) if (n > q || (n === q && a < best)) [best, q] = [a, n];
+      const label = best >= 0 ? map.areas[best]?.label : undefined;
+      return label ? { ...c, famLabel: label } : c;
+    });
+  });
+  return { ...map, levels, clusterById: new Map(levels.flat().map((c) => [c.id, c])) };
 }
 
 /** Sets the shares of document nodes from `graph:family` items; documents without an item lose theirs (they go to the "none" block). */

@@ -115,3 +115,21 @@ describe('warm start and grouped physics', () => {
     expect(mid.x).toBeLessThan(Math.max(cx(0), cx(1)));
   });
 });
+
+describe('one name per cluster while a family is on (D-491)', () => {
+  it('calls each map cluster after the family area that holds most of its points', async () => {
+    const { nameByFamily } = await import('./grouping');
+    const mk = (id: string) => ({ id, topTerms: ['x', 'y'], centroid: { x: 0, y: 0 } }) as never;
+    const map = {
+      n: 4,
+      levels: [[mk('c0'), mk('c1'), mk('c2')]],
+      groups: [{ order: new Uint32Array([0, 1, 2, 3]), starts: new Uint32Array([0, 2, 4, 4, 4]) }],
+      areas: [def('Alpha'), def('Beta')],
+      ar: [[[0, -1, 100]], [[0, -1, 60], [1, -1, 40]], [[1, -1, 100]], undefined],
+      clusterById: new Map(),
+    } as never as Parameters<typeof nameByFamily>[0];
+    const r = nameByFamily(map);
+    expect(r.levels[0]!.map((c) => c.famLabel)).toEqual(['Alpha', 'Beta', undefined]);
+    expect(r.clusterById.get('c1')?.famLabel).toBe('Beta');
+  });
+});

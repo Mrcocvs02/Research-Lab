@@ -31,6 +31,8 @@ const token = (slot: number): string => `var(--area-${slot < AREA_TINTS ? slot +
 export function AreaLegend({ defs, slots, without, onLight, onIsolate, title }: Props) {
   const { t } = useTranslation();
   const [iso, setIso] = useState<number | null>(null);
+  // The legend sits over the drawing: it can be folded to its title (D-491), a per-viewer convenience.
+  const [open, setOpen] = useLocalFlag('rl.map.legendOpen', true);
   useEffect(() => {
     if (iso === null) return;
     const key = (e: KeyboardEvent) => {
@@ -71,22 +73,28 @@ export function AreaLegend({ defs, slots, without, onLight, onIsolate, title }: 
   );
   return (
     <ul className="legend area-legend" data-testid="area-legend" aria-label={title ?? t('network.area.areaLegend')}>
-      <li className="legend-title hint">{title ?? t('network.area.areaLegend')}</li>
-      {shown.map(({ d, i }) => row(d, i, 'area-item', d.color ?? token(slots[i]!)))}
-      {rest.length > 0 && (
+      <li className="legend-title hint">
+        <button type="button" className="legend-fold" aria-expanded={open} onClick={() => setOpen(!open)} title={open ? t('network.area.legendHide') : t('network.area.legendShow')} data-testid="area-legend-fold">
+          <span aria-hidden="true">{open ? '▾' : '▸'}</span> {title ?? t('network.area.areaLegend')}
+        </button>
+      </li>
+      {open && shown.map(({ d, i }) => row(d, i, 'area-item', d.color ?? token(slots[i]!)))}
+      {open && rest.length > 0 && (
         <li className="hint legend-more" data-testid="area-other" title={rest.map(({ d }) => safeText(d.label)).join(', ')}>
           <span className="rl-swatch area-dot" style={{ background: token(OTHER) }} aria-hidden="true" /> {t('network.area.areaOther', { count: rest.length })}
         </li>
       )}
-      {without > 0 && (
+      {open && without > 0 && (
         <li className="hint legend-more" data-testid="area-none">
           <span className="rl-swatch area-dot area-ring" aria-hidden="true" /> {t('network.area.areaNone')}
         </li>
       )}
+      {open && (
       <li className="legend-key hint" aria-hidden="false">
         <span className="area-strip" aria-hidden="true" />
         <span>{t('network.area.areaKey')}</span>
       </li>
+      )}
     </ul>
   );
 }

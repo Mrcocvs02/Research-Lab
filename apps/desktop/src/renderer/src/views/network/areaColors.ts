@@ -70,14 +70,18 @@ export function saveAreaMemo(memo: Record<string, number>): void {
   }
 }
 
-/** Chroma factor k = 0.2 + 0.8 u (0.55 + 0.45 z): full for a node central in one area, faint between areas or with weak tags. */
+/**
+ * Chroma factor k = 0.3 + 0.7 u' (0.6 + 0.4 z), with u' = 1 - (1 - u)^2: full for a node central in one area, fainter (never below 0.3, so still
+ * readable) between areas. The concave u' makes a dominant area win more clearly when most papers sit in two or three areas (D-491).
+ */
 export function chromaFactor(ar: AreaTriples, az: number): number {
   const kept = ar.filter((t) => (t[2] ?? 0) > 0);
-  if (kept.length === 0) return 0.2;
+  if (kept.length === 0) return 0.3;
   const pi = Math.max(...kept.map((t) => t[2]! / 100));
   const K = kept.filter((t) => t[2]! >= 10).length;
   const u = K <= 1 ? 1 : (pi - 1 / K) / (1 - 1 / K);
-  return 0.2 + 0.8 * Math.max(0, Math.min(1, u)) * (0.55 + 0.45 * Math.max(0, Math.min(1, az / 100)));
+  const v = 1 - (1 - Math.max(0, Math.min(1, u))) ** 2;
+  return 0.3 + 0.7 * v * (0.6 + 0.4 * Math.max(0, Math.min(1, az / 100)));
 }
 
 /** The area (index) with the biggest share, or -1. */
@@ -94,14 +98,15 @@ export const shareIn = (ar: AreaTriples | undefined, area: number): number => ((
 /** `#rrggbb` for the shares, or null for a node without area. `tokens` are the nine `--area-*` colours of the theme. */
 export function mixAreaColor(ar: AreaTriples | undefined, az: number, slots: readonly number[], tokens: readonly string[]): string | null {
   if (!ar || ar.length === 0) return null;
-  const total = ar.reduce((s, t) => s + (t[2] ?? 0), 0);
+  // The hue follows the squares of the shares: the dominant area pulls the colour, a small one only tilts it.
+  const total = ar.reduce((s, t) => s + (t[2] ?? 0) ** 2, 0);
   if (total <= 0) return null;
   let L = 0;
   let a = 0;
   let b = 0;
   let C = 0;
   for (const t of ar) {
-    const p = t[2]! / total;
+    const p = t[2]! ** 2 / total;
     const [l0, a0, b0] = toOklab(tokens[slots[t[0]!] ?? OTHER] ?? tokens[OTHER]!);
     const rot = ((ROTATION[t[1]!] ?? 0) * Math.PI) / 180;
     const c0 = Math.hypot(a0, b0);

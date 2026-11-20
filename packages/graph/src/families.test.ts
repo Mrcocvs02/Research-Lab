@@ -186,3 +186,29 @@ describe('vocabLinks', () => {
     expect(vocabLinks(papers).filter((l) => l.a === 'h' || l.b === 'h').length).toBe(2);
   });
 });
+
+describe('the main value fixed by hand (D-521)', () => {
+  const both = (pin?: string | null) => Object.assign([{ v: 'a', w: 1 }, { v: 'b', w: 0.4 }], { pin });
+  it('wins over the weight and over the specificity while it is one of the values of the paper', () => {
+    expect(mainValue(both())).toBe('a');
+    expect(mainValue(both('b'))).toBe('b');
+    // The explicit argument works too, and beats the property.
+    expect(mainValue([{ v: 'a', w: 1 }, { v: 'b', w: 0.4 }], undefined, 'b')).toBe('b');
+    expect(mainValue(both('b'), undefined, 'a')).toBe('a');
+    const spec = new Map([['a', 0.15], ['b', 2]]);
+    expect(mainValue(both('a'), spec)).toBe('a');
+  });
+  it('an expired fixed value (its tag was taken off, so the value is not among the paper values) is ignored', () => {
+    expect(mainValue(both('gone'))).toBe('a');
+    expect(mainValue(both(null))).toBe('a');
+  });
+  it('a paper with a fixed value is clear, whatever its shares', () => {
+    const two = () => Array.from({ length: 4 }, () => [{ v: 'a', w: 1 }, { v: 'b', w: 1 }]);
+    expect(familyEligibility(two(), 4).clarity).toBe(0);
+    const fixed = two().map((l) => Object.assign(l, { pin: 'b' }));
+    expect(familyEligibility(fixed, 4).clarity).toBe(1);
+    // A fixed value that is no longer one of the values does not make the paper clear.
+    const stale = two().map((l) => Object.assign(l, { pin: 'gone' }));
+    expect(familyEligibility(stale, 4).clarity).toBe(0);
+  });
+});

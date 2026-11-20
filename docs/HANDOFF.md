@@ -9,7 +9,7 @@ Stato di passaggio per riprendere il lavoro. Prima di fare qualunque cosa, legge
 1. `CLAUDE.md` (regole di lavoro, modelli per compito, commit, comandi);
 2. `docs/STATUS.md` (fase, onda, fatto, in corso, bloccato, prossimo);
 3. `docs/HANDOFF.md` (questo file);
-4. `docs/DECISIONS.md` (le ultime voci: D-476..D-491);
+4. `docs/DECISIONS.md` (le ultime voci: D-492..D-510);
 5. `docs/design/ARCHITETTURA-UI.md` §14 e §14.1 (ondate di implementazione e funzioni nuove);
 6. `docs/HISTORY.md` (facoltativo: cronologia).
 
@@ -17,12 +17,12 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 
 ## 2. Aggiornato
 
-- Data: 2026-11-19.
-- HEAD di codice su `main`: `c2ce253` (ondata 13, pubblicato). Il commit di documentazione di questo aggiornamento viene dopo `c2ce253`.
-- Branch dell'ondata 13 uniti. Ondate 1–13 unite. Nessun lavoro di ondata in corso. Fase 8 completa con tag `phase-8`.
+- Data: 2026-11-20.
+- HEAD: vedi `git log`. Ondate 1–13 unite su `main` a `c2ce253`. L'aggiornamento di documentazione dell'onda 14 è sul ramo `docs14`.
+- Onda 14 (dopo la 1.0) fatta; nessun lavoro di ondata in corso. Fase 8 completa con tag `phase-8`.
 - Worktree vecchi ancora su disco: rimuovibili. Non cancellare mai una junction `node_modules`.
 - Tag: `phase-0`..`phase-3`, `phase-6`, `phase-7`, `phase-8` pubblicati; `phase-4`, `phase-5` senza tag.
-- Installer di prova della fase 8 (116 MB, senza eseguibile di Claude): da rifare per la versione 1.0.0.
+- Installer di prova della fase 8 (116 MB, senza eseguibile di Claude): da rifare per la versione 1.1.0.
 
 ## 3. Cosa è successo in questa sessione
 
@@ -49,11 +49,19 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
   - X3 unita (`x3`, merge `c20886d`): note di letteratura, modelli, LaTeX, collegamenti per identificatore.
 - Budget: `88e9ca1` (tetti del main per le ondate rimanenti), `2cce6b4` (totali per le ondate 9-10), `renderer.chunkCapsKB` (D-465). Numeri in sezione 5.
 - Ondata 13 unita (D-477..D-491): gap di X7, X8, w12; funzione 49 (Z1a–Z1c) fatta; Mappa K1, L1, K2; gruppi di ricerca come tag `grp:` (D-488); "Raggruppa per" con famiglie (D-489); audit su copia di dati reali (D-490); famiglie di tag (D-491). Budget non più vincolanti (D-487).
+- Onda 14, dopo la 1.0 (D-492..D-510). Feedback dell'utente: rete illeggibile, schede della libreria illeggibili, multi-selezione che mostrava tutto, Sorprendimi con collegamenti noti, Discover con classici banali; priorità alla qualità dei tag. Fatto:
+  - Sorprendimi e Discover (D-492), con "Includi classici" spento di default.
+  - Diagnosi su dati reali (audit "Diagnosi rete e libreria (post 1.0)"); design §19 (D-493..D-501).
+  - Vocabolario controllato con alias, quasi-duplicati, controlli di salute, pulizia guidata in 6 passi con "Annulla tutto" (D-504), provenienza mano/AI/import, import e tagging AI legati al vocabolario.
+  - Mappa su carta con archi di evidenza, vicinato, percorso, Indietro/Avanti, vista Vocabolario, apertura per Automatica (D-510); schede in verticale; multi-selezione solo sui condivisi.
+  - Verifiche dell'auditor Opus su dati reali (D-505..D-509): 0 fusioni errate, 25/25 titoli a 1280 e 1920.
+  - Tetti di budget alzati (D-501..D-503); valori in `CLAUDE.md`.
 - Revisioni e test rimandati alla verifica finale (D-443).
 
 ## 4. Test: eseguiti
 
 - **Verifica finale (D-443), su `main` a `6d2018e`:** unitari 2708 passati, 1 instabile (`export.test.ts` "cancelled or failed", passa da solo); e2e uno alla volta 40 su 42 verdi, con `qa-budget` `firstContentMs` instabile (534, 604 contro 530, non alzato); heavy tutti verdi (6 file unitari, `qa-search-perf`, `security-hostile-scan`). Le sezioni seguenti descrivono lo stato prima di questa verifica e restano come storia dei punti di revisione.
+- Onda 14: unitari 3005/3005; heavy verdi; e2e verdi tranne `qa-budget` `firstContentMs` (instabile, noto).
 - Ondata 13: unitari ed e2e verdi tranne `qa-budget` `firstContentMs` (instabile, noto); heavy verdi.
 - Prima della verifica finale, dal D-443 nessun test era stato eseguito (anche i test scritti in G4a, G4c, N4 e nelle ondate 7-8, vedi sotto). Durante le ondate si eseguono solo `npm run typecheck`, `npm run build`, `npm run check:budget` e `npm run check:generality`. I task scrivono i test ma non li eseguono.
 - Ultimi test noti, su `main` dopo H0 (2026-11-18): unitari 1707 passati, 12 saltati, 1 fallimento instabile in `McpSection.test.ts` (PORT_IN_USE con poca RAM; passa 17/17 da solo); e2e `reader-geometry` 4/4, `study-ui` 1/1, `smoke` 4/4.
@@ -83,15 +91,22 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 
 ## 5. Stato e prossimi passi
 
-Ondate 1–13 unite su `main` a `c2ce253`. Fase 8 completa con tag `phase-8`. `PDF_WRITE_ENABLED` è acceso (D-473); nei test e2e di sviluppo resta spento salvo `RL_E2E_PDF_WRITE=1`.
+Ondate 1–13 unite su `main` a `c2ce253`; onda 14 (dopo la 1.0) fatta. Fase 8 completa con tag `phase-8`. `PDF_WRITE_ENABLED` è acceso (D-473); nei test e2e di sviluppo resta spento salvo `RL_E2E_PDF_WRITE=1`.
 
 Passi, in ordine:
-1. Installer finale: rifare `npm run dist` con la versione finale, senza eseguibile di Claude Code (D-474).
-2. Versione 1.0.0 (D-262), sul commit `14a19e0` del ramo `p8`.
-3. Tag `v1.0.0`.
-4. Dopo 1.0: feedback dell'utente sui miglioramenti (D-475).
+1. Versione 1.1.0.
+2. Installer: rifare `npm run dist` con la versione 1.1.0, senza eseguibile di Claude Code (D-474).
+3. Tag `v1.1.0`.
 
-Piccole lacune note, da chiudere dopo 1.0 con il feedback (non bloccano la 1.0): Rinomina sulla scheda del tema (manca un canale di rinomina del tema); voce in Cronologia per i collegamenti aggiunti; "✦ Suggerisci famiglie" (serve un nuovo prompt AI); il selettore delle famiglie di tag aggiunge un tag alla volta.
+Lacune note dopo l'onda 14 (da chiudere con il feedback, non bloccano la 1.1.0):
+- Duplicati: concetti duplicati risolti ~12 su 18 sulla libreria reale (obiettivo 90%).
+- Topic chiarisce il 52% dei blocchi: macro-aree generiche e piccole dell'utente. L'utente può unirle; Automatica è il default (D-510).
+- Selettore delle famiglie di tag: aggiunge un tag alla volta.
+- "✦ Suggerisci famiglie" (serve un nuovo prompt AI).
+- Rinomina sulla scheda del tema (manca un canale di rinomina del tema).
+- Cronologia per annullare i collegamenti aggiunti.
+- Dimensioni delle schede S/M/L.
+- Stato di studio in batch.
 
 Lasciti per task (non ancora fatti):
 - X1: scelta BibTeX in "Esporta…"; voce nella tavolozza; avanzamento nel chip Attività.

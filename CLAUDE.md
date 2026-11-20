@@ -45,9 +45,9 @@ Configurata in `.claude/settings.local.json` (non versionato) della cartella di 
 
 ## Compact instructions
 Quando compatti il contesto conserva, in quest'ordine:
-- fase e onda correnti (fase 8 completa con tag `phase-8`; ondate 1–13 unite; restano installer finale, versione 1.0.0 e tag `v1.0.0`), ultimo commit su `main` (`c2ce253`) e tag di fase già creati (`phase-0`..`phase-3`, `phase-6`, `phase-7`, `phase-8`; `phase-4`, `phase-5` senza tag; poi `v1.0.0`);
+- fase e onda correnti (fase 8 completa con tag `phase-8`; versione 1.0 rilasciata; onda 14 dopo la 1.0 fatta, D-492..D-510; restano versione 1.1.0, installer e tag `v1.1.0`), ultimo commit su `main` (`c2ce253`) e tag di fase già creati (`phase-0`..`phase-3`, `phase-6`, `phase-7`, `phase-8`; `phase-4`, `phase-5` senza tag);
 - nessun subagent in corso e nessun ramo non unito; funzione 49 fatta (Z1a–Z1c, D-478..D-485);
-- piccole lacune note dopo 1.0 (in `docs/HANDOFF.md`, sezione 5);
+- lacune note dopo l'onda 14 (in `docs/HANDOFF.md`, sezione 5);
 - preferenze dell'utente: subagent Sonnet per logica, interfacce, revisioni e sicurezza; Haiku per il lavoro meccanico (worktree, controlli, docs di stato, traduzioni); coppia Opus solo per il design; al massimo 2 subagent insieme; test solo alla fine, quelli pesanti uno alla volta; niente coautore Claude nei commit, identità locale, push a ogni passo; nessuna domanda bloccante; app leggera ma senza togliere funzioni utili;
 - decisioni prese nella sessione ma non ancora scritte in `docs/DECISIONS.md`.
 Tralascia l'output completo di test, diff e log: restano in git e nei file `docs/`.

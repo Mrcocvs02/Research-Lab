@@ -68,7 +68,7 @@ test('shell with a library: sidebar order and Alt+1..5, Back/Forward, Activity c
   try {
   const w = lib.window;
   const order = await w.locator('nav[aria-label] [data-testid^="nav-"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
-  expect(order).toEqual(['nav-library', 'nav-review', 'nav-projects', 'nav-discover', 'nav-map']);
+  expect(order).toEqual(['nav-library', 'nav-review', 'nav-projects', 'nav-discover', 'nav-map', 'nav-tags']);
   const current = () => w.locator('[data-testid^="nav-"][aria-current="page"]').getAttribute('data-testid');
   await w.keyboard.press('Alt+2');
   await expect.poll(current).toBe('nav-review');

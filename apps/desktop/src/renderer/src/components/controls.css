@@ -594,7 +594,7 @@ button.rl-chip__remove:focus-visible {
   background: transparent;
   transition: background 120ms;
 }
-.rl-resize:hover::after,
+.rl-resize:not(.is-disabled):hover::after,
 .rl-resize:focus-visible::after {
   background: var(--accent);
 }

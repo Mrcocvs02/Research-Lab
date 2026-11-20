@@ -59,3 +59,29 @@ export function chainOf(a: string, steps: ReadonlyArray<{ a: string; b: string }
   }
   return out;
 }
+
+/** What the two buttons of the neighbourhood offer: do the step, undo it once done, or nothing (disabled). */
+export interface RingState {
+  /** Papers in ring 1. */
+  ring1: number;
+  /** "+8" was done. */
+  more: boolean;
+  /** "Widen" was done. */
+  wide: boolean;
+  /** Ring 1 could still grow. */
+  canMore: boolean;
+  /** Nodes on screen. */
+  size: number;
+  busy: boolean;
+  empty: boolean;
+}
+export type RingAction = 'do' | 'undo' | 'off';
+export function ringControls(s: RingState): { more: RingAction; widen: RingAction } {
+  if (s.busy || s.empty) return { more: 'off', widen: 'off' };
+  return {
+    more: s.more ? 'undo' : s.canMore ? 'do' : 'off',
+    widen: s.wide ? 'undo' : s.ring1 === 0 || s.size >= VICINITY_MAX_NODES ? 'off' : 'do',
+  };
+}
+/** The flags of the rings open, for the history (`''`, `m`, `w`, `mw`). */
+export const ringFlags = (s: Pick<RingState, 'more' | 'wide'>): string => (s.more ? 'm' : '') + (s.wide ? 'w' : '');

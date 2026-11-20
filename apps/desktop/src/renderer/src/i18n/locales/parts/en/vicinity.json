@@ -9,6 +9,8 @@
     "focus": "Neighbourhood",
     "more": "Show {{count}} more",
     "widen": "Widen",
+    "fewer": "Show {{count}} fewer",
+    "narrow": "Narrow",
     "nothingNew": "Nothing new around these papers.",
     "capped": "The neighbourhood holds at most {{count}} papers.",
     "none": "No paper with enough evidence around this one.",

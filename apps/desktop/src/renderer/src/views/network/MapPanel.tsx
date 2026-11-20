@@ -19,7 +19,7 @@ import { safeText } from '../library/safeText';
 import { Segmented } from '../../components/Segmented';
 import { AreaLegend, useAreaColors } from './AreaLegend';
 import { setLibraryIntent } from '../../lib/libraryIntent';
-import { clearShare, GroupBy, NameFamilyButton, NameFamilyDialog } from './GroupBy';
+import { GroupBy, NameFamilyButton, NameFamilyDialog } from './GroupBy';
 import { buildBlockView, type FamilyResponse } from './blocksDraw';
 import { filterKinds, type EdgeMode, type EvEdge, type EvFilter } from './edges';
 import { MapSide, MapStrip, useWide, type EvidenceControls, type SideBlock, type Strictness } from './MapSide';
@@ -133,9 +133,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const stage = useRef<HTMLDivElement>(null);
   const aspect = useAspect(stage, !!rawMap && rawMap.n >= 3);
-  const offer = families.find((f) => f.id === family);
-  const [autoFor, setAutoFor] = useState<string | null>(null);
-  const effective = freeMode ? null : offer?.eligible === false || autoFor === family ? 'auto' : family;
+  const effective = freeMode ? null : family;
   const [fam, setFam] = useState<FamilyResponse | null>(null);
   useEffect(() => {
     if (!usable || !effective || aspect === null || !rawMap) return;
@@ -143,8 +141,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     rl.invoke('graph:family', { family: effective, ...(scope ? { scope } : {}), aspect }).then(
       (r) => {
         if (!live) return;
-        if (r.eligible === false && effective !== 'auto') setAutoFor(effective);
-        else setFam(r);
+        setFam(r);
       },
       () => live && setFam(null),
     );
@@ -230,7 +227,6 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const chrome = useContext(ChromeCtx);
   const { info } = useNotify();
   const [hint, dismissHint] = useHint(active && !!map && map.n >= 3);
-  const [topicNoteSeen, setTopicNoteSeen] = useLocalFlag('rl.map.topicNote', false);
   const [legendFor, setLegendFor] = useState<{ id: string; text: string } | null>(null);
   const legendAnchor = useRef<HTMLElement | null>(null);
   const topics = map?.levels[0]?.length ?? 0;
@@ -280,16 +276,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const shownCount = allow && map ? [...allow].filter((id) => map.indexOf.has(id)).length : 0;
   let pill: React.ReactNode = null;
   if (map && !tooFew) {
-    if (family === 'topic' && offer?.eligible === false && !topicNoteSeen) {
-      pill = (
-        <Pill testId="map-group-fallback" onClose={() => setTopicNoteSeen(true)}>
-          {t('network.blocks.topicNote', { pct: clearShare(offer) })}{' '}
-          <button type="button" className="link" onClick={tidyTags}>
-            {t('network.area.tidyTags')}
-          </button>
-        </Pill>
-      );
-    } else if (bridge) {
+    if (bridge) {
       pill = (
         <Pill testId="map-bridge-note" onClose={() => setBridge(null)}>
           {t('network.bridge.note', { a: safeText(bridge.nodes[0].title), b: safeText(bridge.nodes[2].title) })}
@@ -389,7 +376,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     <div className="net-tab map-tab" data-testid="map-panel">
       {stripNaming && !wide && <NameFamilyDialog scope={scope} onClose={() => setStripNaming(false)} />}
       <RowPortal active={active}>
-        <GroupBy families={families} scope={scope} withNone nameInBar={wide} />
+        <GroupBy families={families} scope={scope} withNone nameInBar={wide} onTidy={tidyTags} />
         <NodeSearch
           testId="map-search"
           label={t('network.search.go')}

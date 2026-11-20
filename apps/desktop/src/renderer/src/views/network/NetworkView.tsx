@@ -21,7 +21,8 @@ import type { NetStart } from './GraphNet';
 import { LinksPanel } from './LinksPanel';
 import { MapPanel } from './MapPanel';
 import { staleLine } from './mapStatus';
-import { canBack, canForward, crumbs as crumbsOf, currentNav, emptyNav, pushNav, stepBack, stepForward, type NavStack, type NavState } from './navStack';
+import { canBack, canForward, crumbs as crumbsOf, currentNav, emptyNav, pushNav, sameState, stepBack, stepForward, type NavStack, type NavState } from './navStack';
+import type { Loc } from './exploreNav';
 import { ChromeCtx, HeadMore, MapIllustration } from './NetChrome';
 import { PathChain, type Strictness } from './PathChain';
 import { useFamily } from './grouping';
@@ -144,6 +145,19 @@ export function NetworkView() {
   // The Back / Forward stack common to the Map and the Neighbourhood (50 states).
   const [navStack, setNavStack] = useState<NavStack>(emptyNav);
   const restored = useRef<NavState | null>(null);
+  // Where Explore is and which rings of the neighbourhood are open: states of their sections, so Back stays inside them.
+  const [exLoc, setExLoc] = useState<Loc | null>(null);
+  const [exRestore, setExRestore] = useState<{ loc: Loc; nonce: number } | undefined>(undefined);
+  const [rings, setRings] = useState('');
+  const ringGuard = useRef<{ target: string; timer: number } | null>(null);
+  const onRings = (flags: string) => {
+    setRings(flags);
+    const g = ringGuard.current;
+    if (g && g.target === flags) {
+      window.clearTimeout(g.timer);
+      ringGuard.current = null;
+    }
+  };
 
   const startPath = (a: string, b: string) => {
     setPathFrom(null);
@@ -188,14 +202,16 @@ export function NetworkView() {
     setEntity(null);
   };
 
-  const navState: NavState = { tab, family, doc, center: start?.id ?? null, path: path ? [path.a, path.b] : null };
+  const navState: NavState = { tab, family, doc, center: start?.id ?? null, path: path ? [path.a, path.b] : null, ex: exLoc ?? undefined, rings };
   useEffect(() => {
     const r = restored.current;
     restored.current = null;
-    if (r && r.tab === navState.tab && r.family === navState.family && r.doc === navState.doc && r.path?.[0] === navState.path?.[0] && r.path?.[1] === navState.path?.[1] && (r.center === null || r.center === navState.center)) return;
+    // While the rings of a restored state open one after the other, the steps on the way are not new states.
+    if (ringGuard.current) return;
+    if (r && sameState({ ...r, center: r.center ?? navState.center, ex: r.ex ?? navState.ex }, navState)) return;
     setNavStack((cur) => pushNav(cur, navState));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, family, doc, start?.id, path?.a, path?.b]);
+  }, [tab, family, doc, start?.id, path?.a, path?.b, exLoc?.dim, exLoc?.parentId, exLoc?.selected, rings]);
   /** Goes to the state the stack points at: the tab, the family, the selection, the centre and the path come back together. */
   const goTo = (next: NavStack) => {
     const st = currentNav(next);
@@ -208,7 +224,16 @@ export function NetworkView() {
     if (st.family !== family) setFamily(st.family);
     setPath(st.path ? { a: st.path[0], b: st.path[1] } : null);
     setPathFrom(null);
-    if (st.center !== null && st.center !== start?.id) setStart((cur) => ({ kind: 'doc', id: st.center!, label: '', nonce: (cur?.nonce ?? 0) + 1 }));
+    if (st.ex) setExRestore((cur) => ({ loc: st.ex as Loc, nonce: (cur?.nonce ?? 0) + 1 }));
+    const centre = st.center ?? start?.id ?? null;
+    const wantRings = st.rings ?? '';
+    if (centre !== null && (centre !== start?.id || (st.tab === 'network' && wantRings !== rings))) {
+      if (wantRings !== rings) {
+        if (ringGuard.current) window.clearTimeout(ringGuard.current.timer);
+        ringGuard.current = { target: wantRings, timer: window.setTimeout(() => (ringGuard.current = null), 6000) };
+      }
+      setStart((cur) => ({ kind: 'doc', id: centre, label: '', nonce: (cur?.nonce ?? 0) + 1, rings: wantRings }));
+    }
   };
   const goBack = () => canBack(navStack) && goTo(stepBack(navStack));
   const goForward = () => canForward(navStack) && goTo(stepForward(navStack));
@@ -386,6 +411,7 @@ export function NetworkView() {
                     crumbs={crumbsOf(navStack)}
                     onCenter={centerOn}
                     onPath={startPath}
+                    onRings={onRings}
                   />
                 </div>
               )}
@@ -396,6 +422,8 @@ export function NetworkView() {
                     selectedDoc={doc}
                     onOpenDoc={setDoc}
                     dimRequest={dimRequest}
+                    restore={exRestore}
+                    onLoc={setExLoc}
                     onBuild={() => void model.build()}
                     onAddData={() => nav.navigate({ view: 'review' })}
                     onTags={() => nav.navigate({ view: 'library' })}

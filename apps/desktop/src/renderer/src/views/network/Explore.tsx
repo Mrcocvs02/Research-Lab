@@ -99,6 +99,10 @@ interface ColumnsProps {
   onOpenDoc(docId: string): void;
   /** `L` on the map: show this dimension (a new `nonce` asks again). */
   dimRequest?: { dim: Dim; nonce: number } | undefined;
+  /** The history takes Explore back to a place (a new `nonce` asks again). */
+  restore?: { loc: Loc; nonce: number } | undefined;
+  /** Where Explore is, every time it changes (for the history of the section). */
+  onLoc?(loc: Loc): void;
 }
 
 /**
@@ -106,7 +110,7 @@ interface ColumnsProps {
  * depth), the breadcrumb and Back keep the way down, the selection and the scroll position of every level, and a node
  * leads to its documents or, through "Related", to the nodes of another dimension aligned on it (Back returns to the start).
  */
-function Columns({ active, onAddData, onTags, selectedDoc, onOpenDoc, dimRequest }: ColumnsProps) {
+function Columns({ active, onAddData, onTags, selectedDoc, onOpenDoc, dimRequest, restore, onLoc }: ColumnsProps) {
   const { t } = useTranslation();
   const [loc, setLoc] = useState<Loc>({ dim: 'topic', parentId: null, selected: null });
   const [back, setBack] = useState<BackEntry[]>([]);
@@ -122,6 +126,18 @@ function Columns({ active, onAddData, onTags, selectedDoc, onOpenDoc, dimRequest
     asked.current = dimRequest.nonce;
     setLoc({ dim: dimRequest.dim, parentId: null, selected: null });
   }, [dimRequest]);
+  const restoredAt = useRef(0);
+  useEffect(() => {
+    if (!restore || restore.nonce === restoredAt.current) return;
+    restoredAt.current = restore.nonce;
+    setRel(null);
+    setRelError(null);
+    setLoc(restore.loc);
+  }, [restore]);
+  useEffect(() => {
+    onLoc?.(loc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loc.dim, loc.parentId, loc.selected]);
   // The first visit opens on the first dimension that has something: Themes, then Authors, then Venues.
   const probed = useRef(false);
   useEffect(() => {
@@ -132,7 +148,7 @@ function Columns({ active, onAddData, onTags, selectedDoc, onOpenDoc, dimRequest
       for (const d of DIMS) {
         try {
           const r = await rl.invoke('explore:level', { dimension: d, parentId: null });
-          if (!live || asked.current > 0) return;
+          if (!live || asked.current > 0 || restoredAt.current > 0) return;
           cache.current.set(locKey(d, null), { ...r, key: locKey(d, null) });
           if (r.nodes.length > 0) return void (d !== 'topic' && setLoc({ dim: d, parentId: null, selected: null }));
         } catch {

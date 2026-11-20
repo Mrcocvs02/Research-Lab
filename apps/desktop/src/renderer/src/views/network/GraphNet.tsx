@@ -23,7 +23,7 @@ import { useDocTitle } from '../chat/useLabels';
 import { assignKeyTints, mix, readTheme, type MapTheme } from './colors';
 import { controlPoint, edgeAlpha, edgeWidths, fillTapered, MAX_CURVED, STRAIGHT_ALPHA, straightWidth } from './edges';
 import { MAX_NET_NODES, Network, type EdgeKind, type NetNode, type NodeKind, type RawEdge, type RawNode } from './forceSim';
-import { aboveTau, capEdges, EVIDENCE_KINDS, RING1, RING1_MAX, RING2_PER_NODE, strongestNew, VICINITY_MAX_NODES } from './vicinityModel';
+import { aboveTau, capEdges, EVIDENCE_KINDS, RING1, RING1_MAX, RING2_PER_NODE, ringControls, ringFlags, strongestNew, VICINITY_MAX_NODES } from './vicinityModel';
 import { boundsOf, toScreenX, toScreenY, type Bounds } from './geometry';
 import { clusterText } from './mapModel';
 import { DocCard, HoverCard, useRestingHover } from './HoverCard';
@@ -57,6 +57,8 @@ export interface NetStart {
   label: string;
   /** Changes at every request, so asking for the same start again resets the network. */
   nonce: number;
+  /** Rings to open again after the first one (history): `m` (+8) and `w` (widen). */
+  rings?: string | undefined;
 }
 
 interface Props {
@@ -79,6 +81,8 @@ interface Props {
   onStart(start: Omit<NetStart, 'nonce'>): void;
   /** `L`: open Explore. */
   onExplore?(): void;
+  /** The rings open now (`''`, `m`, `w`, `mw`), for the history. */
+  onRings?(flags: string): void;
 }
 
 const EDGE_STYLE: Record<EdgeKind, { dash: number[]; color: keyof MapTheme }> = {
@@ -99,11 +103,11 @@ const NODE_FILL: Record<NodeKind, keyof MapTheme> = { doc: 'accent', folder: 'mu
  * edges, a card on hover, a path between two nodes, nodes that stay where they are dropped (the pin), the two-step
  * neighbourhood in focus on double click. No graph library, no DOM per node; frames only while something moves.
  */
-export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selectedDoc, selectedDocLabel, onSelectDoc, onStart, onExplore }: Props) {
+export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selectedDoc, selectedDocLabel, onSelectDoc, onStart, onExplore, onRings }: Props) {
   const { t } = useTranslation();
   const net = useMemo(() => new Network(), []);
   /** Neighbourhood: how many papers of ring 1 are in, whether ring 2 was asked for. */
-  const [shown, setShown] = useState({ ring1: 0, ring2: false, more: true });
+  const [shown, setShown] = useState({ ring1: 0, ring2: false, more: true, plus: false });
   const [selKey, setSelKey] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hover, setHover] = useRestingHover<{ key: string; x: number; y: number }>();
@@ -550,7 +554,7 @@ export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selec
         const [r, ev] = await Promise.all([neighborsOf(c, step === 'first' ? RING1 : RING1_MAX), rl.invoke('graph:evidence', { strictness: 'normal' }).catch(() => null)]);
         const take = step === 'first' ? RING1 : Math.min(RING1, RING1_MAX - have);
         const added = absorb(c, r, take, 1, ev?.tau ?? 0);
-        setShown((s) => ({ ...s, ring1: have + added, more: have + added < RING1_MAX && added >= take }));
+        setShown((s) => ({ ...s, ring1: have + added, more: have + added < RING1_MAX && added >= take, plus: step === 'more' ? added > 0 : s.plus }));
         if (step === 'first' && added === 0) setNote({ text: t('vicinity.none') });
       }
       if (familyRef.current !== TOPIC_FAMILY) await applyFamily(false);
@@ -567,6 +571,24 @@ export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selec
     }
   }
 
+  /** Undoes "+8" (the papers of ring 1 past the first 8) or "Widen" (ring 2); what hangs only from a removed paper goes with it. */
+  function shrink(step: 'more' | 'widen'): void {
+    if (busyRef.current) return;
+    const doomed = [...net.nodes.values()].filter((n) => (step === 'widen' ? n.ring === 2 : n.ring === 1)).map((n) => n.key);
+    net.drop(step === 'widen' ? doomed : doomed.slice(RING1));
+    setShown((s) => (step === 'widen' ? { ...s, ring2: false } : { ...s, plus: false, more: true, ring1: Math.min(s.ring1, RING1) }));
+    setNote(null);
+    if (selKey && !net.nodes.has(selKey)) setSelKey(null);
+    syncCount();
+    view.requestDraw();
+    view.fit(true);
+  }
+  const ctlRings = ringControls({ ring1: shown.ring1, more: shown.plus, wide: shown.ring2, canMore: shown.more, size: net.size, busy, empty: count === 0 });
+  useEffect(() => {
+    onRings?.(ringFlags({ more: shown.plus, wide: shown.ring2 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown.plus, shown.ring2]);
+
   // A start (from the selection, the map, the pickers): reset, seed and expand once.
   useEffect(() => {
     if (!start || start.nonce === lastStart.current) return;
@@ -579,11 +601,15 @@ export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selec
     setSelKey(seed.key);
     setError(null);
     setNote(null);
-    setShown({ ring1: 0, ring2: false, more: true });
+    setShown({ ring1: 0, ring2: false, more: true, plus: false });
     syncCount();
     view.fit();
     busyRef.current = false;
-    void grow('first', seed);
+    const again = start.rings ?? '';
+    void grow('first', seed).then(async () => {
+      if (again.includes('m')) await grow('more');
+      if (again.includes('w')) await grow('widen');
+    });
     // The title of the centre (a restored centre comes without one).
     void rl.invoke('documents:get', { docId: seed.id }).then(
       (d) => {
@@ -856,12 +882,14 @@ export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selec
             </div>
           )}
         </ChipPop>
-        <button type="button" onClick={() => void grow('more')} disabled={busy || count === 0 || !shown.more} data-testid="vic-more">
-          {t('vicinity.more', { count: RING1 })}
-        </button>
-        <button type="button" onClick={() => void grow('widen')} disabled={busy || count === 0 || shown.ring2 || shown.ring1 === 0 || net.size >= VICINITY_MAX_NODES} data-testid="vic-widen">
-          {t('vicinity.widen')}
-        </button>
+        <span className="vic-grow">
+          <button type="button" onClick={() => (ctlRings.more === 'undo' ? shrink('more') : void grow('more'))} disabled={ctlRings.more === 'off'} data-testid="vic-more" data-state={ctlRings.more}>
+            {ctlRings.more === 'undo' ? t('vicinity.fewer', { count: RING1 }) : t('vicinity.more', { count: RING1 })}
+          </button>
+          <button type="button" onClick={() => (ctlRings.widen === 'undo' ? shrink('widen') : void grow('widen'))} disabled={ctlRings.widen === 'off'} data-testid="vic-widen" data-state={ctlRings.widen}>
+            {ctlRings.widen === 'undo' ? t('vicinity.narrow') : t('vicinity.widen')}
+          </button>
+        </span>
         <span className="map-actions">
           <button type="button" className="icon-button" title={t('network.fit')} aria-label={t('network.fit')} onClick={() => view.fit(true)} disabled={count === 0} data-testid="net-fit">
             ⤢

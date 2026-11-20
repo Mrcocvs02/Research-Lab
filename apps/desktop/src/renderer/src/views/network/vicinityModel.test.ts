@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Network, REST, RING_STEP, radialPull, type RawEdge, type RawNode } from './forceSim';
-import { aboveTau, capEdges, chainOf, strongestNew } from './vicinityModel';
+import { aboveTau, capEdges, chainOf, ringControls, ringFlags, strongestNew } from './vicinityModel';
 
 const doc = (id: string): RawNode => ({ kind: 'doc', id, label: id });
 const edge = (from: string, to: string, weight: number): RawEdge => ({ from: `doc:${from}`, to: `doc:${to}`, kind: 'similar', weight });
@@ -81,5 +81,23 @@ describe('aboveTau', () => {
   it('drops similarity under the threshold and keeps citations and links', () => {
     const edges: RawEdge[] = [edge('a', 'b', 0.4), edge('a', 'c', 0.1), { ...edge('a', 'd', 0.05), kind: 'cites' }];
     expect(aboveTau(edges, 0.2).map((e) => e.to)).toEqual(['doc:b', 'doc:d']);
+  });
+});
+
+describe('ringControls', () => {
+  const base = { ring1: 8, more: false, wide: false, canMore: true, size: 9, busy: false, empty: false };
+  it('offers each step, then its opposite once done', () => {
+    expect(ringControls(base)).toEqual({ more: 'do', widen: 'do' });
+    expect(ringControls({ ...base, more: true, ring1: 16 })).toEqual({ more: 'undo', widen: 'do' });
+    expect(ringControls({ ...base, wide: true })).toEqual({ more: 'do', widen: 'undo' });
+  });
+  it('switches off while busy or empty, and when there is nothing to add', () => {
+    expect(ringControls({ ...base, busy: true })).toEqual({ more: 'off', widen: 'off' });
+    expect(ringControls({ ...base, canMore: false, ring1: 0 })).toEqual({ more: 'off', widen: 'off' });
+    expect(ringControls({ ...base, size: 30 }).widen).toBe('off');
+  });
+  it('names the open rings for the history', () => {
+    expect(ringFlags({ more: false, wide: false })).toBe('');
+    expect(ringFlags({ more: true, wide: true })).toBe('mw');
   });
 });

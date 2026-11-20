@@ -16,6 +16,10 @@ export interface NavState {
   path: [string, string] | null;
   /** Camera frame `[cx, cy, k]` of the Map, when the owner of the camera gives it. */
   frame?: [number, number, number] | undefined;
+  /** Where Explore is (dimension, node whose children are listed, node chosen): picking a tag is a state of its own (D-499). */
+  ex?: { dim: string; parentId: string | null; selected: string | null } | undefined;
+  /** Rings of the neighbourhood that are open: `m` (+8 done) and `w` (widened); '' is the first ring only. */
+  rings?: string | undefined;
 }
 
 export const MAX_NAV = 50;
@@ -28,13 +32,29 @@ export interface NavStack {
 
 export const emptyNav = (): NavStack => ({ states: [], at: -1 });
 
-const sameState = (a: NavState, b: NavState): boolean =>
-  a.tab === b.tab && a.family === b.family && a.doc === b.doc && a.center === b.center && a.path?.[0] === b.path?.[0] && a.path?.[1] === b.path?.[1];
+/** Whether two states are the same place (the camera frame does not count). */
+export const sameState = (a: NavState, b: NavState): boolean =>
+  a.tab === b.tab &&
+  a.family === b.family &&
+  a.doc === b.doc &&
+  a.center === b.center &&
+  a.path?.[0] === b.path?.[0] &&
+  a.path?.[1] === b.path?.[1] &&
+  a.ex?.dim === b.ex?.dim &&
+  (a.ex?.parentId ?? null) === (b.ex?.parentId ?? null) &&
+  (a.ex?.selected ?? null) === (b.ex?.selected ?? null) &&
+  (a.rings ?? '') === (b.rings ?? '');
 
 /** Records a new state: the states ahead of the current one are dropped; the same state twice in a row is not recorded again; the oldest go past 50. */
 export function pushNav(s: NavStack, next: NavState): NavStack {
   const cur = s.states[s.at];
   if (cur && sameState(cur, next)) return s;
+  // Explore reporting where it is for the first time does not make a new place: the state already there gets it.
+  if (cur && cur.ex === undefined && next.ex !== undefined && sameState({ ...cur, ex: next.ex }, next)) {
+    const states = s.states.slice();
+    states[s.at] = { ...cur, ex: next.ex };
+    return { states, at: s.at };
+  }
   const kept = [...s.states.slice(0, s.at + 1), next];
   const cut = Math.max(0, kept.length - MAX_NAV);
   const states = cut > 0 ? kept.slice(cut) : kept;

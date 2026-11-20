@@ -9,6 +9,8 @@ import type { PreparedMap } from './mapModel';
  * used today; every other family comes from `graph:family` (a tag kind, research groups, or communities found in the network).
  */
 export const TOPIC_FAMILY = 'topic';
+/** The family the Map opens with when the viewer has not chosen one: the communities found in the network (user choice, D-510). */
+export const DEFAULT_FAMILY = 'auto';
 /** "None": the free layout of the map, with no blocks (D-498). */
 export const NONE_FAMILY = 'none';
 const KEY = 'rl.map.family';
@@ -30,9 +32,9 @@ export interface FamilyShares {
 
 function readFamily(): string {
   try {
-    return window.localStorage.getItem(KEY) || TOPIC_FAMILY;
+    return window.localStorage.getItem(KEY) || DEFAULT_FAMILY;
   } catch {
-    return TOPIC_FAMILY;
+    return DEFAULT_FAMILY;
   }
 }
 

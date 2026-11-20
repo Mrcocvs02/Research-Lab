@@ -1,4 +1,4 @@
-import { AppError, type TagAutoMode, type TagAutoState, type TaxonomyOp } from '@rl/core';
+import { AppError, type TagAutoMode, type TagAutoState, type TagHaikuBatch, type TaxonomyOp } from '@rl/core';
 import { conventionName, mergeOps, reviewTags, tagHealth, tagStats, type CleanupInput, type CleanupRow, type DocEdit, type Proposal, type ReviewResult } from '@rl/data/tag-vocabulary';
 import { settle } from '../../ipc/handlers/organize-handlers.js';
 import type { MainServices } from '../../ipc/handlers/services.js';
@@ -13,7 +13,7 @@ import { aiKeyOf, applyAi, dismissedOf, laterApplied, load, readState, toView, w
 
 const cleanup = () => import('@rl/data/tag-cleanup');
 export const aiPreview = async (s: MainServices, r: { model?: string | undefined }) => (await import('./ai.js')).aiPreview(s, r);
-export const aiRun = async (s: MainServices, r: { model?: string | undefined; confirmed: boolean }) => (await import('./ai.js')).aiRun(s, r);
+export const aiRun = async (s: MainServices, r: { model?: string | undefined; confirmed: boolean; decide?: boolean | undefined }) => (await import('./ai.js')).aiRun(s, r);
 
 function rowView(r: CleanupRow) {
   const { variants, ...rest } = r;
@@ -39,7 +39,7 @@ export async function getReview(s: MainServices, req: { step?: number | undefine
     stats: tagStats(input),
     run: { ...state.run, dismissed: state.dismissed.length },
     acceptable: acceptableIds(proposals, input.nodes, input.distinct, 'all'),
-    auto: { mode: state.auto, last: state.autoLast },
+    auto: { mode: state.auto, last: state.autoLast, haiku: state.haikuLast },
     ...(rows ? { rows } : {}),
   };
 }
@@ -82,7 +82,15 @@ function itemOps(input: CleanupInput, review: ReviewResult, plans: Map<string, C
   return { ops, docEdits };
 }
 
-async function runApply(s: MainServices, ops: TaxonomyOp[], docEdits: DocEdit[], summary: string, expectedRevision?: number) {
+/** Operations and document edits of proposals by id (default choices), with the plans of the cleanup rows built here. */
+export async function itemsToOps(input: CleanupInput, review: ReviewResult, items: ReadonlyArray<{ id: string; keep?: string | undefined }>) {
+  const plans = new Map<string, CleanupRow>();
+  const { cleanupPlan } = await cleanup();
+  for (const st of [1, 2, 3, 5] as Step[]) for (const r of cleanupPlan(input, st, review).rows) plans.set(r.id, r);
+  return itemOps(input, review, plans, items);
+}
+
+export async function runApply(s: MainServices, ops: TaxonomyOp[], docEdits: DocEdit[], summary: string, expectedRevision?: number) {
   const rt = await s.runtime.require();
   const r = await rt.organizer.applyTaxonomy(ops, expectedRevision, { docEdits, summary });
   await settle(s, rt, r, [{ kind: 'taxonomy' }, ...(r.reindex.length > 0 ? [{ kind: 'documents' as const, ids: r.reindex.length <= 500 ? r.reindex : undefined }] : [])]);
@@ -142,9 +150,12 @@ export async function setAuto(s: MainServices, req: { mode?: TagAutoMode | undef
   const rt = await s.runtime.require();
   const state = await readState(rt.store.dataDir);
   if (req.mode !== undefined) state.auto = req.mode;
-  if (req.dismiss) state.autoLast = null;
+  if (req.dismiss) {
+    state.autoLast = null;
+    state.haikuLast = null;
+  }
   if (req.mode !== undefined || req.dismiss) await writeState(rt.store.dataDir, state);
-  return { mode: state.auto, last: state.autoLast };
+  return { mode: state.auto, last: state.autoLast, haiku: state.haikuLast };
 }
 
 /**
@@ -160,20 +171,33 @@ export async function autoAccept(s: MainServices): Promise<number> {
   const done = new Set(state.autoDone);
   const pending = applyAi(review.proposals, state, labels).filter((p) => !dismissedOf(state, p.id) && !done.has(p.id));
   const ids = acceptableIds(pending, input.nodes, input.distinct, state.auto);
-  if (ids.length === 0) return 0;
-  const plans = new Map<string, CleanupRow>();
-  const { cleanupPlan } = await cleanup();
-  for (const st of [1, 2, 3, 5] as Step[]) for (const r of cleanupPlan(input, st, review).rows) plans.set(r.id, r);
-  const { ops, docEdits } = itemOps(input, review, plans, ids.map((id) => ({ id })));
-  if (ops.length === 0 && docEdits.length === 0) return 0;
-  const r = await runApply(s, ops, docEdits, `Automatic vocabulary acceptance (${ids.length})`, tax.revision);
   const chosen = new Set(ids);
+  let ops: TaxonomyOp[] = [];
+  let docEdits: DocEdit[] = [];
+  if (ids.length > 0) ({ ops, docEdits } = await itemsToOps(input, review, ids.map((id) => ({ id }))));
+  // "Sure + Haiku decides the uncertain": the tags the sure ones touch are not asked about; one change in the end.
+  let haiku: { items: TagHaikuBatch['items']; ids: string[] } = { items: [], ids: [] };
+  if (state.auto === 'sureHaiku') {
+    const taken = new Set(pending.filter((p) => chosen.has(p.id)).flatMap((p) => p.tags));
+    try {
+      const d = await (await import('./ai.js')).haikuDecide(s, taken);
+      ops = [...ops, ...d.ops];
+      docEdits = [...docEdits, ...d.docEdits];
+      haiku = { items: d.items, ids: d.pairs.map((p) => p.id) };
+    } catch (e) {
+      s.log.warn('Haiku could not decide the uncertain proposals', { error: e });
+    }
+  }
+  if (ops.length === 0 && docEdits.length === 0) return 0;
+  const n = ids.length + haiku.items.length;
+  const r = await runApply(s, ops, docEdits, `Automatic vocabulary acceptance (${n})`, tax.revision);
   const sure = pending.filter((p) => chosen.has(p.id) && p.confidence === 'sure').length;
-  // Also the ones skipped for overlapping: after an undo none of them comes back by itself.
-  state.autoDone = [...state.autoDone, ...acceptableIds(pending, input.nodes, input.distinct, state.auto, false)].slice(-5000);
-  state.autoLast = { n: ids.length, sure, likely: ids.length - sure, changeId: r.changeId, at: new Date().toISOString() };
+  // Also the ones skipped for overlapping or left by Haiku: after an undo none of them comes back by itself.
+  state.autoDone = [...state.autoDone, ...acceptableIds(pending, input.nodes, input.distinct, state.auto === 'sureHaiku' ? 'sure' : state.auto, false), ...haiku.ids].slice(-5000);
+  state.autoLast = { n, sure, likely: n - sure, changeId: r.changeId, at: new Date().toISOString() };
+  if (haiku.items.length > 0) state.haikuLast = { changeId: r.changeId, at: state.autoLast.at, items: haiku.items };
   await writeState(rt.store.dataDir, state);
-  return ids.length;
+  return n;
 }
 
 export async function rejectReview(s: MainServices, req: { ids: string[] }) {

@@ -23,6 +23,7 @@ export function TagReview({ data, initial }: { data: TagData; initial: ReviewFil
   const [editing, setEditing] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [haiku, setHaiku] = useState(false);
   const [focus, setFocus] = useState(0);
   const [busy, setBusy] = useState(false);
   const list = useRef<HTMLDivElement>(null);
@@ -88,6 +89,9 @@ export function TagReview({ data, initial }: { data: TagData; initial: ReviewFil
             </button>
           ))}
         </span>
+        <Button size="sm" disabled={uncertain === 0} disabledReason={t('tax.review.ai.none')} onClick={() => setHaiku(true)} data-testid="tag-review-haiku">
+          {t('tax.haiku.button', { count: uncertain })}
+        </Button>
         <Button size="sm" disabled={uncertain === 0} disabledReason={t('tax.review.ai.none')} onClick={() => setAsking(true)} data-testid="tag-review-ai">
           {t('tax.review.ai.button', { count: uncertain })}
         </Button>
@@ -173,6 +177,16 @@ export function TagReview({ data, initial }: { data: TagData; initial: ReviewFil
           onConfirm={() => {
             setConfirmAll(false);
             void apply(everything.items);
+          }}
+        />
+      )}
+      {haiku && (
+        <TagAiConfirm
+          decide
+          onClose={() => setHaiku(false)}
+          onDone={() => {
+            setHaiku(false);
+            void run(async () => undefined);
           }}
         />
       )}

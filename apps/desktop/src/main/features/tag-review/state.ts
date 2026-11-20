@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { DocumentRecord, TagAutoMode, TagAutoState, TagProposal, TagRun } from '@rl/core';
+import type { DocumentRecord, TagAutoMode, TagAutoState, TagHaikuBatch, TagProposal, TagRun } from '@rl/core';
 import { atomicWriteJson } from '@rl/core/node';
 import type { CleanupInput, Proposal } from '@rl/data/tag-vocabulary';
 import type { MainServices } from '../../ipc/handlers/services.js';
@@ -20,12 +20,13 @@ export interface State {
   auto: TagAutoMode;
   autoDone: string[];
   autoLast: TagAutoState['last'];
+  haikuLast: TagHaikuBatch | null;
 }
 export const emptyRun = (): TagRun => ({ startedAt: null, steps: [], before: null, dismissed: 0 });
 export const FILE = 'tag-review.json';
 
-function autoOf(v: Partial<State>): Pick<State, 'auto' | 'autoDone' | 'autoLast'> {
-  return { auto: v.auto === 'sure' || v.auto === 'all' ? v.auto : 'off', autoDone: Array.isArray(v.autoDone) ? v.autoDone.slice(-5000) : [], autoLast: v.autoLast ?? null };
+function autoOf(v: Partial<State>): Pick<State, 'auto' | 'autoDone' | 'autoLast' | 'haikuLast'> {
+  return { auto: v.auto === 'sure' || v.auto === 'sureHaiku' || v.auto === 'all' ? v.auto : 'off', haikuLast: v.haikuLast ?? null, autoDone: Array.isArray(v.autoDone) ? v.autoDone.slice(-5000) : [], autoLast: v.autoLast ?? null };
 }
 
 export async function readState(dataDir: string): Promise<State> {
@@ -33,7 +34,7 @@ export async function readState(dataDir: string): Promise<State> {
     const v = JSON.parse(await readFile(path.join(dataDir, FILE), 'utf8')) as Partial<State>;
     return { run: v.run ?? emptyRun(), dismissed: Array.isArray(v.dismissed) ? v.dismissed.slice(0, 20_000) : [], ai: v.ai && typeof v.ai === 'object' ? v.ai : {}, migrated: v.migrated === true, ...autoOf(v) };
   } catch {
-    return { run: emptyRun(), dismissed: [], ai: {}, migrated: false, auto: 'off', autoDone: [], autoLast: null };
+    return { run: emptyRun(), dismissed: [], ai: {}, migrated: false, auto: 'off', autoDone: [], autoLast: null, haikuLast: null };
   }
 }
 export const writeState = (dataDir: string, st: State): Promise<void> => atomicWriteJson(path.join(dataDir, FILE), { ...st, run: { ...st.run, dismissed: st.dismissed.length } });

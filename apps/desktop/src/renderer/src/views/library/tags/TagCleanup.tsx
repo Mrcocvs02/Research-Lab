@@ -23,6 +23,7 @@ export function TagCleanup({ initialStep, onClose, onMap }: { initialStep: numbe
   const [state, setState] = useState<Record<string, RowState>>({});
   const [asking, setAsking] = useState(false);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [haiku, setHaiku] = useState(false);
   const [busy, setBusy] = useState(false);
   const { data: d } = useTagReview(picked !== null && picked < SUMMARY ? picked : undefined);
   // Resuming: the run tells which step is next (the rows of that step then load).
@@ -111,6 +112,9 @@ export function TagCleanup({ initialStep, onClose, onMap }: { initialStep: numbe
             <Button variant="primary" busy={busy} disabled={status === 'applied' || ticked.length === 0} onClick={() => void apply()} data-testid="tag-cleanup-apply">
               {t('tax.cleanup.apply', { count: ticked.length, docs: docEdits(rows, state) })}
             </Button>
+            <Button disabled={status === 'applied' || (d?.proposals.filter((p) => p.confidence !== 'sure' && !p.ai).length ?? 0) === 0} onClick={() => setHaiku(true)} data-testid="tag-cleanup-haiku">
+              {t('tax.haiku.button', { count: d?.proposals.filter((p) => p.confidence !== 'sure' && !p.ai).length ?? 0 })}
+            </Button>
             <Button disabled={status === 'applied' || everything.rows.length === 0 || busy} onClick={() => setConfirmAll(true)} data-testid="tag-cleanup-accept-all">
               {t('tax.cleanup.acceptAll', { count: everything.rows.length })}
             </Button>
@@ -165,6 +169,16 @@ export function TagCleanup({ initialStep, onClose, onMap }: { initialStep: numbe
           onConfirm={() => {
             setConfirmAll(false);
             void apply(everything.rows);
+          }}
+        />
+      )}
+      {haiku && (
+        <TagAiConfirm
+          decide
+          onClose={() => setHaiku(false)}
+          onDone={() => {
+            setHaiku(false);
+            changed();
           }}
         />
       )}

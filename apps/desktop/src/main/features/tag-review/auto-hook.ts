@@ -28,7 +28,7 @@ async function run(): Promise<void> {
     const rt = await s.runtime.require();
     const { readFile } = await import('node:fs/promises');
     const raw = await readFile(`${rt.store.dataDir}/tag-review.json`, 'utf8').catch(() => '');
-    if (!/"auto":\s*"(sure|all)"/.test(raw)) return;
+    if (!/"auto":\s*"(?!off")/.test(raw)) return;
     await (await import('./index.js')).autoAccept(s);
   } catch (e) {
     s.log.warn('automatic vocabulary acceptance failed', { error: e });

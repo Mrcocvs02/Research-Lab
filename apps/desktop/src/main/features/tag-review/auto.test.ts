@@ -2,12 +2,15 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createMockAiProvider } from '@rl/ai';
 import { createMemoryLogger, documentRecordSchema, taxonomyFileSchema } from '@rl/core';
 import { canonical, createLibraryStore, createOrganizer, type FileLibraryStore } from '@rl/data';
-import type { Proposal } from '@rl/data/tag-vocabulary';
+import { reviewTags, type Proposal } from '@rl/data/tag-vocabulary';
 import type { MainServices } from '../../ipc/handlers/services.js';
+import { aiSchema, decide } from './ai.js';
 import { acceptableIds } from './auto.js';
-import { applyReview, autoAccept, getReview, setAuto } from './index.js';
+import { applyReview, autoAccept, getReview, runApply, setAuto } from './index.js';
+import { load } from './state.js';
 
 const NOW = '2026-01-02T03:04:05.000Z';
 const hex = (n: number) => n.toString(16).padStart(16, '0');
@@ -92,7 +95,7 @@ describe('accept all and automatic acceptance (D-512)', () => {
 
   it('off (default) does nothing', async () => {
     const before = await snapshot();
-    expect((await getReview(s, {})).auto).toEqual({ mode: 'off', last: null });
+    expect((await getReview(s, {})).auto).toEqual({ mode: 'off', last: null, haiku: null });
     expect(await autoAccept(s)).toBe(0);
     expect(await snapshot()).toBe(before);
   });
@@ -116,4 +119,97 @@ describe('accept all and automatic acceptance (D-512)', () => {
       expect((await setAuto(s, { dismiss: true })).last).toBeNull();
     });
   }
+});
+
+describe('Haiku decides (D-512), with the mock AI', () => {
+  let root: string;
+  let store: FileLibraryStore;
+  let s: MainServices;
+  const snapshot = async () => {
+    const { revision: _r, ...tax } = await store.readTaxonomy();
+    const docs = (await store.documents.list()).map((d) => ({ id: d.id, tags: d.tags, tagOrigin: d.tagOrigin ?? null })).sort((a, b) => (a.id < b.id ? -1 : 1));
+    return canonical({ tax, docs });
+  };
+  /** The pairs Haiku would be asked about. */
+  async function pairs() {
+    const { loaded } = await load(s);
+    const review = reviewTags(loaded.input);
+    const fresh = review.proposals.filter((p) => p.kind === 'merge' && p.tags.length === 2);
+    const labels = new Map(loaded.tax.nodes.map((n) => [n.id, n.label]));
+    const p = { fresh, input: loaded.input, review, labels } as unknown as Parameters<typeof decide>[0];
+    return { p, fresh, loaded };
+  }
+  /** What the mock AI answers, parsed with the schema of the real request. */
+  const ask = async (answers: unknown[]) => {
+    const mock = createMockAiProvider({ structured: { answers } });
+    return (await mock.completeStructured({ model: 'claude-haiku-5-5', reasoning: 'off' as never, system: '', prompt: '', schema: aiSchema, source: 'tag-review' })).value.answers;
+  };
+  const withInput = (p: Parameters<typeof decide>[0], over: Record<string, unknown>) => ({ ...p, input: { ...(p as unknown as { input: object }).input, ...over } }) as unknown as Parameters<typeof decide>[0];
+
+  beforeEach(async () => {
+    root = await mkdtemp(path.join(os.tmpdir(), 'rl-taghaiku-'));
+    store = createLibraryStore({ rootPath: root, deviceId: 'dev-1' });
+    await store.init();
+    await store.writeTaxonomy(taxonomyFileSchema.parse({ nodes: [node('concetto', 'concetto'), node('concetti', 'concetti'), node('other', 'other')] }));
+    await store.documents.put(doc(1, ['concetto', 'other']));
+    await store.documents.put(doc(2, ['concetti']));
+    const organizer = createOrganizer({ store, deviceId: 'dev-1', cacheTtlMs: 0 });
+    const rt = { store, organizer, reindexDocuments: async () => {} };
+    s = { log: createMemoryLogger(), emit: () => {}, runtime: { require: async () => rt } } as unknown as MainServices;
+  });
+  afterEach(() => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }));
+
+  it('a confident "same" merges into the name Haiku keeps, as one change that undoes byte for byte', async () => {
+    const before = await snapshot();
+    const { p, fresh, loaded } = await pairs();
+    expect(fresh.length).toBeGreaterThan(0);
+    const answers = await ask([{ n: 1, verdict: 'same', note: 'plural of the same word', keep: 'B', confidence: 'high' }]);
+    const d = await decide(p, answers, new Set());
+    expect(d.items).toHaveLength(1);
+    expect(d.items[0]).toMatchObject({ kind: 'merge', note: 'plural of the same word' });
+    const keep = (fresh[0] as { tags: string[] }).tags[1] as string;
+    const r = await runApply(s, d.ops, d.docEdits, 'Haiku decisions on the vocabulary (1)', loaded.tax.revision);
+    const nodes = (await store.readTaxonomy()).nodes.filter((n) => n.status === 'active').map((n) => n.id);
+    expect(nodes).toContain(keep);
+    expect(nodes).toHaveLength(2);
+    await (await s.runtime.require()).organizer.undo(r.changeId);
+    expect(JSON.parse(await snapshot())).toEqual(JSON.parse(before));
+  });
+
+  it('low confidence, missing confidence and "related" stay for the user', async () => {
+    const { p } = await pairs();
+    for (const a of [{ n: 1, verdict: 'same', note: 'x', keep: 'A', confidence: 'low' }, { n: 1, verdict: 'same', note: 'x', keep: 'A' }, { n: 1, verdict: 'related', note: 'x', confidence: 'high' }]) {
+      expect((await decide(p, await ask([a]), new Set())).ops).toEqual([]);
+    }
+  });
+
+  it('"different" marks the pair distinct and "broader" moves one under the other', async () => {
+    const { p, fresh } = await pairs();
+    const [x, y] = (fresh[0] as { tags: string[] }).tags as [string, string];
+    expect((await decide(p, await ask([{ n: 1, verdict: 'different', note: 'n', confidence: 'high' }]), new Set())).ops).toEqual([{ op: 'markDistinct', a: x, b: y }]);
+    expect((await decide(p, await ask([{ n: 1, verdict: 'broader', note: 'n', confidence: 'high' }]), new Set())).ops).toEqual([{ op: 'move', id: y, parents: [x] }]);
+  });
+
+  it('guardrails hold against a confident Haiku: distinct pairs, other families, a macro-area under keywords, tags already taken', async () => {
+    const { p, fresh } = await pairs();
+    const [x, y] = (fresh[0] as { tags: string[] }).tags as [string, string];
+    const same = await ask([{ n: 1, verdict: 'same', note: 'n', keep: 'A', confidence: 'high' }]);
+    const nodes = (p as unknown as { input: { nodes: Array<Record<string, unknown>> } }).input.nodes;
+    expect((await decide(withInput(p, { distinct: [{ a: x, b: y }] }), same, new Set())).ops).toEqual([]);
+    const fam = nodes.map((n) => (n['id'] === x ? { ...n, family: 'many' } : n['id'] === y ? { ...n, family: 'one' } : n));
+    expect((await decide(withInput(p, { nodes: fam }), same, new Set())).ops).toEqual([]);
+    // a macro-area is never put under keywords
+    const kw = nodes.map((n) => (n['id'] === 'other' ? { ...n, family: 'keywords' } : n['id'] === x ? { ...n, group: 'macro' } : n));
+    const under = await ask([{ n: 1, verdict: 'narrower', note: 'n', confidence: 'high' }]);
+    const q = { ...withInput(p, { nodes: kw }), fresh: [{ ...(fresh[0] as object), tags: [x, 'other'] }] } as unknown as Parameters<typeof decide>[0];
+    expect((await decide(q, under, new Set())).ops).toEqual([]);
+    expect((await decide(p, same, new Set([x]))).ops).toEqual([]);
+  });
+
+  it('the automatic mode "sure + Haiku" is a mode of its own, is saved, and takes only the sure ones by itself', async () => {
+    expect((await setAuto(s, { mode: 'sureHaiku' })).mode).toBe('sureHaiku');
+    expect((await getReview(s, {})).auto.mode).toBe('sureHaiku');
+    const nodes = [node('a', 'A'), node('b', 'B'), node('c', 'C'), node('d', 'D')] as never;
+    expect(acceptableIds([prop('m', ['a', 'b']), prop('l', ['c', 'd'], { confidence: 'likely' })], nodes, undefined, 'sureHaiku')).toEqual(['m']);
+  });
 });

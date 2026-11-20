@@ -18,6 +18,71 @@ export interface MacroHooks {
   materialize?: (concepts: readonly string[], ops: TaxonomyOp[]) => Promise<TaxonomyOp[]>;
 }
 
+/**
+ * The field vocabulary as the seam (D-535, D-536 (9)): with a pack in use, its concepts that are not tags yet and sit above tags of the
+ * library are the parents a gathered value can go under; applying creates those tags (ancestors included, linked to the concept) in the same
+ * group as the cut. Without a pack nothing is loaded. A failure of the vocabulary never stops the proposal: it just goes without parents.
+ */
+export function packHooks(s: MainServices): MacroHooks {
+  const lang = async (): Promise<'it' | 'en'> => ((await s.settings.get()).uiLanguage === 'en' ? 'en' : 'it');
+  const active = async () => {
+    const rt = await s.runtime.require();
+    const { activeState } = await import('../features/vocab-pack/state.js');
+    const state = await activeState(rt.store.dataDir);
+    if (!state) return null;
+    const { loadPack } = await import('../features/vocab-pack/packs.js');
+    return { rt, state, loaded: await loadPack(state.packId) };
+  };
+  return {
+    latent: async () => {
+      try {
+        const a = await active();
+        if (!a) return [];
+        const { linkedConcepts, conceptLabel } = await import('../features/vocab-pack/materialize.js');
+        const tax = await a.rt.store.readTaxonomy();
+        const linked = linkedConcepts(tax, a.state.packId);
+        const l = await lang();
+        // Every concept above a linked one, once: the nodes below it, in the order of the file.
+        const covers = new Map<string, string[]>();
+        for (const [cid, node] of linked) {
+          const own = a.loaded.byId.get(cid);
+          for (let c = own?.parent ? a.loaded.byId.get(own.parent) : undefined, i = 0; c && i < 8; c = c.parent ? a.loaded.byId.get(c.parent) : undefined, i++) {
+            if (linked.has(c.id)) continue;
+            const list = covers.get(c.id);
+            if (list) list.push(node);
+            else covers.set(c.id, [node]);
+          }
+        }
+        return [...covers].flatMap(([id, nodes]) => {
+          const c = a.loaded.byId.get(id);
+          return c ? [{ id, label: conceptLabel(c, l), covers: nodes, top: !c.parent }] : [];
+        });
+      } catch {
+        return [];
+      }
+    },
+    materialize: async (concepts, ops) => {
+      const a = await active();
+      if (!a) throw new AppError('INVALID_REQUEST', 'The field vocabulary is not available', { reason: 'pack' });
+      const { materialization } = await import('../features/vocab-pack/materialize.js');
+      const { applyTaxonomyOps } = await import('@rl/data');
+      const l = await lang();
+      let tax = await a.rt.store.readTaxonomy();
+      const made: TaxonomyOp[] = [];
+      const ids = new Map<string, string>();
+      for (const c of concepts) {
+        const m = materialization(tax, a.state, a.loaded, c, l);
+        if ('depth' in m) throw new AppError('INVALID_REQUEST', 'The vocabulary parent would go too deep', { reason: 'depth' });
+        made.push(...m.ops);
+        ids.set(c, m.nodeId);
+        // The next concept sees the nodes made so far (shared ancestors, unique ids).
+        tax = applyTaxonomyOps(tax, m.ops, new Map(), new Date().toISOString()).taxonomy;
+      }
+      return [...made, ...ops.map((o) => (o.op === 'move' ? { ...o, parents: o.parents.map((p) => ids.get(p) ?? p) } : o))];
+    },
+  };
+}
+
 /** What the cut reads: the values of level 1 today, the tree under them, the weighted tags of each paper and its fixed main value. */
 async function cutInput(s: MainServices, family: string, scope: Scope): Promise<{ input: CutInput; label: string }> {
   const rt = await s.runtime.require();
@@ -64,7 +129,7 @@ async function build(s: MainServices, family: string, scope: Scope, hooks?: Macr
 }
 
 /** `mapEdit:macroPropose`: the moves, and the cut that follows from the ones not in `skip`. */
-export async function macroPropose(s: MainServices, req: { family: string; scope?: Scope; skip?: string[] | undefined }, hooks?: MacroHooks): Promise<MacroProposal> {
+export async function macroPropose(s: MainServices, req: { family: string; scope?: Scope; skip?: string[] | undefined }, hooks: MacroHooks = packHooks(s)): Promise<MacroProposal> {
   const { prop } = await build(s, req.family, req.scope, hooks);
   if (!prop) {
     const zero = { blocks: 0, clearPct: 0, coverage: 0, largestPct: 0, smallest: 0 };
@@ -86,7 +151,7 @@ export async function macroPropose(s: MainServices, req: { family: string; scope
 }
 
 /** `mapEdit:macroApply`: the ticked moves as one `taxonomy:apply` (plus the materializations, with a vocabulary on), one entry of the history. */
-export async function macroApply(s: MainServices, req: { family: string; scope?: Scope; moves: string[]; names: Record<string, string> }, hooks?: MacroHooks): Promise<{ changeId: string; applied: number }> {
+export async function macroApply(s: MainServices, req: { family: string; scope?: Scope; moves: string[]; names: Record<string, string> }, hooks: MacroHooks = packHooks(s)): Promise<{ changeId: string; applied: number }> {
   const rt = await s.runtime.require();
   const { prop, label } = await build(s, req.family, req.scope, hooks);
   const known = new Set(prop?.moves.map((m) => m.id));
@@ -95,7 +160,7 @@ export async function macroApply(s: MainServices, req: { family: string; scope?:
   const sel = prop.select(prop.moves.map((m) => m.id).filter((id) => !req.moves.includes(id)), req.names);
   let ops = sel.ops as TaxonomyOp[];
   if (sel.materialize.length > 0) {
-    if (!hooks?.materialize) throw new AppError('INVALID_REQUEST', 'The field vocabulary is not available', { reason: 'pack' });
+    if (!hooks.materialize) throw new AppError('INVALID_REQUEST', 'The field vocabulary is not available', { reason: 'pack' });
     ops = await hooks.materialize(sel.materialize, ops);
   }
   const done = prop.moves.length - sel.skipped.length;

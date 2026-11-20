@@ -36,6 +36,7 @@ export type StringPart =
   | 'library'
   | 'links'
   | 'literature'
+  | 'mapEdit'
   | 'mcp'
   | 'network'
   | 'notes'

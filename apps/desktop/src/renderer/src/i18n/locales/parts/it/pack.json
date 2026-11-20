@@ -58,5 +58,40 @@
       "keep": "Smetti di usarlo",
       "undo": "Disattiva e annulla i collegamenti"
     }
+  },
+  "macro": {
+    "title": "Macro-aree di {{family}}",
+    "noteLead": "I tag dei lavori non cambiano",
+    "noteRest": ": cambia solo dove stanno nell'albero (filtri, Vocabolario, blocchi). Un Annulla rimette tutto.",
+    "stale": "La libreria è cambiata dopo questa proposta. Chiudi il dialogo e riaprilo.",
+    "loading": "Cerco un taglio migliore dell'albero…",
+    "none": {
+      "fine": "Le macro-aree vanno già bene",
+      "nocut": "Nessun taglio dell'albero migliora i blocchi · sposta a mano i lavori non chiari"
+    },
+    "selectUnclear_one": "Seleziona il non chiaro ({{count}})",
+    "selectUnclear_other": "Seleziona i non chiari ({{count}})",
+    "today": "Oggi",
+    "proposed": "Proposta",
+    "moves": "Mosse",
+    "stat": {
+      "blocks": "blocchi",
+      "clear": "chiari",
+      "largest": "il più grande",
+      "smallest": "il più piccolo"
+    },
+    "split": "Troppo generico: su {{n}} lavori su {{total}}",
+    "gather": "Insieme su {{n}} lavori",
+    "treeSplit": "«{{name}}» diventa una famiglia a sé · {{kids}} salgono in {{family}}",
+    "treeGather": "Nuovo genitore «{{name}}» sopra {{kids}}",
+    "treeGatherPack": "Nuovo genitore «{{name}}» sopra {{kids}} (dal vocabolario del campo)",
+    "treeGatherExisting": "«{{name}}» (già nell'albero) sopra {{kids}}",
+    "nameLabel": "Nome del nuovo genitore",
+    "nameNeeded": "Scrivi un nome per il nuovo genitore",
+    "provisional": "{{a}} e {{b}}",
+    "pins_one": "{{count}} lavoro fissato su «{{name}}» torna automatico",
+    "pins_other": "{{count}} lavori fissati su «{{name}}» tornano automatici",
+    "apply_one": "Applica {{count}} mossa",
+    "apply_other": "Applica {{count}} mosse"
   }
 }

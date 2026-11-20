@@ -108,6 +108,9 @@
       },
       "reviewTags": {
         "label": "Proposals to review"
+      },
+      "macroPropose": {
+        "label": "Suggest macro-areas"
       }
     },
     "paletteGroups": {

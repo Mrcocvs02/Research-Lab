@@ -6,8 +6,8 @@
       "en"
     ],
     "initialJsKB": 396,
-    "totalJsKB": 2400,
-    "totalKB": 2580,
+    "totalJsKB": 2450,
+    "totalKB": 2630,
     "readerResourcesKB": 2760,
     "chunkCapsKB": {
       "NoteRich": 16,
@@ -32,7 +32,10 @@
       "TagAiConfirm": 16,
       "SelectionSummary": 16,
       "VocabularyTree": 16,
-      "PackDialog": 16
+      "PackDialog": 16,
+      "MapSelectionBar": 16,
+      "BlockEdit": 16,
+      "MacroAreas": 16
     }
   },
   "main": {

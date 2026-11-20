@@ -58,5 +58,40 @@
       "keep": "Stop using it",
       "undo": "Turn off and undo the links"
     }
+  },
+  "macro": {
+    "title": "Macro-areas of {{family}}",
+    "noteLead": "The papers' tags do not change",
+    "noteRest": ": only where they sit in the tree (filters, Vocabulary, blocks). One Undo puts everything back.",
+    "stale": "The library changed since this proposal. Close the dialog and open it again.",
+    "loading": "Looking for a better cut of the tree…",
+    "none": {
+      "fine": "The macro-areas are already fine",
+      "nocut": "No cut of the tree improves the blocks · move the unclear papers by hand"
+    },
+    "selectUnclear_one": "Select the unclear one ({{count}})",
+    "selectUnclear_other": "Select the unclear ones ({{count}})",
+    "today": "Today",
+    "proposed": "Proposed",
+    "moves": "Moves",
+    "stat": {
+      "blocks": "blocks",
+      "clear": "clear",
+      "largest": "the largest",
+      "smallest": "the smallest"
+    },
+    "split": "Too generic: on {{n}} of {{total}} papers",
+    "gather": "Together on {{n}} papers",
+    "treeSplit": "\"{{name}}\" becomes a family of its own · {{kids}} rise to {{family}}",
+    "treeGather": "New parent \"{{name}}\" above {{kids}}",
+    "treeGatherPack": "New parent \"{{name}}\" above {{kids}} (from the field vocabulary)",
+    "treeGatherExisting": "\"{{name}}\" (already in the tree) above {{kids}}",
+    "nameLabel": "Name of the new parent",
+    "nameNeeded": "Write a name for the new parent",
+    "provisional": "{{a}} and {{b}}",
+    "pins_one": "{{count}} paper fixed on \"{{name}}\" returns automatic",
+    "pins_other": "{{count}} papers fixed on \"{{name}}\" return automatic",
+    "apply_one": "Apply {{count}} move",
+    "apply_other": "Apply {{count}} moves"
   }
 }

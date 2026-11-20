@@ -10,6 +10,8 @@ import { Menu, type MenuGroup } from '../../components/Menu';
 import { ErrorNote, ProgressBar } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { takeMapStart } from '../../lib/mapStartIntent';
+import { MAP_INTENT_EVENT, takeMapIntent } from '../../lib/mapIntent';
+import { useLocalFlag } from '../../lib/useLocalFlag';
 import { useNav } from '../../lib/nav';
 import { canRead, useReader } from '../../lib/reader';
 import { rl } from '../../lib/rl';
@@ -28,6 +30,7 @@ import type { Loc } from './exploreNav';
 import { ChromeCtx, HeadMore, MapIllustration } from './NetChrome';
 import { PathChain, type Strictness } from './PathChain';
 import { useFamily } from './grouping';
+import { editableFamily } from './edit/editModel';
 import { setDiscoverIntent } from '../../lib/discoverIntent';
 import { SimilarPanel, SurprisingList } from './SimilarPanel';
 import { useGraphModel, type Phase } from './useGraphModel';
@@ -47,8 +50,21 @@ export interface NetCtl {
   links(): void;
 }
 
-function DocDetail({ docId, onClose, onNetwork, onPathStart, tagLabel, onOpenDoc, ctl }: { docId: string; onClose(): void; onNetwork(): void; onPathStart(): void; tagLabel(id: string): string; onOpenDoc(docId: string): void; ctl: NetCtl | null }) {
+/** What the panel of a paper offers for the blocks of the Map (only on the Map tab): "Move to..." and, once, the hint about dragging. `editable`: the family is Topic or a root. */
+export interface DocMapEdit {
+  editable: boolean;
+  reason: string;
+  onMove(): void;
+}
+
+function DocDetail({ docId, onClose, onNetwork, onPathStart, tagLabel, onOpenDoc, ctl, mapEdit }: { docId: string; onClose(): void; onNetwork(): void; onPathStart(): void; tagLabel(id: string): string; onOpenDoc(docId: string): void; ctl: NetCtl | null; mapEdit: DocMapEdit | null }) {
   const { t } = useTranslation();
+  // The hint about dragging the dot into another block: said once, the first time the panel opens on an editable Map.
+  const [hintSeen, setHintSeen] = useLocalFlag('rl.map.moveHint', false);
+  const [hint] = useState(() => !hintSeen);
+  useEffect(() => {
+    if (mapEdit?.editable && !hintSeen) setHintSeen(true);
+  }, [mapEdit?.editable, hintSeen, setHintSeen]);
   const title = useDocTitle(docId);
   const { openReader } = useReader();
   const [readable, setReadable] = useState(false);
@@ -95,6 +111,7 @@ function DocDetail({ docId, onClose, onNetwork, onPathStart, tagLabel, onOpenDoc
               id: 'node',
               items: [
                 { id: 'path', label: t('vicinity.path.start'), testId: 'path-start', onSelect: onPathStart },
+                ...(mapEdit ? [mapEdit.editable ? { id: 'move', label: t('mapEdit.moveTo'), keys: 'M', testId: 'map-card-move', onSelect: mapEdit.onMove } : { id: 'move', label: t('mapEdit.moveTo'), testId: 'map-card-move', onSelect: () => undefined, disabled: true as const, disabledReason: mapEdit.reason }] : []),
                 ...(ctl
                   ? [
                       { id: 'bridge', label: t('network.bridge.findWith'), testId: 'net-bridge', onSelect: ctl.bridge },
@@ -106,6 +123,11 @@ function DocDetail({ docId, onClose, onNetwork, onPathStart, tagLabel, onOpenDoc
           ]}
         />
       </div>
+      {mapEdit?.editable && hint && (
+        <p className="hint" data-testid="map-move-hint">
+          {t('mapEdit.hint')}
+        </p>
+      )}
       <h3>{t('network.similar.title')}</h3>
       <SimilarPanel docId={docId} tagLabel={tagLabel} onOpen={onOpenDoc} />
     </aside>
@@ -138,6 +160,8 @@ export function NetworkView() {
   const [ctl, setCtl] = useState<NetCtl | null>(null);
   const [panorama, setPanorama] = useState<{ a: string; b: string; terms: string[]; nonce: number } | null>(null);
   const [lightNode, setLightNode] = useState<{ ids: string[]; nonce: number } | null>(null);
+  // What another view asked of the Map (the macro-areas dialog, papers to select, "Move to..." for a paper): read here, handed to the Map with a counter.
+  const [mapReq, setMapReq] = useState<{ macro?: boolean; select?: string[]; move?: string[]; nonce: number } | null>(null);
   const docTitle = useDocTitle(doc);
   const { status, building } = model;
   // Path between two papers (section 19.2.5): started from the panel ("Path to...") or by Shift+click; the second paper chosen ends it.
@@ -269,6 +293,20 @@ export function NetworkView() {
       window.removeEventListener('mouseup', onMouse, true);
     };
   }, []);
+  const askMap = (i: { macro?: boolean; select?: string[]; move?: string[] }) => {
+    setMapReq((cur) => ({ ...i, nonce: (cur?.nonce ?? 0) + 1 }));
+    show('map');
+  };
+  useEffect(() => {
+    const run = () => {
+      const i = takeMapIntent();
+      if (i) askMap(i);
+    };
+    run();
+    window.addEventListener(MAP_INTENT_EVENT, run);
+    return () => window.removeEventListener(MAP_INTENT_EVENT, run);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // "Show on the Map" from the link finder of the Library: start the network from that document.
   useEffect(() => {
     const m = takeMapStart();
@@ -388,7 +426,7 @@ export function NetworkView() {
             <div className="net-panels">
               {visited.has('map') && (
                 <div role="tabpanel" id="net-panel-map" aria-labelledby="net-tab-map" hidden={tab !== 'map'} className="net-panel">
-                  {status ? <MapPanel active={tab === 'map'} status={status} mapVersion={model.mapVersion} scopes={scopes} selected={doc} onSelect={setDoc} onMapChanged={model.bumpMap} onRead={readDoc} onExplore={() => exploreDim('topic')} onVicinity={(id) => centerOn(id, t('network.untitled'))} light={lightNode} onBuild={() => void model.build()} onInfo={setMapInfo} highlight={panorama} /> : null}
+                  {status ? <MapPanel active={tab === 'map'} status={status} mapVersion={model.mapVersion} scopes={scopes} selected={doc} onSelect={setDoc} onMapChanged={model.bumpMap} onRead={readDoc} onExplore={() => exploreDim('topic')} onVicinity={(id) => centerOn(id, t('network.untitled'))} light={lightNode} onBuild={() => void model.build()} onInfo={setMapInfo} highlight={panorama} onPath={startPath} request={mapReq} /> : null}
                 </div>
               )}
               {visited.has('network') && (
@@ -460,7 +498,7 @@ export function NetworkView() {
           )}
           {(entity || doc) && !noModel && <ResizeHandle r={detailW} edge="start" label={t('common.resizeDetails')} testId="resize-net-detail" className="rl-resize--inline" />}
           {entity && !noModel && <EntityDetail key={entity.node.id} mode={entity.mode} entity={entity.node} peers={entityData?.nodes ?? []} yearRange={entityData?.yearRange} onClose={() => setEntity(null)} onOpenDoc={setDoc} />}
-          {doc && !noModel && <DocDetail key={doc} docId={doc} ctl={tab === 'network' ? ctl : null} onClose={() => setDoc(null)} onNetwork={() => centerOn(doc, docTitle ?? t('network.untitled'))} onPathStart={() => setPathFrom(doc)} tagLabel={scopes.tagLabel} onOpenDoc={setDoc} />}
+          {doc && !noModel && <DocDetail key={doc} docId={doc} ctl={tab === 'network' ? ctl : null} onClose={() => setDoc(null)} onNetwork={() => centerOn(doc, docTitle ?? t('network.untitled'))} onPathStart={() => setPathFrom(doc)} tagLabel={scopes.tagLabel} onOpenDoc={setDoc} mapEdit={tab === 'map' && family !== 'none' ? { editable: editableFamily(family), reason: family === 'auto' ? t('mapEdit.autoNo') : t('mapEdit.moveOnly'), onMove: () => askMap({ move: [doc] }) } : null} />}
         </div>
         {optionsOpen && (
           <Lazy>

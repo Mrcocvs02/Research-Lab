@@ -280,7 +280,10 @@
         "many": "Consenti più valori",
         "topic": "Metti sotto Topic"
       },
-      "acceptAll": "Accetta tutte ({{count}})"
+      "acceptAll": "Accetta tutte ({{count}})",
+      "macro": "Proponi macro-aree",
+      "macroApplied_one": "Macro-aree cambiate ({{count}} mossa)",
+      "macroApplied_other": "Macro-aree cambiate ({{count}} mosse)"
     },
     "board": {
       "unsorted": "Da sistemare ({{count}})",

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TagCleanupRow } from '@rl/core';
 import { Button } from '../../../components/Button';
+import { Lazy, lazyView } from '../../../components/Lazy';
+import { setMapIntent } from '../../../lib/mapIntent';
 import { rl } from '../../../lib/rl';
 import { safeText } from '../safeText';
 import { useTaxonomy } from '../useTaxonomy';
@@ -10,6 +12,8 @@ import { TagAcceptAll } from './TagAcceptAll';
 import { TagAiConfirm } from './TagAiConfirm';
 import { STEPS, SUMMARY, appliedSteps, currentStep, docEdits, ghosts, rowChecked, rowVariant, rowsAcceptAll, rowsToApply, stepState, summaryLines, type RowState } from './tagCleanupModel';
 import { useTagChange, useTagReview } from './useTagReview';
+
+const MacroAreas = lazyView(() => import('../../network/edit/MacroAreas'), ['pack']);
 
 /**
  * The guided cleanup (D-497, §19.1.5): five steps then a summary, each step shows its proposals with the sure ones ticked, applies as one
@@ -25,6 +29,7 @@ export function TagCleanup({ initialStep, onClose, onMap }: { initialStep: numbe
   const [confirmAll, setConfirmAll] = useState(false);
   const [haiku, setHaiku] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [macro, setMacro] = useState(false);
   const { data: d } = useTagReview(picked !== null && picked < SUMMARY ? picked : undefined);
   // Resuming: the run tells which step is next (the rows of that step then load).
   useEffect(() => {
@@ -104,6 +109,11 @@ export function TagCleanup({ initialStep, onClose, onMap }: { initialStep: numbe
           {step === 4 && <FamilyBoard ghosts={ghostList} state={state} onState={setRow} />}
           {plain.length === 0 && ghostList.length === 0 ? <p className="empty">{t('tax.cleanup.noRows')}</p> : <ul className="tag-cleanup__rows">{plain.map(cell)}</ul>}
           <div className="actions" data-testid="tag-cleanup-actions">
+            {step === 4 && (
+              <Button onClick={() => setMacro(true)} data-testid="tag-cleanup-macro">
+                {t('tax.cleanup.macro')}
+              </Button>
+            )}
             {step === 2 && (
               <Button size="sm" onClick={() => setAsking(true)} data-testid="tag-review-ai">
                 {t('tax.review.ai.button', { count: rows.filter((r) => r.confidence === 'likely').length })}
@@ -128,6 +138,24 @@ export function TagCleanup({ initialStep, onClose, onMap }: { initialStep: numbe
             )}
           </div>
         </>
+      )}
+
+      {macro && (
+        <Lazy>
+          <MacroAreas
+            family="topic"
+            scope={undefined}
+            onClose={() => setMacro(false)}
+            onApplied={(changeId, n) => {
+              changed();
+              offerUndo(t('tax.cleanup.macroApplied', { count: n }), changeId);
+            }}
+            onSelectUnclear={(ids) => {
+              setMapIntent({ select: ids.slice(0, 5000) });
+              onMap();
+            }}
+          />
+        </Lazy>
       )}
 
       {d && step === SUMMARY && (

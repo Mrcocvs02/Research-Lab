@@ -46,6 +46,20 @@ async function resize(ctx: LaunchedApp, width: number, height: number): Promise<
   await ctx.app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0]!.setSize(w!, h!), [width, height]);
 }
 
+/** Waits until the positions and the canvas size are the same on two consecutive probes (fit and layout stopped moving). */
+async function settled(window: Page): Promise<void> {
+  let prevKey = '';
+  await expect
+    .poll(async () => {
+      const q = await probe(window);
+      const key = JSON.stringify([q.nodes.map((n) => [n.x.toFixed(1), n.y.toFixed(1)]), q.frame.canvas?.w, q.frame.canvas?.h]);
+      const same = key === prevKey;
+      prevKey = key;
+      return same;
+    }, { timeout: 15_000 })
+    .toBe(true);
+}
+
 test('Map in blocks: group by, blocks, no label collisions, legend outside the canvas, Back, neighbourhood, path', async () => {
   test.setTimeout(600_000);
   let ctx: LaunchedApp | undefined;
@@ -144,6 +158,8 @@ test('Map in blocks: group by, blocks, no label collisions, legend outside the c
     await window.getByTestId('net-tab-map').click();
     await expect.poll(async () => inView(await probe(window)).length, { timeout: 15_000 }).toBeGreaterThanOrEqual(3);
     p = await probe(window);
+    await settled(window);
+    p = await probe(window);
     const third = inView(p)[2] ?? inView(p)[0]!;
     pt = await at(third.id);
     await window.mouse.dblclick(pt.x, pt.y);
@@ -154,6 +170,7 @@ test('Map in blocks: group by, blocks, no label collisions, legend outside the c
 
     // Enter on a paper reached by the keyboard does the same.
     await window.getByTestId('net-tab-map').click();
+    await settled(window);
     await window.getByTestId('map-canvas').focus();
     await window.keyboard.press(']');
     await window.keyboard.press('Enter');

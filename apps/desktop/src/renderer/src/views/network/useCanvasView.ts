@@ -186,6 +186,10 @@ export function useCanvasView<T>(opts: CanvasOptions<T>) {
   // Pointer state of the current gesture.
   const gesture = useRef<{ id: number; sx: number; sy: number; vx: number; vy: number; moved: boolean; hit: T | null; dragging: boolean; lx: number; ly: number; lt: number; pvx: number; pvy: number } | null>(null);
 
+  // What the last press hit: the first click of a double click may select a paper, the detail opens beside the canvas and the view moves,
+  // so the second click is resolved against the first (same spot, a short time), not against the moved view.
+  const lastPress = useRef<{ sx: number; sy: number; at: number; hit: T | null } | null>(null);
+
   const local = (e: { clientX: number; clientY: number }) => {
     const r = canvas.current!.getBoundingClientRect();
     return { sx: e.clientX - r.left, sy: e.clientY - r.top };
@@ -198,6 +202,9 @@ export function useCanvasView<T>(opts: CanvasOptions<T>) {
       const { w, h } = size.current;
       stop();
       const hit = o.current.hit(sx, sy, view.current, w, h);
+      const prev = lastPress.current;
+      const now = performance.now();
+      if (!(prev !== null && prev.hit !== null && now - prev.at < 800 && Math.hypot(sx - prev.sx, sy - prev.sy) <= DRAG_PX)) lastPress.current = { sx, sy, at: now, hit };
       gesture.current = { id: e.pointerId, sx, sy, vx: view.current.cx, vy: view.current.cy, moved: false, hit, dragging: false, lx: sx, ly: sy, lt: performance.now(), pvx: 0, pvy: 0 };
       e.currentTarget.setPointerCapture(e.pointerId);
     },
@@ -253,7 +260,9 @@ export function useCanvasView<T>(opts: CanvasOptions<T>) {
     onDoubleClick(e: React.MouseEvent<HTMLCanvasElement>) {
       const { sx, sy } = local(e);
       const { w, h } = size.current;
-      const hit = o.current.hit(sx, sy, view.current, w, h);
+      const lp = lastPress.current;
+      const same = lp !== null && lp.hit !== null && performance.now() - lp.at < 800 && Math.hypot(sx - lp.sx, sy - lp.sy) <= DRAG_PX;
+      const hit = same ? lp.hit : o.current.hit(sx, sy, view.current, w, h);
       if (o.current.onDoubleClick?.(hit) === true) return;
       if (hit === null) zoom(2, sx, sy);
     },

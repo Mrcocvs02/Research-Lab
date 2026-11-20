@@ -29,7 +29,7 @@ test('field vocabulary: sure matches linked and placed in one change, concepts l
   test.setTimeout(300_000);
   const packs = mkdtempSync(path.join(os.tmpdir(), 'rl-packs-'));
   mkdirSync(packs, { recursive: true });
-  copyFileSync(path.join(__dirname, '..', 'packages', 'core', 'src', 'vocab', 'test-pack.json'), path.join(packs, 'test-pack.json'));
+  copyFileSync(path.join(import.meta.dirname, '..', 'packages', 'core', 'src', 'vocab', 'test-pack.json'), path.join(packs, 'test-pack.json'));
   let ctx: LaunchedApp | undefined;
   try {
     ctx = await launchApp({ library: { corpus: 8 }, dialogPath: true, offline: true, env: { RL_E2E: '1', RL_E2E_PACKS_DIR: packs } });

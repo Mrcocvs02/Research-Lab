@@ -4,16 +4,24 @@
  * level 1 values. Two moves lead from today's values to a better cut: SPLIT a generic value (its children rise to level 1, the value becomes a
  * family of its own) and GATHER siblings that go together or are small under a common parent (which becomes a level 1 value, the siblings its
  * sub-areas). The parent is, in order, a latent ancestor of the field vocabulary (when given), a node already there, or a provisional name.
- * A greedy climb on an objective of clarity x coverage with penalties for too many or too few blocks, small and generic values; two starts
- * (today's values, and the projection on the level 1 of the field vocabulary); a proposal only if the objective gains 0.05. Pure, deterministic
- * (ties by id), no files. The caller turns the answer into `taxonomy:apply` operations (`select(...).ops`).
+ * A gather may hold more than two values (a value joins a gathered parent, two gathered parents become one): that is what makes a paper with
+ * values on two or three small topics clear, and takes small blocks in. A greedy climb on an objective of clarity x coverage with penalties for
+ * too many or too few blocks (4 to 7), small, generic and too big values; two starts (today's values, and the projection on the level 1 of the
+ * field vocabulary); a proposal only if the objective gains 0.05. The search reads the papers like the Map does (a tag above another tag of the
+ * paper does not count, `mainValue`), but the numbers it reports, before and after, come from `measureFamily` over the taxonomy the operations
+ * lead to, and the finalists are chosen by them: the preview is what the Map shows after Apply (D-561). Pure, deterministic (ties by id), no
+ * files. The caller turns the answer into `taxonomy:apply` operations (`select(...).ops`).
  */
+import { mainValue, type PaperValues } from './families.js';
+import { measureFamily, type Measured, type MeasureNode } from './macro-measure.js';
 
 export interface CutNode {
   id: string;
   label: string;
   parents: readonly string[];
   status?: string | undefined;
+  /** Family kind of a root (`many`, `one`, `keywords`): the Topic of the Map is the biggest `many` family. */
+  family?: string | undefined;
 }
 /** A concept of the field vocabulary that is not a node of the library yet and sits above `covers` (ids of the library nodes below it in the vocabulary). `top`: it is a level 1 concept of the vocabulary. */
 export interface LatentAncestor {
@@ -38,6 +46,8 @@ export interface CutInput {
   /** Papers of the scope; default `docs.length`. */
   n?: number | undefined;
   latent?: readonly LatentAncestor[] | undefined;
+  /** What the Map reads after the cut: the macro-areas of the Topic (default) or the values of level 1 under `root` (a `root:` family). */
+  family?: 'topic' | 'root' | undefined;
 }
 
 export interface CutStats {
@@ -95,7 +105,7 @@ export interface CutProposal {
   select(skip?: Iterable<string>, names?: Readonly<Record<string, string>>): CutSelection;
 }
 
-export const CUT = { kMin: 3, generic: 0.45, share: 0.6, gain: 0.05, rounds: 30, pairs: 40, maxDepth: 3 } as const;
+export const CUT = { sample: 200, detours: 1200, kMin: 4, kTop: 7, generic: 0.45, share: 0.6, big: 0.5, gain: 0.05, rounds: 30, pairs: 12, maxDepth: 3 } as const;
 
 const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 const r2 = (x: number): number => Math.round(x * 100) / 100;
@@ -127,14 +137,24 @@ interface Agg {
 
 /** Proposes the cut; with no move when no cut gains enough (`moves` empty), `null` when there are fewer than two values to cut. */
 export function proposeCut(input: CutInput): CutProposal | null {
+  if (input.docs.length <= CUT.sample) return cutCore(input).prop;
+  // A big library: the search reads an even sample of the papers (every k-th by id); the cut it finds is then measured and described on all of them.
+  const sorted = [...input.docs].sort((a, b) => cmp(a.id, b.id));
+  const step = Math.ceil(sorted.length / CUT.sample);
+  const sample = sorted.filter((_, i) => i % step === 0);
+  const found = cutCore({ ...input, docs: sample, n: Math.max(1, Math.round(((input.n ?? input.docs.length) * sample.length) / input.docs.length)) });
+  return found.state ? cutCore(input, found.state).prop : null;
+}
+
+function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; state: State | null } {
   const n = Math.max(1, input.n ?? input.docs.length);
-  const kMax = Math.min(10, Math.max(4, Math.round(Math.sqrt(2 * n))));
+  const kMax = Math.min(CUT.kTop, Math.max(CUT.kMin, Math.round(Math.sqrt(2 * n))));
   const sMin = Math.max(2, Math.ceil(0.04 * n));
 
   // The tree under today's values.
   const live = new Map(input.nodes.filter((x) => x.status !== 'deprecated').map((x) => [x.id, x]));
   const top = [...new Set(input.top)].filter((t) => live.has(t));
-  if (top.length < 2) return null;
+  if (top.length < 2) return { prop: null, state: null };
   const childrenOf = new Map<string, string[]>();
   for (const x of [...live.values()].sort((a, b) => cmp(a.id, b.id))) for (const p of x.parents) (childrenOf.get(p) ?? childrenOf.set(p, []).get(p)!).push(x.id);
   const kids = new Map<string, string[]>();
@@ -190,11 +210,26 @@ export function proposeCut(input: CutInput): CutProposal | null {
     return found;
   };
 
-  // Papers with their weighted tags in the tree, and the papers under each tag.
+  // Papers with their weighted tags in the tree, and the papers under each tag. Like the Map (`computeAreas`), a tag above another tag of the paper does not count.
+  const ancMemo = new Map<string, Set<string>>();
+  const strictAnc = (id: string): Set<string> => {
+    let out = ancMemo.get(id);
+    if (!out) {
+      ancMemo.set(id, (out = new Set<string>()));
+      const stack = [...parentsOf(id)];
+      while (stack.length > 0) {
+        const p = stack.pop() as string;
+        if (!out.has(p)) (out.add(p), stack.push(...parentsOf(p)));
+      }
+    }
+    return out;
+  };
   const docs = input.docs.map((d) => {
     const w = new Map<string, number>();
     for (const t of d.tags) if (inTree.has(t.id) && t.w > 0) w.set(t.id, Math.max(w.get(t.id) ?? 0, Math.min(1, t.w)));
-    return { id: d.id, tags: [...w].sort((a, b) => cmp(a[0], b[0])), pin: d.pin && w.has(d.pin) ? d.pin : null };
+    const above = new Set<string>();
+    for (const t of w.keys()) for (const a of strictAnc(t)) if (w.has(a)) above.add(a);
+    return { id: d.id, tags: [...w].filter(([t]) => !above.has(t)).sort((a, b) => cmp(a[0], b[0])), pin: d.pin && w.has(d.pin) ? d.pin : null };
   });
   const docsOfTag = new Map<string, number[]>();
   docs.forEach((d, i) => d.tags.forEach(([t]) => (docsOfTag.get(t) ?? docsOfTag.set(t, []).get(t)!).push(i)));
@@ -239,17 +274,15 @@ export function proposeCut(input: CutInput): CutProposal | null {
   const specOf = (agg: Pick<Agg, 'covered' | 'carry'>): Map<string, number> => new Map([...agg.carry].map(([v, c]) => [v, Math.max(0.15, Math.log(agg.covered / c))]));
   const judge = (d: (typeof docs)[number], vals: Map<string, number>, owners: (t: string) => string[], spec: ReadonlyMap<string, number>): { main: string | null; clear: boolean } => {
     if (vals.size === 0) return { main: null, clear: false };
-    if (d.pin !== null) {
-      const p = owners(d.pin).find((o) => vals.has(o));
-      if (p !== undefined) return { main: p, clear: true };
-    }
-    let best: string | null = null;
+    const list: PaperValues = [...vals].map(([v, w]) => ({ v, w }));
+    // The paper's fixed value, when it sits under one of its values; else the choice of the Map (`mainValue`, weight x specificity).
+    const pin = d.pin !== null ? (owners(d.pin).find((o) => vals.has(o)) ?? null) : null;
+    const main = mainValue(list, spec, pin);
+    if (main === null) return { main: null, clear: false };
+    if (pin !== null && main === pin) return { main, clear: true };
     let sum = 0;
-    for (const [v, w] of [...vals].sort((a, b) => cmp(a[0], b[0]))) {
-      sum += w;
-      if (best === null || w * (spec.get(v) ?? 1) > vals.get(best)! * (spec.get(best) ?? 1)) best = v;
-    }
-    return { main: best, clear: vals.get(best as string)! / sum >= CUT.share };
+    for (const e of list) sum += e.w;
+    return { main, clear: vals.get(main)! / sum >= CUT.share };
   };
   /** Re-reads the papers `which` under `st` into a copy of `base` (or from nothing, `base` null). */
   const assess = (st: State, which: Iterable<number> | null, base: Agg | null): Agg => {
@@ -273,7 +306,7 @@ export function proposeCut(input: CutInput): CutProposal | null {
       const vals = new Map<string, number>();
       for (const [t, w] of docs[i]!.tags) {
         const own = owners(t);
-        for (const c of own) vals.set(c, Math.min(1, (vals.get(c) ?? 0) + w / own.length));
+        for (const c of own) vals.set(c, (vals.get(c) ?? 0) + w / own.length);
       }
       if (vals.size > 0) agg.covered++;
       for (const v of vals.keys()) bump(agg.carry, v, 1);
@@ -291,18 +324,23 @@ export function proposeCut(input: CutInput): CutProposal | null {
     }
     return agg;
   };
+  const kMin = Math.min(CUT.kMin, top.length);
+  /** The objective of a reading: clarity x coverage, less 0.05 per block beyond kMax and 0.15 per block short of kMin, 0.06 per small block, 0.08 per generic value, 2 per share of the papers a block holds beyond half. */
+  const objectiveOf = (m: { blocks: number; clear: number; covered: number; small: number; generic: number; largest: number }): number => {
+    const clarity = m.covered > 0 ? m.clear / m.covered : 0;
+    return clarity * (m.covered / n) - 0.05 * Math.max(0, m.blocks - kMax) - 0.15 * Math.max(0, kMin - m.blocks) - 0.06 * m.small - 0.08 * m.generic - 2 * Math.max(0, m.largest / n - CUT.big);
+  };
+  const latentIds = new Set((input.latent ?? []).map((l) => l.id));
   const objective = (a: Agg): number => {
-    const blocks = a.main.size;
-    const clarity = a.covered > 0 ? a.clear / a.covered : 0;
     let small = 0;
     for (const c of a.main.values()) if (c < sMin) small++;
     let generic = 0;
-    for (const c of a.carry.values()) if (c / n > CUT.generic) generic++;
-    return clarity * (a.covered / n) - 0.04 * Math.max(0, blocks - kMax) - 0.04 * Math.max(0, CUT.kMin - blocks) - 0.03 * small - 0.08 * generic;
-  };
-  const stats = (a: Agg): CutStats => {
-    const counts = [...a.main.values()];
-    return { blocks: counts.length, clearPct: Math.round((a.covered > 0 ? a.clear / a.covered : 0) * 100), coverage: Math.round((a.covered / n) * 100), largestPct: Math.round((Math.max(0, ...counts) / n) * 100), smallest: counts.length > 0 ? Math.min(...counts) : 0 };
+    // A parent made by gathering is as big as the values under it: the size of its block is held by the penalty for the biggest block.
+    for (const [v, c] of a.carry) if (c / n > CUT.generic && !(v.startsWith('new:') || latentIds.has(v))) generic++;
+    // The Map gives way to the children of a value that covers four papers in five (`computeAreas`): such a parent would be undone at once.
+    let wide = 0;
+    for (const c of a.carry.values()) if (a.covered > 0 && c / a.covered >= 0.8) wide++;
+    return objectiveOf({ blocks: a.main.size, clear: a.clear, covered: a.covered, small, generic, largest: Math.max(0, ...a.main.values()) }) - 0.5 * wide;
   };
   const state0 = (): State => ({ cut: new Set(top), v: new Map(), vpar: new Map() });
   const clone = (st: State): State => ({ cut: new Set(st.cut), v: new Map(st.v), vpar: new Map(st.vpar) });
@@ -318,57 +356,129 @@ export function proposeCut(input: CutInput): CutProposal | null {
     return next;
   };
   const latent = [...(input.latent ?? [])].sort((a, b) => a.covers.length - b.covers.length || cmp(a.id, b.id));
-  const gatherState = (st: State, a: string, b: string): { state: State; touched: string[] } | null => {
-    // The parent: a latent ancestor above both, else a node already there above both, else a provisional name.
-    let kind: VNode['kind'] = 'provisional';
-    let id = '';
-    let name = '';
-    let members = [a, b];
-    const lat = latent.find((l) => l.covers.includes(a) && l.covers.includes(b));
-    if (lat) {
-      kind = 'pack';
-      id = lat.id;
-      name = lat.label;
-      members = [...st.cut].filter((m) => !st.v.has(m) && lat.covers.includes(m)).sort(cmp);
-    } else {
-      const ancs = (x: string): Set<string> => {
-        const out = new Set<string>();
-        const stack = [...parentsOf(x)];
-        while (stack.length > 0) {
-          const p = stack.pop() as string;
-          if (!out.has(p)) (out.add(p), stack.push(...parentsOf(p)));
-        }
-        return out;
-      };
-      const aa = ancs(a);
-      // A top above both would only undo the split: that is no gather, the pair gets a parent of its own.
-      const common = [...ancs(b)].filter((x) => aa.has(x) && !st.cut.has(x) && !topSet.has(x)).sort((x, y) => sub(x).size - sub(y).size || cmp(x, y));
-      if (common.length > 0) {
-        // A node already there: it takes the cut members under it, and they stop being values of their own (no new parent).
-        const x = common[0] as string;
-        if ([...st.v.values()].some((v) => v.members.some((m) => sub(x).has(m)))) return null;
+  /** The id and the provisional name of a parent over `members`: the biggest three by papers. */
+  const provisional = (members: readonly string[]): { id: string; name: string } => {
+    const byPapers = [...members].sort((x, y) => under(y).size - under(x).size || cmp(x, y));
+    return { id: `new:${[...members].sort(cmp).join('+')}`, name: byPapers.map((m) => label(m)).slice(0, 3).join(' & ') + (byPapers.length > 3 ? ' & …' : '') };
+  };
+  /** The ways two values of the cut gather: under each of the two smallest ancestors of the vocabulary above both, under a node already there above both, or else under a parent with a provisional name. */
+  const gatherStates = (st: State, a: string, b: string): Array<{ state: State; touched: string[] }> => {
+    const out: Array<{ state: State; touched: string[] }> = [];
+    const make = (kind: VNode['kind'], id: string, name: string, members: string[]): void => {
+      members = members.filter((m) => 1 + 1 + height(m) <= CUT.maxDepth);
+      if (members.length < 2 || !members.includes(a) || !members.includes(b)) return;
+      const next = clone(st);
+      for (const m of members) {
+        next.cut.delete(m);
+        next.vpar.set(m, id);
+      }
+      next.cut.add(id);
+      next.v.set(id, { id, label: name, members: [...members].sort(cmp), kind });
+      out.push({ state: next, touched: [...members, id] });
+    };
+    for (const lat of latent.filter((l) => l.covers.includes(a) && l.covers.includes(b) && !st.v.has(l.id)).slice(0, 2)) make('pack', lat.id, lat.label, [...st.cut].filter((m) => !st.v.has(m) && lat.covers.includes(m)).sort(cmp));
+    const aa = strictAnc(a);
+    // A top above both would only undo the split: that is no gather, the pair gets a parent of its own.
+    const common = [...strictAnc(b)].filter((x) => aa.has(x) && !st.cut.has(x) && !topSet.has(x)).sort((x, y) => sub(x).size - sub(y).size || cmp(x, y));
+    if (common.length > 0) {
+      // A node already there: it takes the cut members under it, and they stop being values of their own (no new parent).
+      const x = common[0] as string;
+      if (![...st.v.values()].some((v) => v.members.some((m) => sub(x).has(m)))) {
         const next = clone(st);
         const gone = [...st.cut].filter((m) => !st.v.has(m) && sub(x).has(m));
         for (const m of gone) next.cut.delete(m);
         next.cut.add(x);
-        return { state: next, touched: [...gone, x] };
+        out.push({ state: next, touched: [...gone, x] });
+      }
+    } else {
+      const { id, name } = provisional([a, b]);
+      make('provisional', id, name, [a, b]);
+    }
+    return out;
+  };
+  /** A unit (a value of the cut, real or gathered) joins another: two values gather; a value joins a gathered parent; two gathered parents become one. Several values under one parent are what makes a paper with two or three small topics clear. */
+  const joinStates = (st: State, a: string, b: string): Array<{ state: State; touched: string[] }> => {
+    const va = st.v.get(a);
+    const vb = st.v.get(b);
+    if (!va && !vb) return gatherStates(st, a, b);
+    const pk = va?.kind === 'pack' ? va : vb?.kind === 'pack' ? vb : undefined;
+    if (pk) {
+      // A parent of the vocabulary takes the real values below it in the vocabulary, nothing else.
+      const x = pk === va ? b : a;
+      const lat = latent.find((l) => l.id === pk.id);
+      if (st.v.has(x) || !lat || !lat.covers.includes(x) || 1 + 1 + height(x) > CUT.maxDepth) return [];
+      const next = clone(st);
+      next.cut.delete(x);
+      next.vpar.set(x, pk.id);
+      next.v.set(pk.id, { ...pk, members: [...pk.members, x].sort(cmp) });
+      return [{ state: next, touched: [x, pk.id] }];
+    }
+    const members = [...(va?.members ?? [a]), ...(vb?.members ?? [b])];
+    if (members.some((m) => 1 + 1 + height(m) > CUT.maxDepth)) return [];
+    const { id, name } = provisional(members);
+    const next = clone(st);
+    for (const u of [a, b]) {
+      next.cut.delete(u);
+      next.v.delete(u);
+    }
+    for (const m of members) next.vpar.set(m, id);
+    next.cut.add(id);
+    next.v.set(id, { id, label: name, members: members.sort(cmp), kind: 'provisional' });
+    return [{ state: next, touched: [...members, id, ...[a, b].filter((u) => st.v.has(u))] }];
+  };
+
+  /** A value leaves the gathered parent `vid` (a parent left with one value dissolves), and stays a value of the cut. */
+  const leaveState = (st: State, vid: string, m: string): { state: State; touched: string[] } | null => {
+    const v = st.v.get(vid);
+    if (!v || v.kind !== 'provisional' || v.members.length < 2) return null;
+    const rest = v.members.filter((x) => x !== m);
+    const next = clone(st);
+    next.cut.delete(vid);
+    next.v.delete(vid);
+    next.cut.add(m);
+    next.vpar.delete(m);
+    const touched = [...v.members, vid];
+    if (rest.length === 1) {
+      next.cut.add(rest[0] as string);
+      next.vpar.delete(rest[0] as string);
+    } else {
+      const { id, name } = provisional(rest);
+      for (const r of rest) next.vpar.set(r, id);
+      next.cut.add(id);
+      next.v.set(id, { id, label: name, members: rest, kind: 'provisional' });
+      touched.push(id);
+    }
+    return { state: next, touched };
+  };
+  /** Second thoughts: a value of a gathered parent goes to the unit it meets most (or stands alone again). */
+  const relocateCands = (st: State): Cand[] => {
+    const out: Cand[] = [];
+    const cache = new Map<string, Set<number>>();
+    const docsOf = (u: string): Set<number> => cache.get(u) ?? (cache.set(u, docsOfMember(u, st)), cache.get(u) as Set<number>);
+    for (const v of [...st.v.values()].sort((x, y) => cmp(x.id, y.id))) {
+      if (v.kind !== 'provisional' || v.members.length < 2) continue;
+      for (const m of v.members) {
+        const left = leaveState(st, v.id, m);
+        if (!left) continue;
+        out.push(left);
+        const M = under(m);
+        const targets = [...left.state.cut]
+          .filter((u) => u !== m)
+          .map((u) => {
+            const U = docsOf(u);
+            let both = 0;
+            for (const i of M) if (U.has(i)) both++;
+            return { u, f: M.size > 0 ? both / M.size : 0 };
+          })
+          .sort((x, y) => y.f - x.f || cmp(x.u, y.u))
+          .slice(0, 3);
+        for (const t of targets) {
+          // `leaveState` may have given the rest a new id: read the unit again from the state it made.
+          for (const j of joinStates(left.state, m, t.u)) out.push({ state: j.state, touched: [...left.touched, ...j.touched] });
+        }
       }
     }
-    members = members.filter((m) => 1 + 1 + height(m) <= CUT.maxDepth);
-    if (members.length < 2 || !members.includes(a) || !members.includes(b)) return null;
-    if (kind === 'provisional') {
-      members.sort((x, y) => under(y).size - under(x).size || cmp(x, y));
-      id = `new:${[...members].sort(cmp).join('+')}`;
-      name = members.map((m) => label(m)).slice(0, 3).join(' & ') + (members.length > 3 ? ' & …' : '');
-    }
-    const next = clone(st);
-    for (const m of members) {
-      next.cut.delete(m);
-      next.vpar.set(m, id);
-    }
-    next.cut.add(id);
-    next.v.set(id, { id, label: name, members: [...members].sort(cmp), kind });
-    return { state: next, touched: [...members, id] };
+    return out;
   };
 
   type Cand = { state: State; touched: string[] };
@@ -379,27 +489,48 @@ export function proposeCut(input: CutInput): CutProposal | null {
     const a = assess(c.state, affected, agg);
     return { state: c.state, agg: a, j: objective(a) };
   };
-  /** The pairs of cut members (`only`: just these) that go together or are small, best first, as gather candidates. */
+  /** The pairs of values of the cut (`only`: just these) that go together or are small, best first, as candidates: gather, join, merge. */
+  const pairMemo = new Map<string, { sc: number; size: number }>();
   const gatherCands = (st: State, agg: Agg, only?: ReadonlySet<string>): Cand[] => {
-    const real = [...st.cut].filter((m) => !st.v.has(m) && (!only || only.has(m))).sort(cmp);
+    const cache = new Map<string, Set<number>>();
+    const docsOf = (u: string): Set<number> => cache.get(u) ?? (cache.set(u, docsOfMember(u, st)), cache.get(u) as Set<number>);
+    const units = [...st.cut].filter((m) => !only || only.has(m)).sort(cmp);
+    const sig = (u: string): string => {
+      const v = st.v.get(u);
+      return v ? `${u}#${v.members.join(',')}` : u;
+    };
+    const small = (u: string): boolean => (agg.main.get(u) ?? 0) < sMin;
     const ranked: Array<{ a: string; b: string; score: number }> = [];
-    for (let x = 0; x < real.length; x++) {
-      for (let y = x + 1; y < real.length; y++) {
-        const A = docsOfMember(real[x]!, st);
-        const B = docsOfMember(real[y]!, st);
-        const [few, many] = A.size < B.size ? [A, B] : [B, A];
-        let both = 0;
-        for (const i of few) if (many.has(i)) both++;
-        let sc = A.size > 0 && B.size > 0 ? (both / A.size) * (both / B.size) : 0;
-        const small = (agg.main.get(real[x]!) ?? 0) < sMin || (agg.main.get(real[y]!) ?? 0) < sMin;
-        // Siblings that are small and have a parent to go under (a latent one, or a node above both that is no value of today) are candidates even if they never co-occur.
-        if (sc === 0 && !(small && (latent.some((l) => l.covers.includes(real[x]!) && l.covers.includes(real[y]!)) || (topOf(real[x]!) === topOf(real[y]!) && !topSet.has(real[x]!))))) continue;
-        if (sc === 0) sc = 1e-6;
-        ranked.push({ a: real[x]!, b: real[y]!, score: sc });
+    for (let x = 0; x < units.length; x++) {
+      for (let y = x + 1; y < units.length; y++) {
+        // What two units share depends on them alone: kept from round to round, only the pairs with a new unit are counted.
+        const key = `${sig(units[x]!)}|${sig(units[y]!)}`;
+        let known = pairMemo.get(key);
+        if (!known) {
+          const A = docsOf(units[x]!);
+          const B = docsOf(units[y]!);
+          const [few, many] = A.size < B.size ? [A, B] : [B, A];
+          let both = 0;
+          for (const i of few) if (many.has(i)) both++;
+          pairMemo.set(key, (known = { sc: A.size > 0 && B.size > 0 ? (both / A.size) * (both / B.size) : 0, size: A.size + B.size }));
+        }
+        let sc = known.sc;
+        // A small block that never meets another still has to go somewhere: into a parent it shares with it (vocabulary, tree), else the smallest block.
+        if (sc === 0) {
+          if (!small(units[x]!) && !small(units[y]!)) continue;
+          const kin = latent.some((l) => l.covers.includes(units[x]!) && l.covers.includes(units[y]!)) || (topOf(units[x]!) === topOf(units[y]!) && !topSet.has(units[x]!));
+          sc = (kin ? 1e-4 : 1e-6) / (1 + known.size);
+        }
+        ranked.push({ a: units[x]!, b: units[y]!, score: sc });
       }
     }
     ranked.sort((p, q) => q.score - p.score || cmp(p.a, q.a) || cmp(p.b, q.b));
-    return ranked.slice(0, CUT.pairs).flatMap((p) => gatherState(st, p.a, p.b) ?? []);
+    const pick = ranked.slice(0, CUT.pairs);
+    for (const u of units) {
+      const r = small(u) ? ranked.find((p) => p.a === u || p.b === u) : undefined;
+      if (r && !pick.includes(r)) pick.push(r);
+    }
+    return pick.flatMap((p) => joinStates(st, p.a, p.b));
   };
   const best = (list: readonly Scored[], j: number): Scored | null => {
     let top: Scored | null = null;
@@ -408,11 +539,11 @@ export function proposeCut(input: CutInput): CutProposal | null {
   };
 
   /** One greedy climb from `st`. */
-  const climb = (start: State): { st: State; agg: Agg; j: number } => {
+  const climb = (start: State, detour = 0): { st: State; agg: Agg; j: number } => {
     let st = start;
     let agg = assess(st, null, null);
     let j = objective(agg);
-    for (let round = 0; round < CUT.rounds; round++) {
+    for (let round = 0; round < Math.max(CUT.rounds, top.length); round++) {
       const scored: Scored[] = [];
       for (const m of [...st.cut].sort(cmp)) {
         if (st.v.has(m) || (agg.carry.get(m) ?? 0) / n <= CUT.generic) continue;
@@ -430,7 +561,11 @@ export function proposeCut(input: CutInput): CutProposal | null {
         if (cur.state !== scored[scored.length - 1]!.state) scored.push(cur);
       }
       for (const c of gatherCands(st, agg)) scored.push(score(c, st, agg));
-      const pick = best(scored, j);
+      // Second thoughts only when no split or gather helps any more.
+      let pick = best(scored, j);
+      // A detour: the first step is the `detour`-th best instead of the best, so the climb does not always end in the same corner.
+      if (round === 0 && detour > 0) pick = [...scored].sort((p, q) => q.j - p.j)[detour] ?? null;
+      if (!pick) pick = best(relocateCands(st).map((c) => score(c, st, agg)), j);
       if (!pick) break;
       st = pick.state;
       // An exact reading after each step keeps the approximation of the specificity from piling up.
@@ -440,13 +575,72 @@ export function proposeCut(input: CutInput): CutProposal | null {
     return { st, agg, j };
   };
 
+  // ---- the operations a cut leads to, and the numbers the Map shows after them
+  const splitsOf = (st: State): string[] => {
+    const members = new Set([...st.v.values()].flatMap((v) => v.members));
+    return top.filter((g) => !st.cut.has(g) && !members.has(g));
+  };
+  const risen = (st: State, g: string): string[] => [...st.cut].filter((c) => !st.v.has(c) && !topSet.has(c) && topOf(c) === g).sort(cmp);
+  /** Operations of a cut (provisional parents take their label as it is in `st`), the concepts of the vocabulary it needs, and the id each gathered parent will have. */
+  const opsOf = (st: State): { ops: CutOp[]; materialize: string[]; idOf: Map<string, string>; packs: Array<{ id: string; label: string }> } => {
+    const ops: CutOp[] = [];
+    const materialize: string[] = [];
+    const packs: Array<{ id: string; label: string }> = [];
+    const taken = new Set(slugs);
+    const idOf = new Map<string, string>();
+    for (const v of [...st.v.values()].sort((a, b) => cmp(a.id, b.id))) {
+      if (v.kind === 'pack') {
+        materialize.push(v.id);
+        packs.push({ id: v.id, label: v.label });
+        idOf.set(v.id, v.id);
+        continue;
+      }
+      const base = v.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'area';
+      let id = base;
+      for (let k = 2; taken.has(id); k++) id = `${base}-${k}`;
+      taken.add(id);
+      idOf.set(v.id, id);
+      ops.push({ op: 'create', id, label: v.label, parents: input.root ? [input.root] : [] });
+    }
+    const level1 = input.root ? [input.root] : [];
+    for (const g of splitsOf(st)) {
+      if ((live.get(g)?.parents.length ?? 0) > 0) ops.push({ op: 'move', id: g, parents: [] });
+      ops.push({ op: 'setFamily', id: g, family: 'many' });
+      for (const c of risen(st, g)) ops.push({ op: 'move', id: c, parents: level1 });
+    }
+    for (const v of [...st.v.values()].sort((a, b) => cmp(a.id, b.id))) for (const m of v.members) ops.push({ op: 'move', id: m, parents: [idOf.get(v.id) as string] });
+    return { ops, materialize, idOf, packs };
+  };
+  /** The blocks the Map shows after the operations: the taxonomy they lead to, read by the Map's own functions. */
+  const simulate = (ops: readonly CutOp[], packs: ReadonlyArray<{ id: string; label: string }>, made: ReadonlySet<string> = new Set()): Measured => {
+    const map = new Map<string, MeasureNode>(input.nodes.map((x) => [x.id, { id: x.id, label: x.label, parents: [...x.parents], status: x.status, family: x.family }]));
+    for (const pk of packs) if (!map.has(pk.id)) map.set(pk.id, { id: pk.id, label: pk.label, parents: input.root ? [input.root] : [] });
+    for (const o of ops) {
+      if (o.op === 'create') map.set(o.id, { id: o.id, label: o.label, parents: [...o.parents] });
+      else {
+        const x = map.get(o.id);
+        if (!x) continue;
+        if (o.op === 'move') x.parents = [...o.parents];
+        else x.family = o.family;
+      }
+    }
+    return measureFamily([...map.values()], input.docs, { mode: input.family ?? 'topic', root: input.root, n, sMin, skipGeneric: made });
+  };
+  const truth = (st: State): Measured => {
+    const p = opsOf(st);
+    return simulate(p.ops, p.packs, new Set(p.idOf.values()));
+  };
+  const statsOf = (m: Measured): CutStats => ({ blocks: m.blocks, clearPct: m.clearPct, coverage: m.coverage, largestPct: m.largestPct, smallest: m.smallest });
+
   const s0 = state0();
-  const agg0 = assess(s0, null, null);
-  const j0 = objective(agg0);
-  let result = climb(s0);
+  const before = simulate([], []);
+  const jBefore = objectiveOf(before);
+  const starts: Array<{ st: State }> = preset ? [{ st: preset }] : [climb(s0)];
+  // On a small library there is time to start the climb again from the second and third best first step.
+  if (!preset && docs.length * top.length <= CUT.detours) for (const d of [1, 2]) starts.push(climb(s0, d));
   // Second start: the values of today gathered under the level 1 concepts of the field vocabulary.
   const tops = latent.filter((l) => l.top);
-  if (tops.length > 0) {
+  if (!preset && tops.length > 0) {
     const s1 = state0();
     for (const l of tops) {
       const members = top.filter((t) => s1.cut.has(t) && !s1.v.has(t) && l.covers.includes(t) && 2 + height(t) <= CUT.maxDepth);
@@ -458,19 +652,21 @@ export function proposeCut(input: CutInput): CutProposal | null {
       s1.cut.add(l.id);
       s1.v.set(l.id, { id: l.id, label: l.label, members: [...members].sort(cmp), kind: 'pack' });
     }
-    if (s1.v.size > 0) {
-      const alt = climb(s1);
-      if (alt.j > result.j + 1e-9) result = alt;
-    }
+    if (s1.v.size > 0) starts.push(climb(s1));
   }
-  // Too small a gain: no move, the cut stays today's values (the answer still carries the numbers of today).
-  if (result.j < j0 + CUT.gain) result = { st: s0, agg: agg0, j: j0 };
+  // The finalists are judged by what the Map will show; too small a gain: no move, the cut stays today's values.
+  let result: { st: State; j: number } | null = null;
+  for (const r of starts) {
+    const j = objectiveOf(truth(r.st));
+    if (!result || j > result.j + 1e-9) result = { st: r.st, j };
+  }
+  if (!result || (!preset && result.j < jBefore + CUT.gain)) result = { st: s0, j: jBefore };
 
   // ---- the moves of the final cut, and the cut with some of them left out
   const finalSt = result.st;
+  const finalAgg = assess(finalSt, null, null);
   const inMember = new Set([...finalSt.v.values()].flatMap((v) => v.members));
   const splits = top.filter((g) => !finalSt.cut.has(g) && !inMember.has(g));
-  const risen = (st: State, g: string): string[] => [...st.cut].filter((c) => !st.v.has(c) && !topSet.has(c) && topOf(c) === g).sort(cmp);
   const childOf = (m: string, st: State, a: Agg): CutChild => ({ id: m, label: label(m, st), papers: a.carry.get(m) ?? under(m).size });
   /** Every node that rose out of `g`: in the cut, or gathered under a parent after rising. */
   const riseAll = (st: State, g: string): string[] => [...new Set([...st.cut, ...[...st.v.values()].flatMap((v) => v.members)])].filter((c) => !st.v.has(c) && !topSet.has(c) && topOf(c) === g).sort(cmp);
@@ -482,7 +678,7 @@ export function proposeCut(input: CutInput): CutProposal | null {
   };
   const moves: CutMove[] = [];
   for (const g of splits) {
-    moves.push({ id: `split:${g}`, kind: 'split', label: label(g), papers: result.agg.carry.get(g) ?? under(g).size, share: r2(under(g).size / n), children: riseAll(finalSt, g).map((m) => childOf(m, finalSt, result.agg)), requires: [], pinsLost: pinsLostBy(g) });
+    moves.push({ id: `split:${g}`, kind: 'split', label: label(g), papers: finalAgg.carry.get(g) ?? under(g).size, share: r2(under(g).size / n), children: riseAll(finalSt, g).map((m) => childOf(m, finalSt, finalAgg)), requires: [], pinsLost: pinsLostBy(g) });
   }
   for (const v of [...finalSt.v.values()].sort((a, b) => cmp(a.id, b.id))) {
     const requires = [...new Set(v.members.filter((m) => !topSet.has(m)).map((m) => topOf(m)).filter((g): g is string => g !== undefined && splits.includes(g)))].sort(cmp).map((g) => `split:${g}`);
@@ -490,19 +686,14 @@ export function proposeCut(input: CutInput): CutProposal | null {
       id: `gather:${v.id}`,
       kind: 'gather',
       label: v.label,
-      papers: result.agg.carry.get(v.id) ?? 0,
-      share: r2((result.agg.carry.get(v.id) ?? 0) / n),
-      children: v.members.map((m) => childOf(m, finalSt, result.agg)),
+      papers: finalAgg.carry.get(v.id) ?? 0,
+      share: r2((finalAgg.carry.get(v.id) ?? 0) / n),
+      children: v.members.map((m) => childOf(m, finalSt, finalAgg)),
       parent: v.kind === 'pack' ? { kind: 'pack', id: v.id, label: v.label } : { kind: 'provisional', label: v.label },
       requires,
       pinsLost: 0,
     });
   }
-
-  const splitsOf = (st: State): string[] => {
-    const members = new Set([...st.v.values()].flatMap((v) => v.members));
-    return top.filter((g) => !st.cut.has(g) && !members.has(g));
-  };
 
   const select: CutProposal['select'] = (skipIds = [], names = {}) => {
     const off = new Set(skipIds);
@@ -525,41 +716,20 @@ export function proposeCut(input: CutInput): CutProposal | null {
       for (const c of risen(st, g)) st.cut.delete(c);
       st.cut.add(g);
     }
-    const agg = assess(st, null, null);
     // Provisional parents take the name the user wrote.
     for (const v of st.v.values()) if (v.kind === 'provisional' && names[`gather:${v.id}`]) st.v.set(v.id, { ...v, label: names[`gather:${v.id}`] as string });
-    const items: CutItem[] = [...st.cut].map((id) => {
+    const plan = opsOf(st);
+    const after = simulate(plan.ops, plan.packs, new Set(plan.idOf.values()));
+    // The blocks of the Map: a value of the Map is the id the node will have; the papers of a block are the ones whose main value it is.
+    const backTo = new Map([...plan.idOf].map(([virt, real]) => [real, virt]));
+    const items: CutItem[] = [...after.main].map(([value, papers]) => {
+      const id = backTo.get(value) ?? value;
       const virt = st.v.get(id);
-      return { id, label: label(id, st), papers: agg.main.get(id) ?? 0, kind: virt ? ('gather' as const) : topSet.has(id) ? ('keep' as const) : ('split-child' as const), ...(virt ? { children: virt.members.map((m) => childOf(m, st, agg)) } : {}) };
+      return { id, label: label(id, st), papers, kind: virt ? ('gather' as const) : topSet.has(id) ? ('keep' as const) : ('split-child' as const), ...(virt ? { children: virt.members.map((m) => childOf(m, st, finalAgg)) } : {}) };
     });
     items.sort((a, b) => b.papers - a.papers || cmp(a.id, b.id));
-    const ops: CutOp[] = [];
-    const materialize: string[] = [];
-    const taken = new Set(slugs);
-    const idOf = new Map<string, string>();
-    for (const v of [...st.v.values()].sort((a, b) => cmp(a.id, b.id))) {
-      if (v.kind === 'pack') {
-        materialize.push(v.id);
-        idOf.set(v.id, v.id);
-        continue;
-      }
-      const base = v.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'area';
-      let id = base;
-      for (let k = 2; taken.has(id); k++) id = `${base}-${k}`;
-      taken.add(id);
-      idOf.set(v.id, id);
-      ops.push({ op: 'create', id, label: v.label, parents: input.root ? [input.root] : [] });
-    }
-    const level1 = input.root ? [input.root] : [];
-    for (const g of splitsOf(st)) {
-      if ((live.get(g)?.parents.length ?? 0) > 0) ops.push({ op: 'move', id: g, parents: [] });
-      ops.push({ op: 'setFamily', id: g, family: 'many' });
-      for (const c of risen(st, g)) ops.push({ op: 'move', id: c, parents: level1 });
-    }
-    for (const v of [...st.v.values()].sort((a, b) => cmp(a.id, b.id))) for (const m of v.members) ops.push({ op: 'move', id: m, parents: [idOf.get(v.id) as string] });
-    return { after: stats(agg), cut: items, ops, materialize, skipped: [...off].sort(cmp) };
+    return { after: statsOf(after), cut: items, ops: plan.ops, materialize: plan.materialize, skipped: [...off].sort(cmp) };
   };
 
-  const unclear = docs.flatMap((d, i) => (agg0.docs.get(i)?.clear ? [] : [d.id])).slice(0, 5000);
-  return { before: stats(agg0), moves, unclear, select };
+  return { prop: { before: statsOf(before), moves, unclear: before.unclear.slice(0, 5000), select }, state: finalSt };
 }

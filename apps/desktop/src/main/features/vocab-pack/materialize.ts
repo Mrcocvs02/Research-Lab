@@ -68,7 +68,8 @@ const levelsOf = (tax: Pick<TaxonomyFile, 'nodes'>, id: string): number => {
 /**
  * What turns a concept into a tag: the missing ancestors (down from level 1 of the family) and the concept itself, each linked with
  * `setPack`; the family root too when it does not exist yet. Pure. `own` is the user's choice of label and parent for the concept itself
- * (the review of an AI proposal lets them change both): a different parent means the concept alone, under it. Returns null when the chain
+ * (the review of an AI proposal lets them change both): a different parent means the concept alone, under it (`alone`: the concept alone under `parentId`
+ * even when that is its nearest parent, as the macro-areas need it at level 1, D-561). Returns null when the chain
  * would go deeper than the library allows (`reason: depth`).
  */
 export function materialization(
@@ -77,7 +78,7 @@ export function materialization(
   loaded: LoadedPack,
   conceptId: string,
   lang: 'it' | 'en',
-  own: { label?: string | undefined; parentId?: string | null | undefined } = {},
+  own: { label?: string | undefined; parentId?: string | null | undefined; alone?: boolean | undefined } = {},
 ): Materialization | { depth: true } {
   const concept = loaded.byId.get(conceptId);
   if (!concept) throw new Error(`unknown concept ${conceptId}`);
@@ -91,7 +92,7 @@ export function materialization(
   let root = familyRoot(tax, state, concept.family);
   let madeRoot: Materialization['root'];
   const base = nearestParent(tax, state, loaded, concept);
-  const alone = own.parentId !== undefined && own.parentId !== base;
+  const alone = own.alone === true || (own.parentId !== undefined && own.parentId !== base);
   // The chain from the first missing ancestor down to the concept.
   const chain: PackConceptIn[] = [concept];
   if (!alone) for (let c = concept.parent ? loaded.byId.get(concept.parent) : undefined, i = 0; c && !linked.has(c.id) && i < 8; c = c.parent ? loaded.byId.get(c.parent) : undefined, i++) chain.unshift(c);

@@ -66,6 +66,13 @@ export interface TagCleanupRow {
   variants: Record<string, { ops: TaxonomyOp[]; docEdits: number }>;
 }
 
+/** Automatic acceptance of new proposals (D-512): off, the sure ones, or all (sure + likely); `last` is the latest automatic batch. */
+export type TagAutoMode = 'off' | 'sure' | 'all';
+export interface TagAutoState {
+  mode: TagAutoMode;
+  last: { n: number; sure: number; likely: number; changeId: string; at: string } | null;
+}
+
 /** The state of the run (steps done and their change ids), kept in `<dataDir>/tag-review.json`. */
 export interface TagRun {
   startedAt: string | null;
@@ -94,10 +101,10 @@ const step = z.number().int().min(1).max(5);
 const run = z.custom<TagRun>();
 
 export const tagReviewChannels = defineChannels('tagReview', {
-  /** Proposals (review list), health strip and run state; with `step`, the rows of that step of the cleanup. */
+  /** Proposals (review list; `acceptable` = ids "Accept all" takes: sure and likely, past the guardrails of D-512), health strip and run state; with `step`, the rows of that step of the cleanup. */
   get: {
     request: z.object({ step: step.optional() }),
-    response: z.custom<{ revision: number; proposals: TagProposal[]; health: TagHealthItem[]; stats: TagStats; run: TagRun; rows?: TagCleanupRow[] }>(),
+    response: z.custom<{ revision: number; proposals: TagProposal[]; health: TagHealthItem[]; stats: TagStats; run: TagRun; rows?: TagCleanupRow[]; acceptable: string[]; auto: TagAutoState }>(),
   },
   /**
    * Applies proposals (`items`: by id, with the survivor / label / action chosen) or the ticked rows of a cleanup `step`
@@ -112,6 +119,8 @@ export const tagReviewChannels = defineChannels('tagReview', {
     }),
     response: z.custom<{ changeId: string; changeIds: string[]; applied: number; documentsChanged: number; run: TagRun }>(),
   },
+  /** Sets the automatic acceptance mode (`mode`) and/or forgets the notice of the last automatic batch (`dismiss`). */
+  setAuto: { request: z.object({ mode: z.enum(['off', 'sure', 'all']).optional(), dismiss: z.boolean().optional() }), response: z.custom<TagAutoState>() },
   /** "Not the same": the pairs of the proposals are marked distinct (undoable); other kinds are dismissed in `tag-review.json`. */
   reject: { request: z.object({ ids: z.array(rowId).min(1).max(500) }), response: z.custom<{ changeId: string | null; rejected: number }>() },
   /** "Skip" a step of the run (no change). */

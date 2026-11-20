@@ -73,3 +73,11 @@ export function moveIndex(i: number, key: string, n: number): number {
 
 /** Rows that touch a tag ("Similar" in the node editor). */
 export const proposalsFor = (list: readonly TagProposal[], id: string): TagProposal[] => list.filter((p) => p.kind !== 'parent' && p.tags.includes(id));
+
+/** What "Accept all" takes (D-512): the proposals main marked acceptable (sure and likely, past the guardrails), with how many of each. */
+export function acceptAll(list: readonly TagProposal[], acceptable: readonly string[]): { items: TagProposal[]; sure: number; likely: number } {
+  const ok = new Set(acceptable);
+  const items = list.filter((p) => ok.has(p.id));
+  const sure = items.filter((p) => p.confidence === 'sure').length;
+  return { items, sure, likely: items.length - sure };
+}

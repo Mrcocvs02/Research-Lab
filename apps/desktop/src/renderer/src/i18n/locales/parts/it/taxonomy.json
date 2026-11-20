@@ -204,7 +204,8 @@
           "related": "Claude: collegati",
           "different": "Claude: diversi"
         }
-      }
+      },
+      "acceptAll": "Accetta tutte ({{count}})"
     },
     "cleanup": {
       "open": "Riordina…",
@@ -270,13 +271,29 @@
         "pick": "Un valore per lavoro",
         "many": "Consenti più valori",
         "topic": "Metti sotto Topic"
-      }
+      },
+      "acceptAll": "Accetta tutte ({{count}})"
     },
     "board": {
       "unsorted": "Da sistemare ({{count}})",
       "families": "Famiglie",
       "putIn": "Metti in…",
       "put": "Metti in ({{count}})"
+    },
+    "acceptAll": {
+      "title": "Accettare tutte le proposte?",
+      "what": "Verranno applicate {{sure}} proposte sicure e {{likely}} probabili.",
+      "undo": "È un'unica modifica: un solo Annulla rimette tutto com'era.",
+      "confirm": "Accetta {{count}}"
+    },
+    "auto": {
+      "label": "Accetta automaticamente le proposte",
+      "mode": {
+        "off": "No",
+        "sure": "Solo le sicure",
+        "all": "Tutte"
+      },
+      "notice": "{{count}} proposte accettate automaticamente"
     }
   }
 }

@@ -261,6 +261,7 @@ export const CHANNEL_NAMES: readonly string[] = [
   'tagReview:apply',
   'tagReview:get',
   'tagReview:reject',
+  'tagReview:setAuto',
   'tagReview:skip',
   'tagReview:undoRun',
   'taxonomy:apply',

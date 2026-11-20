@@ -93,4 +93,4 @@ export { maintenanceTargetSchema, MAINTENANCE_TARGETS } from './maintenance.js';
 export { RESOURCE_KINDS, type ResourceKind, type ResourceView, type ImportIdItem, type ImportIdAddResult, type ImportIdState, type ResumeInfo } from './resources.js';
 export { CITECTX_LIMITS, COMPARE_LIMITS, GROUPS_LIMITS, compareCellSchema, compareColumnSchema, compareRowSchema, compareTableSchema, groupsOverviewSchema, type CompareCell, type CompareColumn, type CompareRow, type CompareTable, type GroupsOverview } from './synthesis.js';
 export { REFS_LIMITS, type GuidePassage, type RefEntry } from './refs.js';
-export type { TagProposal, TagRun, TagCleanupRow, TagHealthItem, TagStats, TagAiPlan } from './tag-review.js';
+export type { TagProposal, TagRun, TagCleanupRow, TagHealthItem, TagStats, TagAiPlan, TagAutoMode, TagAutoState } from './tag-review.js';

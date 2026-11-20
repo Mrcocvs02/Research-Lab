@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { DocumentRecord, TagProposal, TagRun } from '@rl/core';
+import type { DocumentRecord, TagAutoMode, TagAutoState, TagProposal, TagRun } from '@rl/core';
 import { atomicWriteJson } from '@rl/core/node';
 import type { CleanupInput, Proposal } from '@rl/data/tag-vocabulary';
 import type { MainServices } from '../../ipc/handlers/services.js';
@@ -16,16 +16,24 @@ export interface State {
   dismissed: string[];
   ai: Record<string, Ai>;
   migrated: boolean;
+  /** D-512: automatic acceptance, the proposals it already took (never taken again after an undo) and its last batch. */
+  auto: TagAutoMode;
+  autoDone: string[];
+  autoLast: TagAutoState['last'];
 }
 export const emptyRun = (): TagRun => ({ startedAt: null, steps: [], before: null, dismissed: 0 });
 export const FILE = 'tag-review.json';
 
+function autoOf(v: Partial<State>): Pick<State, 'auto' | 'autoDone' | 'autoLast'> {
+  return { auto: v.auto === 'sure' || v.auto === 'all' ? v.auto : 'off', autoDone: Array.isArray(v.autoDone) ? v.autoDone.slice(-5000) : [], autoLast: v.autoLast ?? null };
+}
+
 export async function readState(dataDir: string): Promise<State> {
   try {
     const v = JSON.parse(await readFile(path.join(dataDir, FILE), 'utf8')) as Partial<State>;
-    return { run: v.run ?? emptyRun(), dismissed: Array.isArray(v.dismissed) ? v.dismissed.slice(0, 20_000) : [], ai: v.ai && typeof v.ai === 'object' ? v.ai : {}, migrated: v.migrated === true };
+    return { run: v.run ?? emptyRun(), dismissed: Array.isArray(v.dismissed) ? v.dismissed.slice(0, 20_000) : [], ai: v.ai && typeof v.ai === 'object' ? v.ai : {}, migrated: v.migrated === true, ...autoOf(v) };
   } catch {
-    return { run: emptyRun(), dismissed: [], ai: {}, migrated: false };
+    return { run: emptyRun(), dismissed: [], ai: {}, migrated: false, auto: 'off', autoDone: [], autoLast: null };
   }
 }
 export const writeState = (dataDir: string, st: State): Promise<void> => atomicWriteJson(path.join(dataDir, FILE), { ...st, run: { ...st.run, dismissed: st.dismissed.length } });

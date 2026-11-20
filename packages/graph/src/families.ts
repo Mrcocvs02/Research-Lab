@@ -159,11 +159,16 @@ export function valueSpecificity(shares: Iterable<ReadonlyArray<{ v: string; w: 
   return new Map([...count].map(([v, c]) => [v, Math.max(0.15, Math.log(n / c))]));
 }
 
+/** The weighted values of one paper. `pin` is the value the user fixed by hand as its main one (D-521, `mainTags`), already resolved to a level 1 value. */
+export type PaperValues = ReadonlyArray<{ v: string; w: number }> & { pin?: string | null | undefined };
+
 /**
- * The main value of a paper: the biggest weight, or with `spec` (D-508) the biggest weight x specificity, so a value on most papers
- * (a generic macro-area) does not win over a narrower one it ties with. Ties: the smaller id.
+ * The main value of a paper: the one the user fixed by hand (`pin`, or `list.pin`) while it is still one of the paper's values; else the biggest weight, or
+ * with `spec` (D-508) the biggest weight x specificity, so a value on most papers (a generic macro-area) does not win over a narrower one it ties with.
+ * A pin that is no longer among the values (its tag was taken off) is ignored. Ties: the smaller id.
  */
-export function mainValue(list: ReadonlyArray<{ v: string; w: number }>, spec?: ReadonlyMap<string, number>): string | null {
+export function mainValue(list: PaperValues, spec?: ReadonlyMap<string, number>, pin: string | null | undefined = list.pin): string | null {
+  if (pin && list.some((e) => e.v === pin && e.w > 0)) return pin;
   let best: { v: string; w: number } | null = null;
   const score = (e: { v: string; w: number }): number => e.w * (spec?.get(e.v) ?? 1);
   for (const e of list) if (e.w > 0 && (!best || score(e) > score(best) || (score(e) === score(best) && e.v < best.v))) best = e;
@@ -172,9 +177,9 @@ export function mainValue(list: ReadonlyArray<{ v: string; w: number }>, spec?: 
 
 /**
  * The test: coverage >= 0.6, clarity >= 0.7, 2 to 12 values (more is fine when the 12 biggest hold 80% of the papers: the rest goes to "Other").
- * A family of kind `one` is clear by construction; the keywords family never passes. `shares` is the weighted values of each paper (the ones with none may be left out).
+ * A family of kind `one` is clear by construction, and so is a paper whose main value the user fixed; the keywords family never passes. `shares` is the weighted values of each paper (the ones with none may be left out).
  */
-export function familyEligibility(shares: Iterable<ReadonlyArray<{ v: string; w: number }>>, total: number, opts: { one?: boolean; keywords?: boolean } = {}): Eligibility {
+export function familyEligibility(shares: Iterable<PaperValues>, total: number, opts: { one?: boolean; keywords?: boolean } = {}): Eligibility {
   const all = [...shares];
   const spec = valueSpecificity(all);
   const main = new Map<string, number>();
@@ -186,7 +191,7 @@ export function familyEligibility(shares: Iterable<ReadonlyArray<{ v: string; w:
     withValue++;
     main.set(m, (main.get(m) ?? 0) + 1);
     const sum = list.reduce((s, e) => s + Math.max(0, e.w), 0);
-    if (opts.one || list.find((e) => e.v === m)!.w / sum >= ELIGIBLE.share) clear++;
+    if (opts.one || (list.pin && list.pin === m) || list.find((e) => e.v === m)!.w / sum >= ELIGIBLE.share) clear++;
   }
   const counts = [...main.values()].sort((a, b) => b - a);
   const values = counts.length;

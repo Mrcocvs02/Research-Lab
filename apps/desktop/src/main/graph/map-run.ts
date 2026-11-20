@@ -7,6 +7,8 @@ import { drift, loadModel, modelId, noModel, placePending } from './service.js';
 import { loadView, scopeIds } from './view.js';
 
 const clusterId = (m: GraphModel, c: number): string => (m.clusters[c] as { id: string }).id;
+/** The compact reading state of a point (D-525): 1 = in studio, 2 = read; nothing for "to read". */
+const reading = (state: string | undefined): { st?: 1 | 2 } => (state === 'reading' ? { st: 1 } : state === 'read' ? { st: 2 } : {});
 
 /** `graph:map` (loaded on first use): one point per document of the scope with its clusters, the clusters, and the macro-areas of the points. */
 export async function map(s: MainServices, scope: { folder?: string | undefined; projectId?: string | undefined; tagId?: string | undefined } | undefined) {
@@ -16,17 +18,17 @@ export async function map(s: MainServices, scope: { folder?: string | undefined;
   if (!lm) throw noModel();
   const m = lm.model;
   const wanted = await scopeIds(rt, view, scope);
-  const points: Array<{ docId: string; x: number; y: number; clusters: string[]; ar?: number[][] | undefined; az?: number | undefined }> = [];
+  const points: Array<{ docId: string; x: number; y: number; clusters: string[]; ar?: number[][] | undefined; az?: number | undefined; st?: 1 | 2 }> = [];
   const stale = new Set<string>();
   const { pending } = drift(view, m, lm.index);
   for (const r of pending) stale.add(r.id);
   for (let i = 0; i < m.ids.length; i++) {
     const id = m.ids[i] as string;
     if (stale.has(id) || !view.byId.has(id) || (wanted && !wanted.has(id))) continue;
-    points.push({ docId: id, x: m.x[i] as number, y: m.y[i] as number, clusters: (m.cl[i] as number[]).map((c) => clusterId(m, c)) });
+    points.push({ docId: id, x: m.x[i] as number, y: m.y[i] as number, clusters: (m.cl[i] as number[]).map((c) => clusterId(m, c)), ...reading(view.byId.get(id)?.study.state) });
   }
   const placed = await placePending(s, rt, view, lm, wanted ? pending.filter((r) => wanted.has(r.id)) : pending);
-  for (const [id, p] of placed) points.push({ docId: id, x: p.x, y: p.y, clusters: p.clusters.map((c) => clusterId(m, c)) });
+  for (const [id, p] of placed) points.push({ docId: id, x: p.x, y: p.y, clusters: p.clusters.map((c) => clusterId(m, c)), ...reading(view.byId.get(id)?.study.state) });
   // More documents than the reply may carry (60,000 can be built, 50,000 shown): the rest are counted so the view can say so.
   const omitted = Math.max(0, points.length - GRAPH_LIMITS.mapPoints);
   if (omitted > 0) points.length = GRAPH_LIMITS.mapPoints;

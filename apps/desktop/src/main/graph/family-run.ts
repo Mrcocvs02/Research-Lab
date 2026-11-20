@@ -1,5 +1,5 @@
 import { visibleGroupTags, type DocumentRecord } from '@rl/core';
-import { autoMemberships, familyEligibility, familyModel, layoutBlocks, mainValue, neighborsOf, parseFamily, tagMemberships, valueSpecificity, vocabLinks, type AreaModel, type AreaSummary, type Block, type Eligibility, type FamilyNode, type Memberships, type VocabLink } from '@rl/graph';
+import { autoMemberships, familyEligibility, familyModel, layoutBlocks, mainValue, neighborsOf, parseFamily, tagMemberships, valueSpecificity, vocabLinks, type AreaModel, type AreaSummary, type Block, type Eligibility, type FamilyNode, type Memberships, type PaperValues, type VocabLink } from '@rl/graph';
 import type { MainServices } from '../ipc/handlers/services.js';
 import { areaModel, weightsOf, withoutKeywords } from './areas-run.js';
 import { isSourceFamily } from './family-offer.js';
@@ -12,7 +12,7 @@ import { loadView, scopeIds, type LibraryView } from './view.js';
  * the communities of the network itself; the answer has the shape of the macro-areas (`areas`, `ar`, `az`) so the renderer colours, labels
  * and pulls the nodes with the code it already has. Nothing here writes anything.
  */
-type Scope = { folder?: string | undefined; projectId?: string | undefined; tagId?: string | undefined } | undefined;
+export type Scope = { folder?: string | undefined; projectId?: string | undefined; tagId?: string | undefined } | undefined;
 interface Item {
   id: string;
   cell?: [number, number] | undefined;
@@ -20,6 +20,8 @@ interface Item {
   others?: string[] | undefined;
   ar?: number[][] | undefined;
   az?: number | undefined;
+  /** Reading state: 1 = in studio, 2 = read; absent = to read (D-525). */
+  st?: 1 | 2 | undefined;
 }
 
 const GROUP_HINT = 'extra:';
@@ -28,9 +30,9 @@ export const scopeKey = (scope: Scope): string => JSON.stringify(scope ?? null);
 
 const docTags = (rec: DocumentRecord, withGroups: boolean): Array<{ id: string; w: number }> => (withGroups ? [...weightsOf(rec), ...visibleGroupTags(rec).map((id) => ({ id, w: 1 }))] : weightsOf(rec));
 
-interface Values {
-  /** Weighted values of level 1 of each paper that has any. */
-  docs: Map<string, Array<{ v: string; w: number }>>;
+export interface Values {
+  /** Weighted values of level 1 of each paper that has any; `pin` is the value the user fixed as the paper's main one (D-521). */
+  docs: Map<string, Array<{ v: string; w: number }> & PaperValues>;
   labels: Map<string, string>;
   /** Level 2 value of a paper inside its main value. */
   sub: (docId: string, value: string) => string | null;
@@ -48,8 +50,19 @@ interface Offer {
 }
 const reasonOf = (e: Eligibility): Reason => ({ coverage: e.coverage, clarity: e.clarity, values: e.values });
 
+/** Hand-fixed main values (`mainTags`, D-521): a paper whose fixed tag is still on it and sits under one of its values gets `pin` = that value, which wins over the choice by weight. */
+function pinValues(docs: Values['docs'], recs: readonly DocumentRecord[], key: string, valuesOfTag: (tag: string) => string[]): void {
+  for (const r of recs) {
+    const tag = r.mainTags?.[key];
+    const list = docs.get(r.id);
+    if (!tag || !list || !r.tags.includes(tag)) continue;
+    const v = valuesOfTag(tag).find((o) => list.some((e) => e.v === o));
+    if (v !== undefined) list.pin = v;
+  }
+}
+
 /** The values of level 1 and 2 of a tag family or of the topic (the macro-areas and their branches), as the blocks and the test read them. */
-async function valuesOf(s: MainServices, view: LibraryView, scope: Scope, family: string, recs: DocumentRecord[]): Promise<Values> {
+export async function valuesOf(s: MainServices, view: LibraryView, scope: Scope, family: string, recs: DocumentRecord[]): Promise<Values> {
   const ref = parseFamily(family);
   const nodes = (view.tax?.nodes ?? []) as Array<FamilyNode & { family?: string }>;
   const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -65,6 +78,7 @@ async function valuesOf(s: MainServices, view: LibraryView, scope: Scope, family
     }
     const labels = new Map(m.areas.map((a) => [a.id, a.label]));
     for (const a of m.areas) for (const b of a.branches) labels.set(b.id, view.lookup.tagLabel(b.id) ?? b.id);
+    pinValues(docs, recs, 'topic', (t) => (m.tagShare(t)?.ar ?? []).map(([a]) => m.areas[a]!.id));
     return { docs, labels, sub: (id) => branch.get(id) ?? null, one: false, keywords: false };
   }
   if (ref.kind === 'auto') {
@@ -79,8 +93,26 @@ async function valuesOf(s: MainServices, view: LibraryView, scope: Scope, family
   if (!prefix) for (const n of nodes) for (const p of n.parents) if (mem.labels.has(p)) (kids.get(p) ?? kids.set(p, []).get(p)!).push(n.id);
   const tagsById = new Map(tagged.map((d) => [d.id, d.tags]));
   const tops = [...mem.labels.keys()];
+  const docs: Values['docs'] = new Map([...mem.docs].map(([id, l]) => [id, l.map((e) => ({ v: e.cluster, w: e.w }))]));
+  if (ref.kind === 'root') {
+    // The level 1 value above a tag: the first ancestor (itself included) that hangs directly under the family root.
+    const above = (t: string): string[] => {
+      const seen = new Set<string>();
+      const stack = [t];
+      const out: string[] = [];
+      while (stack.length > 0) {
+        const x = stack.pop() as string;
+        if (seen.has(x)) continue;
+        seen.add(x);
+        if (byId.get(x)?.parents.includes(ref.value)) out.push(x);
+        else stack.push(...(byId.get(x)?.parents ?? []));
+      }
+      return out.sort();
+    };
+    pinValues(docs, recs, ref.value, above);
+  }
   return {
-    docs: new Map([...mem.docs].map(([id, l]) => [id, l.map((e) => ({ v: e.cluster, w: e.w }))])),
+    docs,
     labels,
     sub(id, value) {
       const kid = new Set(kids.get(value) ?? []);
@@ -230,7 +262,10 @@ export async function runFamily(s: MainServices, req: { family?: string | undefi
     const sh = m.docs.get(id);
     const c = laid?.cells.get(id);
     const b = laid?.blockOf.get(id);
-    if ((sh && sh.ar.length > 0) || c) items.push({ id, ...(sh && sh.ar.length > 0 ? { ar: sh.ar, az: sh.az } : {}), ...(c && b ? { cell: c, block: b.block, others: b.others } : {}) });
+    if ((sh && sh.ar.length > 0) || c) {
+      const state = view.byId.get(id)?.study.state;
+      items.push({ id, ...(sh && sh.ar.length > 0 ? { ar: sh.ar, az: sh.az } : {}), ...(c && b ? { cell: c, block: b.block, others: b.others } : {}), ...(state === 'reading' ? { st: 1 as const } : state === 'read' ? { st: 2 as const } : {}) });
+    }
   }
   return {
     families,

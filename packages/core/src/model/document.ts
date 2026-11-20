@@ -186,6 +186,8 @@ export const documentRecordSchema = z.object({
   tags: z.array(itemIdSchema).max(L.tags).default([]),
   /** Where a tag came from when it was not typed by the user (D-494); an absent key = by hand. */
   tagOrigin: z.record(itemIdSchema, z.enum(['ai', 'import'])).optional(),
+  /** The main value the user fixed by hand in a family of the Map (D-521): key = the family root id (or `topic`), value = a tag of the paper; read only while the paper still carries the tag. */
+  mainTags: z.record(itemIdSchema, itemIdSchema).refine((r) => Object.keys(r).length <= 50).optional(),
   /** Research groups (institutions) of the paper, derived from OpenAlex (D-488): they become tags `grp:<name>`, apart from `tags`. */
   groups: z.array(z.string().trim().min(1).max(L.author)).max(20).optional(),
   /** Groups of `groups` the user hid: a hidden group is no tag, and a refresh of `groups` does not bring it back. */

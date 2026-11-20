@@ -90,13 +90,13 @@ export class ExportTarget {
    * Writes `text` as a NEW file: it never replaces one that exists, even one created a moment ago by someone else (the
    * complete file is made under a temporary name and linked into place). Returns false when the name is taken.
    */
-  async writeNew(rel: string, text: string): Promise<boolean> {
+  async writeNew(rel: string, text: string | Uint8Array): Promise<boolean> {
     const abs = this.resolve(rel);
     await this.checkWalk(path.dirname(abs));
     await mkdir(path.dirname(abs), { recursive: true });
     if (await this.checkWalk(abs)) return false;
     const tmp = `${abs}.${randomBytes(4).toString('hex')}.part`;
-    await writeFile(tmp, text, { encoding: 'utf8', flag: 'wx' });
+    await writeFile(tmp, text, typeof text === 'string' ? { encoding: 'utf8', flag: 'wx' } : { flag: 'wx' });
     try {
       return await moveNew(tmp, abs);
     } finally {

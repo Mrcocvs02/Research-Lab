@@ -21,6 +21,7 @@ import { importChannels, importEvents } from './import.js';
 import { inboxChannels, inboxEvents } from './inbox.js';
 import { jobsChannels, jobsEvents } from './jobs.js';
 import { historyChannels } from './history.js';
+import { mapEditChannels, mapViewsChannels } from './map-edit.js';
 import { mcpChannels, mcpEvents } from './mcp.js';
 import { libraryChannels, libraryEvents } from './library.js';
 import { literatureChannels } from './literature.js';
@@ -52,6 +53,8 @@ export const channels = mergeRegistries(appChannels, settingsChannels, libraryCh
   groupsChannels,
   citectxChannels,
   projectSchemaChannels,
+  mapEditChannels,
+  mapViewsChannels,
 );
 
 export const events = mergeRegistries(aiEvents, annotationsEvents, appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, tagReviewEvents, watchEvents, graphEvents, exportEvents, mcpEvents, backupEvents);
@@ -92,5 +95,6 @@ export { backupInfoSchema, backupJobStatusSchema, backupManifestSchema, backupPr
 export { maintenanceTargetSchema, MAINTENANCE_TARGETS } from './maintenance.js';
 export { RESOURCE_KINDS, type ResourceKind, type ResourceView, type ImportIdItem, type ImportIdAddResult, type ImportIdState, type ResumeInfo } from './resources.js';
 export { CITECTX_LIMITS, COMPARE_LIMITS, GROUPS_LIMITS, compareCellSchema, compareColumnSchema, compareRowSchema, compareTableSchema, groupsOverviewSchema, type CompareCell, type CompareColumn, type CompareRow, type CompareTable, type GroupsOverview } from './synthesis.js';
+export { MAP_EDIT_LIMITS, type MacroChild, type MacroCutItem, type MacroMove, type MacroProposal, type MacroStats, type MapView, type MapViewFrame, type MapViewInput, type MapViewState } from './map-edit.js';
 export { REFS_LIMITS, type GuidePassage, type RefEntry } from './refs.js';
 export type { TagProposal, TagRun, TagCleanupRow, TagHealthItem, TagStats, TagAiPlan, TagAiProgress, TagAiRunResult, TagAutoMode, TagAutoState, TagHaikuBatch } from './tag-review.js';

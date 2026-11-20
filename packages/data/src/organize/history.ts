@@ -106,13 +106,23 @@ export function restoreDocument(cur: DocumentRecord, entries: readonly ChangeEnt
   for (const e of entries) {
     if (e.target.id !== undefined && e.target.id !== cur.id) throw invalidEntry('a document', { id: cur.id });
     if (e.action === 'tags.update') {
-      checkKeys(obj(e.before), new Set(['tags', 'tagOrigin']), 'a document');
-      if (!sameSet(next['tags'], obj(e.after)['tags'])) throw conflict('The tags of a document', { id: cur.id });
-      next['tags'] = obj(e.before)['tags'];
+      const before = obj(e.before);
+      const after = obj(e.after);
+      checkKeys(before, new Set(['tags', 'tagOrigin', 'mainTags']), 'a document');
+      // An entry holds the tags, and/or the hand-fixed main values (D-521) that went with them; each part is checked and restored on its own.
+      if ('tags' in before || 'tags' in after || !('mainTags' in before || 'mainTags' in after)) {
+        if (!sameSet(next['tags'], after['tags'])) throw conflict('The tags of a document', { id: cur.id });
+        next['tags'] = before['tags'];
+      }
       // The provenance of the tags (D-494) goes back with them; null = no provenance recorded.
-      if ('tagOrigin' in obj(e.before)) {
-        if (obj(e.before)['tagOrigin'] === null) delete next['tagOrigin'];
-        else next['tagOrigin'] = obj(e.before)['tagOrigin'];
+      if ('tagOrigin' in before) {
+        if (before['tagOrigin'] === null) delete next['tagOrigin'];
+        else next['tagOrigin'] = before['tagOrigin'];
+      }
+      if ('mainTags' in before || 'mainTags' in after) {
+        if (canonical(next['mainTags'] ?? null) !== canonical(after['mainTags'] ?? null)) throw conflict('The fixed values of a document', { id: cur.id });
+        if (before['mainTags'] === null || before['mainTags'] === undefined) delete next['mainTags'];
+        else next['mainTags'] = before['mainTags'];
       }
     } else if (e.action === 'ai.review') {
       const before = obj(obj(e.before)['ai']);
@@ -457,6 +467,14 @@ export class HistoryService {
     for (const id of docs) {
       for (const e of docEntries.get(id) as ChangeEntry[]) {
         if (e.action === 'ai.review') await cs.appendLog({ type: 'change', at: now, deviceId: this.c.deviceId, actor: e.actor, target: { kind: 'document', id }, action: 'ai.review', before: e.after, after: e.before });
+      }
+    }
+    // Likewise the hand-fixed main values (D-521): the inverse is logged here so that a redo brings them back.
+    for (const id of docs) {
+      for (const e of docEntries.get(id) as ChangeEntry[]) {
+        if (e.action === 'tags.update' && ('mainTags' in obj(e.before) || 'mainTags' in obj(e.after))) {
+          await cs.appendLog({ type: 'change', at: now, deviceId: this.c.deviceId, actor: e.actor, target: { kind: 'document', id }, action: 'tags.update', before: { mainTags: obj(e.after)['mainTags'] ?? null }, after: { mainTags: obj(e.before)['mainTags'] ?? null } });
+        }
       }
     }
     for (const [id, es] of projEntries) {

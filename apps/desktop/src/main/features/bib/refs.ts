@@ -69,7 +69,7 @@ const BASE = /^[^<>:"/\\|?*\u0000-\u001f]+$/;
 const RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)$/i;
 
 /** Writes `text` as `base.ext`, `base-2.ext`... : the first name that does not exist, created exclusively (nothing is overwritten, even in a race). */
-async function writeFree(target: ExportTarget, base: string, ext: string, text: string): Promise<string> {
+async function writeFree(target: ExportTarget, base: string, ext: string, text: string | Uint8Array): Promise<string> {
   for (let n = 1; n < 100; n++) {
     const file = n === 1 ? `${base}.${ext}` : `${base}-${n}.${ext}`;
     if (await target.writeNew(file, text)) return file;
@@ -87,10 +87,17 @@ async function folderOf(s: MainServices, destination: string, fileName: string |
   return { target: new ExportTarget(dir), base };
 }
 
-/** The PRISMA diagram (SVG) or its table (Markdown), written as a new file in a folder chosen by the user. */
-export async function saveText(s: MainServices, req: { destination: string; fileName: string; ext: 'svg' | 'md' | 'pdf'; text: string }): Promise<{ file: string }> {
-  const { target, base } = await folderOf(s, req.destination, req.fileName, req.ext, 'prisma');
-  // `pdf`: the text is the Markdown of a report, laid out as a plain PDF (loaded only now).
+/** The PRISMA diagram (SVG) or its table (Markdown), the Map as SVG or PNG, written as a new file in a folder chosen by the user. */
+export async function saveText(s: MainServices, req: { destination: string; fileName: string; ext: 'svg' | 'md' | 'pdf' | 'png'; text: string; base64?: boolean | undefined }): Promise<{ file: string }> {
+  if ((req.ext === 'png') !== (req.base64 === true) || req.text.length > (req.ext === 'png' ? 8_000_000 : req.ext === 'svg' ? 2_000_000 : 400_000)) throw new AppError('INVALID_REQUEST', 'The text is too long for this kind of file', { reason: 'too-long' });
+  const { target, base } = await folderOf(s, req.destination, req.fileName, req.ext, req.ext === 'png' || req.ext === 'svg' ? 'map' : 'prisma');
+  // `pdf`: the text is the Markdown of a report, laid out as a plain PDF (loaded only now). `png`: the bytes, in base64.
+  if (req.ext === 'png') {
+    const bytes = Buffer.from(req.text, 'base64');
+    // Not an image (or damaged): nothing is written. The signature of a PNG file is fixed.
+    if (bytes.length < 8 || bytes.readUInt32BE(0) !== 0x89504e47 || bytes.readUInt32BE(4) !== 0x0d0a1a0a) throw new AppError('INVALID_REQUEST', 'Not a PNG image', { reason: 'not-png' });
+    return { file: await writeFree(target, base, 'png', bytes) };
+  }
   const text = req.ext === 'pdf' ? (await import('../project/pdf.js')).reportPdf(req.text) : req.text;
   return { file: await writeFree(target, base, req.ext, text) };
 }

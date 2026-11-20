@@ -32,6 +32,8 @@ export const graphStatusSchema = z.object({
 /** Macro-areas (D-483): `ar` up to 3 triples [area, branch, share x 100], `az` the centrality x 100; `areas` is `{ id, label, count, branches }[]`. Built by the lazy `areas` chunk of the main process. */
 const A = { ar: z.array(z.array(z.number())).optional(), az: z.number().optional() };
 const areas = z.array(z.any()).optional();
+/** Reading state of a paper for the Map (D-525): 1 = in studio, 2 = read; absent = to read (the default of nearly every paper). */
+const ST = { st: z.union([z.literal(1), z.literal(2)]).optional() };
 const familyReason = z.object({ coverage: z.number(), clarity: z.number(), values: z.number() });
 const strictnessSchema = z.enum(['strict', 'normal', 'wide']).default('normal');
 const evidenceEdgeSchema = z.object({ a: documentIdSchema, b: documentIdSchema, e: z.number(), kinds: z.array(z.enum(['cites', 'linked', 'similar'])).min(1).max(3), w: z.number().optional() });
@@ -70,7 +72,7 @@ export const graphChannels = defineChannels('graph', {
       scope: z.object({ folder: relativePathSchema.optional(), projectId: z.string().max(100).optional(), tagId: itemIdSchema.optional() }).optional(),
     }),
     response: z.object({
-      points: z.array(z.object({ docId: documentIdSchema, x: z.number(), y: z.number(), clusters: z.array(z.string().max(100)).max(8), ...A })).max(GRAPH_LIMITS.mapPoints),
+      points: z.array(z.object({ docId: documentIdSchema, x: z.number(), y: z.number(), clusters: z.array(z.string().max(100)).max(8), ...A, ...ST })).max(GRAPH_LIMITS.mapPoints),
       areas,
       clusters: z.array(clusterViewSchema),
       seed: z.number().int(),
@@ -136,7 +138,7 @@ export const graphChannels = defineChannels('graph', {
     response: z.object({
       families: z.array(z.object({ id: z.string().max(200), label: z.string().max(200), count: z.number().int().nonnegative(), eligible: z.boolean().optional(), reason: familyReason.optional() })),
       areas,
-      items: z.array(z.object({ id: documentIdSchema, cell: z.array(z.number()).length(2).optional(), block: z.string().max(200).optional(), others: z.array(z.string().max(200)).max(2).optional(), ...A })).max(GRAPH_LIMITS.mapPoints),
+      items: z.array(z.object({ id: documentIdSchema, cell: z.array(z.number()).length(2).optional(), block: z.string().max(200).optional(), others: z.array(z.string().max(200)).max(2).optional(), ...A, ...ST })).max(GRAPH_LIMITS.mapPoints),
       /** With a family: whether it passes the test of the blocks, and the numbers behind it. */
       eligible: z.boolean().optional(),
       reason: familyReason.optional(),

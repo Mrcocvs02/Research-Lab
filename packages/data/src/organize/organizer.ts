@@ -13,6 +13,8 @@ import { canonical } from '../store.js';
 import { clip, inChunks, toInfo, type DocInfo, type OrgCtx, type OrganizerStore } from './common.js';
 import { HistoryService, type HistoryItem, type HistoryResult } from './history.js';
 import { ProjectService, type ProjectResult } from './projects.js';
+import { livePins, type Pins } from './pins.js';
+import type { RetagItem } from './retag.js';
 import { applyTaxonomyOps } from './taxonomy-ops.js';
 import type { DocEdit, Written } from './taxonomy-ops-ext.js';
 import { affectedNodeIds, buildTaxonomyView, docsWithAnyTag } from './taxonomy-view.js';
@@ -357,7 +359,8 @@ export class Organizer {
           const tags = recs[k]?.tags ?? [];
           // A tag the user adds again is "confirmed": its provenance mark goes away (D-494), so that counts as a change too.
           const origin = recs[k]?.tagOrigin;
-          if (canonical(compute(tags)) !== canonical(tags) || (origin !== undefined && [...addSet, ...removeSet].some((t) => t in origin))) todo.push(id);
+          const pins = recs[k]?.mainTags;
+          if (canonical(compute(tags)) !== canonical(tags) || (origin !== undefined && [...addSet, ...removeSet].some((t) => t in origin)) || (pins !== undefined && canonical(livePins(pins, compute(tags)) ?? null) !== canonical(pins))) todo.push(id);
         });
       }
       if (todo.length === 0) return { changeId: null, changed: 0, unchanged: ids.length, reindex: [] };
@@ -368,6 +371,7 @@ export class Organizer {
       const cs = store.withChange({ changeId, summary: clip(`Tags on ${todo.length} document(s): ${parts}`) });
       const now = this.ctx.now().toISOString();
       let changed = 0;
+      const unpinned = new Map<string, Pins>();
       await inChunks(todo, 8, async (id) => {
         await cs.documents.update(id, (cur) => {
           if (!cur) throw new AppError('NOT_FOUND', 'Unknown document', { docId: id });
@@ -379,15 +383,27 @@ export class Organizer {
             for (const t of [...addSet, ...removeSet]) delete left[t];
             tagOrigin = Object.keys(left).length > 0 ? left : undefined;
           }
-          if (canonical(tags) === canonical(cur.tags) && tagOrigin === cur.tagOrigin) return cur;
+          // A fixed main value whose tag is gone is dropped with it (D-521); the log keeps it so that an undo brings it back.
+          const mainTags = livePins(cur.mainTags, tags);
+          if (cur.mainTags && canonical(mainTags ?? null) !== canonical(cur.mainTags)) unpinned.set(id, cur.mainTags);
+          if (canonical(tags) === canonical(cur.tags) && tagOrigin === cur.tagOrigin && !unpinned.has(id)) return cur;
           changed++;
-          const { tagOrigin: _old, ...rest } = cur;
-          return { ...rest, tags, ...(tagOrigin ? { tagOrigin } : {}), updatedAt: now };
+          const { tagOrigin: _old, mainTags: _pins, ...rest } = cur;
+          return { ...rest, tags, ...(tagOrigin ? { tagOrigin } : {}), ...(mainTags ? { mainTags } : {}), updatedAt: now };
         });
       });
+      for (const [id, from] of unpinned) await cs.appendLog({ type: 'change', at: now, deviceId: this.ctx.deviceId, actor: 'user', target: { kind: 'document', id }, action: 'tags.update', before: { mainTags: from }, after: { mainTags: null } });
       this.ctx.invalidate();
       return { changeId, changed, unchanged: ids.length - changed, reindex: todo };
     });
+  }
+
+  /**
+   * Retags many papers, each with its own tags to add and remove and its own fixed main value (D-521), as ONE change (the Map's drag, D-522, D-534):
+   * chunked, all or nothing, undone as one. The code is in `retag.ts`, loaded with `import()` at the first use (D-501).
+   */
+  retagEach(items: readonly RetagItem[], summary: string): Promise<{ changeId: string | null; changed: number; removed: string[]; already: number } & Touched> {
+    return this.run(async () => (await import('./retag.js')).retagEach(this.ctx, items, summary));
   }
 
   /* ------------------------------ folder tree ------------------------------ */

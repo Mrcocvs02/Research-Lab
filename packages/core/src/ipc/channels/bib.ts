@@ -87,9 +87,14 @@ export const bibChannels = defineChannels('bib', {
     request: z.object({ selection: exportSelectionSchema, format: z.enum(['bibtex', 'ris', 'csl']), destination: z.string().min(1).max(1024), fileName: z.string().max(120).optional() }),
     response: reply<{ count: number; file: string }>(),
   },
-  /** A text file (SVG or Markdown of the PRISMA diagram, or `pdf`: the Markdown of a report laid out as a plain PDF) to a new file in a folder chosen with `dialog:chooseFolder`; an existing file is never overwritten (the name gets a number). */
+  /**
+   * A file to a new place in a folder chosen with `dialog:chooseFolder` (purpose `export-destination`); an existing file is never overwritten (the name gets a number).
+   * `svg` (the PRISMA diagram or the Map, text up to 2 000 000), `md` (Markdown), `pdf` (the Markdown of a report laid out as a plain PDF): text up to 400 000
+   * (`svg` up to 2 000 000); `png` (the Map): the bytes in base64 (`base64: true`, up to 8 000 000 characters).
+   */
   saveText: {
-    request: z.object({ destination: z.string().min(1).max(1024), fileName: z.string().max(100), ext: z.enum(['svg', 'md', 'pdf']), text: z.string().max(400_000) }),
+    // The size per kind is checked by the handler (lazy): `png` needs `base64`, and only `png` takes it.
+    request: z.object({ destination: z.string().min(1).max(1024), fileName: z.string().max(100), ext: z.enum(['svg', 'md', 'pdf', 'png']), text: z.string().max(8_000_000), base64: z.boolean().optional() }),
     response: reply<{ file: string }>(),
   },
   /** The PRISMA counts of a project: the app's own (from its "extend" searches) plus what the user added for steps done outside. */

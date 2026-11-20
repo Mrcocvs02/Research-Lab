@@ -180,19 +180,7 @@ export function mainValue(list: PaperValues, spec?: ReadonlyMap<string, number>,
  * A family of kind `one` is clear by construction, and so is a paper whose main value the user fixed; the keywords family never passes. `shares` is the weighted values of each paper (the ones with none may be left out).
  */
 export function familyEligibility(shares: Iterable<PaperValues>, total: number, opts: { one?: boolean; keywords?: boolean } = {}): Eligibility {
-  const all = [...shares];
-  const spec = valueSpecificity(all);
-  const main = new Map<string, number>();
-  let withValue = 0;
-  let clear = 0;
-  for (const list of all) {
-    const m = mainValue(list, spec);
-    if (m === null) continue;
-    withValue++;
-    main.set(m, (main.get(m) ?? 0) + 1);
-    const sum = list.reduce((s, e) => s + Math.max(0, e.w), 0);
-    if (opts.one || (list.pin && list.pin === m) || list.find((e) => e.v === m)!.w / sum >= ELIGIBLE.share) clear++;
-  }
+  const { withValue, clear, main } = valueStats(shares, opts.one);
   const counts = [...main.values()].sort((a, b) => b - a);
   const values = counts.length;
   const coverage = total > 0 ? withValue / total : 0;
@@ -201,6 +189,33 @@ export function familyEligibility(shares: Iterable<PaperValues>, total: number, 
   const fits = values <= ELIGIBLE.maxValues || (withValue > 0 && top / withValue >= ELIGIBLE.cover);
   const r = (v: number) => Math.round(v * 1000) / 1000;
   return { eligible: !opts.keywords && coverage >= ELIGIBLE.coverage && clarity >= ELIGIBLE.clarity && values >= 2 && fits, coverage: r(coverage), clarity: r(clarity), values };
+}
+
+/** What the blocks of the Map and the test read from the values of the papers: papers with a main value, papers whose main value is clear, papers per main value, and who is not clear. */
+export interface ValueStats {
+  withValue: number;
+  clear: number;
+  main: Map<string, number>;
+  unclear: number[];
+}
+/** The one definition of "clear" (section 19.2.2): the main value (`mainValue` with the specificity of the values) is fixed by hand or holds at least `ELIGIBLE.share` of the weight of the paper. `unclear`: indexes in `shares` of papers with a value that is not clear. */
+export function valueStats(shares: Iterable<PaperValues>, one = false): ValueStats {
+  const all = [...shares];
+  const spec = valueSpecificity(all);
+  const main = new Map<string, number>();
+  const unclear: number[] = [];
+  let withValue = 0;
+  let clear = 0;
+  all.forEach((list, i) => {
+    const m = mainValue(list, spec);
+    if (m === null) return;
+    withValue++;
+    main.set(m, (main.get(m) ?? 0) + 1);
+    const sum = list.reduce((s, e) => s + Math.max(0, e.w), 0);
+    if (one || (list.pin && list.pin === m) || list.find((e) => e.v === m)!.w / sum >= ELIGIBLE.share) clear++;
+    else unclear.push(i);
+  });
+  return { withValue, clear, main, unclear };
 }
 
 export interface VocabLink {

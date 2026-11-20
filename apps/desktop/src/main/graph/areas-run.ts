@@ -1,5 +1,5 @@
 import { type DocumentRecord } from '@rl/core';
-import { computeAreas, resolveAuthor, type AreaModel, type AreaShare, type AreaSummary, type AuthorAliases } from '@rl/graph';
+import { computeAreas, resolveAuthor, topicNodes, withoutKeywords, type AreaModel, type AreaShare, type AreaSummary, type AuthorAliases } from '@rl/graph';
 import type { MainServices } from '../ipc/handlers/services.js';
 import type { LibraryRuntime } from '../library/library-runtime.js';
 import { scopeIds, type LibraryView } from './view.js';
@@ -22,48 +22,7 @@ export function weightsOf(rec: DocumentRecord): Array<{ id: string; w: number }>
   return rec.tags.map((id) => ({ id, w: scores.get(id) ?? 1 }));
 }
 
-/** The nodes without the keywords family (§19.1.1: keywords never reach the Map), D-505. */
-export function withoutKeywords<T extends { id: string; parents: readonly string[]; family?: string | undefined }>(nodes: readonly T[]): T[] {
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const memo = new Map<string, boolean>();
-  const inKeywords = (id: string, depth = 0): boolean => {
-    const known = memo.get(id);
-    if (known !== undefined) return known;
-    const n = byId.get(id);
-    memo.set(id, false); // cycle guard
-    const r = !!n && depth < 50 && (n.family === 'keywords' || n.parents.some((p) => inKeywords(p, depth + 1)));
-    memo.set(id, r);
-    return r;
-  };
-  return nodes.filter((n) => !inKeywords(n.id));
-}
-
-/**
- * The nodes the Topic areas are made of. Without families of the controlled vocabulary: every node but the keywords. With them:
- * only the biggest family that takes several values (the Topic of the cleanup); the other families (a generic value made a family of
- * its own, Method, ...) are offered by themselves in "Group by" and must not come back as areas of Topic (D-509).
- */
-export function topicNodes<T extends { id: string; parents: readonly string[]; family?: string | undefined }>(nodes: readonly T[]): T[] {
-  const kept = withoutKeywords(nodes);
-  const roots = kept.filter((n) => n.parents.length === 0 && (n.family === 'many' || n.family === 'one'));
-  if (roots.length < 2) return kept;
-  const byId = new Map(kept.map((n) => [n.id, n]));
-  const rootOf = (id: string): string | undefined => {
-    let cur = byId.get(id);
-    for (let i = 0; cur && cur.parents.length > 0 && i < 50; i++) cur = byId.get(cur.parents[0]!);
-    return cur?.id;
-  };
-  const size = new Map<string, number>();
-  for (const n of kept) {
-    const r = rootOf(n.id);
-    if (r !== undefined) size.set(r, (size.get(r) ?? 0) + 1);
-  }
-  const many = roots.filter((r) => r.family === 'many').sort((a, b) => (size.get(b.id) ?? 0) - (size.get(a.id) ?? 0) || (a.id < b.id ? -1 : 1));
-  const topic = many[0];
-  if (!topic) return kept;
-  const others = new Set(roots.filter((r) => r.id !== topic.id).map((r) => r.id));
-  return kept.filter((n) => !others.has(rootOf(n.id) ?? ''));
-}
+export { topicNodes, withoutKeywords };
 
 export async function areaModel(rt: LibraryRuntime, view: LibraryView, scope: Scope): Promise<AreaModel> {
   const key = `${view.key}|${JSON.stringify(scope ?? null)}`;

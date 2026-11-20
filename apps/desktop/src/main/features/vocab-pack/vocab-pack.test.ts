@@ -122,6 +122,16 @@ describe('materializing a concept', () => {
     await enable(s, { packId: 'test-pack', families: {}, accept: none, reject: [] });
   });
 
+  it('for the macro-areas (D-561) a concept is made alone under the family root, a value of level 1, without the ancestors it lacks', async () => {
+    const { packHooks } = await import('../../graph/macro-run.js');
+    const ops = await packHooks(s).materialize!(['topic.beta-states'], [{ op: 'move', id: 'alpha', parents: ['topic.beta-states'] }], 'topic');
+    const creates = ops.filter((o) => o.op === 'create');
+    expect(creates).toHaveLength(1);
+    expect(creates[0]).toMatchObject({ parents: ['topic'] });
+    expect(ops.find((o) => o.op === 'setPack')).toMatchObject({ id: (creates[0] as { id: string }).id, pack: 'test-pack/topic.beta-states' });
+    expect(ops.find((o) => o.op === 'move')).toMatchObject({ id: 'alpha', parents: [(creates[0] as { id: string }).id] });
+  });
+
   it('makes the concept and the ancestors it lacks, with the family root, and tags the papers: ONE change', async () => {
     const before = await snapshot();
     const r = await materialize(s, { conceptId: 'topic.beta-spectrum', docIds: [hex(3)] });

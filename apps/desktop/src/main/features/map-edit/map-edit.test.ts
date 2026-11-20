@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { documentRecordSchema, taxonomyFileSchema, type DocumentRecord } from '@rl/core';
 import { createLibraryStore, createOrganizer, type FileLibraryStore, type Organizer } from '@rl/data';
+import { NO_VALUE_BLOCK, layoutBlocks, mainValue, valueSpecificity, valueStats } from '@rl/graph';
 import { valuesOf } from '../../graph/family-run.js';
 import { macroApply, macroPropose } from '../../graph/macro-run.js';
 import { loadView } from '../../graph/view.js';
@@ -104,6 +105,11 @@ describe('macro-areas', () => {
     expect(t.find((n) => n.id === 'a')?.parents).toEqual(['waves']);
     expect(t.find((n) => n.id === 'g')).toMatchObject({ parents: [], family: 'many' });
     expect(t.find((n) => n.id === 'c1')?.parents).toEqual(['field']);
+    // A `root:` family: the preview is what the Map reads from the values of level 1 under the root after Apply (D-561).
+    const view = await loadView(await s.runtime.require());
+    const v = await valuesOf(s, view, undefined, 'root:field', view.records);
+    const st = valueStats(v.docs.values());
+    expect({ clearPct: Math.round((st.clear / st.withValue) * 100), blocks: st.main.size, coverage: Math.round((st.withValue / all.length) * 100) }).toEqual({ clearPct: p.after.clearPct, blocks: p.after.blocks, coverage: p.after.coverage });
     expect((await org.listHistory()).filter((h) => h.changeId === r.changeId)).toHaveLength(1);
     // The papers keep their tags and are not written.
     expect(await Promise.all(all.map((_, i) => read(i + 1)))).toEqual(docsBefore);
@@ -117,5 +123,52 @@ describe('macro-areas', () => {
     await setup(nodes, docs());
     await expect(macroApply(s, { family: 'root:field', moves: ['split:zzz'], names: {} })).rejects.toMatchObject({ code: 'CONFLICT', details: { reason: 'stale' } });
     await expect(macroPropose(s, { family: 'auto' })).rejects.toMatchObject({ details: { reason: 'family' } });
+  });
+
+  describe('Topic with 14 small values on 26 works (D-561)', () => {
+    const values = Array.from({ length: 14 }, (_, i) => `v${String(i + 1).padStart(2, '0')}`);
+    const works = [
+      ['v01', 'v02'], ['v01', 'v02'], ['v02', 'v03'], ['v01', 'v03'], ['v01', 'v02', 'v03'], ['v02'],
+      ['v04', 'v05'], ['v04', 'v05'], ['v05', 'v06'], ['v04', 'v06'], ['v04', 'v05', 'v06'], ['v04', 'v05', 'v09'],
+      ['v07', 'v08'], ['v07', 'v08'], ['v08', 'v09'], ['v07', 'v09', 'v02'], ['v08'],
+      ['v10', 'v11'], ['v11', 'v12'], ['v10', 'v12', 'v03'], ['v10', 'v11', 'v12'],
+      ['v13', 'v14'], ['v13'],
+      ['v03', 'v04'], ['v06', 'v07'], ['v09', 'v10'],
+    ];
+    /** What the Map shows for Topic now: its values, the main value of each work, the clarity of §19.2.2 and the blocks as laid out. */
+    const mapShows = async () => {
+      const view = await loadView(await s.runtime.require());
+      const v = await valuesOf(s, view, undefined, 'topic', view.records);
+      const lists = [...v.docs.values()];
+      const st = valueStats(lists);
+      const spec = valueSpecificity(lists);
+      const placed = view.records.map((r) => ({ id: r.id, value: mainValue(v.docs.get(r.id) ?? [], spec) }));
+      const counts = layoutBlocks({ docs: placed, labels: v.labels, aspect: 1.6 }).blocks.filter((b) => b.id !== NO_VALUE_BLOCK).map((b) => b.count);
+      const n = view.records.length;
+      return { blocks: counts.length, clearPct: Math.round((st.clear / st.withValue) * 100), coverage: Math.round((st.withValue / n) * 100), largestPct: Math.round((Math.max(...counts) / n) * 100), smallest: Math.min(...counts) };
+    };
+
+    it('the preview is what the Map shows after Apply, and Undo brings the taxonomy back byte for byte', async () => {
+      await setup([node('topic', { family: 'many' }), ...values.map((id) => node(id, { parents: ['topic'] }))], works.map((tags, i) => doc(i + 1, tags)));
+      const taxBefore = await taxonomyText();
+      const p = await macroPropose(s, { family: 'topic' });
+      expect(p.before).toEqual(await mapShows());
+      expect(p.before).toMatchObject({ blocks: 12, clearPct: 12, smallest: 1 });
+      expect(p.after.blocks).toBeGreaterThanOrEqual(4);
+      expect(p.after.blocks).toBeLessThanOrEqual(7);
+      expect(p.after.smallest).toBeGreaterThanOrEqual(2);
+      expect(p.after.largestPct).toBeLessThanOrEqual(50);
+      expect(p.after.clearPct).toBeGreaterThanOrEqual(80);
+
+      const r = await macroApply(s, { family: 'topic', moves: p.moves.map((m) => m.id), names: {} });
+      expect(r.applied).toBe(p.moves.length);
+      expect(await mapShows()).toEqual(p.after);
+      expect(p.cut.map((c) => c.papers).sort((a, b) => b - a)).toHaveLength(p.after.blocks);
+      expect((await org.listHistory()).filter((h) => h.changeId === r.changeId)).toHaveLength(1);
+
+      await org.undo();
+      expect(await taxonomyText()).toBe(taxBefore);
+      expect(await mapShows()).toEqual(p.before);
+    });
   });
 });

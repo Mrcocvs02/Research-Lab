@@ -3,10 +3,12 @@
  * TF-IDF vectors, nearest neighbours combined with shared citations and tags, seeded Louvain clustering in levels, a
  * seeded force layout, incremental placement of new documents, and zoomable exploration of topics, authors and venues.
  */
-export { computeAreas } from './areas.js';
-export { ELIGIBLE, FAMILY_TOP, OTHER_CLUSTER, VOCAB_LINKS_PER_NODE, autoMemberships, familyEligibility, familyModel, mainValue, parseFamily, tagMemberships, valueSpecificity, vocabLinks } from './families.js';
-export type { Eligibility, FamilyKind, FamilyNode, FamilyRef, Memberships, PaperValues, VocabLink } from './families.js';
+export { computeAreas, topicNodes, withoutKeywords } from './areas.js';
+export { ELIGIBLE, FAMILY_TOP, OTHER_CLUSTER, VOCAB_LINKS_PER_NODE, autoMemberships, familyEligibility, familyModel, mainValue, parseFamily, tagMemberships, valueSpecificity, valueStats, vocabLinks } from './families.js';
+export type { Eligibility, FamilyKind, FamilyNode, FamilyRef, Memberships, PaperValues, ValueStats, VocabLink } from './families.js';
 export { CUT, proposeCut } from './macro-cut.js';
+export { measureFamily } from './macro-measure.js';
+export type { MeasureDoc, MeasureNode, Measured } from './macro-measure.js';
 export type { CutChild, CutDoc, CutInput, CutItem, CutMove, CutNode, CutOp, CutProposal, CutSelection, CutStats, LatentAncestor } from './macro-cut.js';
 export { BLOCK_GAP, BLOCK_HEAD, CELL_H, CELL_W, MAX_VALUES, NO_VALUE_BLOCK, OTHER_BLOCK, SUB_HEAD, layoutBlocks } from './blocks.js';
 export type { Block, BlockDoc, BlockInput, BlockLayout } from './blocks.js';

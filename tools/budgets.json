@@ -41,10 +41,11 @@
   },
   "main": {
     "entryJsKB": 1145,
-    "lazyJsKB": 680,
+    "lazyJsKB": 690,
     "lazyChunkKB": 30,
     "lazyChunkOverrides": {
-      "writer": 48
+      "writer": 48,
+      "macro": 36
     }
   },
   "preload": {

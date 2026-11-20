@@ -19,6 +19,7 @@ import { useLibraryEvents } from '../../lib/events';
 import { useNav } from '../../lib/nav';
 import { useNotify } from '../../lib/notify';
 import { rl } from '../../lib/rl';
+import { setMapViewIntent } from '../../lib/mapViewIntent';
 import { safeText } from '../library/safeText';
 import { BibBanner } from './BibBanner';
 import { ProjectMoreMenu } from './ProjectMoreMenu';
@@ -174,6 +175,47 @@ function MemberMenu({ title, enabled, onAssign }: { title: string; enabled: bool
       </IconButton>
       <Menu anchor={anchor} open={open} onClose={() => setOpen(false)} groups={groups} label={t('projects.moreOf', { name: title })} />
     </span>
+  );
+}
+
+/** "Map views (2)": the saved views of the Map linked to this project; a click opens one on the Map (D-527, section 20.7.1). */
+function ProjectMapViews({ projectId }: { projectId: string }) {
+  const { t } = useTranslation();
+  const nav = useNav();
+  const [views, setViews] = useState<Array<{ id: string; name: string }>>([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    let live = true;
+    rl.invoke('mapViews:list', {}).then(
+      (r) => live && setViews(r.views.filter((v) => v.projectId === projectId).map((v) => ({ id: v.id, name: v.name }))),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [projectId]);
+  if (views.length === 0) return null;
+  const go = (id: string) => {
+    setMapViewIntent(id);
+    nav.navigate({ view: 'map' });
+  };
+  return (
+    <div className="project-map-views">
+      <button type="button" className="link" aria-expanded={views.length > 1 ? open : undefined} onClick={() => (views.length === 1 ? go(views[0]!.id) : setOpen(!open))} data-testid="project-map-views">
+        {t('mapViews.projectRow', { count: views.length })}
+      </button>
+      {open && views.length > 1 && (
+        <ul>
+          {views.map((v) => (
+            <li key={v.id}>
+              <button type="button" className="link" onClick={() => go(v.id)} aria-label={t('mapViews.projectOpen', { name: safeText(v.name) })} data-testid="project-map-view-item">
+                {safeText(v.name)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -379,6 +421,8 @@ export function ProjectDetailView({ id }: { id: string }) {
           {safeText(p.description)}
         </p>
       )}
+
+      <ProjectMapViews projectId={id} />
 
       <Tabs tabs={tabs} value={tab} onChange={(x) => setTab(x as Tab)} label={t('projects.sections')} idBase="ptab" testIdBase="project-tab" />
 

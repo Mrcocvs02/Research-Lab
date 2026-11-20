@@ -125,15 +125,15 @@ interface FrameProps {
   count: number;
   onLight(id: string | null): void;
   onFly(id: string): void;
-  /** More controls for the popover of the strip (the naming of Automatic below 1440 px). */
+  /** More controls: in the strip's popover (the naming of Automatic below 1440 px); in the side column, the sections of reading, isolated papers and saved views (D-525..D-527). */
   extra?: ReactNode;
 }
 
 /**
  * The side column of 248 px (`map-side`): the blocks, the controls of the edges, the count and, at the bottom, the place of the minimap.
- * It folds into a bar of 40 px, which the caller remembers.
+ * It folds into a bar of 40 px, which the caller remembers. `top` is the bar of the multiple selection, above the blocks (D-524); `extra` the sections after the controls.
  */
-export function MapSide({ open, onToggle, minimapRef, ...p }: FrameProps & { open: boolean; onToggle(): void; minimapRef(el: HTMLElement | null): void }) {
+export function MapSide({ open, onToggle, minimapRef, top, ...p }: FrameProps & { open: boolean; onToggle(): void; minimapRef(el: HTMLElement | null): void; top?: ReactNode }) {
   const { t } = useTranslation();
   const w = useResizable('rl.w.mapSide', { def: 248, min: 220, max: 420 });
   return (
@@ -144,8 +144,10 @@ export function MapSide({ open, onToggle, minimapRef, ...p }: FrameProps & { ope
       {open && <ResizeHandle r={w} edge="start" label={t('common.resizeMap')} testId="resize-map-side" />}
       {open && (
         <div className="map-side-body">
+          {top}
           {p.blocks.length > 0 ? <BlockList blocks={p.blocks} onLight={p.onLight} onFly={p.onFly} /> : p.legend}
           <Controls c={p.controls} count={p.count} />
+          {p.extra}
           <div className="map-minislot" ref={minimapRef} />
         </div>
       )}

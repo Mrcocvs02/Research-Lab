@@ -1,0 +1,3167 @@
+{
+ "version": 1,
+ "id": "physics-qi-manybody",
+ "label": "Physics, quantum information and many-body physics",
+ "labelIt": "Fisica, informazione quantistica e fisica a molti corpi",
+ "language": "en",
+ "families": [
+  {
+   "id": "topic",
+   "label": "Topic",
+   "singleValue": false,
+   "concepts": [
+    {
+     "id": "topic.quantum-information-and-computation",
+     "label": "Quantum information and computation",
+     "labelIt": "Informazione e calcolo quantistico",
+     "aliases": [
+      "quantum information science",
+      "QIS"
+     ],
+     "arxiv": [
+      "quant-ph"
+     ]
+    },
+    {
+     "id": "topic.entanglement",
+     "label": "Entanglement",
+     "labelIt": "Entanglement",
+     "aliases": [
+      "quantum entanglement",
+      "entangled states"
+     ],
+     "parent": "topic.quantum-information-and-computation"
+    },
+    {
+     "id": "topic.entanglement-entropy",
+     "label": "Entanglement entropy",
+     "labelIt": "Entropia di entanglement",
+     "aliases": [
+      "entanglement entropies",
+      "von Neumann entanglement entropy"
+     ],
+     "parent": "topic.entanglement",
+     "distinctFrom": [
+      "entropy (thermodynamics)",
+      "Shannon entropy"
+     ]
+    },
+    {
+     "id": "topic.entanglement-spectrum",
+     "label": "Entanglement spectrum",
+     "labelIt": "Spettro di entanglement",
+     "aliases": [
+      "entanglement Hamiltonian"
+     ],
+     "parent": "topic.entanglement"
+    },
+    {
+     "id": "topic.area-law",
+     "label": "Area law",
+     "labelIt": "Legge dell'area",
+     "aliases": [
+      "area laws",
+      "area-law entanglement"
+     ],
+     "parent": "topic.entanglement"
+    },
+    {
+     "id": "topic.entanglement-measures",
+     "label": "Entanglement measures",
+     "aliases": [
+      "entanglement monotones",
+      "concurrence",
+      "logarithmic negativity"
+     ],
+     "parent": "topic.entanglement"
+    },
+    {
+     "id": "topic.multipartite-entanglement",
+     "label": "Multipartite entanglement",
+     "aliases": [
+      "GHZ states",
+      "W states"
+     ],
+     "parent": "topic.entanglement"
+    },
+    {
+     "id": "topic.quantum-error-correction",
+     "label": "Quantum error correction",
+     "labelIt": "Correzione d'errore quantistica",
+     "aliases": [
+      "QEC",
+      "quantum error-correcting codes"
+     ],
+     "parent": "topic.quantum-information-and-computation"
+    },
+    {
+     "id": "topic.stabilizer-codes",
+     "label": "Stabilizer codes",
+     "aliases": [
+      "stabiliser codes",
+      "stabilizer formalism"
+     ],
+     "parent": "topic.quantum-error-correction"
+    },
+    {
+     "id": "topic.surface-code",
+     "label": "Surface code",
+     "aliases": [
+      "surface codes"
+     ],
+     "parent": "topic.quantum-error-correction",
+     "distinctFrom": [
+      "toric code"
+     ]
+    },
+    {
+     "id": "topic.fault-tolerant-quantum-computation",
+     "label": "Fault-tolerant quantum computation",
+     "aliases": [
+      "fault tolerance",
+      "threshold theorem"
+     ],
+     "parent": "topic.quantum-error-correction"
+    },
+    {
+     "id": "topic.quantum-ldpc-codes",
+     "label": "Quantum LDPC codes",
+     "aliases": [
+      "qLDPC codes"
+     ],
+     "parent": "topic.quantum-error-correction"
+    },
+    {
+     "id": "topic.quantum-algorithms",
+     "label": "Quantum algorithms",
+     "labelIt": "Algoritmi quantistici",
+     "aliases": [
+      "quantum algorithm"
+     ],
+     "parent": "topic.quantum-information-and-computation"
+    },
+    {
+     "id": "topic.variational-quantum-algorithms",
+     "label": "Variational quantum algorithms",
+     "aliases": [
+      "VQA",
+      "VQE",
+      "variational quantum eigensolver",
+      "QAOA"
+     ],
+     "parent": "topic.quantum-algorithms"
+    },
+    {
+     "id": "topic.quantum-phase-estimation",
+     "label": "Quantum phase estimation",
+     "aliases": [
+      "QPE",
+      "phase estimation"
+     ],
+     "parent": "topic.quantum-algorithms"
+    },
+    {
+     "id": "topic.hamiltonian-simulation-algorithms",
+     "label": "Hamiltonian simulation algorithms",
+     "aliases": [
+      "Trotterization",
+      "qubitization",
+      "quantum signal processing"
+     ],
+     "parent": "topic.quantum-algorithms"
+    },
+    {
+     "id": "topic.quantum-advantage",
+     "label": "Quantum advantage",
+     "aliases": [
+      "quantum supremacy",
+      "quantum computational advantage"
+     ],
+     "parent": "topic.quantum-algorithms"
+    },
+    {
+     "id": "topic.quantum-complexity-theory",
+     "label": "Quantum complexity theory",
+     "aliases": [
+      "BQP",
+      "QMA",
+      "quantum computational complexity"
+     ],
+     "parent": "topic.quantum-algorithms"
+    },
+    {
+     "id": "topic.quantum-state-tomography-and-learning",
+     "label": "Quantum state tomography and learning",
+     "aliases": [
+      "quantum tomography",
+      "shadow tomography",
+      "classical shadows"
+     ],
+     "parent": "topic.quantum-information-and-computation"
+    },
+    {
+     "id": "topic.quantum-resource-theories",
+     "label": "Quantum resource theories",
+     "aliases": [
+      "resource theory",
+      "nonstabilizerness",
+      "quantum magic"
+     ],
+     "parent": "topic.quantum-information-and-computation"
+    },
+    {
+     "id": "topic.quantum-cryptography-and-communication",
+     "label": "Quantum cryptography and communication",
+     "aliases": [
+      "quantum key distribution",
+      "QKD",
+      "quantum networks"
+     ],
+     "parent": "topic.quantum-information-and-computation"
+    },
+    {
+     "id": "topic.quantum-many-body-physics",
+     "label": "Quantum many-body physics",
+     "labelIt": "Fisica quantistica a molti corpi",
+     "aliases": [
+      "many-body physics",
+      "quantum many-body problem"
+     ],
+     "arxiv": [
+      "cond-mat.str-el",
+      "quant-ph"
+     ]
+    },
+    {
+     "id": "topic.quantum-phase-transitions",
+     "label": "Quantum phase transitions",
+     "labelIt": "Transizioni di fase quantistiche",
+     "aliases": [
+      "quantum phase transition",
+      "QPT"
+     ],
+     "parent": "topic.quantum-many-body-physics"
+    },
+    {
+     "id": "topic.quantum-criticality",
+     "label": "Quantum criticality",
+     "aliases": [
+      "quantum critical point",
+      "quantum critical points"
+     ],
+     "parent": "topic.quantum-phase-transitions"
+    },
+    {
+     "id": "topic.deconfined-quantum-criticality",
+     "label": "Deconfined quantum criticality",
+     "aliases": [
+      "deconfined criticality",
+      "DQCP"
+     ],
+     "parent": "topic.quantum-phase-transitions"
+    },
+    {
+     "id": "topic.berezinskii-kosterlitz-thouless-transition",
+     "label": "Berezinskii-Kosterlitz-Thouless transition",
+     "aliases": [
+      "BKT transition",
+      "Kosterlitz-Thouless transition"
+     ],
+     "parent": "topic.quantum-phase-transitions"
+    },
+    {
+     "id": "topic.conformal-field-theory-in-lattice-systems",
+     "label": "Conformal field theory in lattice systems",
+     "aliases": [
+      "CFT",
+      "central charge"
+     ],
+     "parent": "topic.quantum-phase-transitions"
+    },
+    {
+     "id": "topic.ground-state-properties",
+     "label": "Ground-state properties",
+     "aliases": [
+      "ground states",
+      "ground state physics"
+     ],
+     "parent": "topic.quantum-many-body-physics"
+    },
+    {
+     "id": "topic.spectral-gap",
+     "label": "Spectral gap",
+     "aliases": [
+      "energy gap",
+      "gap problem"
+     ],
+     "parent": "topic.ground-state-properties"
+    },
+    {
+     "id": "topic.correlation-functions",
+     "label": "Correlation functions",
+     "aliases": [
+      "correlation function",
+      "correlation length"
+     ],
+     "parent": "topic.ground-state-properties"
+    },
+    {
+     "id": "topic.order-parameters-and-symmetry-breaking",
+     "label": "Order parameters and symmetry breaking",
+     "aliases": [
+      "order parameter",
+      "long-range order",
+      "spontaneous symmetry breaking"
+     ],
+     "parent": "topic.ground-state-properties"
+    },
+    {
+     "id": "topic.excitations",
+     "label": "Excitations",
+     "aliases": [
+      "elementary excitations",
+      "collective excitations"
+     ],
+     "parent": "topic.quantum-many-body-physics"
+    },
+    {
+     "id": "topic.magnons-and-spin-waves",
+     "label": "Magnons and spin waves",
+     "aliases": [
+      "magnons",
+      "spin waves"
+     ],
+     "parent": "topic.excitations"
+    },
+    {
+     "id": "topic.spinons-and-fractionalization",
+     "label": "Spinons and fractionalization",
+     "aliases": [
+      "spinon",
+      "spinons",
+      "fractionalized excitations"
+     ],
+     "parent": "topic.excitations"
+    },
+    {
+     "id": "topic.anyons",
+     "label": "Anyons",
+     "aliases": [
+      "anyon",
+      "non-Abelian anyons"
+     ],
+     "parent": "topic.excitations"
+    },
+    {
+     "id": "topic.dynamical-structure-factor",
+     "label": "Dynamical structure factor",
+     "aliases": [
+      "dynamic structure factor",
+      "spectral function"
+     ],
+     "parent": "topic.excitations"
+    },
+    {
+     "id": "topic.nonequilibrium-quantum-dynamics",
+     "label": "Nonequilibrium quantum dynamics",
+     "labelIt": "Dinamica quantistica fuori equilibrio",
+     "aliases": [
+      "non-equilibrium dynamics",
+      "thermalization"
+     ],
+     "parent": "topic.quantum-many-body-physics"
+    },
+    {
+     "id": "topic.eigenstate-thermalization-hypothesis",
+     "label": "Eigenstate thermalization hypothesis",
+     "aliases": [
+      "ETH"
+     ],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.many-body-localization",
+     "label": "Many-body localization",
+     "aliases": [
+      "MBL",
+      "many-body localisation"
+     ],
+     "parent": "topic.nonequilibrium-quantum-dynamics",
+     "distinctFrom": [
+      "Anderson localization"
+     ]
+    },
+    {
+     "id": "topic.quantum-quenches",
+     "label": "Quantum quenches",
+     "aliases": [
+      "quantum quench",
+      "quench dynamics"
+     ],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.quantum-many-body-scars",
+     "label": "Quantum many-body scars",
+     "aliases": [
+      "quantum scars",
+      "weak ergodicity breaking"
+     ],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.floquet-systems-and-time-crystals",
+     "label": "Floquet systems and time crystals",
+     "aliases": [
+      "Floquet engineering",
+      "discrete time crystals",
+      "time crystals"
+     ],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.quantum-chaos-and-scrambling",
+     "label": "Quantum chaos and scrambling",
+     "aliases": [
+      "OTOC",
+      "out-of-time-order correlators",
+      "scrambling",
+      "Lieb-Robinson bounds"
+     ],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.quantum-hydrodynamics-and-transport",
+     "label": "Quantum hydrodynamics and transport",
+     "aliases": [
+      "generalized hydrodynamics",
+      "GHD",
+      "many-body transport"
+     ],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.integrability",
+     "label": "Integrability",
+     "aliases": [
+      "integrable systems",
+      "Bethe ansatz",
+      "Yang-Baxter equation"
+     ],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.open-quantum-systems",
+     "label": "Open quantum systems",
+     "labelIt": "Sistemi quantistici aperti",
+     "aliases": [
+      "open quantum system",
+      "quantum dissipation"
+     ],
+     "parent": "topic.quantum-many-body-physics"
+    },
+    {
+     "id": "topic.lindblad-master-equation",
+     "label": "Lindblad master equation",
+     "aliases": [
+      "Lindbladian",
+      "GKSL equation"
+     ],
+     "parent": "topic.open-quantum-systems"
+    },
+    {
+     "id": "topic.quantum-trajectories",
+     "label": "Quantum trajectories",
+     "aliases": [
+      "quantum jumps"
+     ],
+     "parent": "topic.open-quantum-systems"
+    },
+    {
+     "id": "topic.measurement-induced-phase-transitions",
+     "label": "Measurement-induced phase transitions",
+     "aliases": [
+      "MIPT",
+      "monitored quantum circuits"
+     ],
+     "parent": "topic.open-quantum-systems"
+    },
+    {
+     "id": "topic.non-hermitian-physics",
+     "label": "Non-Hermitian physics",
+     "aliases": [
+      "non-Hermitian systems",
+      "PT symmetry",
+      "exceptional points"
+     ],
+     "parent": "topic.open-quantum-systems"
+    },
+    {
+     "id": "topic.random-quantum-circuits",
+     "label": "Random quantum circuits",
+     "aliases": [
+      "random circuits",
+      "unitary designs"
+     ],
+     "parent": "topic.quantum-many-body-physics"
+    },
+    {
+     "id": "topic.condensed-matter-physics",
+     "label": "Condensed matter physics",
+     "labelIt": "Fisica della materia condensata",
+     "aliases": [
+      "condensed matter",
+      "condensed-matter physics",
+      "solid state physics"
+     ],
+     "arxiv": [
+      "cond-mat"
+     ]
+    },
+    {
+     "id": "topic.electronic-structure",
+     "label": "Electronic structure",
+     "aliases": [
+      "band theory",
+      "band structure"
+     ],
+     "parent": "topic.condensed-matter-physics"
+    },
+    {
+     "id": "topic.density-functional-theory",
+     "label": "Density functional theory",
+     "aliases": [
+      "DFT",
+      "Kohn-Sham"
+     ],
+     "parent": "topic.electronic-structure"
+    },
+    {
+     "id": "topic.dynamical-mean-field-theory",
+     "label": "Dynamical mean-field theory",
+     "aliases": [
+      "DMFT",
+      "dynamical mean field theory"
+     ],
+     "parent": "topic.electronic-structure"
+    },
+    {
+     "id": "topic.gw-approximation",
+     "label": "GW approximation",
+     "aliases": [
+      "GW method",
+      "Bethe-Salpeter equation"
+     ],
+     "parent": "topic.electronic-structure"
+    },
+    {
+     "id": "topic.superconductivity",
+     "label": "Superconductivity",
+     "labelIt": "Superconduttività",
+     "aliases": [
+      "superconductors",
+      "superconducting pairing"
+     ],
+     "parent": "topic.condensed-matter-physics",
+     "arxiv": [
+      "cond-mat.supr-con"
+     ]
+    },
+    {
+     "id": "topic.high-temperature-superconductivity",
+     "label": "High-temperature superconductivity",
+     "aliases": [
+      "high-Tc superconductivity",
+      "cuprate superconductors",
+      "high Tc"
+     ],
+     "parent": "topic.superconductivity"
+    },
+    {
+     "id": "topic.pairing-mechanisms",
+     "label": "Pairing mechanisms",
+     "aliases": [
+      "pairing symmetry",
+      "d-wave pairing"
+     ],
+     "parent": "topic.superconductivity"
+    },
+    {
+     "id": "topic.pair-density-waves",
+     "label": "Pair density waves",
+     "aliases": [
+      "PDW",
+      "pair-density wave"
+     ],
+     "parent": "topic.superconductivity"
+    },
+    {
+     "id": "topic.disordered-systems",
+     "label": "Disordered systems",
+     "labelIt": "Sistemi disordinati",
+     "aliases": [
+      "disorder"
+     ],
+     "parent": "topic.condensed-matter-physics",
+     "arxiv": [
+      "cond-mat.dis-nn"
+     ]
+    },
+    {
+     "id": "topic.anderson-localization",
+     "label": "Anderson localization",
+     "aliases": [
+      "Anderson localisation"
+     ],
+     "parent": "topic.disordered-systems",
+     "distinctFrom": [
+      "Many-body localization"
+     ]
+    },
+    {
+     "id": "topic.spin-glass-physics",
+     "label": "Spin glass physics",
+     "aliases": [
+      "spin glass",
+      "replica symmetry breaking",
+      "glassy systems"
+     ],
+     "parent": "topic.disordered-systems"
+    },
+    {
+     "id": "topic.mesoscopic-and-nanoscale-physics",
+     "label": "Mesoscopic and nanoscale physics",
+     "aliases": [
+      "mesoscopic physics",
+      "quantum dots",
+      "quantum transport"
+     ],
+     "parent": "topic.condensed-matter-physics",
+     "arxiv": [
+      "cond-mat.mes-hall"
+     ]
+    },
+    {
+     "id": "topic.two-dimensional-materials",
+     "label": "Two-dimensional materials",
+     "aliases": [
+      "2D materials",
+      "graphene",
+      "moire systems",
+      "transition metal dichalcogenides"
+     ],
+     "parent": "topic.condensed-matter-physics"
+    },
+    {
+     "id": "topic.quantum-hall-effect",
+     "label": "Quantum Hall effect",
+     "labelIt": "Effetto Hall quantistico",
+     "aliases": [
+      "integer quantum Hall effect",
+      "fractional quantum Hall effect",
+      "FQHE"
+     ],
+     "parent": "topic.condensed-matter-physics"
+    },
+    {
+     "id": "topic.quantum-gases",
+     "label": "Quantum gases",
+     "labelIt": "Gas quantistici",
+     "aliases": [
+      "ultracold quantum gases",
+      "ultracold gases"
+     ],
+     "parent": "topic.condensed-matter-physics",
+     "arxiv": [
+      "cond-mat.quant-gas"
+     ]
+    },
+    {
+     "id": "topic.bose-einstein-condensation",
+     "label": "Bose-Einstein condensation",
+     "aliases": [
+      "BEC",
+      "Bose-Einstein condensate"
+     ],
+     "parent": "topic.quantum-gases"
+    },
+    {
+     "id": "topic.degenerate-fermi-gases",
+     "label": "Degenerate Fermi gases",
+     "aliases": [
+      "Fermi gases",
+      "BCS-BEC crossover"
+     ],
+     "parent": "topic.quantum-gases"
+    },
+    {
+     "id": "topic.optical-lattices",
+     "label": "Optical lattices",
+     "aliases": [
+      "optical lattice"
+     ],
+     "parent": "topic.quantum-gases"
+    },
+    {
+     "id": "topic.dipolar-and-rydberg-gases",
+     "label": "Dipolar and Rydberg gases",
+     "aliases": [
+      "dipolar quantum gases"
+     ],
+     "parent": "topic.quantum-gases"
+    },
+    {
+     "id": "topic.soft-and-active-matter",
+     "label": "Soft and active matter",
+     "aliases": [
+      "soft condensed matter",
+      "active matter"
+     ],
+     "parent": "topic.condensed-matter-physics",
+     "arxiv": [
+      "cond-mat.soft"
+     ]
+    },
+    {
+     "id": "topic.materials-science",
+     "label": "Materials science",
+     "aliases": [
+      "materials physics"
+     ],
+     "parent": "topic.condensed-matter-physics",
+     "arxiv": [
+      "cond-mat.mtrl-sci"
+     ]
+    },
+    {
+     "id": "topic.strongly-correlated-systems",
+     "label": "Strongly correlated systems",
+     "labelIt": "Sistemi fortemente correlati",
+     "aliases": [
+      "strongly correlated electrons",
+      "strong correlations",
+      "correlated electron systems"
+     ],
+     "arxiv": [
+      "cond-mat.str-el"
+     ]
+    },
+    {
+     "id": "topic.mott-physics",
+     "label": "Mott physics",
+     "aliases": [
+      "Mott insulator",
+      "Mott transition",
+      "metal-insulator transition"
+     ],
+     "parent": "topic.strongly-correlated-systems"
+    },
+    {
+     "id": "topic.quantum-magnetism",
+     "label": "Quantum magnetism",
+     "labelIt": "Magnetismo quantistico",
+     "aliases": [
+      "quantum magnets",
+      "quantum spin systems"
+     ],
+     "parent": "topic.strongly-correlated-systems"
+    },
+    {
+     "id": "topic.quantum-spin-liquids",
+     "label": "Quantum spin liquids",
+     "labelIt": "Liquidi di spin quantistici",
+     "aliases": [
+      "spin liquids",
+      "quantum spin liquid",
+      "QSL",
+      "resonating valence bond",
+      "RVB"
+     ],
+     "parent": "topic.quantum-magnetism"
+    },
+    {
+     "id": "topic.frustrated-magnetism",
+     "label": "Frustrated magnetism",
+     "aliases": [
+      "geometric frustration",
+      "frustrated magnets"
+     ],
+     "parent": "topic.quantum-magnetism"
+    },
+    {
+     "id": "topic.valence-bond-solids",
+     "label": "Valence bond solids",
+     "aliases": [
+      "VBS",
+      "valence-bond solid"
+     ],
+     "parent": "topic.quantum-magnetism"
+    },
+    {
+     "id": "topic.neel-order",
+     "label": "Neel order",
+     "aliases": [
+      "antiferromagnetic order",
+      "antiferromagnetism"
+     ],
+     "parent": "topic.quantum-magnetism"
+    },
+    {
+     "id": "topic.quantum-dimer-models",
+     "label": "Quantum dimer models",
+     "aliases": [
+      "dimer models",
+      "Rokhsar-Kivelson"
+     ],
+     "parent": "topic.quantum-magnetism"
+    },
+    {
+     "id": "topic.stripes-and-charge-order",
+     "label": "Stripes and charge order",
+     "aliases": [
+      "stripe order",
+      "charge density waves",
+      "CDW"
+     ],
+     "parent": "topic.strongly-correlated-systems"
+    },
+    {
+     "id": "topic.non-fermi-liquids-and-strange-metals",
+     "label": "Non-Fermi liquids and strange metals",
+     "aliases": [
+      "non-Fermi liquid",
+      "strange metal",
+      "strange metals"
+     ],
+     "parent": "topic.strongly-correlated-systems"
+    },
+    {
+     "id": "topic.heavy-fermions-and-kondo-physics",
+     "label": "Heavy fermions and Kondo physics",
+     "aliases": [
+      "heavy-fermion systems",
+      "Kondo lattice",
+      "Kondo effect"
+     ],
+     "parent": "topic.strongly-correlated-systems"
+    },
+    {
+     "id": "topic.pseudogap",
+     "label": "Pseudogap",
+     "aliases": [
+      "pseudogap phase"
+     ],
+     "parent": "topic.strongly-correlated-systems"
+    },
+    {
+     "id": "topic.doped-mott-insulators",
+     "label": "Doped Mott insulators",
+     "aliases": [
+      "doped Mott insulator",
+      "doped antiferromagnets"
+     ],
+     "parent": "topic.strongly-correlated-systems"
+    },
+    {
+     "id": "topic.topological-phases-and-order",
+     "label": "Topological phases and order",
+     "labelIt": "Fasi e ordine topologico",
+     "aliases": [
+      "topological phases",
+      "topological matter",
+      "topological phases of matter"
+     ]
+    },
+    {
+     "id": "topic.topological-order",
+     "label": "Topological order",
+     "labelIt": "Ordine topologico",
+     "aliases": [
+      "intrinsic topological order",
+      "long-range entanglement"
+     ],
+     "parent": "topic.topological-phases-and-order"
+    },
+    {
+     "id": "topic.toric-code",
+     "label": "Toric code",
+     "aliases": [
+      "Kitaev toric code"
+     ],
+     "parent": "topic.topological-order",
+     "distinctFrom": [
+      "Surface code"
+     ]
+    },
+    {
+     "id": "topic.topological-entanglement-entropy",
+     "label": "Topological entanglement entropy",
+     "aliases": [
+      "TEE",
+      "Kitaev-Preskill",
+      "Levin-Wen entropy"
+     ],
+     "parent": "topic.topological-order",
+     "distinctFrom": [
+      "Entanglement entropy"
+     ]
+    },
+    {
+     "id": "topic.fracton-phases",
+     "label": "Fracton phases",
+     "aliases": [
+      "fractons",
+      "fracton order"
+     ],
+     "parent": "topic.topological-order"
+    },
+    {
+     "id": "topic.string-net-models",
+     "label": "String-net models",
+     "aliases": [
+      "Levin-Wen model"
+     ],
+     "parent": "topic.topological-order"
+    },
+    {
+     "id": "topic.symmetry-protected-topological-phases",
+     "label": "Symmetry-protected topological phases",
+     "aliases": [
+      "SPT",
+      "SPT phases",
+      "Haldane phase"
+     ],
+     "parent": "topic.topological-phases-and-order"
+    },
+    {
+     "id": "topic.topological-insulators-and-semimetals",
+     "label": "Topological insulators and semimetals",
+     "aliases": [
+      "topological insulators",
+      "Weyl semimetals",
+      "topological superconductors",
+      "Chern insulators"
+     ],
+     "parent": "topic.topological-phases-and-order"
+    },
+    {
+     "id": "topic.majorana-physics",
+     "label": "Majorana physics",
+     "aliases": [
+      "Majorana zero modes",
+      "Majorana fermions"
+     ],
+     "parent": "topic.topological-phases-and-order"
+    },
+    {
+     "id": "topic.topological-quantum-computation",
+     "label": "Topological quantum computation",
+     "aliases": [
+      "topological quantum computing",
+      "topological qubits"
+     ],
+     "parent": "topic.topological-phases-and-order"
+    },
+    {
+     "id": "topic.generalized-symmetries",
+     "label": "Generalized symmetries",
+     "aliases": [
+      "higher-form symmetries",
+      "non-invertible symmetries"
+     ],
+     "parent": "topic.topological-phases-and-order"
+    },
+    {
+     "id": "topic.statistical-physics",
+     "label": "Statistical physics",
+     "labelIt": "Fisica statistica",
+     "aliases": [
+      "statistical mechanics",
+      "stat mech"
+     ],
+     "arxiv": [
+      "cond-mat.stat-mech"
+     ]
+    },
+    {
+     "id": "topic.phase-transitions-and-critical-phenomena",
+     "label": "Phase transitions and critical phenomena",
+     "aliases": [
+      "critical phenomena",
+      "phase transitions",
+      "universality classes",
+      "critical exponents"
+     ],
+     "parent": "topic.statistical-physics"
+    },
+    {
+     "id": "topic.renormalization-group",
+     "label": "Renormalization group",
+     "labelIt": "Gruppo di rinormalizzazione",
+     "aliases": [
+      "RG",
+      "renormalisation group",
+      "functional renormalization group",
+      "FRG"
+     ],
+     "parent": "topic.phase-transitions-and-critical-phenomena"
+    },
+    {
+     "id": "topic.finite-size-scaling",
+     "label": "Finite-size scaling",
+     "aliases": [
+      "finite size scaling",
+      "data collapse"
+     ],
+     "parent": "topic.phase-transitions-and-critical-phenomena"
+    },
+    {
+     "id": "topic.percolation",
+     "label": "Percolation",
+     "aliases": [
+      "percolation theory"
+     ],
+     "parent": "topic.phase-transitions-and-critical-phenomena"
+    },
+    {
+     "id": "topic.kibble-zurek-mechanism",
+     "label": "Kibble-Zurek mechanism",
+     "aliases": [
+      "Kibble Zurek",
+      "KZM"
+     ],
+     "parent": "topic.phase-transitions-and-critical-phenomena"
+    },
+    {
+     "id": "topic.nonequilibrium-statistical-mechanics",
+     "label": "Nonequilibrium statistical mechanics",
+     "aliases": [
+      "stochastic thermodynamics",
+      "fluctuation theorems",
+      "large deviation theory"
+     ],
+     "parent": "topic.statistical-physics"
+    },
+    {
+     "id": "topic.entropy-and-thermodynamics",
+     "label": "Entropy and thermodynamics",
+     "aliases": [
+      "entropy (thermodynamics)",
+      "thermodynamic entropy",
+      "second law of thermodynamics",
+      "free energy"
+     ],
+     "parent": "topic.statistical-physics",
+     "distinctFrom": [
+      "Entanglement entropy",
+      "Shannon entropy"
+     ]
+    },
+    {
+     "id": "topic.quantum-thermodynamics",
+     "label": "Quantum thermodynamics",
+     "aliases": [
+      "quantum heat engines",
+      "quantum thermal machines"
+     ],
+     "parent": "topic.statistical-physics"
+    },
+    {
+     "id": "topic.replica-and-cavity-methods",
+     "label": "Replica and cavity methods",
+     "aliases": [
+      "replica method",
+      "cavity method",
+      "replica trick"
+     ],
+     "parent": "topic.statistical-physics"
+    },
+    {
+     "id": "topic.random-matrix-theory",
+     "label": "Random matrix theory",
+     "aliases": [
+      "RMT",
+      "random matrices",
+      "Wigner-Dyson statistics",
+      "level statistics"
+     ],
+     "parent": "topic.statistical-physics"
+    },
+    {
+     "id": "topic.stochastic-processes",
+     "label": "Stochastic processes",
+     "aliases": [
+      "Markov processes",
+      "Langevin dynamics",
+      "random walks"
+     ],
+     "parent": "topic.statistical-physics"
+    },
+    {
+     "id": "topic.information-theory",
+     "label": "Information theory",
+     "labelIt": "Teoria dell'informazione",
+     "aliases": [
+      "information-theoretic methods"
+     ],
+     "arxiv": [
+      "cs.IT",
+      "quant-ph"
+     ]
+    },
+    {
+     "id": "topic.shannon-entropy",
+     "label": "Shannon entropy",
+     "labelIt": "Entropia di Shannon",
+     "aliases": [
+      "information entropy",
+      "Shannon information"
+     ],
+     "parent": "topic.information-theory",
+     "distinctFrom": [
+      "Entanglement entropy",
+      "entropy (thermodynamics)"
+     ]
+    },
+    {
+     "id": "topic.mutual-information",
+     "label": "Mutual information",
+     "aliases": [
+      "quantum mutual information",
+      "conditional mutual information"
+     ],
+     "parent": "topic.information-theory"
+    },
+    {
+     "id": "topic.relative-entropy",
+     "label": "Relative entropy",
+     "aliases": [
+      "Kullback-Leibler divergence",
+      "KL divergence",
+      "quantum relative entropy"
+     ],
+     "parent": "topic.information-theory"
+    },
+    {
+     "id": "topic.renyi-and-generalized-entropies",
+     "label": "Renyi and generalized entropies",
+     "aliases": [
+      "Renyi entropy",
+      "Renyi entropies",
+      "Tsallis entropy",
+      "min-entropy"
+     ],
+     "parent": "topic.information-theory"
+    },
+    {
+     "id": "topic.quantum-channels-and-capacities",
+     "label": "Quantum channels and capacities",
+     "aliases": [
+      "quantum channel",
+      "channel capacity",
+      "CPTP maps"
+     ],
+     "parent": "topic.information-theory"
+    },
+    {
+     "id": "topic.fisher-information-and-metrology",
+     "label": "Fisher information and metrology",
+     "aliases": [
+      "quantum Fisher information",
+      "QFI",
+      "quantum metrology",
+      "quantum sensing"
+     ],
+     "parent": "topic.information-theory"
+    },
+    {
+     "id": "topic.complexity-measures",
+     "label": "Complexity measures",
+     "aliases": [
+      "Kolmogorov complexity",
+      "circuit complexity"
+     ],
+     "parent": "topic.information-theory"
+    },
+    {
+     "id": "topic.black-hole-information-and-scrambling",
+     "label": "Black hole information and scrambling",
+     "aliases": [
+      "information paradox",
+      "Hayden-Preskill"
+     ],
+     "parent": "topic.information-theory",
+     "arxiv": [
+      "hep-th"
+     ]
+    },
+    {
+     "id": "topic.quantum-simulation-and-quantum-hardware",
+     "label": "Quantum simulation and quantum hardware",
+     "labelIt": "Simulazione quantistica e hardware quantistico",
+     "aliases": [
+      "quantum simulation",
+      "quantum simulators",
+      "quantum technologies"
+     ]
+    },
+    {
+     "id": "topic.analog-quantum-simulation",
+     "label": "Analog quantum simulation",
+     "aliases": [
+      "analogue quantum simulation",
+      "analog quantum simulators",
+      "programmable quantum simulators"
+     ],
+     "parent": "topic.quantum-simulation-and-quantum-hardware"
+    },
+    {
+     "id": "topic.digital-quantum-simulation",
+     "label": "Digital quantum simulation",
+     "aliases": [
+      "digital quantum simulators",
+      "gate-based quantum simulation"
+     ],
+     "parent": "topic.quantum-simulation-and-quantum-hardware"
+    },
+    {
+     "id": "topic.nisq-devices",
+     "label": "NISQ devices",
+     "aliases": [
+      "NISQ",
+      "noisy intermediate-scale quantum",
+      "quantum processors"
+     ],
+     "parent": "topic.quantum-simulation-and-quantum-hardware"
+    },
+    {
+     "id": "topic.quantum-benchmarking-and-certification",
+     "label": "Quantum benchmarking and certification",
+     "aliases": [
+      "randomized benchmarking",
+      "cross-entropy benchmarking",
+      "XEB",
+      "Hamiltonian learning"
+     ],
+     "parent": "topic.quantum-simulation-and-quantum-hardware"
+    },
+    {
+     "id": "topic.quantum-annealing",
+     "label": "Quantum annealing",
+     "aliases": [
+      "adiabatic quantum computation",
+      "quantum annealers"
+     ],
+     "parent": "topic.quantum-simulation-and-quantum-hardware"
+    },
+    {
+     "id": "topic.quantum-control",
+     "label": "Quantum control",
+     "aliases": [
+      "optimal control",
+      "shortcuts to adiabaticity",
+      "dynamical decoupling"
+     ],
+     "parent": "topic.quantum-simulation-and-quantum-hardware"
+    },
+    {
+     "id": "topic.cavity-and-circuit-qed",
+     "label": "Cavity and circuit QED",
+     "aliases": [
+      "cavity quantum electrodynamics",
+      "cavity QED",
+      "circuit QED",
+      "quantum optics"
+     ],
+     "parent": "topic.quantum-simulation-and-quantum-hardware"
+    },
+    {
+     "id": "topic.computational-physics",
+     "label": "Computational physics",
+     "labelIt": "Fisica computazionale",
+     "aliases": [
+      "computational physics",
+      "numerical physics",
+      "scientific computing"
+     ],
+     "arxiv": [
+      "physics.comp-ph"
+     ]
+    },
+    {
+     "id": "topic.sign-problem",
+     "label": "Sign problem",
+     "labelIt": "Problema del segno",
+     "aliases": [
+      "fermion sign problem",
+      "minus sign problem",
+      "sign problems"
+     ],
+     "parent": "topic.computational-physics"
+    },
+    {
+     "id": "topic.method-benchmarking",
+     "label": "Method benchmarking",
+     "aliases": [
+      "benchmark of numerical methods"
+     ],
+     "parent": "topic.computational-physics"
+    },
+    {
+     "id": "topic.thermodynamic-limit-extrapolation",
+     "label": "Thermodynamic-limit extrapolation",
+     "aliases": [
+      "finite-size effects",
+      "infinite-size extrapolation"
+     ],
+     "parent": "topic.computational-physics"
+    },
+    {
+     "id": "topic.high-performance-computing",
+     "label": "High-performance computing",
+     "aliases": [
+      "HPC",
+      "GPU computing",
+      "GPU acceleration"
+     ],
+     "parent": "topic.computational-physics"
+    },
+    {
+     "id": "topic.software-for-physics",
+     "label": "Software for physics",
+     "aliases": [
+      "numerical libraries",
+      "simulation software"
+     ],
+     "parent": "topic.computational-physics"
+    },
+    {
+     "id": "topic.automatic-differentiation",
+     "label": "Automatic differentiation",
+     "aliases": [
+      "AD",
+      "autodiff",
+      "differentiable programming"
+     ],
+     "parent": "topic.computational-physics"
+    },
+    {
+     "id": "topic.machine-learning-and-ai",
+     "label": "Machine learning and AI",
+     "labelIt": "Apprendimento automatico e intelligenza artificiale",
+     "aliases": [
+      "artificial intelligence",
+      "AI",
+      "machine learning",
+      "ML"
+     ],
+     "arxiv": [
+      "cs.LG",
+      "stat.ML",
+      "cs.AI"
+     ]
+    },
+    {
+     "id": "topic.machine-learning-for-physics",
+     "label": "Machine learning for physics",
+     "labelIt": "Apprendimento automatico per la fisica",
+     "aliases": [
+      "ML for physics",
+      "machine learning in physics",
+      "physics-informed machine learning",
+      "AI for science"
+     ],
+     "parent": "topic.machine-learning-and-ai"
+    },
+    {
+     "id": "topic.machine-learning-of-phases-of-matter",
+     "label": "Machine learning of phases of matter",
+     "aliases": [
+      "learning phase transitions",
+      "phase classification with neural networks"
+     ],
+     "parent": "topic.machine-learning-for-physics"
+    },
+    {
+     "id": "topic.neural-network-quantum-states",
+     "label": "Neural-network quantum states",
+     "labelIt": "Stati quantistici a rete neurale",
+     "aliases": [
+      "NQS",
+      "neural quantum states",
+      "neural network quantum states",
+      "neural-network wavefunctions"
+     ],
+     "parent": "topic.machine-learning-for-physics"
+    },
+    {
+     "id": "topic.machine-learned-interatomic-potentials",
+     "label": "Machine-learned interatomic potentials",
+     "aliases": [
+      "neural network potentials",
+      "machine learning force fields",
+      "MLIP"
+     ],
+     "parent": "topic.machine-learning-for-physics"
+    },
+    {
+     "id": "topic.quantum-machine-learning",
+     "label": "Quantum machine learning",
+     "aliases": [
+      "QML",
+      "quantum neural networks",
+      "quantum kernels"
+     ],
+     "parent": "topic.machine-learning-for-physics"
+    },
+    {
+     "id": "topic.learning-quantum-states-and-hamiltonians",
+     "label": "Learning quantum states and Hamiltonians",
+     "aliases": [
+      "learning from measurements",
+      "Hamiltonian inference"
+     ],
+     "parent": "topic.machine-learning-for-physics"
+    },
+    {
+     "id": "topic.scientific-discovery-with-ai",
+     "label": "Scientific discovery with AI",
+     "aliases": [
+      "symbolic regression",
+      "equation discovery",
+      "LLM agents for science"
+     ],
+     "parent": "topic.machine-learning-for-physics"
+    },
+    {
+     "id": "topic.deep-learning",
+     "label": "Deep learning",
+     "labelIt": "Apprendimento profondo",
+     "aliases": [
+      "deep neural networks",
+      "neural networks",
+      "DNN"
+     ],
+     "parent": "topic.machine-learning-and-ai"
+    },
+    {
+     "id": "topic.transformers-and-attention",
+     "label": "Transformers and attention",
+     "aliases": [
+      "transformer",
+      "transformers",
+      "self-attention"
+     ],
+     "parent": "topic.deep-learning"
+    },
+    {
+     "id": "topic.convolutional-and-graph-neural-networks",
+     "label": "Convolutional and graph neural networks",
+     "aliases": [
+      "CNN",
+      "convolutional neural networks",
+      "GNN",
+      "graph neural networks",
+      "equivariant neural networks"
+     ],
+     "parent": "topic.deep-learning"
+    },
+    {
+     "id": "topic.generative-models",
+     "label": "Generative models",
+     "aliases": [
+      "normalizing flows",
+      "diffusion models",
+      "VAE",
+      "GAN",
+      "autoregressive models"
+     ],
+     "parent": "topic.deep-learning"
+    },
+    {
+     "id": "topic.large-language-models",
+     "label": "Large language models",
+     "aliases": [
+      "LLM",
+      "LLMs",
+      "foundation models",
+      "language models"
+     ],
+     "parent": "topic.deep-learning"
+    },
+    {
+     "id": "topic.reinforcement-learning",
+     "label": "Reinforcement learning",
+     "aliases": [
+      "RL",
+      "deep reinforcement learning"
+     ],
+     "parent": "topic.deep-learning"
+    },
+    {
+     "id": "topic.learning-theory",
+     "label": "Learning theory",
+     "aliases": [
+      "statistical learning theory",
+      "generalization theory",
+      "neural tangent kernel",
+      "scaling laws"
+     ],
+     "parent": "topic.machine-learning-and-ai"
+    },
+    {
+     "id": "topic.statistical-physics-of-learning",
+     "label": "Statistical physics of learning",
+     "aliases": [
+      "statistical mechanics of learning",
+      "Hopfield networks",
+      "Boltzmann machines",
+      "energy-based models"
+     ],
+     "parent": "topic.machine-learning-and-ai"
+    },
+    {
+     "id": "topic.optimization-for-learning",
+     "label": "Optimization for learning",
+     "aliases": [
+      "stochastic gradient descent",
+      "SGD",
+      "natural gradient",
+      "loss landscape"
+     ],
+     "parent": "topic.machine-learning-and-ai"
+    },
+    {
+     "id": "topic.interpretability-and-uncertainty",
+     "label": "Interpretability and uncertainty",
+     "aliases": [
+      "explainable AI",
+      "XAI",
+      "uncertainty quantification"
+     ],
+     "parent": "topic.machine-learning-and-ai"
+    },
+    {
+     "id": "topic.tensor-networks-and-machine-learning",
+     "label": "Tensor networks and machine learning",
+     "aliases": [
+      "tensor network machine learning",
+      "quantum-inspired machine learning"
+     ],
+     "parent": "topic.machine-learning-and-ai"
+    },
+    {
+     "id": "topic.mathematical-physics",
+     "label": "Mathematical physics",
+     "labelIt": "Fisica matematica",
+     "aliases": [
+      "math-ph",
+      "rigorous results"
+     ],
+     "arxiv": [
+      "math-ph"
+     ]
+    },
+    {
+     "id": "topic.rigorous-results-in-many-body-theory",
+     "label": "Rigorous results in many-body theory",
+     "aliases": [
+      "Lieb-Schultz-Mattis theorem",
+      "LSM theorem",
+      "Mermin-Wagner theorem"
+     ],
+     "parent": "topic.mathematical-physics"
+    },
+    {
+     "id": "topic.lie-groups-and-representation-theory",
+     "label": "Lie groups and representation theory",
+     "aliases": [
+      "group theory in physics",
+      "representation theory",
+      "Lie algebras",
+      "quantum groups"
+     ],
+     "parent": "topic.mathematical-physics"
+    },
+    {
+     "id": "topic.operator-algebras",
+     "label": "Operator algebras",
+     "aliases": [
+      "C*-algebras",
+      "von Neumann algebras",
+      "algebraic quantum field theory"
+     ],
+     "parent": "topic.mathematical-physics"
+    },
+    {
+     "id": "topic.category-theory-in-physics",
+     "label": "Category theory in physics",
+     "aliases": [
+      "tensor categories",
+      "fusion categories",
+      "TQFT",
+      "topological quantum field theory"
+     ],
+     "parent": "topic.mathematical-physics"
+    },
+    {
+     "id": "topic.quantum-field-theory-methods",
+     "label": "Quantum field theory methods",
+     "aliases": [
+      "QFT",
+      "effective field theory",
+      "bosonization",
+      "path integral",
+      "Chern-Simons theory",
+      "lattice gauge theory"
+     ],
+     "parent": "topic.mathematical-physics",
+     "arxiv": [
+      "hep-th",
+      "hep-lat"
+     ]
+    },
+    {
+     "id": "topic.holography-and-ads-cft",
+     "label": "Holography and AdS/CFT",
+     "aliases": [
+      "AdS/CFT",
+      "gauge/gravity duality",
+      "holographic duality"
+     ],
+     "parent": "topic.mathematical-physics",
+     "arxiv": [
+      "hep-th"
+     ]
+    },
+    {
+     "id": "topic.spectral-theory-and-pde-methods",
+     "label": "Spectral theory and PDE methods",
+     "aliases": [
+      "spectral theory",
+      "Schrodinger operators",
+      "semiclassical analysis"
+     ],
+     "parent": "topic.mathematical-physics"
+    },
+    {
+     "id": "topic.geometry-of-quantum-states",
+     "label": "Geometry of quantum states",
+     "aliases": [
+      "quantum geometry",
+      "Berry phase",
+      "Berry curvature",
+      "quantum geometric tensor",
+      "information geometry"
+     ],
+     "parent": "topic.mathematical-physics"
+    }
+   ]
+  },
+  {
+   "id": "method",
+   "label": "Method",
+   "singleValue": true,
+   "concepts": [
+    {
+     "id": "method.tensor-networks",
+     "label": "Tensor networks",
+     "labelIt": "Reti tensoriali",
+     "aliases": [
+      "tensor network methods",
+      "tensor network",
+      "TN methods",
+      "tensor network states"
+     ]
+    },
+    {
+     "id": "method.matrix-product-states",
+     "label": "Matrix product states",
+     "labelIt": "Stati a prodotto di matrici",
+     "aliases": [
+      "MPS",
+      "matrix-product states",
+      "MPO",
+      "matrix product operators"
+     ],
+     "parent": "method.tensor-networks"
+    },
+    {
+     "id": "method.dmrg",
+     "label": "DMRG",
+     "labelIt": "Gruppo di rinormalizzazione della matrice densità",
+     "aliases": [
+      "density matrix renormalization group",
+      "density-matrix renormalization group",
+      "density matrix renormalisation group"
+     ],
+     "parent": "method.tensor-networks",
+     "distinctFrom": [
+      "Renormalization group"
+     ]
+    },
+    {
+     "id": "method.idmrg",
+     "label": "iDMRG",
+     "aliases": [
+      "infinite DMRG",
+      "infinite-size DMRG"
+     ],
+     "parent": "method.dmrg"
+    },
+    {
+     "id": "method.cylinder-dmrg",
+     "label": "Cylinder DMRG",
+     "aliases": [
+      "DMRG on cylinders",
+      "2D DMRG",
+      "two-dimensional DMRG"
+     ],
+     "parent": "method.dmrg"
+    },
+    {
+     "id": "method.time-dependent-dmrg",
+     "label": "Time-dependent DMRG",
+     "aliases": [
+      "tDMRG",
+      "td-DMRG"
+     ],
+     "parent": "method.dmrg"
+    },
+    {
+     "id": "method.excited-state-dmrg",
+     "label": "Excited-state DMRG",
+     "aliases": [
+      "DMRG-X",
+      "DMRG for excited states"
+     ],
+     "parent": "method.dmrg"
+    },
+    {
+     "id": "method.tebd",
+     "label": "TEBD",
+     "aliases": [
+      "time-evolving block decimation"
+     ],
+     "parent": "method.tensor-networks"
+    },
+    {
+     "id": "method.tdvp",
+     "label": "TDVP",
+     "aliases": [
+      "time-dependent variational principle",
+      "tangent-space methods"
+     ],
+     "parent": "method.tensor-networks"
+    },
+    {
+     "id": "method.vumps",
+     "label": "VUMPS",
+     "aliases": [
+      "variational uniform matrix product states",
+      "uniform MPS",
+      "uMPS"
+     ],
+     "parent": "method.tensor-networks"
+    },
+    {
+     "id": "method.peps",
+     "label": "PEPS",
+     "labelIt": "Stati di coppie entangled proiettate",
+     "aliases": [
+      "projected entangled pair states",
+      "projected entangled-pair states",
+      "2D tensor networks"
+     ],
+     "parent": "method.tensor-networks"
+    },
+    {
+     "id": "method.ipeps",
+     "label": "iPEPS",
+     "aliases": [
+      "infinite PEPS",
+      "infinite projected entangled pair states"
+     ],
+     "parent": "method.peps"
+    },
+    {
+     "id": "method.corner-transfer-matrix-renormalization-group",
+     "label": "Corner transfer matrix renormalization group",
+     "aliases": [
+      "CTMRG",
+      "corner transfer matrix"
+     ],
+     "parent": "method.peps"
+    },
+    {
+     "id": "method.simple-update-and-full-update",
+     "label": "Simple update and full update",
+     "aliases": [
+      "simple update",
+      "full update"
+     ],
+     "parent": "method.peps"
+    },
+    {
+     "id": "method.mera",
+     "label": "MERA",
+     "aliases": [
+      "multiscale entanglement renormalization ansatz",
+      "entanglement renormalization"
+     ],
+     "parent": "method.tensor-networks"
+    },
+    {
+     "id": "method.tree-tensor-networks",
+     "label": "Tree tensor networks",
+     "aliases": [
+      "TTN",
+      "tree tensor network"
+     ],
+     "parent": "method.tensor-networks"
+    },
+    {
+     "id": "method.tensor-renormalization-group",
+     "label": "Tensor renormalization group",
+     "aliases": [
+      "TRG",
+      "HOTRG",
+      "tensor network renormalization",
+      "TNR"
+     ],
+     "parent": "method.tensor-networks"
+    },
+    {
+     "id": "method.tensor-network-contraction",
+     "label": "Tensor network contraction",
+     "aliases": [
+      "tensor contraction",
+      "boundary MPS",
+      "approximate contraction"
+     ],
+     "parent": "method.tensor-networks"
+    },
+    {
+     "id": "method.symmetric-tensor-networks",
+     "label": "Symmetric tensor networks",
+     "aliases": [
+      "U(1) symmetric tensor networks",
+      "non-Abelian tensor networks",
+      "symmetry-adapted tensor networks"
+     ],
+     "parent": "method.tensor-networks"
+    },
+    {
+     "id": "method.fermionic-tensor-networks",
+     "label": "Fermionic tensor networks",
+     "aliases": [
+      "fermionic PEPS",
+      "fPEPS",
+      "fermionic MERA"
+     ],
+     "parent": "method.tensor-networks"
+    },
+    {
+     "id": "method.quantum-monte-carlo",
+     "label": "Quantum Monte Carlo",
+     "labelIt": "Monte Carlo quantistico",
+     "aliases": [
+      "QMC",
+      "quantum Monte-Carlo"
+     ]
+    },
+    {
+     "id": "method.variational-monte-carlo",
+     "label": "Variational Monte Carlo",
+     "aliases": [
+      "VMC",
+      "stochastic reconfiguration"
+     ],
+     "parent": "method.quantum-monte-carlo"
+    },
+    {
+     "id": "method.diffusion-monte-carlo",
+     "label": "Diffusion Monte Carlo",
+     "aliases": [
+      "DMC",
+      "fixed-node diffusion Monte Carlo"
+     ],
+     "parent": "method.quantum-monte-carlo"
+    },
+    {
+     "id": "method.auxiliary-field-quantum-monte-carlo",
+     "label": "Auxiliary-field quantum Monte Carlo",
+     "aliases": [
+      "AFQMC",
+      "determinant quantum Monte Carlo",
+      "DQMC",
+      "constrained-path Monte Carlo"
+     ],
+     "parent": "method.quantum-monte-carlo"
+    },
+    {
+     "id": "method.stochastic-series-expansion",
+     "label": "Stochastic series expansion",
+     "aliases": [
+      "SSE",
+      "directed loop algorithm",
+      "worm algorithm"
+     ],
+     "parent": "method.quantum-monte-carlo"
+    },
+    {
+     "id": "method.path-integral-monte-carlo",
+     "label": "Path-integral Monte Carlo",
+     "aliases": [
+      "PIMC",
+      "path integral Monte Carlo",
+      "world-line Monte Carlo"
+     ],
+     "parent": "method.quantum-monte-carlo"
+    },
+    {
+     "id": "method.green-function-monte-carlo",
+     "label": "Green function Monte Carlo",
+     "aliases": [
+      "GFMC",
+      "Green's function Monte Carlo"
+     ],
+     "parent": "method.quantum-monte-carlo"
+    },
+    {
+     "id": "method.continuous-time-qmc",
+     "label": "Continuous-time QMC",
+     "aliases": [
+      "CT-QMC",
+      "CT-HYB",
+      "continuous time quantum Monte Carlo"
+     ],
+     "parent": "method.quantum-monte-carlo"
+    },
+    {
+     "id": "method.diagrammatic-monte-carlo",
+     "label": "Diagrammatic Monte Carlo",
+     "aliases": [
+      "DiagMC",
+      "diagrammatic quantum Monte Carlo"
+     ],
+     "parent": "method.quantum-monte-carlo"
+    },
+    {
+     "id": "method.full-configuration-interaction-qmc",
+     "label": "Full configuration interaction QMC",
+     "aliases": [
+      "FCIQMC"
+     ],
+     "parent": "method.quantum-monte-carlo"
+    },
+    {
+     "id": "method.classical-monte-carlo",
+     "label": "Classical Monte Carlo",
+     "aliases": [
+      "Metropolis algorithm",
+      "Markov chain Monte Carlo",
+      "MCMC",
+      "parallel tempering",
+      "Wang-Landau"
+     ],
+     "parent": "method.quantum-monte-carlo"
+    },
+    {
+     "id": "method.exact-diagonalization",
+     "label": "Exact diagonalization",
+     "labelIt": "Diagonalizzazione esatta",
+     "aliases": [
+      "ED",
+      "exact diagonalisation",
+      "full diagonalization"
+     ]
+    },
+    {
+     "id": "method.lanczos-method",
+     "label": "Lanczos method",
+     "aliases": [
+      "Lanczos algorithm",
+      "Lanczos",
+      "Krylov subspace methods",
+      "Davidson algorithm"
+     ],
+     "parent": "method.exact-diagonalization"
+    },
+    {
+     "id": "method.symmetry-resolved-diagonalization",
+     "label": "Symmetry-resolved diagonalization",
+     "aliases": [
+      "symmetry-adapted ED",
+      "momentum-resolved ED"
+     ],
+     "parent": "method.exact-diagonalization"
+    },
+    {
+     "id": "method.finite-temperature-lanczos",
+     "label": "Finite-temperature Lanczos",
+     "aliases": [
+      "FTLM",
+      "thermal pure quantum states",
+      "quantum typicality",
+      "METTS"
+     ],
+     "parent": "method.exact-diagonalization"
+    },
+    {
+     "id": "method.polynomial-and-spectral-filtering",
+     "label": "Polynomial and spectral filtering",
+     "aliases": [
+      "Chebyshev expansion",
+      "kernel polynomial method",
+      "KPM",
+      "shift-and-invert",
+      "FEAST"
+     ],
+     "parent": "method.exact-diagonalization"
+    },
+    {
+     "id": "method.quantum-cluster-methods",
+     "label": "Quantum cluster methods",
+     "aliases": [
+      "cluster perturbation theory",
+      "CPT",
+      "variational cluster approximation",
+      "VCA",
+      "cellular DMFT",
+      "CDMFT"
+     ],
+     "parent": "method.exact-diagonalization"
+    },
+    {
+     "id": "method.variational-methods",
+     "label": "Variational methods",
+     "labelIt": "Metodi variazionali",
+     "aliases": [
+      "variational approach",
+      "variational ansatz",
+      "variational wavefunctions",
+      "variational method"
+     ]
+    },
+    {
+     "id": "method.gutzwiller-projected-states",
+     "label": "Gutzwiller projected states",
+     "aliases": [
+      "Gutzwiller projection",
+      "Gutzwiller wavefunction",
+      "projected wavefunctions",
+      "Jastrow wavefunction"
+     ],
+     "parent": "method.variational-methods"
+    },
+    {
+     "id": "method.hartree-fock",
+     "label": "Hartree-Fock",
+     "aliases": [
+      "HF",
+      "Hartree Fock",
+      "unrestricted Hartree-Fock",
+      "Hartree-Fock-Bogoliubov"
+     ],
+     "parent": "method.variational-methods"
+    },
+    {
+     "id": "method.mean-field-theory",
+     "label": "Mean-field theory",
+     "aliases": [
+      "mean field theory",
+      "mean-field approximation",
+      "slave-boson mean field",
+      "parton mean field",
+      "large-N expansion"
+     ],
+     "parent": "method.variational-methods"
+    },
+    {
+     "id": "method.variational-time-evolution",
+     "label": "Variational time evolution",
+     "aliases": [
+      "Dirac-Frenkel variational principle",
+      "McLachlan principle",
+      "t-VMC"
+     ],
+     "parent": "method.variational-methods"
+    },
+    {
+     "id": "method.coupled-cluster-methods",
+     "label": "Coupled cluster methods",
+     "aliases": [
+      "coupled cluster",
+      "CCSD",
+      "CCSD(T)"
+     ],
+     "parent": "method.variational-methods"
+    },
+    {
+     "id": "method.neural-network-wavefunction-methods",
+     "label": "Neural-network wavefunction methods",
+     "labelIt": "Metodi con funzioni d'onda a rete neurale",
+     "aliases": [
+      "NQS methods",
+      "neural network variational Monte Carlo",
+      "neural variational Monte Carlo",
+      "neural-network variational states"
+     ]
+    },
+    {
+     "id": "method.restricted-boltzmann-machine-wavefunctions",
+     "label": "Restricted Boltzmann machine wavefunctions",
+     "aliases": [
+      "RBM wavefunction",
+      "RBM ansatz",
+      "RBM states"
+     ],
+     "parent": "method.neural-network-wavefunction-methods"
+    },
+    {
+     "id": "method.autoregressive-neural-quantum-states",
+     "label": "Autoregressive neural quantum states",
+     "aliases": [
+      "autoregressive wavefunctions",
+      "autoregressive NQS"
+     ],
+     "parent": "method.neural-network-wavefunction-methods"
+    },
+    {
+     "id": "method.transformer-wavefunctions",
+     "label": "Transformer wavefunctions",
+     "aliases": [
+      "transformer neural quantum states",
+      "transformer NQS",
+      "attention-based wavefunctions"
+     ],
+     "parent": "method.neural-network-wavefunction-methods"
+    },
+    {
+     "id": "method.convolutional-and-symmetric-nqs",
+     "label": "Convolutional and symmetric NQS",
+     "aliases": [
+      "CNN wavefunctions",
+      "group convolutional neural networks",
+      "GCNN",
+      "symmetrized neural quantum states"
+     ],
+     "parent": "method.neural-network-wavefunction-methods"
+    },
+    {
+     "id": "method.fermionic-neural-wavefunctions",
+     "label": "Fermionic neural wavefunctions",
+     "aliases": [
+      "FermiNet",
+      "PauliNet",
+      "neural backflow",
+      "neural network backflow"
+     ],
+     "parent": "method.neural-network-wavefunction-methods"
+    },
+    {
+     "id": "method.neural-network-time-evolution",
+     "label": "Neural network time evolution",
+     "aliases": [
+      "time-dependent neural quantum states",
+      "NQS time evolution"
+     ],
+     "parent": "method.neural-network-wavefunction-methods"
+    },
+    {
+     "id": "method.recurrent-neural-network-wavefunctions",
+     "label": "Recurrent neural network wavefunctions",
+     "aliases": [
+      "RNN wavefunctions",
+      "recurrent neural quantum states"
+     ],
+     "parent": "method.neural-network-wavefunction-methods"
+    },
+    {
+     "id": "method.wavefunction-methods-in-quantum-chemistry",
+     "label": "Wavefunction methods in quantum chemistry",
+     "labelIt": "Metodi di funzione d'onda",
+     "aliases": [
+      "WFN methods",
+      "wavefunction methods",
+      "wavefunction-based methods",
+      "wave function theory"
+     ]
+    },
+    {
+     "id": "method.configuration-interaction",
+     "label": "Configuration interaction",
+     "aliases": [
+      "CI",
+      "FCI",
+      "full configuration interaction",
+      "selected CI",
+      "CIPSI"
+     ],
+     "parent": "method.wavefunction-methods-in-quantum-chemistry"
+    },
+    {
+     "id": "method.multireference-methods",
+     "label": "Multireference methods",
+     "aliases": [
+      "CASSCF",
+      "CASPT2",
+      "active space methods",
+      "MRCI"
+     ],
+     "parent": "method.wavefunction-methods-in-quantum-chemistry"
+    },
+    {
+     "id": "method.many-body-perturbation-theory",
+     "label": "Many-body perturbation theory",
+     "aliases": [
+      "MBPT",
+      "Moller-Plesset",
+      "MP2",
+      "perturbative expansions",
+      "series expansions"
+     ],
+     "parent": "method.wavefunction-methods-in-quantum-chemistry"
+    },
+    {
+     "id": "method.quantum-chemistry-dmrg",
+     "label": "Quantum chemistry DMRG",
+     "aliases": [
+      "QC-DMRG",
+      "ab initio DMRG"
+     ],
+     "parent": "method.wavefunction-methods-in-quantum-chemistry"
+    },
+    {
+     "id": "method.diagrammatic-and-green-function-methods",
+     "label": "Diagrammatic and Green function methods",
+     "labelIt": "Metodi diagrammatici",
+     "aliases": [
+      "diagrammatic methods",
+      "Feynman diagrams",
+      "diagrammatic expansion",
+      "Green function methods",
+      "Hedin equations"
+     ]
+    },
+    {
+     "id": "method.analytical-methods",
+     "label": "Analytical methods",
+     "labelIt": "Metodi analitici",
+     "aliases": [
+      "analytical approach",
+      "analytic methods",
+      "exact solution",
+      "exactly solvable models"
+     ]
+    },
+    {
+     "id": "method.field-theoretic-methods",
+     "label": "Field-theoretic methods",
+     "aliases": [
+      "field theory methods",
+      "nonlinear sigma model",
+      "NLSM",
+      "Keldysh field theory",
+      "Keldysh formalism"
+     ],
+     "parent": "method.analytical-methods"
+    },
+    {
+     "id": "method.renormalization-group-methods",
+     "label": "Renormalization group methods",
+     "aliases": [
+      "RG analysis",
+      "RG flow",
+      "Wilsonian RG",
+      "numerical renormalization group",
+      "NRG"
+     ],
+     "parent": "method.analytical-methods"
+    },
+    {
+     "id": "method.rigorous-proofs",
+     "label": "Rigorous proofs",
+     "aliases": [
+      "mathematical proof",
+      "rigorous bounds",
+      "proof techniques"
+     ],
+     "parent": "method.analytical-methods"
+    },
+    {
+     "id": "method.spin-wave-theory",
+     "label": "Spin-wave theory",
+     "aliases": [
+      "linear spin-wave theory",
+      "LSWT",
+      "Holstein-Primakoff",
+      "Schwinger boson theory"
+     ],
+     "parent": "method.analytical-methods"
+    },
+    {
+     "id": "method.bethe-ansatz-methods",
+     "label": "Bethe ansatz methods",
+     "aliases": [
+      "coordinate Bethe ansatz",
+      "algebraic Bethe ansatz",
+      "thermodynamic Bethe ansatz",
+      "TBA"
+     ],
+     "parent": "method.analytical-methods"
+    },
+    {
+     "id": "method.embedding-methods",
+     "label": "Embedding methods",
+     "labelIt": "Metodi di embedding",
+     "aliases": [
+      "quantum embedding",
+      "DMET",
+      "density matrix embedding theory",
+      "DFT+DMFT",
+      "DMFT method"
+     ]
+    },
+    {
+     "id": "method.density-functional-methods",
+     "label": "Density functional methods",
+     "labelIt": "Metodi del funzionale della densità",
+     "aliases": [
+      "DFT calculations",
+      "first-principles calculations",
+      "DFT+U",
+      "hybrid functionals",
+      "TDDFT",
+      "ab initio calculations"
+     ]
+    },
+    {
+     "id": "method.machine-learning-methods",
+     "label": "Machine learning methods",
+     "labelIt": "Metodi di apprendimento automatico",
+     "aliases": [
+      "ML methods",
+      "machine learning approach",
+      "data-driven methods",
+      "learning-based methods"
+     ]
+    },
+    {
+     "id": "method.supervised-learning",
+     "label": "Supervised learning",
+     "aliases": [
+      "supervised classification",
+      "regression models",
+      "kernel methods",
+      "Gaussian processes",
+      "random forests"
+     ],
+     "parent": "method.machine-learning-methods"
+    },
+    {
+     "id": "method.unsupervised-learning",
+     "label": "Unsupervised learning",
+     "aliases": [
+      "clustering",
+      "dimensionality reduction",
+      "PCA",
+      "principal component analysis",
+      "autoencoders",
+      "representation learning",
+      "self-supervised learning"
+     ],
+     "parent": "method.machine-learning-methods"
+    },
+    {
+     "id": "method.reinforcement-learning-method",
+     "label": "Reinforcement learning method",
+     "aliases": [
+      "RL agent",
+      "policy optimization",
+      "reinforcement learning for quantum control"
+     ],
+     "parent": "method.machine-learning-methods"
+    },
+    {
+     "id": "method.differentiable-programming-method",
+     "label": "Differentiable programming method",
+     "aliases": [
+      "automatic differentiation method",
+      "differentiable tensor networks",
+      "gradient-based optimization"
+     ],
+     "parent": "method.machine-learning-methods"
+    },
+    {
+     "id": "method.quantum-simulators-and-experiments",
+     "label": "Quantum simulators and experiments",
+     "labelIt": "Simulatori quantistici ed esperimenti",
+     "aliases": [
+      "experimental quantum simulation",
+      "experimental techniques",
+      "experimental platform"
+     ]
+    },
+    {
+     "id": "method.neutral-atom-tweezer-arrays",
+     "label": "Neutral-atom tweezer arrays",
+     "aliases": [
+      "optical tweezer arrays",
+      "tweezer arrays",
+      "neutral atom quantum computing"
+     ],
+     "parent": "method.quantum-simulators-and-experiments"
+    },
+    {
+     "id": "method.quantum-gas-microscopes",
+     "label": "Quantum gas microscopes",
+     "aliases": [
+      "quantum gas microscope",
+      "site-resolved imaging"
+     ],
+     "parent": "method.quantum-simulators-and-experiments"
+    },
+    {
+     "id": "method.trapped-ion-experiments",
+     "label": "Trapped-ion experiments",
+     "aliases": [
+      "ion trap quantum simulation",
+      "trapped ion quantum computer"
+     ],
+     "parent": "method.quantum-simulators-and-experiments"
+    },
+    {
+     "id": "method.superconducting-circuit-processors",
+     "label": "Superconducting-circuit processors",
+     "aliases": [
+      "superconducting quantum processors",
+      "superconducting quantum computers"
+     ],
+     "parent": "method.quantum-simulators-and-experiments"
+    },
+    {
+     "id": "method.photonic-quantum-simulators",
+     "label": "Photonic quantum simulators",
+     "aliases": [
+      "photonic simulators",
+      "boson sampling experiments",
+      "photonic quantum computing"
+     ],
+     "parent": "method.quantum-simulators-and-experiments"
+    },
+    {
+     "id": "method.solid-state-spectroscopy",
+     "label": "Solid-state spectroscopy",
+     "aliases": [
+      "neutron scattering",
+      "inelastic neutron scattering",
+      "ARPES",
+      "STM",
+      "scanning tunneling microscopy",
+      "NMR",
+      "muSR",
+      "RIXS",
+      "Raman spectroscopy",
+      "transport measurements"
+     ],
+     "parent": "method.quantum-simulators-and-experiments"
+    },
+    {
+     "id": "method.classical-simulation-of-quantum-systems",
+     "label": "Classical simulation of quantum systems",
+     "labelIt": "Simulazione classica di sistemi quantistici",
+     "aliases": [
+      "classical simulation",
+      "classical simulability",
+      "Clifford simulation",
+      "stabilizer simulation",
+      "Pauli propagation",
+      "state-vector simulation",
+      "quantum circuit simulation"
+     ]
+    },
+    {
+     "id": "method.statistical-and-data-analysis-methods",
+     "label": "Statistical and data-analysis methods",
+     "labelIt": "Metodi statistici e di analisi dati",
+     "aliases": [
+      "statistical analysis",
+      "data analysis",
+      "Bayesian inference",
+      "bootstrap",
+      "jackknife",
+      "error analysis",
+      "statistical inference"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "system",
+   "label": "System / model",
+   "singleValue": false,
+   "concepts": [
+    {
+     "id": "system.lattice-fermion-models",
+     "label": "Lattice fermion models",
+     "labelIt": "Modelli fermionici su reticolo",
+     "aliases": [
+      "fermionic lattice models",
+      "itinerant electron models",
+      "tight-binding models"
+     ]
+    },
+    {
+     "id": "system.hubbard-model",
+     "label": "Hubbard model",
+     "labelIt": "Modello di Hubbard",
+     "aliases": [
+      "Hubbard",
+      "Fermi-Hubbard model",
+      "repulsive Hubbard model",
+      "2D Hubbard model",
+      "Hubbard Hamiltonian",
+      "doped Hubbard model"
+     ],
+     "parent": "system.lattice-fermion-models"
+    },
+    {
+     "id": "system.extended-and-multiband-hubbard-models",
+     "label": "Extended and multiband Hubbard models",
+     "aliases": [
+      "extended Hubbard model",
+      "Hubbard-Holstein model",
+      "multiband Hubbard model",
+      "three-band Hubbard model",
+      "Emery model",
+      "multi-orbital Hubbard model"
+     ],
+     "parent": "system.lattice-fermion-models"
+    },
+    {
+     "id": "system.t-j-model",
+     "label": "t-J model",
+     "aliases": [
+      "t-J",
+      "tJ model",
+      "t-J Hamiltonian",
+      "doped t-J model"
+     ],
+     "parent": "system.lattice-fermion-models"
+    },
+    {
+     "id": "system.anderson-impurity-and-kondo-models",
+     "label": "Anderson impurity and Kondo models",
+     "aliases": [
+      "Anderson impurity model",
+      "SIAM",
+      "Kondo model",
+      "periodic Anderson model",
+      "impurity models"
+     ],
+     "parent": "system.lattice-fermion-models"
+    },
+    {
+     "id": "system.electron-phonon-models",
+     "label": "Electron-phonon models",
+     "aliases": [
+      "Holstein model",
+      "Su-Schrieffer-Heeger model",
+      "SSH model",
+      "polaron models"
+     ],
+     "parent": "system.lattice-fermion-models"
+    },
+    {
+     "id": "system.free-fermion-and-topological-band-models",
+     "label": "Free-fermion and topological band models",
+     "aliases": [
+      "free fermions",
+      "Kitaev chain model",
+      "Haldane model",
+      "Kane-Mele model",
+      "Hofstadter model",
+      "BHZ model"
+     ],
+     "parent": "system.lattice-fermion-models"
+    },
+    {
+     "id": "system.electron-gas-and-luttinger-liquids",
+     "label": "Electron gas and Luttinger liquids",
+     "aliases": [
+      "homogeneous electron gas",
+      "jellium",
+      "two-dimensional electron gas",
+      "Luttinger liquid",
+      "Tomonaga-Luttinger liquid",
+      "Fermi liquid"
+     ],
+     "parent": "system.lattice-fermion-models"
+    },
+    {
+     "id": "system.quantum-spin-models",
+     "label": "Quantum spin models",
+     "labelIt": "Modelli di spin quantistici",
+     "aliases": [
+      "spin models",
+      "spin Hamiltonians",
+      "quantum spin chains",
+      "spin ladders"
+     ]
+    },
+    {
+     "id": "system.heisenberg-model",
+     "label": "Heisenberg model",
+     "labelIt": "Modello di Heisenberg",
+     "aliases": [
+      "Heisenberg",
+      "Heisenberg antiferromagnet",
+      "Heisenberg spin chain",
+      "XXX model",
+      "XXZ model",
+      "XXZ chain",
+      "XYZ model"
+     ],
+     "parent": "system.quantum-spin-models"
+    },
+    {
+     "id": "system.j1-j2-model",
+     "label": "J1-J2 model",
+     "aliases": [
+      "J1-J2 Heisenberg model",
+      "J1-J2",
+      "frustrated Heisenberg model",
+      "Majumdar-Ghosh model"
+     ],
+     "parent": "system.quantum-spin-models"
+    },
+    {
+     "id": "system.transverse-field-ising-model",
+     "label": "Transverse-field Ising model",
+     "aliases": [
+      "TFIM",
+      "quantum Ising model",
+      "transverse Ising model",
+      "quantum Ising chain",
+      "mixed-field Ising model"
+     ],
+     "parent": "system.quantum-spin-models",
+     "distinctFrom": [
+      "Classical Ising model"
+     ]
+    },
+    {
+     "id": "system.kitaev-honeycomb-model",
+     "label": "Kitaev honeycomb model",
+     "aliases": [
+      "Kitaev model",
+      "Kitaev honeycomb",
+      "Kitaev-Heisenberg model"
+     ],
+     "parent": "system.quantum-spin-models"
+    },
+    {
+     "id": "system.aklt-and-spin-1-chains",
+     "label": "AKLT and spin-1 chains",
+     "aliases": [
+      "AKLT",
+      "AKLT model",
+      "Haldane chain",
+      "bilinear-biquadratic model"
+     ],
+     "parent": "system.quantum-spin-models"
+    },
+    {
+     "id": "system.frustrated-lattice-antiferromagnets",
+     "label": "Frustrated lattice antiferromagnets",
+     "aliases": [
+      "kagome Heisenberg antiferromagnet",
+      "kagome lattice",
+      "triangular-lattice antiferromagnet",
+      "pyrochlore antiferromagnet",
+      "quantum spin ice",
+      "Shastry-Sutherland model"
+     ],
+     "parent": "system.quantum-spin-models"
+    },
+    {
+     "id": "system.quantum-dimer-lattice-models",
+     "label": "Quantum dimer Hamiltonians",
+     "aliases": [
+      "quantum dimer Hamiltonian",
+      "RK point",
+      "quantum loop models"
+     ],
+     "parent": "system.quantum-spin-models"
+    },
+    {
+     "id": "system.orbital-and-su-n-models",
+     "label": "Orbital and SU(N) models",
+     "aliases": [
+      "Kugel-Khomskii model",
+      "SU(N) Heisenberg model",
+      "Haldane-Shastry model"
+     ],
+     "parent": "system.quantum-spin-models"
+    },
+    {
+     "id": "system.classical-ising-model",
+     "label": "Classical Ising model",
+     "aliases": [
+      "Ising model",
+      "2D Ising model",
+      "3D Ising model",
+      "Ising universality class",
+      "Ising ferromagnet"
+     ],
+     "parent": "system.quantum-spin-models",
+     "distinctFrom": [
+      "Transverse-field Ising model"
+     ]
+    },
+    {
+     "id": "system.classical-vector-and-clock-models",
+     "label": "Classical vector and clock models",
+     "aliases": [
+      "classical XY model",
+      "classical Heisenberg model",
+      "O(N) model",
+      "Potts model",
+      "clock models",
+      "Blume-Capel model",
+      "six-vertex model"
+     ],
+     "parent": "system.quantum-spin-models"
+    },
+    {
+     "id": "system.bosonic-models",
+     "label": "Bosonic models",
+     "aliases": [
+      "bosonic lattice models",
+      "interacting bosons",
+      "hard-core bosons"
+     ]
+    },
+    {
+     "id": "system.bose-hubbard-model",
+     "label": "Bose-Hubbard model",
+     "aliases": [
+      "Bose Hubbard model",
+      "Bose-Hubbard",
+      "extended Bose-Hubbard model",
+      "superfluid-Mott insulator transition"
+     ],
+     "parent": "system.bosonic-models"
+    },
+    {
+     "id": "system.bose-gas-models",
+     "label": "Bose gas models",
+     "aliases": [
+      "Gross-Pitaevskii equation",
+      "Lieb-Liniger model",
+      "Tonks-Girardeau gas",
+      "Bogoliubov theory",
+      "dilute Bose gas",
+      "Bose polaron"
+     ],
+     "parent": "system.bosonic-models"
+    },
+    {
+     "id": "system.light-matter-models",
+     "label": "Light-matter models",
+     "aliases": [
+      "Jaynes-Cummings model",
+      "Dicke model",
+      "Rabi model",
+      "spin-boson model",
+      "Lipkin-Meshkov-Glick model"
+     ],
+     "parent": "system.bosonic-models"
+    },
+    {
+     "id": "system.lattice-gauge-and-field-theory-models",
+     "label": "Lattice gauge and field-theory models",
+     "aliases": [
+      "lattice gauge theories",
+      "Z2 lattice gauge theory",
+      "quantum link models",
+      "Schwinger model",
+      "Gross-Neveu model",
+      "sine-Gordon model",
+      "QED3",
+      "abelian Higgs model"
+     ]
+    },
+    {
+     "id": "system.random-and-disordered-models",
+     "label": "Random and disordered models",
+     "aliases": [
+      "random models"
+     ]
+    },
+    {
+     "id": "system.sachdev-ye-kitaev-model",
+     "label": "Sachdev-Ye-Kitaev model",
+     "labelIt": "Modello di Sachdev-Ye-Kitaev",
+     "aliases": [
+      "SYK model",
+      "SYK",
+      "complex SYK",
+      "Majorana SYK",
+      "Brownian SYK",
+      "SYK chain"
+     ],
+     "parent": "system.random-and-disordered-models"
+    },
+    {
+     "id": "system.spin-glass-models",
+     "label": "Spin glass models",
+     "aliases": [
+      "Edwards-Anderson model",
+      "Sherrington-Kirkpatrick model",
+      "SK model",
+      "p-spin model",
+      "random-energy model",
+      "quantum spin glass models"
+     ],
+     "parent": "system.random-and-disordered-models"
+    },
+    {
+     "id": "system.random-circuit-models",
+     "label": "Random circuit models",
+     "aliases": [
+      "random unitary circuits",
+      "random Clifford circuits",
+      "brickwork circuits",
+      "dual-unitary circuits",
+      "kicked Ising model"
+     ],
+     "parent": "system.random-and-disordered-models"
+    },
+    {
+     "id": "system.anderson-and-quasiperiodic-models",
+     "label": "Anderson and quasiperiodic models",
+     "aliases": [
+      "Anderson model",
+      "Aubry-Andre model",
+      "Aubry-Andre-Harper model",
+      "quasiperiodic models",
+      "Rosenzweig-Porter model",
+      "disordered XXZ chain"
+     ],
+     "parent": "system.random-and-disordered-models"
+    },
+    {
+     "id": "system.quantum-simulation-platforms",
+     "label": "Quantum simulation platforms",
+     "labelIt": "Piattaforme di simulazione quantistica",
+     "aliases": [
+      "quantum simulator platforms",
+      "quantum hardware platforms"
+     ]
+    },
+    {
+     "id": "system.rydberg-atom-arrays",
+     "label": "Rydberg atom arrays",
+     "labelIt": "Array di atomi di Rydberg",
+     "aliases": [
+      "Rydberg arrays",
+      "Rydberg atoms",
+      "Rydberg tweezer arrays",
+      "PXP model",
+      "Rydberg blockade"
+     ],
+     "parent": "system.quantum-simulation-platforms"
+    },
+    {
+     "id": "system.superconducting-qubits",
+     "label": "Superconducting qubits",
+     "labelIt": "Qubit superconduttivi",
+     "aliases": [
+      "superconducting qubit",
+      "transmon",
+      "transmons",
+      "fluxonium",
+      "Josephson junction arrays",
+      "cat qubits"
+     ],
+     "parent": "system.quantum-simulation-platforms"
+    },
+    {
+     "id": "system.trapped-ions",
+     "label": "Trapped ions",
+     "labelIt": "Ioni intrappolati",
+     "aliases": [
+      "trapped-ion",
+      "trapped-ion systems",
+      "ion crystals",
+      "ion chains"
+     ],
+     "parent": "system.quantum-simulation-platforms"
+    },
+    {
+     "id": "system.ultracold-atoms",
+     "label": "Ultracold atoms",
+     "labelIt": "Atomi ultrafreddi",
+     "aliases": [
+      "cold atoms",
+      "ultracold atoms in optical lattices",
+      "ultracold fermions",
+      "ultracold bosons",
+      "ultracold molecules",
+      "polar molecules"
+     ],
+     "parent": "system.quantum-simulation-platforms"
+    },
+    {
+     "id": "system.photonic-and-polariton-systems",
+     "label": "Photonic and polariton systems",
+     "aliases": [
+      "photonic lattices",
+      "exciton-polaritons",
+      "polariton condensates",
+      "waveguide arrays",
+      "coupled cavity arrays"
+     ],
+     "parent": "system.quantum-simulation-platforms"
+    },
+    {
+     "id": "system.spin-qubits-and-defects",
+     "label": "Spin qubits and defects",
+     "aliases": [
+      "spin qubits",
+      "semiconductor spin qubits",
+      "quantum dot arrays",
+      "NV centers",
+      "nitrogen-vacancy centers",
+      "color centers"
+     ],
+     "parent": "system.quantum-simulation-platforms"
+    },
+    {
+     "id": "system.quantum-materials",
+     "label": "Quantum materials",
+     "labelIt": "Materiali quantistici",
+     "aliases": [
+      "correlated materials",
+      "strongly correlated materials",
+      "transition metal oxides",
+      "real materials"
+     ]
+    },
+    {
+     "id": "system.cuprates",
+     "label": "Cuprates",
+     "aliases": [
+      "cuprate",
+      "copper oxides",
+      "LSCO",
+      "YBCO",
+      "BSCCO",
+      "CuO2 planes"
+     ],
+     "parent": "system.quantum-materials"
+    },
+    {
+     "id": "system.nickelates",
+     "label": "Nickelates",
+     "aliases": [
+      "nickelate",
+      "nickelate superconductors",
+      "infinite-layer nickelates",
+      "La3Ni2O7"
+     ],
+     "parent": "system.quantum-materials"
+    },
+    {
+     "id": "system.iron-based-superconductors",
+     "label": "Iron-based superconductors",
+     "aliases": [
+      "iron pnictides",
+      "iron chalcogenides",
+      "FeSe",
+      "iron-based superconductor"
+     ],
+     "parent": "system.quantum-materials"
+    },
+    {
+     "id": "system.moire-materials",
+     "label": "Moire materials",
+     "aliases": [
+      "moire superlattices",
+      "twisted bilayers",
+      "magic-angle graphene",
+      "twisted bilayer graphene",
+      "TBG",
+      "moire TMD"
+     ],
+     "parent": "system.quantum-materials"
+    },
+    {
+     "id": "system.kitaev-and-frustrated-magnet-candidates",
+     "label": "Kitaev and frustrated magnet candidates",
+     "aliases": [
+      "alpha-RuCl3",
+      "RuCl3",
+      "herbertsmithite",
+      "kagome magnets",
+      "pyrochlore magnets",
+      "YbMgGaO4"
+     ],
+     "parent": "system.quantum-materials"
+    }
+   ]
+  },
+  {
+   "id": "paperType",
+   "label": "Paper type",
+   "singleValue": true,
+   "concepts": [
+    {
+     "id": "paperType.review",
+     "label": "Review",
+     "labelIt": "Rassegna",
+     "aliases": [
+      "review article",
+      "literature review",
+      "survey",
+      "topical review",
+      "colloquium",
+      "review paper"
+     ]
+    },
+    {
+     "id": "paperType.tutorial-or-lecture-notes",
+     "label": "Tutorial or lecture notes",
+     "labelIt": "Tutorial o dispense",
+     "aliases": [
+      "tutorial",
+      "lecture notes",
+      "lectures",
+      "pedagogical introduction",
+      "primer"
+     ]
+    },
+    {
+     "id": "paperType.theory",
+     "label": "Theory",
+     "labelIt": "Teoria",
+     "aliases": [
+      "theoretical study",
+      "theoretical paper",
+      "theoretical analysis",
+      "analytical study"
+     ]
+    },
+    {
+     "id": "paperType.rigorous-result",
+     "label": "Rigorous result",
+     "labelIt": "Risultato rigoroso",
+     "aliases": [
+      "theorem",
+      "rigorous proof",
+      "no-go theorem",
+      "mathematical result"
+     ]
+    },
+    {
+     "id": "paperType.numerical-study",
+     "label": "Numerical study",
+     "labelIt": "Studio numerico",
+     "aliases": [
+      "numerical simulation",
+      "numerical simulations",
+      "numerical investigation",
+      "computational study",
+      "simulation study"
+     ]
+    },
+    {
+     "id": "paperType.method-or-algorithm",
+     "label": "Method or algorithm",
+     "labelIt": "Metodo o algoritmo",
+     "aliases": [
+      "method paper",
+      "algorithm",
+      "new algorithm",
+      "new method",
+      "methodological paper"
+     ]
+    },
+    {
+     "id": "paperType.experiment",
+     "label": "Experiment",
+     "labelIt": "Esperimento",
+     "aliases": [
+      "experimental study",
+      "experimental paper",
+      "experimental results",
+      "experimental demonstration"
+     ]
+    },
+    {
+     "id": "paperType.benchmark",
+     "label": "Benchmark",
+     "labelIt": "Confronto di metodi",
+     "aliases": [
+      "benchmark paper",
+      "benchmarking study",
+      "comparison of methods",
+      "comparative study"
+     ]
+    },
+    {
+     "id": "paperType.software-or-dataset",
+     "label": "Software or dataset",
+     "labelIt": "Software o dataset",
+     "aliases": [
+      "software paper",
+      "software package",
+      "code release",
+      "dataset paper",
+      "dataset"
+     ]
+    },
+    {
+     "id": "paperType.perspective-or-opinion",
+     "label": "Perspective or opinion",
+     "labelIt": "Prospettiva o opinione",
+     "aliases": [
+      "perspective",
+      "opinion",
+      "viewpoint",
+      "commentary",
+      "outlook",
+      "roadmap",
+      "position paper",
+      "essay"
+     ]
+    },
+    {
+     "id": "paperType.proposal",
+     "label": "Proposal",
+     "labelIt": "Proposta",
+     "aliases": [
+      "experimental proposal",
+      "proposal paper",
+      "proposed experiment",
+      "blueprint"
+     ]
+    },
+    {
+     "id": "paperType.thesis",
+     "label": "Thesis",
+     "labelIt": "Tesi",
+     "aliases": [
+      "PhD thesis",
+      "doctoral thesis",
+      "dissertation",
+      "master thesis"
+     ]
+    }
+   ]
+  }
+ ]
+}

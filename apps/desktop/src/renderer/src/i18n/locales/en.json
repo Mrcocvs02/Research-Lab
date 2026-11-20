@@ -8,6 +8,12 @@
     "en": "English"
   },
   "common": {
+    "resizeHint": "Drag to resize, double click to reset",
+    "resizeSidebar": "Resize the sidebar",
+    "resizeDetails": "Resize the details panel",
+    "resizeChat": "Resize the Claude panel",
+    "resizeMap": "Resize the map side panel",
+    "resizeReader": "Resize the reader side panel",
     "loading": "Loading…",
     "retry": "Try again",
     "save": "Save",

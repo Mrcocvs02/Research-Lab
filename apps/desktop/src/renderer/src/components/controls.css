@@ -566,3 +566,38 @@ button.rl-chip__remove:focus-visible {
     opacity: 0.5;
   }
 }
+
+/* Resize handle of a side panel (ResizeHandle): a thin strip on the panel's edge, wider hit area than the visible line. */
+.rl-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 8;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+}
+.rl-resize--end {
+  right: -4px;
+}
+.rl-resize--start {
+  left: -4px;
+}
+.rl-resize::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background 120ms;
+}
+.rl-resize:hover::after,
+.rl-resize:focus-visible::after {
+  background: var(--accent);
+}
+.rl-resize:focus-visible {
+  outline: none;
+}

@@ -3,7 +3,7 @@
  * tokens only. Layout changes with the window width through media queries (D-335, D-363): no measuring in JavaScript.
  */
 .shell {
-  --sidebar-w: 232px;
+  --sidebar-w: min(var(--sidebar-user, 232px), 28vw);
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr) auto;
   grid-template-rows: 48px auto minmax(0, 1fr);
@@ -12,6 +12,24 @@
     'sidebar banner chat'
     'sidebar main chat';
   height: 100%;
+}
+/* The resize handle of the sidebar lives in its own grid cell (the sidebar clips its overflow); not for the icon-only sidebar. */
+.shell-resize {
+  position: relative;
+  grid-area: sidebar;
+  z-index: 9;
+  pointer-events: none;
+}
+.shell-resize > * {
+  pointer-events: auto;
+}
+.shell[data-collapsed] .shell-resize {
+  display: none;
+}
+@media (max-width: 1099px) {
+  .shell-resize {
+    display: none;
+  }
 }
 /* Compressed sidebar: icons only (the reader, the sidebar toggle, and windows narrower than 1100 px). */
 .shell[data-collapsed] {
@@ -614,10 +632,11 @@
 
 /* ---- Claude panel: beside the view when the window is wide, over it below 1180 px (D-335) ---- */
 .claude-panel {
+  position: relative;
   grid-area: chat;
   display: flex;
   flex-direction: column;
-  width: var(--chat-w);
+  width: min(var(--chat-w), 40vw);
   background: var(--surface);
   border-left: 1px solid var(--border);
 }

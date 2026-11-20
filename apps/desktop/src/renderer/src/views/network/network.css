@@ -76,8 +76,17 @@
   flex-direction: column;
   gap: var(--space-2);
 }
+.rl-resize.rl-resize--inline {
+  position: relative;
+  flex: none;
+  align-self: stretch;
+  margin: 0 -4px;
+  left: auto;
+  right: auto;
+}
 .net-detail {
-  width: 320px;
+  width: var(--net-detail-w, 320px);
+  max-width: 60%;
   flex: none;
   overflow: auto;
   border-left: 1px solid var(--border);
@@ -1038,6 +1047,7 @@
   white-space: nowrap;
 }
 .map-side {
+  position: relative;
   flex: none;
   width: 248px;
   min-height: 0;

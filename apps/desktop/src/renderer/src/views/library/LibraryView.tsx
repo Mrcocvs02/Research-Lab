@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { ResizeHandle } from '../../components/ResizeHandle';
+import { useResizable } from '../../lib/useResizable';
 import { Lazy, lazyView } from '../../components/Lazy';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../../components/Button';
@@ -55,6 +57,7 @@ export function LibraryView() {
 
 function LibraryInner() {
   const { t } = useTranslation();
+  const detailW = useResizable('rl.w.detail', { def: 360, min: 300, max: 520 });
   const app = useApp();
   const { info } = useNotify();
   const { status, start, cancel } = useScanStatus();
@@ -198,7 +201,7 @@ function LibraryInner() {
           ) : (
             <FacetBar facets={list.facets} browse={browse} anything={anything} onFilters={(filters) => set({ filters })} onTags={(tags) => set({ tags })} onFolder={(folder) => set({ folder })} onClearAll={clearAll} resources={showResources} onResources={setShowResources} />
           )}
-          <div className={`library-grid${detailOpen ? ' with-detail' : ''}${navOpen ? ' nav-open' : ''}`}>
+          <div style={{ '--detail-w': `${detailW.width}px` } as CSSProperties} className={`library-grid${detailOpen ? ' with-detail' : ''}${navOpen ? ' nav-open' : ''}`}>
             <aside className="library-nav" aria-label={t('docs.navigation')}>
               <Tabs
                 label={t('docs.navigation')}
@@ -272,6 +275,7 @@ function LibraryInner() {
               )}
             </section>
 
+            {detailOpen && <ResizeHandle r={detailW} edge="start" label={t('common.resizeDetails')} testId="resize-detail" className="detail-resize" />}
             {detailOpen && (
               <aside className="detail-pane" aria-label={t('docs.details')} data-testid="detail-pane" onKeyDown={(e) => e.key === 'Escape' && !document.querySelector('.rl-popover') && setDetailOpen(false)}>
                 <Lazy>

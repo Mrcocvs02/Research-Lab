@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { ResizeHandle } from '../../components/ResizeHandle';
+import { useResizable } from '../../lib/useResizable';
 import type { Channels, RequestOf } from '@rl/core';
 import { GRAPH_LIMITS } from '@rl/core';
 import { useTranslation } from 'react-i18next';
@@ -117,6 +119,7 @@ function DocDetail({ docId, onClose, onNetwork, onPathStart, tagLabel, onOpenDoc
  */
 export function NetworkView() {
   const { t, i18n } = useTranslation();
+  const detailW = useResizable('rl.w.netDetail', { def: 320, min: 260, max: 520 });
   const model = useGraphModel();
   const scopes = useScopeOptions();
   const [tab, setTab] = useState<Tab>('map');
@@ -374,7 +377,7 @@ export function NetworkView() {
           </div>
           {!noModel && <div className="net-row-slot" ref={setRow} />}
         </div>
-        <div className="net-main">
+        <div className="net-main" style={{ '--net-detail-w': `${detailW.width}px` } as CSSProperties}>
           {noModel ? (
             <div className="net-panels" data-testid="graph-empty">
               <EmptyState icon={<MapIllustration />} title={t('network.noModel.title')} action={<button type="button" className="primary" onClick={() => void model.build()} data-testid="graph-build-empty">{t('network.build')}</button>}>
@@ -455,6 +458,7 @@ export function NetworkView() {
               )}
             </div>
           )}
+          {(entity || doc) && !noModel && <ResizeHandle r={detailW} edge="start" label={t('common.resizeDetails')} testId="resize-net-detail" className="rl-resize--inline" />}
           {entity && !noModel && <EntityDetail key={entity.node.id} mode={entity.mode} entity={entity.node} peers={entityData?.nodes ?? []} yearRange={entityData?.yearRange} onClose={() => setEntity(null)} onOpenDoc={setDoc} />}
           {doc && !noModel && <DocDetail key={doc} docId={doc} ctl={tab === 'network' ? ctl : null} onClose={() => setDoc(null)} onNetwork={() => centerOn(doc, docTitle ?? t('network.untitled'))} onPathStart={() => setPathFrom(doc)} tagLabel={scopes.tagLabel} onOpenDoc={setDoc} />}
         </div>

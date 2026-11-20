@@ -5,6 +5,8 @@ import { ANNOTATION_COLORS, STUDY_LIMITS, type Annotation } from '@rl/core';
 import { costLabel } from '../../components/AiCostPreview';
 import { Lazy, lazyView } from '../../components/Lazy';
 import { ErrorNote } from '../../components/ui';
+import { ResizeHandle } from '../../components/ResizeHandle';
+import { useResizable } from '../../lib/useResizable';
 import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
 import { useHistory } from '../../lib/history';
@@ -103,6 +105,7 @@ interface Props {
  */
 export function ReaderView({ target, onClose, split }: Props) {
   const { t } = useTranslation();
+  const sideW = useResizable('rl.w.readerSide', { def: 340, min: 260, max: 560 });
   const { reportError, fail, info: notifyInfo } = useNotify();
   const docId = target.docId;
   const findId = useId();
@@ -876,7 +879,7 @@ export function ReaderView({ target, onClose, split }: Props) {
       )}
       {pdf.ask === 'consent' && <PdfConsentDialog onChoose={pdf.choose} onClose={() => pdf.setAsk(null)} />}
       <PdfConfirmDialogs pdf={pdf} docId={docId} />
-      <div className={sideShown ? 'reader-body with-side' : 'reader-body'}>
+      <div className={sideShown ? 'reader-body with-side' : 'reader-body'} style={sideShown ? ({ '--reader-side-w': `${sideW.width}px` } as React.CSSProperties) : undefined}>
         <div className="reader-main">
           {findOpen && (
             <FindBar
@@ -1021,6 +1024,7 @@ export function ReaderView({ target, onClose, split }: Props) {
           )}
         </div>
 
+        {sideShown && <ResizeHandle r={sideW} edge="start" label={t('common.resizeReader')} testId="resize-reader-side" className="reader-resize" />}
         {sideShown && (
           <aside className="reader-side" aria-label={t('reader.panel')} data-testid="reader-side-panel">
             <div className="rl-tabs" role="tablist" aria-label={t('reader.panel')}>

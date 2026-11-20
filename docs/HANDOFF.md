@@ -6,12 +6,11 @@ Questo file serve a riprendere il lavoro su Research Lab da una chat nuova di Cl
 ## Ripresa (2026-11-20, sera) — leggere per primo
 
 - Rilasciata **v1.2.0** (`7a3246a`, tag `v1.2.0`), installer `apps/desktop/release/ResearchLab-Setup-1.2.0.exe` (125 MB, senza Claude Code, non provato con installazione). Test: unitari 3044/3044, pesanti verdi, e2e verdi tranne `qa-budget` (instabile noto).
-- **In corso, non uniti** (worktree sotto `C:\dev\rl-wt`, rami non spinti):
-  - `hk1` **unito**: "Lascia decidere a Haiku" con avanzamento visibile ("120/600", chip Attività, Annulla che tiene il parziale, riepilogo), tutte le domande in una corsa (anteprima con costo totale e tetto), prompt condiviso inviato una volta con cache e domande a centinaia per chiamata (riportare i token prima/dopo), "Vai al documento"/"Inizia da qui" spostati a destra nel vicinato. D-515.
+- **Uniti su `main` dopo la 1.2.0** (spinti; nessun ramo in corso):
+  - `hk1` **unito** (`a5d1ea1`): "Lascia decidere a Haiku" con avanzamento visibile ("120/600", chip Attività, Annulla che tiene il parziale, riepilogo), tutte le domande in una corsa (anteprima con costo totale e tetto), prompt condiviso inviato una volta con cache e domande a centinaia per chiamata (riportare i token prima/dopo), "Vai al documento"/"Inizia da qui" spostati a destra nel vicinato. D-515.
   - `vpack` **unito** (`9a57b84`): vocabolario di base (topic 161 con 12 macro-aree, method 79, system 42, paperType 12; termini scritti da zero, solo categorie arXiv come indizi; PhySH non usato: licenza non dichiarata) del campo dell'utente (fisica, informazione quantistica, molti corpi, materia condensata, metodi numerici, AI, fisica matematica) in `packages/core/src/vocab/packs/physics-qi-manybody.json` + schema zod + test + `docs/design/vocab-packs.md`; licenze da verificare (PhySH CC0?).
-  - Se una sessione si è chiusa: controllare `git status`/`git log main..<ramo>` nel worktree; un agente interrotto si riprende con un nuovo agente che parte dal lavoro non committato.
 - **Prossimi passi:**
-  1. Unire `hk1` (`vpack` già unito) (controllo diff, niente Co-Authored-By, typecheck/build/check:budget/check:generality, push).
+  1. ~~Unire `hk1` e `vpack`~~ fatto (`a5d1ea1`, `9a57b84`).
   2. Progetto Opus: il vocabolario di base guida tagging, macro-aree e blocchi (il Vocabolario mostra solo i concetti usati in libreria; il vocabolario evolve con i paper); correzioni a mano nella panoramica a blocchi (trascinare un paper in un altro blocco = cambia il valore della famiglia, rinominare/unire blocchi); migliorare la scelta delle macro-aree. **La panoramica a blocchi va tenuta** (piace all'utente).
   3. Sonnet implementa; Opus verifica su una copia della cartella UL (sola lettura, copia temporanea, niente percorso nei file).
   4. Giro completo dei test (unitari; e2e due alla volta, ognuno con `--output` suo; pesanti), documenti, versione 1.3.0.

@@ -100,6 +100,7 @@
       "remove": "Togli",
       "showAll": "Mostra tutti ({{count}})",
       "toProject": "Aggiungi a progetto…"
-    }
+    },
+    "manageTagsLink": "Gestisci i tag…"
   }
 }

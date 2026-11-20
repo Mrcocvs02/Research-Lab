@@ -70,7 +70,7 @@ function ValueList({ facet, data, filters, onChange }: { facet: Facet; data: Sea
 }
 
 /** Include and exclude pickers with the match mode: what the old tag row held, now behind the Tag chip. */
-function TagPopover({ tags, onChange }: { tags: BrowseState['tags']; onChange(next: BrowseState['tags']): void }) {
+function TagPopover({ tags, onChange, onManage }: { tags: BrowseState['tags']; onChange(next: BrowseState['tags']): void; onManage(): void }) {
   const { t } = useTranslation();
   const { model } = useTaxonomy();
   const groupId = useId();
@@ -90,6 +90,9 @@ function TagPopover({ tags, onChange }: { tags: BrowseState['tags']; onChange(ne
         </div>
       )}
       <TagPicker model={model} exclude={excluded} ariaLabel={t('filter.exclude')} placeholder={t('filter.excludePlaceholder')} onPick={(id) => onChange(setTagFilter(tags, id, 'exclude'))} testId="filter-exclude-input" />
+      <button type="button" className="link" onClick={onManage} data-testid="tag-filter-manage">
+        {t('library.manageTagsLink')}
+      </button>
     </div>
   );
 }
@@ -102,6 +105,8 @@ interface Props {
   onTags(next: BrowseState['tags']): void;
   onFolder(path: string | null): void;
   onClearAll(): void;
+  /** "Manage tags…" in the tag popover: opens the tag manager. */
+  onManageTags(): void;
   /** The Type facet "Resources" (17.4.4): resources are shown in place of the documents. */
   resources: boolean;
   onResources(on: boolean): void;
@@ -111,7 +116,7 @@ interface Props {
  * The one row of filters (4.2, 17.3): six facet chips with their popovers, the active filters as removable chips, "Clear"
  * and "Show missing files". 8 controls at rest; the selection bar takes the place of the whole row.
  */
-export function FacetBar({ facets, browse, anything, onFilters, onTags, onFolder, onClearAll, resources, onResources }: Props) {
+export function FacetBar({ facets, browse, anything, onFilters, onTags, onFolder, onClearAll, onManageTags, resources, onResources }: Props) {
   const { t } = useTranslation();
   const { model, colorOf, labelOf } = useTaxonomy();
   const missingId = useId();
@@ -195,7 +200,7 @@ export function FacetBar({ facets, browse, anything, onFilters, onTags, onFolder
       <div className="facet-bar__chips" role="group" aria-label={t('search.filters')}>
         {CHIPS.map((id) => (
           <FacetChip key={id} id={id} active={isActive(id)}>
-            {id === 'tags' ? <TagPopover tags={tags} onChange={onTags} /> : <ValueList facet={id} data={facets} filters={filters} onChange={onFilters} />}
+            {id === 'tags' ? <TagPopover tags={tags} onChange={onTags} onManage={onManageTags} /> : <ValueList facet={id} data={facets} filters={filters} onChange={onFilters} />}
           </FacetChip>
         ))}
         <Chip selected={resources} onClick={() => onResources(!resources)} className="facet-resources">

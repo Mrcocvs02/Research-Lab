@@ -4,6 +4,7 @@ import type { Channels, ResponseOf } from '@rl/core';
 import { useChangeVersion, useLibraryEvents } from '../../../lib/events';
 import { useNotify } from '../../../lib/notify';
 import { rl } from '../../../lib/rl';
+import { publishTagCount } from '../../../lib/tagCount';
 
 export type TagData = ResponseOf<Channels, 'tagReview:get'>;
 
@@ -19,7 +20,10 @@ export function useTagReview(step?: number, enabled = true) {
     const mine = ++ticket.current;
     try {
       const d = await rl.invoke('tagReview:get', step ? { step: step as 1 | 2 | 3 | 4 | 5 } : {});
-      if (mine === ticket.current) setData(d);
+      if (mine === ticket.current) {
+        setData(d);
+        if (!step) publishTagCount(d.proposals.filter((p) => p.confidence !== 'maybe').length);
+      }
     } catch {
       /* shown nowhere: the manager works without the review */
     }

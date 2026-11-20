@@ -7,6 +7,8 @@ import { useAiUi } from '../lib/aiUi';
 import { useInbox } from '../lib/inbox';
 import { useEffectiveShortcuts } from '../lib/keymap';
 import { NAV_ORDER, type NavView } from '../lib/nav';
+import { openTagManager } from '../lib/libraryIntent';
+import { useTagCount } from '../lib/tagCount';
 import { useWatchCount } from '../lib/watch';
 import { useApp } from '../state/app-context';
 import { libraryTint } from './libraryModel';
@@ -33,7 +35,8 @@ interface Props {
 export function Sidebar({ view, onSection, onNewLibrary, proposals, documents, collapsed, onToggle, chatId }: Props) {
   const { t } = useTranslation();
   const keys = useEffectiveShortcuts();
-  const { chatOpen, setChatOpen, openGuide } = useAiUi();
+  const { chatOpen, setChatOpen, openGuide, goTo } = useAiUi();
+  const tagCount = useTagCount();
   const inbox = useInbox();
   const discoverCount = useWatchCount();
 
@@ -86,7 +89,27 @@ export function Sidebar({ view, onSection, onNewLibrary, proposals, documents, c
       </div>
       <LibrarySwitcher onNewLibrary={onNewLibrary} documents={documents} />
       <nav aria-label={t('shell.navigation')}>
-        <ul>{NAV_ORDER.map((n) => item(n.id, n.view))}</ul>
+        <ul>
+          {NAV_ORDER.map((n) => item(n.id, n.view))}
+          <li>
+            <button
+              type="button"
+              className="nav-item"
+              aria-label={tagCount > 0 ? `${t('shell.tags')}: ${t('shell.tagsToReview', { count: tagCount })}` : t('shell.tags')}
+              title={[tagCount > 0 ? `${t('shell.tags')}: ${t('shell.tagsToReview', { count: tagCount })}` : t('shell.tags'), keys['tags.manage']].filter(Boolean).join(' · ')}
+              onClick={() => openTagManager(() => goTo('library'), tagCount > 0 ? 'review' : 'manage')}
+              data-testid="nav-tags"
+            >
+              <Icon name="tag" />
+              <span className="nav-item__label">{t('shell.tags')}</span>
+              {tagCount > 0 && (
+                <span className="rl-badge rl-badge--count nav-badge" data-testid="tags-badge">
+                  {count(tagCount)}
+                </span>
+              )}
+            </button>
+          </li>
+        </ul>
       </nav>
       <div className="sidebar-foot">
         <ul>

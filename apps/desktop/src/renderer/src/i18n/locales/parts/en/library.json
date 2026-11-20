@@ -100,6 +100,7 @@
       "remove": "Remove",
       "showAll": "Show all ({{count}})",
       "toProject": "Add to project…"
-    }
+    },
+    "manageTagsLink": "Manage tags…"
   }
 }

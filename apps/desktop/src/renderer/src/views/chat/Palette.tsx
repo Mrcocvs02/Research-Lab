@@ -1,3 +1,4 @@
+import { openTagManager } from '../../lib/libraryIntent';
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ShortcutId } from '@rl/core';
@@ -113,7 +114,7 @@ export function Palette({ onClose }: { onClose(): void }) {
     const reason = (id: PaletteActionId): string | undefined => {
       if (id === 'undo') return !hasLibrary ? noLibrary : history.canUndo ? undefined : t('history.nothingToUndo');
       if (id === 'redo') return !hasLibrary ? noLibrary : history.canRedo ? undefined : t('history.nothingToRedo');
-      if (['scanNow', 'backupNow', 'addPdf', 'addFromId', 'addResource', 'goReview', 'goProjects', 'goDiscover', 'goMap'].includes(id) && !hasLibrary) return noLibrary;
+      if (['scanNow', 'backupNow', 'addPdf', 'addFromId', 'addResource', 'goReview', 'goProjects', 'goDiscover', 'goMap', 'manageTags', 'tidyTags', 'reviewTags'].includes(id) && !hasLibrary) return noLibrary;
       return undefined;
     };
     const actions: Item[] = PALETTE_ACTIONS.filter((a) => a.id !== 'resume' || resume !== null).map((a) => ({
@@ -155,6 +156,12 @@ export function Palette({ onClose }: { onClose(): void }) {
         return goTo('map');
       case 'goSettings':
         return goTo('settings');
+      case 'manageTags':
+        return openTagManager(() => goTo('library'), 'manage');
+      case 'tidyTags':
+        return openTagManager(() => goTo('library'), 'cleanup');
+      case 'reviewTags':
+        return openTagManager(() => goTo('library'), 'review');
       case 'openActivity':
         return setActivityOpen(true);
       case 'scanNow':

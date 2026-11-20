@@ -11,7 +11,7 @@ import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
 import { useChangeVersion } from '../../lib/events';
 import { setSearchText, useSearchText } from '../../lib/librarySearch';
-import { takeLibraryIntent } from '../../lib/libraryIntent';
+import { TAG_MANAGER_EVENT, takeLibraryIntent, tagPlaceOf, type TagPlace } from '../../lib/libraryIntent';
 import { useLocalChoice } from '../../lib/useLocalString';
 import { useLocalFlag } from '../../lib/useLocalFlag';
 import { useNotify } from '../../lib/notify';
@@ -62,7 +62,10 @@ function LibraryInner() {
   const text = useSearchText();
 
   const [state, setState] = useState<BrowseState>(() => browseFromIntent(takeLibraryIntent()));
-  const [cleanupFirst] = useState(() => takeLibraryIntent()?.cleanup === true);
+  const [tagPlace, setTagPlace] = useState<{ place: TagPlace; n: number } | null>(() => {
+    const place = tagPlaceOf(takeLibraryIntent());
+    return place ? { place, n: 0 } : null;
+  });
   const browse = useMemo<BrowseState>(() => ({ ...state, text }), [state, text]);
   const [view, setView] = useLocalChoice<ViewMode>('rl.libraryView', ['list', 'grid'], 'list');
   const [cardSize, setCardSize] = useLocalChoice<CardSize>('rl.cardSize', CARD_SIZES, 'm');
@@ -70,12 +73,24 @@ function LibraryInner() {
   const [selection, setSelection] = useState<SelectionState>(emptySelection);
   const [detailOpen, setDetailOpen] = useLocalFlag('rl.detailOpen', false);
   const [navOpen, setNavOpen] = useState(false);
-  const [mode, setMode] = useState<'browse' | 'taxonomy'>(cleanupFirst ? 'taxonomy' : 'browse');
+  const [mode, setMode] = useState<'browse' | 'taxonomy'>(tagPlace ? 'taxonomy' : 'browse');
   const [addOpen, setAddOpen] = useState(false);
   const [showResources, setShowResources] = useState(false);
   const [jobOpen, setJobOpen] = useState(false);
   const [litOpen, setLitOpen] = useState(false);
   const set = (patch: Partial<Omit<BrowseState, 'text'>>) => setState((b) => ({ ...b, ...patch }));
+
+  // A direct way into the tag manager (palette, shortcut, sidebar, facet) while the Library is on screen.
+  useEffect(() => {
+    const on = () => {
+      const place = tagPlaceOf(takeLibraryIntent());
+      if (!place) return;
+      setTagPlace((c) => ({ place, n: (c?.n ?? 0) + 1 }));
+      setMode('taxonomy');
+    };
+    window.addEventListener(TAG_MANAGER_EVENT, on);
+    return () => window.removeEventListener(TAG_MANAGER_EVENT, on);
+  }, []);
 
   // The text of the search box is the view's own while it lives: it goes away with the view.
   useEffect(() => () => setSearchText(''), []);
@@ -181,7 +196,7 @@ function LibraryInner() {
 
       {mode === 'taxonomy' ? (
         <Lazy>
-          <TaxonomyManager onBack={() => setMode('browse')} startCleanup={cleanupFirst} />
+          <TaxonomyManager key={tagPlace?.n ?? 0} onBack={() => setMode('browse')} start={tagPlace?.place ?? 'manage'} />
         </Lazy>
       ) : (
         <>
@@ -196,7 +211,7 @@ function LibraryInner() {
               tagEditor={(close) => <SelectionSummary docIds={selectedIds} rows={selectedRows} onNeedRows={needRows} onProject={() => { close(); setAddOpen(true); }} onClose={close} />}
             />
           ) : (
-            <FacetBar facets={list.facets} browse={browse} anything={anything} onFilters={(filters) => set({ filters })} onTags={(tags) => set({ tags })} onFolder={(folder) => set({ folder })} onClearAll={clearAll} resources={showResources} onResources={setShowResources} />
+            <FacetBar facets={list.facets} browse={browse} anything={anything} onFilters={(filters) => set({ filters })} onTags={(tags) => set({ tags })} onFolder={(folder) => set({ folder })} onClearAll={clearAll} onManageTags={() => setMode('taxonomy')} resources={showResources} onResources={setShowResources} />
           )}
           <div className={`library-grid${detailOpen ? ' with-detail' : ''}${navOpen ? ' nav-open' : ''}`}>
             <aside className="library-nav" aria-label={t('docs.navigation')}>

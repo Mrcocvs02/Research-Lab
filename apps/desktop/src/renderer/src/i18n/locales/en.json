@@ -403,7 +403,9 @@
     "treeLabel": "Tags",
     "countHint": "Documents with this tag or a sub-tag",
     "excludeThis": "Exclude {{name}}",
-    "manage": "Manage taxonomy…"
+    "manage": "Manage taxonomy…",
+    "changed_one": "Tags updated on {{count}} document.",
+    "changed_other": "Tags updated on {{count}} documents."
   },
   "bulk": {
     "editTags": "Edit tags"
@@ -420,7 +422,16 @@
     "path": "Path"
   },
   "tax": {
-    "title": "Taxonomy"
+    "title": "Taxonomy",
+    "haiku": {
+      "progress": "Haiku is deciding… {{done}}/{{total}}",
+      "progressDetail": "Call {{batch}} of {{batches}} · {{time}} · decided so far: {{decided}}",
+      "stop": "Cancel",
+      "stopped": "Haiku was stopped",
+      "failed": "Haiku could not decide",
+      "finished": "Haiku has finished",
+      "summary": "Decided: {{decided}} · left to you: {{left}} · errors: {{errors}}"
+    }
   },
   "projects": {
     "addToProject": "Add to project…",

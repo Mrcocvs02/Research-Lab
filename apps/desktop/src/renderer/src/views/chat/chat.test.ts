@@ -553,7 +553,8 @@ describe('command palette', () => {
     setup({ palette: true, commands: [{ id: 'mine', label: 'My own command', prompt: 'Do my thing' }] });
     await ready();
     const box = await screen.findByTestId('palette-input');
-    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(22));
+    // The 23 actions of the app (the list in the previous test); the commands of the user show only when the text asks for them.
+    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(23));
     fireEvent.change(box, { target: { value: 'my own' } });
     await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(1));
     const only = screen.getAllByTestId('palette-item');

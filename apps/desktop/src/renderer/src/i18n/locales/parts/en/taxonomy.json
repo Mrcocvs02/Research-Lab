@@ -320,15 +320,8 @@
         "parent": "parent and child: \"{{a}}\" and \"{{b}}\"",
         "distinct": "\"{{a}}\" and \"{{b}}\" stay distinct"
       },
-      "progress": "Haiku is deciding… {{done}}/{{total}}",
-      "progressDetail": "Call {{batch}} of {{batches}} · {{time}} · decided so far: {{decided}}",
-      "stop": "Cancel",
       "hide": "Close (keeps running)",
       "background": "You can close this window: progress stays in the Activity panel. If you cancel, what is already decided is kept (as an undoable change).",
-      "finished": "Haiku has finished",
-      "stopped": "Haiku was stopped",
-      "failed": "Haiku could not decide",
-      "summary": "Decided: {{decided}} · left to you: {{left}} · errors: {{errors}}",
       "capped": "{{count}} questions were not sent because they are over the spending cap: they stay for later."
     }
   }

@@ -403,7 +403,9 @@
     "treeLabel": "Tag",
     "countHint": "Documenti con questo tag o un suo sotto-tag",
     "excludeThis": "Escludi {{name}}",
-    "manage": "Gestisci la tassonomia…"
+    "manage": "Gestisci la tassonomia…",
+    "changed_one": "Tag aggiornati su {{count}} documento.",
+    "changed_other": "Tag aggiornati su {{count}} documenti."
   },
   "bulk": {
     "editTags": "Modifica i tag"
@@ -420,7 +422,16 @@
     "path": "Percorso"
   },
   "tax": {
-    "title": "Tassonomia"
+    "title": "Tassonomia",
+    "haiku": {
+      "progress": "Haiku sta decidendo… {{done}}/{{total}}",
+      "progressDetail": "Chiamata {{batch}} di {{batches}} · {{time}} · decise finora: {{decided}}",
+      "stop": "Annulla",
+      "stopped": "Haiku è stato fermato",
+      "failed": "Haiku non ha potuto decidere",
+      "finished": "Haiku ha finito",
+      "summary": "Decise: {{decided}} · lasciate a te: {{left}} · errori: {{errors}}"
+    }
   },
   "projects": {
     "addToProject": "Aggiungi al progetto…",

@@ -37,7 +37,9 @@ describe('latent lines', () => {
     const lines = block.split('\n');
     expect(lines.filter((l) => l === LATENT_RULE)).toHaveLength(1);
     expect(lines.indexOf(LATENT_RULE)).toBeGreaterThan(lines.indexOf('- alpha | Alpha theory | Topic | aliases: '));
-    expect(lines.slice(-2)).toEqual(['- f3 | Concept 3 | Topic › Area', '- f4 | Concept 4 | Topic › Area']);
+    // The closing delimiter stays the last line; the latent lines sit right before it.
+    expect(lines.at(-1)).toBe('TAXONOMY>>>');
+    expect(lines.slice(-3, -1)).toEqual(['- f3 | Concept 3 | Topic › Area', '- f4 | Concept 4 | Topic › Area']);
     // The text before the latent part is the block of a library without a pack.
     expect(block.startsWith(taxonomyBlock(views).replace('\nTAXONOMY>>>', ''))).toBe(true);
     expect(latentLines([])).toEqual([]);

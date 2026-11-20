@@ -176,6 +176,7 @@ export function NetworkView() {
   const [exLoc, setExLoc] = useState<Loc | null>(null);
   const [exRestore, setExRestore] = useState<{ loc: Loc; nonce: number } | undefined>(undefined);
   const [rings, setRings] = useState('');
+  const [views, setViews] = useState(0);
   const ringGuard = useRef<{ target: string; timer: number } | null>(null);
   const onRings = (flags: string) => {
     setRings(flags);
@@ -229,7 +230,7 @@ export function NetworkView() {
     setEntity(null);
   };
 
-  const navState: NavState = { tab, family, doc, center: start?.id ?? null, path: path ? [path.a, path.b] : null, ex: exLoc ?? undefined, rings };
+  const navState: NavState = { tab, family, doc, center: start?.id ?? null, path: path ? [path.a, path.b] : null, ex: exLoc ?? undefined, rings, view: views };
   useEffect(() => {
     const r = restored.current;
     restored.current = null;
@@ -238,13 +239,14 @@ export function NetworkView() {
     if (r && sameState({ ...r, center: r.center ?? navState.center, ex: r.ex ?? navState.ex }, navState)) return;
     setNavStack((cur) => pushNav(cur, navState));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, family, doc, start?.id, path?.a, path?.b, exLoc?.dim, exLoc?.parentId, exLoc?.selected, rings]);
+  }, [tab, family, doc, start?.id, path?.a, path?.b, exLoc?.dim, exLoc?.parentId, exLoc?.selected, rings, views]);
   /** Goes to the state the stack points at: the tab, the family, the selection, the centre and the path come back together. */
   const goTo = (next: NavStack) => {
     const st = currentNav(next);
     if (!st) return;
     restored.current = st;
     setNavStack(next);
+    setViews(st.view ?? 0);
     show(st.tab);
     setDocState(st.doc);
     if (st.doc) setEntity(null);
@@ -426,7 +428,7 @@ export function NetworkView() {
             <div className="net-panels">
               {visited.has('map') && (
                 <div role="tabpanel" id="net-panel-map" aria-labelledby="net-tab-map" hidden={tab !== 'map'} className="net-panel">
-                  {status ? <MapPanel active={tab === 'map'} status={status} mapVersion={model.mapVersion} scopes={scopes} selected={doc} onSelect={setDoc} onMapChanged={model.bumpMap} onRead={readDoc} onExplore={() => exploreDim('topic')} onVicinity={(id) => centerOn(id, t('network.untitled'))} light={lightNode} onBuild={() => void model.build()} onInfo={setMapInfo} highlight={panorama} onPath={startPath} request={mapReq} /> : null}
+                  {status ? <MapPanel active={tab === 'map'} status={status} mapVersion={model.mapVersion} scopes={scopes} selected={doc} onSelect={setDoc} onMapChanged={model.bumpMap} onRead={readDoc} onExplore={() => exploreDim('topic')} onVicinity={(id) => centerOn(id, t('network.untitled'))} light={lightNode} onBuild={() => void model.build()} onInfo={setMapInfo} highlight={panorama} onPath={startPath} request={mapReq} onViewOpened={() => setViews((n) => n + 1)} /> : null}
                 </div>
               )}
               {visited.has('network') && (

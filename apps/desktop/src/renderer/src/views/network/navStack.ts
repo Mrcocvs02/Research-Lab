@@ -20,6 +20,8 @@ export interface NavState {
   ex?: { dim: string; parentId: string | null; selected: string | null } | undefined;
   /** Rings of the neighbourhood that are open: `m` (+8 done) and `w` (widened); '' is the first ring only. */
   rings?: string | undefined;
+  /** How many saved views were opened (D-527): opening one is a place of its own, even when the family and the paper stay as they were. */
+  view?: number | undefined;
 }
 
 export const MAX_NAV = 50;
@@ -43,7 +45,8 @@ export const sameState = (a: NavState, b: NavState): boolean =>
   a.ex?.dim === b.ex?.dim &&
   (a.ex?.parentId ?? null) === (b.ex?.parentId ?? null) &&
   (a.ex?.selected ?? null) === (b.ex?.selected ?? null) &&
-  (a.rings ?? '') === (b.rings ?? '');
+  (a.rings ?? '') === (b.rings ?? '') &&
+  (a.view ?? 0) === (b.view ?? 0);
 
 /** Records a new state: the states ahead of the current one are dropped; the same state twice in a row is not recorded again; the oldest go past 50. */
 export function pushNav(s: NavStack, next: NavState): NavStack {

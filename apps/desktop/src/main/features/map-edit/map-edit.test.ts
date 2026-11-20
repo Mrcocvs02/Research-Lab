@@ -53,7 +53,8 @@ describe('mapEdit:move', () => {
   });
 
   it('several values: the target is fixed as main value and the others stay; removeFrom takes the old value with its tags; one change, undone as one', async () => {
-    await setup(nodes, [doc(1, ['a', 'kid']), doc(2, ['a', 'kid'])]);
+    // A block exists only where papers are: `b` is a block of the topic because papers 3 and 4 use it.
+    await setup(nodes, [doc(1, ['a', 'kid']), doc(2, ['a', 'kid']), doc(3, ['b']), doc(4, ['b'])]);
     const before = content(await read(1));
     const r = await move(s, { family: 'topic', docIds: [hex(1)], to: 'b' });
     expect(await read(1)).toMatchObject({ tags: ['a', 'kid', 'b'], mainTags: { topic: 'b' } });

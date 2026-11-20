@@ -24,6 +24,14 @@ describe('navStack', () => {
     expect(stepForward(s)).toBe(s);
   });
 
+  it('records opening a saved view as a place of its own, even when nothing else changed', () => {
+    let s = pushNav(emptyNav(), st({ doc: 'a' }));
+    s = pushNav(s, st({ doc: 'a', view: 1 }));
+    expect(s.states).toHaveLength(2);
+    expect(pushNav(s, st({ doc: 'a', view: 1 }))).toBe(s);
+    expect(currentNav(stepBack(s))?.view).toBeUndefined();
+  });
+
   it('drops the states ahead when a new one is recorded after going back', () => {
     let s = emptyNav();
     for (const d of ['a', 'b', 'c']) s = pushNav(s, st({ doc: d }));

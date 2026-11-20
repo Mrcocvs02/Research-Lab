@@ -22,10 +22,6 @@
     "open": "Open",
     "moreActions": "More actions"
   },
-  "tags": {
-    "changed_one": "Tags updated on {{count}} document.",
-    "changed_other": "Tags updated on {{count}} documents."
-  },
   "bulk": {
     "title_one": "{{count}} document selected",
     "title_other": "{{count}} documents selected",

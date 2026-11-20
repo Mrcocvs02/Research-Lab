@@ -33,7 +33,8 @@ export function buildVocabTree(roots: ReadonlyArray<{ id: string; label: string 
   const by = (a: VocabSource, b: VocabSource): number => b.subtree - a.subtree || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0);
   for (const list of kids.values()) list.sort(by);
   const count = new Map(nodes.map((n) => [n.id, n.subtree]));
-  const top: VNode[] = roots.map((r) => ({ id: r.id, label: r.label, count: count.get(r.id) ?? 0, depth: 1, children: [], more: 0 }));
+  // Only what papers use is shown (D-518): a value with no paper under it, and any concept of a field vocabulary nobody used, never appears.
+  const top: VNode[] = roots.filter((r) => (count.get(r.id) ?? 0) > 0).map((r) => ({ id: r.id, label: r.label, count: count.get(r.id) ?? 0, depth: 1, children: [], more: 0 }));
   const seen = new Set(top.map((r) => r.id));
   let budget = Math.max(0, cap - top.length);
   const take = (parent: VNode, list: VocabSource[], at: number): boolean => {

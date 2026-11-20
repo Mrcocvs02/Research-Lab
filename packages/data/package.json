@@ -13,6 +13,7 @@
     "./tag-vocabulary": "./src/tag-vocabulary.ts",
     "./tag-cleanup": "./src/organize/tag-cleanup.ts",
     "./pdf-annot": "./src/pdf-annot/writer.ts",
-    "./pdf-annot-testkit": "./src/pdf-annot/testkit.ts"
+    "./pdf-annot-testkit": "./src/pdf-annot/testkit.ts",
+    "./pack-match": "./src/organize/pack-match.ts"
   }
 }

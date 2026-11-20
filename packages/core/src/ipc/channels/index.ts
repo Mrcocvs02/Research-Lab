@@ -37,6 +37,7 @@ import { citectxChannels, compareChannels, groupsChannels } from './synthesis.js
 import { taxonomyChannels } from './taxonomy.js';
 import { tagReviewChannels, tagReviewEvents } from './tag-review.js';
 import { thumbsChannels } from './thumbs.js';
+import { vocabPackChannels } from './vocab-pack.js';
 import { watchChannels, watchEvents } from './watch.js';
 import { scanChannels, scanEvents } from './scan.js';
 import { indexChannels, searchChannels } from './search.js';
@@ -52,6 +53,7 @@ export const channels = mergeRegistries(appChannels, settingsChannels, libraryCh
   groupsChannels,
   citectxChannels,
   projectSchemaChannels,
+  vocabPackChannels,
 );
 
 export const events = mergeRegistries(aiEvents, annotationsEvents, appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, tagReviewEvents, watchEvents, graphEvents, exportEvents, mcpEvents, backupEvents);
@@ -93,4 +95,6 @@ export { maintenanceTargetSchema, MAINTENANCE_TARGETS } from './maintenance.js';
 export { RESOURCE_KINDS, type ResourceKind, type ResourceView, type ImportIdItem, type ImportIdAddResult, type ImportIdState, type ResumeInfo } from './resources.js';
 export { CITECTX_LIMITS, COMPARE_LIMITS, GROUPS_LIMITS, compareCellSchema, compareColumnSchema, compareRowSchema, compareTableSchema, groupsOverviewSchema, type CompareCell, type CompareColumn, type CompareRow, type CompareTable, type GroupsOverview } from './synthesis.js';
 export { REFS_LIMITS, type GuidePassage, type RefEntry } from './refs.js';
+export type { PackConfidence, PackFamilyInfo, PackFamilyMatch, PackInfo, PackListResult, PackMatch, PackPreview, PackSearchItem, PackState } from './vocab-pack.js';
+export { VOCAB_PACK_LIMITS } from './vocab-pack.js';
 export type { TagProposal, TagRun, TagCleanupRow, TagHealthItem, TagStats, TagAiPlan, TagAiProgress, TagAiRunResult, TagAutoMode, TagAutoState, TagHaikuBatch } from './tag-review.js';

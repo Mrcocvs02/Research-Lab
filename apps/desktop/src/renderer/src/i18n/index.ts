@@ -39,6 +39,7 @@ export type StringPart =
   | 'mcp'
   | 'network'
   | 'notes'
+  | 'pack'
   | 'palette'
   | 'projects'
   | 'reader'

@@ -38,6 +38,8 @@
     "rejectField": "Reject: {{field}}",
     "acceptDoc": "Accept the document",
     "confirmMany": "Confirm: {{count}} proposals",
-    "emptyTitle": "All done"
+    "emptyTitle": "All done",
+    "fromField": "From the field vocabulary",
+    "fromFieldHint": "This tag comes from the vocabulary of the field: accepting it links it to its concept and puts it in its place."
   }
 }

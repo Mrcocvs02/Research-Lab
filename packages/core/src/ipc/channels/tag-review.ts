@@ -14,14 +14,14 @@ export type TagAiVerdict = 'same' | 'broader' | 'narrower' | 'related' | 'differ
 export interface TagProposal {
   /** Deterministic from the kind and the tags. */
   id: string;
-  kind: 'merge' | 'twins' | 'parent' | 'name' | 'metadata';
+  kind: 'merge' | 'twins' | 'parent' | 'name' | 'metadata' | 'promote';
   tags: string[];
   /** The tag that survives (merge, twins merged) or the parent (kind `parent`). */
   keep?: string;
   /** The label the survivor gets (naming convention applied, or the built "Extended (ACR)"); absent = unchanged. */
   label?: string;
   confidence: TagConfidence;
-  /** The rules that fired, comma separated: `form`, `plural`, `alias`, `acronym-in-name`, `acronym-expansion`, `spelling`, `twins`, `inclusion`, `cooccurrence`, `venue`, `status`, `author`, `underscore`, `case`, `long`. */
+  /** The rules that fired, comma separated: `form`, `plural`, `alias`, `acronym-in-name`, `acronym-expansion`, `spelling`, `twins`, `inclusion`, `cooccurrence`, `promote`, `venue`, `status`, `author`, `underscore`, `case`, `long`. */
   reason: string;
   /** Twins: what to do by default. */
   action?: 'merge' | 'keywords';

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { latentOf } from '../features/vocab-pack/hook.js';
 import { labelResolver } from './vocab.js';
 import { estimateCostFromModels, activeTagNodes, cleanSuggestion, folderOf, aiVisible, suggestPrompt, suggestSchema, suggestSystem, taxonomyBlock, type SuggestClean, type SuggestField, type SuggestRaw } from '@rl/ai';
 import { AI_LIMITS, AppError, type AiTagScore, type AiJobStatus, type AiMeta, type DocumentId, type DocumentRecord, type ReasoningLevel, type ReviewStatus, type TokenUsage } from '@rl/core';
@@ -139,7 +140,9 @@ async function plan(s: MainServices, ctx: AiCtx, req: JobRequest) {
     else skipped++;
   }
   const tax = req.fields.includes('tags') ? await ctx.rt.store.readTaxonomy().catch(() => null) : null;
-  const fixed = suggestSystem(req.fields, ctx.cfg.language).length + (req.fields.includes('tags') ? taxonomyBlock(activeTagNodes(tax)).length : 0) + 200;
+  // With a field vocabulary the latent lines add up to a few hundred tokens per work (D-519): the estimate counts them.
+  const latent = req.fields.includes('tags') ? await latentOf(ctx.rt.store.dataDir, tax, ctx.cfg.language, null) : null;
+  const fixed = suggestSystem(req.fields, ctx.cfg.language).length + (req.fields.includes('tags') ? taxonomyBlock(activeTagNodes(tax)).length : 0) + (latent?.estimate ?? 0) + 200;
   const base = await computePreview(s, ctx, {
     purpose: 'job:suggest',
     model: req.model,
@@ -376,7 +379,9 @@ async function suggestOne(a: OneArgs): Promise<void> {
   const pages = await host.pageTexts(rec, EXCERPT_PAGES);
   const data = buildDataBlock(rec, pages, undefined, JOB_EXCERPT_CHARS);
   const system = suggestSystem(fields, cfg.language);
-  const prompt = suggestPrompt(fields, data, nodes);
+  // Concepts of the field vocabulary that fit the text this prompt sends anyway (names and paths only; none without a pack).
+  const latent = fields.includes('tags') ? await latentOf(rt.store.dataDir, tax, cfg.language, data) : null;
+  const prompt = suggestPrompt(fields, data, nodes, latent?.offered ?? []);
   const folder = folderOf(rec.path);
   const sendLog = (inputTokens: number, outputTokens: number | undefined, usd: number | null) =>
     rt.store.appendLog({
@@ -417,7 +422,7 @@ async function suggestOne(a: OneArgs): Promise<void> {
   if (j.controller.signal.aborted) throw new AppError('CANCELLED', 'Cancelled');
   const active = await s.runtime.require().catch(() => null);
   if (!active || active.libraryId !== j.libraryId) throw new AppError('CANCELLED', 'The library changed');
-  const clean = cleanSuggestion(result.value as SuggestRaw, fields, tax, fields.includes('tags') ? { resolveLabels: await labelResolver(tax) } : {});
+  const clean = cleanSuggestion(result.value as SuggestRaw, fields, tax, fields.includes('tags') ? { resolveLabels: await labelResolver(tax), ...(latent ? { latent: latent.lookup } : {}) } : {});
   await writeProposals(s, rt, rec.id, clean, { ...result.meta, source: 'job:suggest' }, a.deviceId);
   j.status.done++;
   emit(j, false);

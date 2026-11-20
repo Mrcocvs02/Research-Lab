@@ -33,7 +33,7 @@
       "showMap": "Show on the Map",
       "showLibrary": "Show in the Library",
       "emptyTitle": "No vocabulary to show",
-      "emptyText": "The family has no values with papers yet. Tag some papers or choose another family."
+      "familyEmpty": "No tag of this family is used yet."
     },
     "explore": {
       "mode": "View",

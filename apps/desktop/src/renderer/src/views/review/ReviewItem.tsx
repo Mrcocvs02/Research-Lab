@@ -49,7 +49,12 @@ function NewTagRows({ value, drafts, setDrafts, disabled }: { value: NewTag[]; d
         const d = drafts[i];
         if (!d) return null;
         return (
-          <li key={i} data-testid="review-newtag" data-index={i}>
+          <li key={i} data-testid="review-newtag" data-index={i} data-source={n.pack ? 'pack' : undefined}>
+            {n.pack && (
+              <p className="hint" data-testid="review-newtag-source" title={t('review.fromFieldHint')}>
+                {t('review.fromField')}
+              </p>
+            )}
             <label className="check">
               <input type="checkbox" checked={d.keep} disabled={disabled} onChange={(e) => set(i, { keep: e.target.checked })} data-testid="review-newtag-keep" />
               <span>{t('review.newTagKeep')}</span>

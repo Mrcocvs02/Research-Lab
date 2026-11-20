@@ -214,6 +214,12 @@ export function applyTaxonomyOps(input: TaxonomyFile, ops: readonly TaxonomyOp[]
         assertAcyclic(tax.nodes, 'implies', i);
         break;
       }
+      case 'setPack': {
+        const n = node(i, op.id);
+        if (op.pack === null) delete n.pack;
+        else n.pack = op.pack;
+        break;
+      }
       case 'setFamily':
       case 'markDistinct':
       case 'unmarkDistinct':

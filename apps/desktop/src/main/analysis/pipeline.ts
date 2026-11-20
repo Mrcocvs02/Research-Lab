@@ -31,6 +31,7 @@ import {
   type Lang,
 } from '@rl/ai/analysis';
 import { labelResolver } from '../ai/vocab.js';
+import { latentOf } from '../features/vocab-pack/hook.js';
 import { callStructured, strongModel, type Runner } from './call.js';
 import { isApprovedNote, readNote, writeNote } from './note-store.js';
 
@@ -114,6 +115,8 @@ export async function analyseOne(a: AnalyseArgs): Promise<void> {
   if (fields.length === 0) return;
   const cands = fields.includes('tags') ? retrieveCandidates(note, nodes) : [];
   const lang: Lang = cfg.language;
+  // Concepts of the field vocabulary that fit the note (names and paths only; none without a pack, D-519).
+  const latent = fields.includes('tags') ? await latentOf(rt.store.dataDir, tax, lang, note) : null;
   const { value, meta } = await callStructured(r, {
     purpose: 'job:analysis',
     model: a.model,
@@ -121,10 +124,10 @@ export async function analyseOne(a: AnalyseArgs): Promise<void> {
     docIds: [rec.id],
     folders: [folderOf(rec.path)],
     system: analysisSystem(fields, lang),
-    prompt: analysisPrompt(fields, docMeta(rec), note, fields.includes('tags') ? candidateBlock(cands, allNodes) : null),
+    prompt: analysisPrompt(fields, docMeta(rec), note, fields.includes('tags') ? candidateBlock(cands, allNodes, latent?.offered ?? []) : null),
     schema: analysisSchema(fields),
   });
-  const clean = cleanAnalysis(value as AnalysisRaw, fields, tax, { resolveLabels: await labelResolver(tax) });
+  const clean = cleanAnalysis(value as AnalysisRaw, fields, tax, { resolveLabels: await labelResolver(tax), ...(latent ? { latent: latent.lookup } : {}) });
   await a.write({ ...clean, ...(clean.scores ? { scores: clean.scores } : {}) }, meta);
   // Local, no model: the references of the work in order of relevance, now that its note exists.
   await import('./cite-rank.js').then((m) => m.rankCitationsFor(r.s, rt, rec.id)).catch((e: unknown) => r.s.log.warn('citation ranking failed', { error: e }));

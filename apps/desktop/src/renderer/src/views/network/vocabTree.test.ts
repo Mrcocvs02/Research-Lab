@@ -15,6 +15,11 @@ describe('buildVocabTree', () => {
     expect(t[0]!.children[0]!.children).toHaveLength(0);
   });
 
+  it('never shows a value, or a concept of a field vocabulary, that no paper uses (D-518)', () => {
+    const t = buildVocabTree([...roots, { id: 'latent', label: 'Latent' }], [...nodes, src('latent', [], 0), src('latent1', ['latent'], 0)]);
+    expect(t.map((r) => r.id)).toEqual(['a', 'b']);
+  });
+
   it('opens level 3 on the node asked for', () => {
     const t = buildVocabTree(roots, nodes, new Set(['a1']));
     expect(t[0]!.children[0]!.children.map((c) => c.id)).toEqual(['a1x']);

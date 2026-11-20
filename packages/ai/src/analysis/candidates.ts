@@ -1,5 +1,5 @@
 import { ancestorsOf, type GraphNode } from './closure.js';
-import { vocabularyOf } from '../suggest.js';
+import { LATENT_MAX, latentLines, vocabularyOf, type LatentConcept } from '../suggest.js';
 import { clip, norm, oneLine, tokenize } from './text.js';
 
 /** A taxonomy node as the candidate retrieval sees it. */
@@ -91,8 +91,19 @@ export function retrieveCandidates(noteText: string, nodes: readonly CandidateNo
   return [...out.values()].sort((a, b) => b.score - a.score || a.id.localeCompare(b.id)).slice(0, max);
 }
 
+/* ------------------------------------------------ latent concepts of the field vocabulary (D-519) ------------------------------------------------ */
+
+/** The latent concepts that best fit `text` (tf-idf of `retrieveCandidates`, text hits only), best first, at most `max`. Pure and deterministic. */
+export function pickLatent(text: string, pool: readonly LatentConcept[], max = LATENT_MAX): LatentConcept[] {
+  const nodes: CandidateNode[] = pool.map((c) => ({ id: c.short, label: c.label, aliases: c.aliases, parents: [], implies: [] }));
+  const byShort = new Map(pool.map((c) => [c.short, c]));
+  return retrieveCandidates(text, nodes, { top: max, max })
+    .filter((c) => c.via === 'text')
+    .flatMap((c) => byShort.get(c.id) ?? []);
+}
+
 /** The candidates as a delimited block, one per line: `- id | label | path | definition | aliases: a, b`. */
-export function candidateBlock(cands: readonly Candidate[], nodes: readonly CandidateNode[]): string {
+export function candidateBlock(cands: readonly Candidate[], nodes: readonly CandidateNode[], latent: readonly LatentConcept[] = []): string {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const pathOf = (id: string) => {
     const labels: string[] = [];
@@ -111,5 +122,5 @@ export function candidateBlock(cands: readonly Candidate[], nodes: readonly Cand
   });
   const voc = vocabularyOf(nodes);
   const rules = [...new Set(cands.flatMap((c) => (voc.families && voc.one.has(voc.rootOf.get(c.id) ?? '') ? [oneLine(byId.get(voc.rootOf.get(c.id) as string)?.label ?? '')] : [])))].map((f) => `# at most one value of family ${f}`);
-  return `<<<TAXONOMY\n${[...rules, ...lines].join('\n')}\nTAXONOMY>>>`;
+  return `<<<TAXONOMY\n${[...rules, ...lines, ...latentLines(latent)].join('\n')}\nTAXONOMY>>>`;
 }

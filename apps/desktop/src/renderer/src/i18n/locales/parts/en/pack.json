@@ -1,0 +1,62 @@
+{
+  "pack": {
+    "open": "Field vocabulary",
+    "loading": "Loading…",
+    "none": "No field vocabulary is available.",
+    "preview": "Recognises {{n}} of your {{tags}} tags · {{p}} of {{total}} papers have a field topic",
+    "conflicts_one": "{{count}} conflict",
+    "conflicts_other": "{{count}} conflicts",
+    "suggest": "A field vocabulary seems to fit your library: \"{{name}}\"",
+    "suggestSee": "See",
+    "suggestDismiss": "Not now",
+    "enable": "Turn on",
+    "active": "In use: \"{{name}}\". Its concepts become tags only when you use them.",
+    "later": "Create on first use",
+    "steps": "Steps",
+    "step": {
+      "1": "Families",
+      "2": "Matches",
+      "3": "Places"
+    },
+    "hint": {
+      "1": "Each family of the vocabulary is paired with one of yours. A family you do not have is created when its first concept becomes a tag.",
+      "2": "Your tags that are the same as a concept of the field. Your names stay; the field's name becomes a variant. The sure ones are ticked.",
+      "3": "Linked tags that sit in Unsorted or Keywords can go into their family, under the parent the vocabulary names when you already have it."
+    },
+    "reason": {
+      "largest": "Your biggest multi-value family",
+      "name": "Same name",
+      "overlap": "Most of its values are yours",
+      "later": "None of yours fits",
+      "kind": "Paired, but one takes a single value and the other several: the type is not changed"
+    },
+    "confidence": {
+      "sure": "Sure",
+      "likely": "Probable",
+      "maybe": "Maybe"
+    },
+    "noMatches": "None of your tags is recognised by this vocabulary.",
+    "noPlaces": "Nothing to place.",
+    "actionLabel": "What to do",
+    "action": {
+      "link": "Link",
+      "name": "Link and use the field's name",
+      "no": "Not the same"
+    },
+    "distinct": "not merged: the field tells them apart",
+    "place": "Put \"{{tag}}\" under {{parent}}",
+    "levelOne": "the top of {{family}}",
+    "back": "Back",
+    "next": "Next",
+    "apply": "Apply as one change",
+    "done": "{{linked}} tags linked, {{placed}} placed. One Undo in History puts everything back.",
+    "stoppedUsing": "The field vocabulary is no longer used. Your tags stay.",
+    "undone": "Field vocabulary turned off, {{count}} change undone.",
+    "stopped": "It stopped: {{reason}}",
+    "disable": {
+      "open": "Turn off…",
+      "keep": "Stop using it",
+      "undo": "Turn off and undo the links"
+    }
+  }
+}

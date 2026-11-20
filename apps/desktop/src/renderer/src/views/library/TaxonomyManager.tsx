@@ -25,6 +25,7 @@ import { useTaxonomy } from './useTaxonomy';
 // "To review" and the guided cleanup load when first opened (D-501); each has its own chunk.
 const TagReview = lazyView(() => import('./tags/TagReview').then((m) => ({ default: m.TagReview })), ['taxonomy']);
 const TagCleanup = lazyView(() => import('./tags/TagCleanup').then((m) => ({ default: m.TagCleanup })), ['taxonomy']);
+const PackDialog = lazyView(() => import('./tags/PackDialog').then((m) => ({ default: m.PackDialog })), ['pack']);
 
 export const PRESET_COLORS = ['#d9480f', '#e8590c', '#f08c00', '#2f9e44', '#0c8599', '#1971c2', '#4263eb', '#7048e8', '#ae3ec9', '#d6336c', '#868e96', '#495057'];
 
@@ -476,7 +477,7 @@ function NewFamilyForm({ onDone }: { onDone(createdId: string | null): void }) {
 
 /** The vocabulary: health strip, the tree (families, "To sort", Keywords) and "To review" in tabs, the node editor, and the guided cleanup. */
 export function TaxonomyManager({ onBack, start = 'manage' }: { onBack(): void; /** Where to open: the tree, "To review" or the guided cleanup (Map, palette, shortcut, sidebar). */ start?: 'manage' | 'review' | 'cleanup' }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { model, loaded, error, apply, view } = useTaxonomy();
   const { fail } = useNotify();
   const { navigate } = useNav();
@@ -492,6 +493,26 @@ export function TaxonomyManager({ onBack, start = 'manage' }: { onBack(): void; 
   const [cleanup, setCleanup] = useState<{ step: number | null } | null>(start === 'cleanup' ? { step: null } : null);
   const queryId = useId();
   const { data: review } = useTagReview();
+  const [packOpen, setPackOpen] = useState(false);
+  // A field vocabulary that fits the library is suggested once (D-516): a quiet row, never turned on by itself.
+  const [packSuggest, setPackSuggest] = useState<{ id: string; name: string } | null>(null);
+  useEffect(() => {
+    let live = true;
+    rl.invoke('vocabPack:list', {}).then(
+      (l) => {
+        const p = l.packs.find((x) => x.id === l.suggest);
+        if (live) setPackSuggest(p ? { id: p.id, name: i18n.language.startsWith('it') && p.labelIt ? p.labelIt : p.label } : null);
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [i18n.language, packOpen]);
+  const seenSuggest = () => {
+    setPackSuggest(null);
+    void rl.invoke('vocabPack:list', { dismiss: true }).catch(() => undefined);
+  };
 
   const visible = useMemo(() => {
     const q = fold(query);
@@ -601,6 +622,9 @@ export function TaxonomyManager({ onBack, start = 'manage' }: { onBack(): void; 
           <h1>{t('tax.pageTitle')}</h1>
         </nav>
         <div className="library-head__acts">
+          <Button onClick={() => setPackOpen(true)} data-testid="tax-pack-open">
+            {t('pack.open')}
+          </Button>
           <Button onClick={() => setNewFamily(true)} data-testid="tax-family-new">
             {t('tax.family.new')}
           </Button>
@@ -609,6 +633,29 @@ export function TaxonomyManager({ onBack, start = 'manage' }: { onBack(): void; 
           </Button>
         </div>
       </header>
+      {packSuggest && (
+        <p className="hint" role="status" data-testid="pack-suggest">
+          {t('pack.suggest', { name: safeText(packSuggest.name) })}{' '}
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              seenSuggest();
+              setPackOpen(true);
+            }}
+          >
+            {t('pack.suggestSee')}
+          </button>{' '}
+          <button type="button" className="link" aria-label={t('pack.suggestDismiss')} title={t('pack.suggestDismiss')} onClick={seenSuggest}>
+            ✕
+          </button>
+        </p>
+      )}
+      {packOpen && (
+        <Lazy>
+          <PackDialog onClose={() => setPackOpen(false)} />
+        </Lazy>
+      )}
       {review && <TagHealth health={review.health} onOpen={open} onCleanup={() => setCleanup({ step: null })} />}
       {cleanup ? (
         <Lazy>

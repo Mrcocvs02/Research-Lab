@@ -1,5 +1,9 @@
-import { useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { PackSearchItem } from '@rl/core';
+import { useChangeVersion, useLibraryEvents } from '../../lib/events';
+import { useNotify } from '../../lib/notify';
+import { rl } from '../../lib/rl';
 import { safeText } from './safeText';
 import { canCreateTag, similarTag, suggestTags } from './tagSuggest';
 import type { TaxonomyModel } from './taxonomyModel';
@@ -65,14 +69,21 @@ interface PickerProps {
   autoFocus?: boolean;
   /** An action is running: the input waits. */
   disabled?: boolean;
+  /** The papers a concept of the field vocabulary is put on when picked (D-518): with it the picker offers "From the field vocabulary" after the tags. */
+  pack?: { docIds: readonly string[] } | undefined;
 }
 
 /**
  * Tag entry with completion from the taxonomy: matches labels and aliases (a hit on an alias says so), and can
  * create a tag on the fly. Combobox pattern: the input keeps the focus, arrows move the highlight, Enter picks.
  */
-export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaLabel, testId, autoFocus, disabled }: PickerProps) {
+export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaLabel, testId, autoFocus, disabled, pack }: PickerProps) {
   const { t } = useTranslation();
+  const { invalidate } = useLibraryEvents();
+  const { info, reportError } = useNotify();
+  const taxVersion = useChangeVersion('taxonomy');
+  const [fromField, setFromField] = useState<PackSearchItem[]>([]);
+  const [noPack, setNoPack] = useState(false);
   const listId = useId();
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
@@ -84,7 +95,35 @@ export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaL
   const create = onCreate !== undefined && canCreateTag(model, text);
   // Before a new tag: a tag that is the same name written differently is offered instead (D-497).
   const similar = create ? similarTag(model, text) : null;
-  const options = [...suggestions.map((s) => ({ kind: 'tag' as const, s })), ...(create ? [{ kind: 'create' as const, label: text.trim() }] : [])];
+  // Concepts of the field vocabulary no tag stands for yet (at most 6, after the tags); asked of main only while a pack is in use.
+  const wantPack = pack !== undefined && !noPack && text.trim().length >= 2;
+  useEffect(() => setNoPack(false), [taxVersion]);
+  useEffect(() => {
+    if (!wantPack) {
+      setFromField([]);
+      return;
+    }
+    let live = true;
+    const timer = setTimeout(() => {
+      rl.invoke('vocabPack:search', { q: text.trim(), limit: 6 }).then(
+        (r) => live && setFromField(r.items),
+        (e: unknown) => {
+          if (!live) return;
+          setFromField([]);
+          if ((e as { code?: string }).code === 'INVALID_REQUEST') setNoPack(true);
+        },
+      );
+    }, 200);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [wantPack, text]);
+  const options = [
+    ...suggestions.map((s) => ({ kind: 'tag' as const, s })),
+    ...(wantPack ? fromField.map((f) => ({ kind: 'pack' as const, f })) : []),
+    ...(create ? [{ kind: 'create' as const, label: text.trim() }] : []),
+  ];
   const activeIndex = Math.min(active, options.length - 1);
 
   const reset = () => {
@@ -98,6 +137,21 @@ export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaL
     if (opt.kind === 'tag') {
       onPick(opt.s.id);
       reset();
+    } else if (opt.kind === 'pack') {
+      // One change: the concept (and the ancestors it lacks) becomes a tag and goes on the papers.
+      setBusy(true);
+      try {
+        await rl.invoke('vocabPack:materialize', { conceptId: opt.f.conceptId, docIds: [...(pack?.docIds ?? [])] });
+        invalidate('taxonomy');
+        invalidate('documents');
+        info(t('tags.changed', { count: pack?.docIds.length ?? 0 }));
+        reset();
+      } catch (e) {
+        reportError(e);
+      } finally {
+        setBusy(false);
+        input.current?.focus();
+      }
     } else {
       setBusy(true);
       try {
@@ -170,14 +224,20 @@ export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaL
       )}
       <ul id={listId} role="listbox" className="tag-options" hidden={!showList} data-testid="tag-options">
         {showList && options.map((o, i) => (
+          <Fragment key={o.kind === 'tag' ? o.s.id : o.kind === 'pack' ? `pack:${o.f.conceptId}` : '__create__'}>
+            {o.kind === 'pack' && options[i - 1]?.kind !== 'pack' && (
+              <li role="presentation" className="tag-alias" data-testid="tag-picker-pack">
+                {t('tagPicker.pack')}
+              </li>
+            )}
           <li
-            key={o.kind === 'tag' ? o.s.id : '__create__'}
             id={`${listId}-${i}`}
             role="option"
             aria-selected={i === activeIndex}
             className={i === activeIndex ? 'active' : undefined}
-            data-testid={o.kind === 'tag' ? 'tag-option' : 'tag-create'}
+            data-testid={o.kind === 'tag' ? 'tag-option' : o.kind === 'pack' ? 'tag-picker-pack-option' : 'tag-create'}
             data-tag={o.kind === 'tag' ? o.s.id : undefined}
+            data-concept={o.kind === 'pack' ? o.f.conceptId : undefined}
             // mousedown, not click: the input must not lose the focus (and close the list) first
             onMouseDown={(e) => {
               e.preventDefault();
@@ -193,10 +253,16 @@ export function TagPicker({ model, exclude, onPick, onCreate, placeholder, ariaL
                 </span>
                 {o.s.path && <span className="tag-path">{safeText(o.s.path)}</span>}
               </>
+            ) : o.kind === 'pack' ? (
+              <>
+                <span className="tag-option-main">{safeText(o.f.label)}</span>
+                {o.f.path && <span className="tag-path">{safeText(o.f.path)}</span>}
+              </>
             ) : (
               <span className="tag-option-main">{t('tags.create', { label: safeText(o.label) })}</span>
             )}
           </li>
+          </Fragment>
         ))}
       </ul>
     </div>

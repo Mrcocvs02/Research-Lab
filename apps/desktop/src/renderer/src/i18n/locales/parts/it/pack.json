@@ -1,0 +1,62 @@
+{
+  "pack": {
+    "open": "Vocabolario del campo",
+    "loading": "Caricamento…",
+    "none": "Nessun vocabolario del campo è disponibile.",
+    "preview": "Riconosce {{n}} dei tuoi {{tags}} tag · {{p}} lavori su {{total}} hanno un tema del campo",
+    "conflicts_one": "{{count}} conflitto",
+    "conflicts_other": "{{count}} conflitti",
+    "suggest": "Un vocabolario del campo sembra adatto alla tua libreria: «{{name}}»",
+    "suggestSee": "Vedi",
+    "suggestDismiss": "Non ora",
+    "enable": "Attiva",
+    "active": "In uso: «{{name}}». I suoi concetti diventano tag solo quando li usi.",
+    "later": "Crea al primo uso",
+    "steps": "Passi",
+    "step": {
+      "1": "Famiglie",
+      "2": "Corrispondenze",
+      "3": "Posto"
+    },
+    "hint": {
+      "1": "Ogni famiglia del vocabolario si abbina a una delle tue. Una famiglia che non hai nasce quando il suo primo concetto diventa un tag.",
+      "2": "I tuoi tag uguali a un concetto del campo. I tuoi nomi restano; il nome del campo diventa una variante. I sicuri sono già spuntati.",
+      "3": "I tag collegati che stanno in Da sistemare o in Parole chiave possono andare nella loro famiglia, sotto il genitore che il vocabolario indica se lo hai già."
+    },
+    "reason": {
+      "largest": "La tua famiglia a più valori più grande",
+      "name": "Stesso nome",
+      "overlap": "La maggior parte dei suoi valori è tua",
+      "later": "Nessuna delle tue va bene",
+      "kind": "Abbinate, ma una prende un solo valore e l'altra più valori: il tipo non cambia"
+    },
+    "confidence": {
+      "sure": "Sicuro",
+      "likely": "Probabile",
+      "maybe": "Forse"
+    },
+    "noMatches": "Nessuno dei tuoi tag è riconosciuto da questo vocabolario.",
+    "noPlaces": "Niente da sistemare.",
+    "actionLabel": "Cosa fare",
+    "action": {
+      "link": "Collega",
+      "name": "Collega e usa il nome del campo",
+      "no": "Non è lo stesso"
+    },
+    "distinct": "non unito: il campo li distingue",
+    "place": "Metti «{{tag}}» sotto {{parent}}",
+    "levelOne": "la cima di {{family}}",
+    "back": "Indietro",
+    "next": "Avanti",
+    "apply": "Applica come una sola modifica",
+    "done": "{{linked}} tag collegati, {{placed}} messi al loro posto. Un solo Annulla nella Cronologia rimette tutto.",
+    "stoppedUsing": "Il vocabolario del campo non è più usato. I tuoi tag restano.",
+    "undone": "Vocabolario del campo disattivato, {{count}} modifica annullata.",
+    "stopped": "Si è fermato: {{reason}}",
+    "disable": {
+      "open": "Disattiva…",
+      "keep": "Smetti di usarlo",
+      "undo": "Disattiva e annulla i collegamenti"
+    }
+  }
+}

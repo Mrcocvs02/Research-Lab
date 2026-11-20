@@ -1,0 +1,92 @@
+/* Sections of the Map's side column added by mapExtras.tsx: reading, isolated papers and bridges, saved views. */
+.map-ext {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.map-ext > h3 {
+  margin: 0;
+  font-weight: 600;
+}
+.map-ext-fold {
+  display: inline-flex;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.map-ext-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--fs-small, 13px);
+  color: var(--text-muted);
+}
+.map-ext-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.map-ext-why {
+  margin: 0;
+}
+.map-ext-rows {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.map-ext-pairs,
+.map-views-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+.map-ext-pair,
+.map-view-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.map-ext-pair-text,
+.map-view-open {
+  flex: 1;
+  min-width: 0;
+}
+.map-view-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+.map-view-form input,
+.map-view-form select {
+  width: 100%;
+  min-width: 0;
+}
+.map-view-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+.map-export-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.map-export-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}

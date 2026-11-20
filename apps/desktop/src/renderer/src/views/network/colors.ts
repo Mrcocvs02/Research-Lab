@@ -220,6 +220,8 @@ export interface MapTheme {
   text: string;
   muted: string;
   accent: string;
+  /** `--warning`: the dotted ring of the isolated papers of the Map (D-532). */
+  warning: string;
   bg: string;
   surface: string;
   border: string;
@@ -236,6 +238,7 @@ export function readTheme(el: Element, dark: boolean): MapTheme {
     text: css.color || (dark ? '#ececef' : '#1b1c1f'),
     muted: get('--text-muted', dark ? '#a9acb5' : '#555963'),
     accent: get('--accent', dark ? '#5cc6d1' : '#0f6e78'),
+    warning: get('--warning', dark ? '#f2b755' : '#8a5300'),
     bg: get('--bg', dark ? '#121316' : '#f6f5f1'),
     surface: get('--surface', dark ? '#1a1b1f' : '#ffffff'),
     border: get('--border', dark ? '#33353c' : '#dedcd5'),

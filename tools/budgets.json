@@ -32,7 +32,8 @@
       "TagAiConfirm": 16,
       "SelectionSummary": 16,
       "VocabularyTree": 16,
-      "PackDialog": 16
+      "PackDialog": 16,
+      "MapViews": 16
     }
   },
   "main": {

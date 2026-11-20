@@ -30,3 +30,17 @@
   2. Versione 1.2.0, quando l'utente è pronto.
 - **Budget:** tetti in `CLAUDE.md`, non più rigidi (D-487), alzati per D-501..D-503; ogni nuovo chunk del renderer ha un tetto di 16 KiB (`renderer.chunkCapsKB`, D-465).
 - **Da ricordare:** test pesanti solo uno alla volta; e2e in parallelo solo con cartelle `--output` separate; con poca RAM libera la suite e2e si ferma da sola (mem-sample). Installer: `pdfjs-dist` e `fflate` esterni al bundle del main (D-052), Fuses di Electron; eseguibile di Claude Code non incluso (D-474).
+
+## Ripresa (2026-11-20, sera) — leggere per primo
+
+- Rilasciata **v1.2.0** (`7a3246a`, tag `v1.2.0`), installer `apps/desktop/release/ResearchLab-Setup-1.2.0.exe` (125 MB, senza Claude Code, non provato con installazione). Test: unitari 3044/3044, pesanti verdi, e2e verdi tranne `qa-budget` (instabile noto).
+- **In corso, non uniti** (worktree sotto `C:\dev\rl-wt`, rami non spinti):
+  - `hk1` (Sonnet): "Lascia decidere a Haiku" con avanzamento visibile ("120/600", chip Attività, Annulla che tiene il parziale, riepilogo), tutte le domande in una corsa (anteprima con costo totale e tetto), prompt condiviso inviato una volta con cache e domande a centinaia per chiamata (riportare i token prima/dopo), "Vai al documento"/"Inizia da qui" spostati a destra nel vicinato. D-515.
+  - `vpack` (Sonnet, ricerca web): vocabolario di base del campo dell'utente (fisica, informazione quantistica, molti corpi, materia condensata, metodi numerici, AI, fisica matematica) in `packages/core/src/vocab/packs/physics-qi-manybody.json` + schema zod + test + `docs/design/vocab-packs.md`; licenze da verificare (PhySH CC0?).
+  - Se una sessione si è chiusa: controllare `git status`/`git log main..<ramo>` nel worktree; un agente interrotto si riprende con un nuovo agente che parte dal lavoro non committato.
+- **Prossimi passi:**
+  1. Unire `hk1` e `vpack` (controllo diff, niente Co-Authored-By, typecheck/build/check:budget/check:generality, push).
+  2. Progetto Opus: il vocabolario di base guida tagging, macro-aree e blocchi (il Vocabolario mostra solo i concetti usati in libreria; il vocabolario evolve con i paper); correzioni a mano nella panoramica a blocchi (trascinare un paper in un altro blocco = cambia il valore della famiglia, rinominare/unire blocchi); migliorare la scelta delle macro-aree. **La panoramica a blocchi va tenuta** (piace all'utente).
+  3. Sonnet implementa; Opus verifica su una copia della cartella UL (sola lettura, copia temporanea, niente percorso nei file).
+  4. Giro completo dei test (unitari; e2e due alla volta, ognuno con `--output` suo; pesanti), documenti, versione 1.3.0.
+- Regole operative ricordate dall'utente: costo in token prima del tempo; agenti al massimo 2; test bomba vietati (D-476); tetti in KiB non vincolanti ma app leggera (D-487); niente Co-Authored-By.

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AREA_TINTS } from './colors';
 import { OTHER, OTHER_CLUSTER_ID, assignAreaSlots } from './areaColors';
 import { CROSS_CLUSTER, Network, SAME_CLUSTER, clusterAffinity, clusterMultiplier, clustersOf, type RawNode } from './forceSim';
-import { applyShares } from './grouping';
+import { applyShares, clearShare, isPartial, offerFamilies, type FamilyInfo } from './grouping';
 
 const def = (id: string) => ({ id, label: id, count: 1, branches: [] });
 
@@ -131,5 +131,25 @@ describe('one name per cluster while a family is on (D-491)', () => {
     const r = nameByFamily(map);
     expect(r.levels[0]!.map((c) => c.famLabel)).toEqual(['Alpha', 'Beta', undefined]);
     expect(r.clusterById.get('c1')?.famLabel).toBe('Beta');
+  });
+});
+
+describe('family offer list', () => {
+  const fam = (id: string, cov: number, clarity: number, eligible = false): FamilyInfo => ({ id, label: id, count: 5, eligible, reason: { coverage: cov, clarity, values: 4 } });
+  const list: FamilyInfo[] = [fam('topic', 0.4, 0.5), fam('level:method', 0.9, 0.9, true), fam('group:none', 0, 0), fam('group:low', 0.1, 0.5), { id: 'auto', label: 'Automatic', count: 0, eligible: true }];
+  it('measures the share of papers in a clear value', () => {
+    expect(clearShare(fam('topic', 0.4, 0.5))).toBe(20);
+    expect(clearShare({})).toBe(0);
+  });
+  it('keeps partial families choosable and hides those at 0 %', () => {
+    expect(offerFamilies(list, 'auto').map((f) => f.id)).toEqual(['topic', 'level:method', 'group:low', 'auto']);
+  });
+  it('keeps the chosen family even when it is at 0 %', () => {
+    expect(offerFamilies(list, 'group:none').map((f) => f.id)).toContain('group:none');
+  });
+  it('tells a partial family from a good one', () => {
+    expect(isPartial(list[0])).toBe(true);
+    expect(isPartial(list[1])).toBe(false);
+    expect(isPartial(undefined)).toBe(false);
   });
 });

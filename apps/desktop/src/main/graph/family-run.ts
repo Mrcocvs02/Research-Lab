@@ -2,6 +2,7 @@ import { visibleGroupTags, type DocumentRecord } from '@rl/core';
 import { autoMemberships, familyEligibility, familyModel, layoutBlocks, mainValue, neighborsOf, parseFamily, tagMemberships, valueSpecificity, vocabLinks, type AreaModel, type AreaSummary, type Block, type Eligibility, type FamilyNode, type Memberships, type VocabLink } from '@rl/graph';
 import type { MainServices } from '../ipc/handlers/services.js';
 import { areaModel, weightsOf, withoutKeywords } from './areas-run.js';
+import { isSourceFamily } from './family-offer.js';
 import { readNames } from './family-names-store.js';
 import { loadModel, modelId } from './service.js';
 import { loadView, scopeIds, type LibraryView } from './view.js';
@@ -121,12 +122,12 @@ async function listFamilies(s: MainServices, view: LibraryView, scope: Scope, re
   for (const r of nodes.filter((n) => n.parents.length === 0 && n.status !== 'deprecated' && (n.family === 'one' || n.family === 'many'))) {
     // The Topic areas are this root's subtree (its values, or deeper when a generic value gave way to its children): already offered.
     if (areaIds.size > 0 && [...areaIds].every((a) => a === r.id || familyRoot(a) === r.id)) continue;
-    offers.push({ id: `root:${r.id}`, label: r.label });
+    if (!isSourceFamily(r.label)) offers.push({ id: `root:${r.id}`, label: r.label });
   }
   if (nodes.some((n) => n.level === 'method' && n.status !== 'deprecated')) offers.push({ id: 'level:method', label: 'Method' });
   // A group hint of the old index whose tags all sit in a family now (moved by the cleanup) is no longer a family of its own (D-505).
   const groups = new Set(nodes.map((n) => n.group).filter((g): g is string => !!g && g.startsWith(GROUP_HINT) && g.length > GROUP_HINT.length));
-  for (const g of groups) if (nodes.some((n) => n.group === g && n.status !== 'deprecated' && familyRoot(n.id) === undefined)) offers.push({ id: `group:${g}`, label: g.slice(GROUP_HINT.length) });
+  for (const g of groups) if (nodes.some((n) => n.group === g && n.status !== 'deprecated' && familyRoot(n.id) === undefined) && !isSourceFamily(g.slice(GROUP_HINT.length))) offers.push({ id: `group:${g}`, label: g.slice(GROUP_HINT.length) });
   offers.push({ id: 'prefix:grp:', label: 'Group' });
   for (const o of offers) {
     const count = tagMemberships(parseFamily(o.id), nodes, docs).docs.size;
@@ -221,7 +222,7 @@ export async function runFamily(s: MainServices, req: { family?: string | undefi
   if (!req.family) return { families, items: [] };
   const m = await familyAreas(s, view, req.scope, req.family);
   const offer = families.find((f) => f.id === req.family);
-  const laid = offer?.eligible === false ? null : await blocksOf(s, await valuesOf(s, view, req.scope, req.family, recs), recs, req.aspect ?? 1.6);
+  const laid = await blocksOf(s, await valuesOf(s, view, req.scope, req.family, recs), recs, req.aspect ?? 1.6);
   // In blocks every paper of the scope has its cell (one with no value, or added after the model was built, sits in the last block).
   const ids = req.docIds ?? (laid && m.docs.size > 0 ? recs.map((r) => r.id) : [...m.docs.keys()]);
   const items: Item[] = [];

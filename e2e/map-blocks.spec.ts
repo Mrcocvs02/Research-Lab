@@ -87,6 +87,8 @@ test('Map in blocks: group by, blocks, no label collisions, legend outside the c
     await expect(blocks).toBeVisible({ timeout: 60_000 });
     const nBlocks = Number(await blocks.getAttribute('data-blocks'));
     expect(nBlocks, 'blocks of the automatic grouping').toBeGreaterThanOrEqual(1);
+    // Every family offered can be chosen: none is disabled.
+    expect(await (await control(window, 'map-group-by')).locator('option[disabled]').count(), 'disabled families').toBe(0);
     await window.keyboard.press('Escape');
 
     // 2. Titles of all the works, zero collisions, no edge until a paper is selected, the strip above the canvas at 1280 px.
@@ -167,6 +169,29 @@ test('Map in blocks: group by, blocks, no label collisions, legend outside the c
     await expect(window.getByTestId('net-detail')).toHaveAttribute('data-doc-id', third.id);
     await expect(window.getByTestId('net-canvas')).toBeVisible();
     await expect.poll(async () => Number(await window.getByTestId('net-count').getAttribute('data-count')), { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
+
+    // The two buttons of the neighbourhood become their opposite once clicked, and undo their effect.
+    const more = window.getByTestId('vic-more');
+    if (await more.isEnabled()) {
+      const before = Number(await window.getByTestId('net-count').getAttribute('data-count'));
+      await more.click();
+      await expect(more).toHaveAttribute('data-state', 'undo', { timeout: 30_000 });
+      await more.click();
+      await expect(more).toHaveAttribute('data-state', 'do');
+      expect(Number(await window.getByTestId('net-count').getAttribute('data-count'))).toBe(before);
+    }
+
+    // Back stays inside Explore: choosing a node, then going to the neighbourhood, Back returns to Explore with the node still chosen.
+    await window.getByTestId('net-tab-explore').click();
+    const node = window.getByTestId('explore-node').first();
+    if (await node.isVisible({ timeout: 15_000 }).catch(() => false)) {
+      await node.click();
+      const id = await node.getAttribute('data-id');
+      await window.getByTestId('net-tab-network').click();
+      await window.getByTestId('map-back').click();
+      await expect(window.getByTestId('net-tab-explore')).toHaveAttribute('aria-selected', 'true');
+      await expect(window.locator(`[data-testid="explore-node"][data-id="${id}"]`)).toHaveAttribute('aria-pressed', 'true');
+    }
 
     // Enter on a paper reached by the keyboard does the same.
     await window.getByTestId('net-tab-map').click();

@@ -423,8 +423,8 @@
     },
     "blocks": {
       "hint": "Click: the paper's links · Double-click: its neighbourhood · Alt+←: back · ✕",
-      "topicNote": "Topic does not group well yet ({{pct}} % of the papers in a clear value) · Showing automatic groups.",
       "reason": "Only {{pct}} % of the papers have a clear value · Tidy the tags",
+      "partial": "{{name}} groups only {{pct}} % of the papers clearly: partial blocks.",
       "loading": "Arranging the papers…",
       "side": "Map legend and controls",
       "sideHide": "Fold the column",

@@ -317,6 +317,23 @@ export class Network {
     return doomed.size;
   }
 
+  /** Removes these nodes, the ones that came through them (`via`) and their edges; nothing else goes (the neighbourhood undoes a ring with it). Returns how many left. */
+  drop(keys: Iterable<string>): number {
+    const doomed = new Set(keys);
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const n of this.nodes.values()) {
+        if (!doomed.has(n.key) && n.via !== null && doomed.has(n.via)) {
+          doomed.add(n.key);
+          grew = true;
+        }
+      }
+    }
+    const gone = [...doomed].filter((k) => this.nodes.has(k)).length;
+    this.removeKeys(doomed);
+    return gone;
+  }
+
   /** Removes one node and its edges; nodes left without any edge go too (a lone start node stays). */
   remove(key: string): void {
     this.removeKeys(new Set([key]));

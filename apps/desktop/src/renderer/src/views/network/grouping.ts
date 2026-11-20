@@ -25,6 +25,20 @@ export interface FamilyInfo {
   eligible?: boolean | undefined;
   reason?: { coverage: number; clarity: number; values: number } | undefined;
 }
+/** Share of the papers that sit in a clear value of a family, in percent (section 19.2.2): coverage x clarity, the papers a block shows with certainty. */
+export const clearShare = (f: Pick<FamilyInfo, 'reason'>): number => (f.reason ? Math.round(100 * f.reason.coverage * f.reason.clarity) : 0);
+
+/**
+ * The families the menu offers: every one that has values stays choosable, whether or not it passes the test (a partial one says so in the strip);
+ * one that groups no paper clearly (0 %) is left out, and the chosen one is always there (D-499).
+ */
+export function offerFamilies(list: readonly FamilyInfo[], current: string): FamilyInfo[] {
+  return list.filter((f) => f.id === current || f.id === 'auto' || f.eligible !== false || clearShare(f) > 0);
+}
+
+/** Whether the family is on but groups clearly only part of the papers (the strip says so). */
+export const isPartial = (f: FamilyInfo | undefined): f is FamilyInfo => !!f && f.eligible === false && f.id !== 'none';
+
 export interface FamilyShares {
   areas: AreaDef[];
   items: Array<{ id: string; ar?: AreaTriples | undefined; az?: number | undefined }>;

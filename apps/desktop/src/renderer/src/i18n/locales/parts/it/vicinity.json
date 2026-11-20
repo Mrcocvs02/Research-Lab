@@ -9,6 +9,8 @@
     "focus": "Vicinato",
     "more": "Mostra altri {{count}}",
     "widen": "Allarga",
+    "fewer": "Mostra meno {{count}}",
+    "narrow": "Restringi",
     "nothingNew": "Niente di nuovo attorno a questi lavori.",
     "capped": "Il vicinato contiene al più {{count}} lavori.",
     "none": "Nessun lavoro con prove sufficienti attorno a questo.",

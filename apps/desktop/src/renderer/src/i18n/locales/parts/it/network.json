@@ -423,8 +423,8 @@
     },
     "blocks": {
       "hint": "Clic: i collegamenti del lavoro · Doppio clic: il suo vicinato · Alt+←: indietro · ✕",
-      "topicNote": "Topic non raggruppa ancora bene ({{pct}} % dei lavori in un valore chiaro) · Riordina i tag.",
       "reason": "Solo il {{pct}} % dei lavori ha un valore chiaro · Riordina i tag",
+      "partial": "{{name}} raggruppa con chiarezza solo il {{pct}} % dei lavori: blocchi parziali.",
       "loading": "Dispongo i lavori…",
       "side": "Legenda e controlli della mappa",
       "sideHide": "Richiudi la colonna",

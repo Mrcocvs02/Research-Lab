@@ -16,16 +16,17 @@ interface Props {
   crumbs: readonly string[];
   onCenter(docId: string, label: string): void;
   onPath(a: string, b: string): void;
+  onRings?(flags: string): void;
 }
 
 /**
  * The Neighbourhood tab (section 19.2.5): the papers around one paper, nothing else. The networks of tags and topics are gone (the
  * vocabulary is a tree in Explore, section 19.2.7) and the one of the authors lives in Explore too.
  */
-export function LinksPanel({ active, onCtl, start, selectedDoc, selectedDocLabel, onSelectDoc, onStart, onExplore, crumbs, onCenter, onPath }: Props) {
+export function LinksPanel({ active, onCtl, start, selectedDoc, selectedDocLabel, onSelectDoc, onStart, onExplore, crumbs, onCenter, onPath, onRings }: Props) {
   return (
     <div className="links-panel" data-testid="links-panel" data-mode="doc">
-      <GraphNet active={active} start={start} selectedDoc={selectedDoc} selectedDocLabel={selectedDocLabel} onSelectDoc={onSelectDoc} onStart={onStart} onExplore={() => onExplore('topic')} onCtl={onCtl} crumbs={crumbs} onCenter={onCenter} onPath={onPath} />
+      <GraphNet active={active} start={start} selectedDoc={selectedDoc} selectedDocLabel={selectedDocLabel} onSelectDoc={onSelectDoc} onStart={onStart} onExplore={() => onExplore('topic')} onCtl={onCtl} crumbs={crumbs} onCenter={onCenter} onPath={onPath} onRings={onRings} />
     </div>
   );
 }

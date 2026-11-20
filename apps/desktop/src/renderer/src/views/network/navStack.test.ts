@@ -58,3 +58,33 @@ describe('navStack', () => {
     expect(crumbs(s, 1)).toEqual(['a']);
   });
 });
+
+describe('navStack: states inside a section', () => {
+  it('records each Explore choice as its own state, so Back returns to choosing the tag', () => {
+    let s = emptyNav();
+    s = pushNav(s, st({ tab: 'explore', ex: { dim: 'topic', parentId: null, selected: null } }));
+    s = pushNav(s, st({ tab: 'explore', ex: { dim: 'topic', parentId: null, selected: 't1' } }));
+    s = pushNav(s, st({ tab: 'network', center: 'a', ex: { dim: 'topic', parentId: null, selected: 't1' } }));
+    expect(s.states).toHaveLength(3);
+    const back = stepBack(s);
+    expect(currentNav(back)?.tab).toBe('explore');
+    expect(currentNav(back)?.ex?.selected).toBe('t1');
+    expect(currentNav(stepBack(back))?.ex?.selected).toBeNull();
+  });
+
+  it('treats a drill-down and the rings of the neighbourhood as different states', () => {
+    const a = pushNav(emptyNav(), st({ tab: 'explore', ex: { dim: 'topic', parentId: null, selected: 't1' } }));
+    expect(pushNav(a, st({ tab: 'explore', ex: { dim: 'topic', parentId: 'p', selected: 't1' } })).states).toHaveLength(2);
+    expect(pushNav(a, st({ tab: 'explore', ex: { dim: 'topic', parentId: null, selected: 't1' } }))).toBe(a);
+    const n = pushNav(emptyNav(), st({ tab: 'network', center: 'a' }));
+    expect(pushNav(n, st({ tab: 'network', center: 'a', rings: 'm' })).states).toHaveLength(2);
+    expect(pushNav(n, st({ tab: 'network', center: 'a', rings: '' }))).toBe(n);
+  });
+
+  it('fills in where Explore is on the state already there instead of adding one', () => {
+    const a = pushNav(emptyNav(), st({ tab: 'explore' }));
+    const b = pushNav(a, st({ tab: 'explore', ex: { dim: 'topic', parentId: null, selected: null } }));
+    expect(b.states).toHaveLength(1);
+    expect(b.states[0]!.ex?.dim).toBe('topic');
+  });
+});

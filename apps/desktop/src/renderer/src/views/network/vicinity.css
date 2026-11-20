@@ -36,46 +36,60 @@ span.vic-crumb {
 }
 
 .path-strip {
+  position: relative;
+  z-index: 3;
   flex: none;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  background: var(--surface-2);
+  background: var(--surface);
+  color: var(--text);
   min-width: 0;
 }
 .path-chain {
   flex: 1;
   min-width: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0;
+  gap: var(--space-1) 0;
   margin: 0;
   padding: 0;
   list-style: none;
-  overflow-x: auto;
 }
 .path-chain li {
   display: flex;
   align-items: center;
-  flex: none;
+  min-width: 0;
 }
 .path-evidence {
   display: inline-block;
   padding: 0 var(--space-2);
   font-size: var(--fs-small);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 .path-evidence::after {
-  content: ' →';
+  content: ' \2192';
 }
 .path-node {
-  max-width: 22ch;
+  max-width: 36ch;
+  min-height: 28px;
+  height: auto;
+  padding: var(--space-1) var(--space-2);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  color: var(--text);
 }
 .path-none {
   flex: 1;
@@ -170,4 +184,14 @@ span.vic-crumb {
 .vocab-n,
 .vocab-more {
   fill: var(--text-muted);
+}
+
+.vic-grow {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  gap: var(--space-2);
+}
+.vic-grow + .map-actions {
+  margin-left: 0;
 }

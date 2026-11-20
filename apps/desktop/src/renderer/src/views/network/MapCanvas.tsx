@@ -14,7 +14,7 @@ import { areaSummary, shareIn, withUserTints, type AreaDef } from './areaColors'
 import { FREE_LABEL_CAP, placeTopicLabels, shortLabel, type TopicLabelItem } from './labelsLod';
 import { firstNode, mapAction, nearestInDirection } from './mapKeyboard';
 import { clusterText, nodeRadius, paintPoints, pointsInView, stepPoint, type PointPaint, type PreparedMap } from './mapModel';
-import { blockView, DOT_X, DOT_Y, dotX, dotY, drawBlocks, hitBlocks, paintLabels, type BlocksFrame, type BlockView } from './blocksDraw';
+import { blockView, DOT_X, DOT_Y, dotX, dotY, drawBlocks, hitBlocks, paintLabels, type BlocksExtras, type BlocksFrame, type BlockView } from './blocksDraw';
 import { adjacency, bundleEdges, selectEdges, type EdgeMode, type EvEdge } from './edges';
 import { centralPapers } from './labelsLod';
 import { MiniMap } from './MiniMap';
@@ -39,6 +39,9 @@ export interface MapHandle {
   canvas(): HTMLCanvasElement | null;
   /** Lights a group (legend hover or focus) or none (null). */
   light(id: string | null): void;
+  /** The camera (centre and zoom), or null; `frame` shows everything, some blocks, some papers or an exact camera (saved views). */
+  camera(): { cx: number; cy: number; k: number } | null;
+  frame(f: { kind: 'fit' } | { kind: 'blocks'; ids: string[] } | { kind: 'docs'; ids: string[] } | { kind: 'camera'; cx: number; cy: number; k: number }): void;
   /** Lights an area of the legend (nodes with less than 20 % in it fade to 25 %) or none. */
   lightArea(area: number | null): void;
   /** Isolates an area (the others fade to 15 %) or releases it. */
@@ -114,19 +117,10 @@ export interface BlocksProp {
   keep?: boolean;
 }
 
-/** What the canvas shows beside the blocks, from the reading and gaps sections (`useMapExtras`): ids, turned into cell indices for the drawing. */
+/** What the canvas shows beside the blocks, from the gaps section (`useMapExtras`): ids, turned into cell indices for the drawing. The reading marks are the view's own `st`. */
 export interface CanvasExtras {
-  st?: ReadonlyMap<string, 1 | 2>;
   isolated?: ReadonlySet<string>;
-}
-/** `extras` of `drawBlocks` (section 20.10); declared here so the canvas compiles against the contract whichever side lands first. */
-interface BlockExtras {
-  st?: Uint8Array;
-  multi?: ReadonlySet<number>;
-  isolated?: ReadonlySet<number>;
-  pairLit?: [number, number] | null;
-  drop?: { block: number; valid: boolean } | null;
-  ghost?: { sx: number; sy: number; idx: number; count: number } | null;
+  pairLit?: readonly [number, number] | null;
 }
 
 /** How the family of the blocks can be edited: by hand (Topic, a root), not at all (Automatic is no tag), or not offered. */
@@ -826,6 +820,8 @@ function FreeCanvas({ map, level, selected, onSelect, onRead, onExplore, onVicin
         focusLit.current = lit.current >= 0;
         view.requestDraw();
       },
+      camera: () => null,
+      frame: () => undefined,
       lightArea(area) {
         litArea.current = area ?? -1;
         view.requestDraw();
@@ -1019,16 +1015,9 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
     return out;
   }, [multi, bv]);
   // What `drawBlocks` is given beside the blocks: the reading marks and the isolated papers by cell, the multiple selection, then the drag (ghost, block under it).
-  const staticExtras = useMemo<BlockExtras>(() => {
-    const out: BlockExtras = {};
-    if (extras?.st && extras.st.size > 0) {
-      const st = new Uint8Array(bv.ids.length);
-      for (const [id, v] of extras.st) {
-        const i = bv.index.get(id);
-        if (i !== undefined) st[i] = v;
-      }
-      out.st = st;
-    }
+  const staticExtras = useMemo<BlocksExtras>(() => {
+    const out: BlocksExtras = {};
+    if (extras?.pairLit) out.pairLit = extras.pairLit;
     if (extras?.isolated && extras.isolated.size > 0) out.isolated = new Set([...extras.isolated].flatMap((id) => bv.index.get(id) ?? []));
     if (multiIdx.size > 0) out.multi = multiIdx;
     return out;
@@ -1083,8 +1072,8 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
       const hoverId = hoverIdx.current >= 0 ? st.bv.ids[hoverIdx.current]! : null;
       const shown = st.edgeMode === 'strong' ? st.strong : { single: selectEdges(st.edgeMode, st.adj, [st.selected, hoverId]), bundles: [] };
       const d = dragRef.current;
-      const extrasNow: BlockExtras = { ...st.staticExtras, ...(d ? { drop: d.over >= 0 ? { block: d.over, valid: d.valid } : null, ghost: { sx: d.sx, sy: d.sy, idx: d.idx, count: selRef2.current.has(st.bv.ids[d.idx]!) ? selRef2.current.size : 1 } } : {}) };
-      const frame: BlocksFrame & { extras?: BlockExtras } = { ctx, w, h, v, bv: st.bv, th, hover: hoverIdx.current, sel: selRef.current, cursor: cursor.current, lit: lit.current, edges: shown.single, bundles: shown.bundles, forced: st.neighbors, central: st.central, allow: allowRef.current, fly: flyRef.current, redraw: () => view.requestDraw(), extras: extrasNow };
+      const extrasNow: BlocksExtras = { ...st.staticExtras, ...(d ? { drop: d.over >= 0 ? { block: d.over, valid: d.valid } : null, ghost: { sx: d.sx, sy: d.sy, idx: d.idx, count: selRef2.current.has(st.bv.ids[d.idx]!) ? selRef2.current.size : 1 } } : {}) };
+      const frame: BlocksFrame = { ctx, w, h, v, bv: st.bv, th, hover: hoverIdx.current, sel: selRef.current, cursor: cursor.current, lit: lit.current, edges: shown.single, bundles: shown.bundles, forced: st.neighbors, central: st.central, allow: allowRef.current, fly: flyRef.current, redraw: () => view.requestDraw(), extras: extrasNow };
       const out = drawBlocks(frame);
       // The rectangle of a Ctrl+drag: a 1 px border and a light fill in the accent colour.
       const rc = rectRef.current;
@@ -1454,6 +1443,31 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
         lit.current = id === null ? -1 : bv.blocks.findIndex((x) => x.id === id);
         focusLit.current = lit.current >= 0;
         view.requestDraw();
+      },
+      camera: () => ({ ...view.view.current }),
+      frame(f) {
+        const { w, h } = view.size.current;
+        if (f.kind === 'fit') return view.fit(true);
+        if (f.kind === 'camera') return view.flyTo(f.cx, f.cy, f.k);
+        // Blocks or papers: the rectangle that holds them, framed with a margin.
+        let x0 = Infinity;
+        let y0 = Infinity;
+        let x1 = -Infinity;
+        let y1 = -Infinity;
+        const grow = (ax: number, ay: number, bx: number, by: number) => {
+          x0 = Math.min(x0, ax);
+          y0 = Math.min(y0, ay);
+          x1 = Math.max(x1, bx);
+          y1 = Math.max(y1, by);
+        };
+        if (f.kind === 'blocks') for (const k of bv.blocks) if (f.ids.includes(k.id)) grow(k.x, k.y, k.x + k.w, k.y + k.h);
+        if (f.kind === 'docs') for (const id of f.ids) {
+          const i = bv.index.get(id);
+          if (i !== undefined) grow(dotX(bv, i) - 80, dotY(bv, i) - 40, dotX(bv, i) + 80, dotY(bv, i) + 40);
+        }
+        if (x1 < x0) return view.fit(true);
+        const target = blockView({ ...bv.blocks[0]!, x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, w || 800, h || 600);
+        view.flyTo(target.cx, target.cy, target.k);
       },
       lightArea() {},
       isolateArea() {},

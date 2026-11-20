@@ -39,8 +39,7 @@ import type { GraphStatus } from './useGraphModel';
 
 import './edit/edit.css';
 import { actionIds, blockIds, combineSelection, editableFamily, summarizeMove, type SelectMode } from './edit/editModel';
-// MERGE: the merge with the reading task switches this import to './mapExtras' and deletes the shim.
-import { useMapExtras } from './edit/mapExtrasShim';
+import { useMapExtras, type ViewBridge } from './mapExtras';
 import type { At } from './edit/BlockEdit';
 
 const BlockMenu = lazyView(() => import('./edit/BlockEdit').then((m) => ({ default: m.BlockMenu })), ['mapEdit']);
@@ -348,7 +347,24 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     nav.navigate({ view: 'library' });
   };
 
-  const extras = useMapExtras({ blocks: blocksView, evidence: edges, selected, multi, family: effective ?? NONE_FAMILY, scope, onFly: (id) => handle.current?.flyToDoc(id), onSelect: (id) => onSelect(id), onSelectMany: (ids) => select(ids, 'replace') });
+  // What a saved view reads and writes of this panel: the filters, the scope and the camera.
+  const viewBridge: ViewBridge = {
+    read: () => ({ years, kinds: (['cites', 'linked', 'similar'] as const).filter((k) => kinds[k]), strictness: strict, edgeMode, camera: handle.current?.camera() ?? null, size: stage.current ? { w: stage.current.clientWidth, h: stage.current.clientHeight } : null }),
+    write: (v) => {
+      const s0 = v.scope;
+      setKind(s0?.folder !== undefined ? 'folder' : s0?.projectId !== undefined ? 'project' : s0?.tagId !== undefined ? 'tag' : 'all');
+      setValue(s0?.folder ?? s0?.projectId ?? s0?.tagId ?? '');
+      setYears(v.years);
+      setKCites(v.kinds.includes('cites'));
+      setKLinked(v.kinds.includes('linked'));
+      setKSimilar(v.kinds.includes('similar'));
+      setStrict(v.strictness);
+      setEdgeMode(v.edgeMode);
+    },
+    frame: (f) => handle.current?.frame(f),
+  };
+  // Evidence goes in unfiltered by the chips (isolation counts every kind); a saved view opened by the extras changes the family and the selection through the same callbacks as a click, so Back and Forward record it.
+  const extras = useMapExtras({ blocks: blocksView, evidence, selected, multi, family: effective ?? NONE_FAMILY, scope, onFly: (id) => handle.current?.flyToDoc(id), onSelect: (id) => onSelect(id), onSelectMany: (ids) => select(ids, 'replace'), bridge: viewBridge, familyName: familyLabel(t, families.find((f) => f.id === effective) ?? { id: effective ?? '', label: effective ?? '' }), active });
 
   // What another view asked for (the intent mailbox, read by NetworkView): papers to select, the dialog, "Move to..." for a paper.
   const lastRequest = useRef(0);
@@ -622,8 +638,6 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
         />
       </Lazy>
     ) : null;
-  // `top` and `extra` of `MapSide`: the bar of the selection and the sections of the reading task. They are spread, so this file compiles whichever side of the merge lands first.
-  const sideProps = { top: selbar, extra: extras.sideSections };
   /** F2 and the Menu key on a block of the list or of the strip open the menu of the block, like the right click. */
   const blockOf = (el: EventTarget | null): string | null => (el instanceof Element ? (el.closest<HTMLElement>('[data-testid="map-block"]')?.dataset['value'] ?? null) : null);
   const onBlockKey = (e: React.KeyboardEvent) => {
@@ -848,7 +862,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
               />
             )}
           </div>
-          {wide && <MapSide open={sideOpen} onToggle={() => setSideOpen(!sideOpen)} minimapRef={setSlot} blocks={sideBlocks} legend={legend} controls={controls} count={shown} onLight={(id) => handle.current?.light(id)} onFly={(id) => handle.current?.focusCluster(id)} {...sideProps} />}
+          {wide && <MapSide open={sideOpen} onToggle={() => setSideOpen(!sideOpen)} minimapRef={setSlot} blocks={sideBlocks} legend={legend} controls={controls} count={shown} onLight={(id) => handle.current?.light(id)} onFly={(id) => handle.current?.focusCluster(id)} top={selbar} extra={extras.sideSections} />}
         </div>
       )}
       {moveFor && blocksView && (

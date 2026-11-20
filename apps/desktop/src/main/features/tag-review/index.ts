@@ -13,6 +13,7 @@ import { aiKeyOf, applyAi, dismissedOf, laterApplied, load, readState, toView, w
 
 const cleanup = () => import('@rl/data/tag-cleanup');
 export const aiPreview = async (s: MainServices, r: { model?: string | undefined }) => (await import('./ai.js')).aiPreview(s, r);
+export const aiCancel = async () => (await import('./ai.js')).aiCancel();
 export const aiRun = async (s: MainServices, r: { model?: string | undefined; confirmed: boolean; decide?: boolean | undefined }) => (await import('./ai.js')).aiRun(s, r);
 
 function rowView(r: CleanupRow) {

@@ -828,6 +828,14 @@ export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selec
             <Crumb key={id} docId={id} last={i === crumbs.length - 1} onGo={(label) => onCenter(id, label)} />
           ))}
         </nav>
+        <span className="vic-grow">
+          <button type="button" onClick={() => (ctlRings.more === 'undo' ? shrink('more') : void grow('more'))} disabled={ctlRings.more === 'off'} data-testid="vic-more" data-state={ctlRings.more}>
+            {ctlRings.more === 'undo' ? t('vicinity.fewer', { count: RING1 }) : t('vicinity.more', { count: RING1 })}
+          </button>
+          <button type="button" onClick={() => (ctlRings.widen === 'undo' ? shrink('widen') : void grow('widen'))} disabled={ctlRings.widen === 'off'} data-testid="vic-widen" data-state={ctlRings.widen}>
+            {ctlRings.widen === 'undo' ? t('vicinity.narrow') : t('vicinity.widen')}
+          </button>
+        </span>
         <NodeSearch
           ref={searchRef}
           testId="net-search"
@@ -882,14 +890,6 @@ export function GraphNet({ active, onCtl, start, crumbs, onCenter, onPath, selec
             </div>
           )}
         </ChipPop>
-        <span className="vic-grow">
-          <button type="button" onClick={() => (ctlRings.more === 'undo' ? shrink('more') : void grow('more'))} disabled={ctlRings.more === 'off'} data-testid="vic-more" data-state={ctlRings.more}>
-            {ctlRings.more === 'undo' ? t('vicinity.fewer', { count: RING1 }) : t('vicinity.more', { count: RING1 })}
-          </button>
-          <button type="button" onClick={() => (ctlRings.widen === 'undo' ? shrink('widen') : void grow('widen'))} disabled={ctlRings.widen === 'off'} data-testid="vic-widen" data-state={ctlRings.widen}>
-            {ctlRings.widen === 'undo' ? t('vicinity.narrow') : t('vicinity.widen')}
-          </button>
-        </span>
         <span className="map-actions">
           <button type="button" className="icon-button" title={t('network.fit')} aria-label={t('network.fit')} onClick={() => view.fit(true)} disabled={count === 0} data-testid="net-fit">
             ⤢

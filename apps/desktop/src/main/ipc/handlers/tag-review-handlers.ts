@@ -11,6 +11,7 @@ export const tagReviewHandlers = (s: MainServices): DomainHandlers<'tagReview'> 
   'tagReview:setAuto': async (r) => (await feature()).setAuto(s, r),
   'tagReview:skip': async (r) => (await feature()).skipStep(s, r),
   'tagReview:aiPreview': async (r) => (await feature()).aiPreview(s, r),
+  'tagReview:aiCancel': async () => (await feature()).aiCancel(),
   'tagReview:aiRun': async (r) => (await feature()).aiRun(s, r),
   'tagReview:undoRun': async (r) => (await feature()).undoRun(s, r),
 });

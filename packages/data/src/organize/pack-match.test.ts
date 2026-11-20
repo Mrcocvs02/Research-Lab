@@ -27,6 +27,37 @@ describe('matching the tags of a library with the concepts of a pack (D-517)', (
     expect(one('AT')).toMatchObject([{ conceptId: 'topic.alpha-theory', confidence: 'sure' }]);
   });
 
+  it('a match through an alias with more words than the label (a narrower term) is at most probable (D-560)', () => {
+    const one = (label: string) => run([node('n', label)]).matches;
+    // "conditional epsilon maps" is an alias of "Epsilon maps" in the synthetic pack, as a narrower term would be: never a sure merge.
+    expect(one('Conditional epsilon maps')).toMatchObject([{ conceptId: 'topic.epsilon-maps', confidence: 'likely' }]);
+    // A spelling variant (as many words) stays sure.
+    expect(one('Epsilon mapping')).toMatchObject([{ conceptId: 'topic.epsilon-maps', confidence: 'sure' }]);
+    // The label itself, even with more words in the tag than in the label, is not an alias match.
+    expect(one('Epsilon maps')).toMatchObject([{ conceptId: 'topic.epsilon-maps', confidence: 'sure' }]);
+  });
+
+  it('a sure match through an alias needs the rules of form, plural, sigla in the name or alias in collision', () => {
+    const one = (label: string, aliases: string[] = []) => run([node('n', label, { aliases })]).matches;
+    expect(one('Alpha theory models')).toMatchObject([{ conceptId: 'topic.alpha-theory', confidence: 'likely' }]);
+    expect(one('Alpha theory (AT)')).toMatchObject([{ conceptId: 'topic.alpha-theory', confidence: 'sure' }]);
+    // The same words in another order are probable even through a true alias.
+    expect(one('Models of alpha-theory')).toMatchObject([{ conceptId: 'topic.alpha-theory', confidence: 'likely' }]);
+  });
+
+  it('a narrower term that has its own concept is matched to it, apart from its parent: no claim on the same concept', () => {
+    const r = run([node('p', 'Eta model'), node('c', 'Mixed eta model'), node('a', 'Eta')]);
+    expect(pairOf(r, 'p')).toMatchObject([{ conceptId: 'topic.eta-model', confidence: 'maybe' }]);
+    // "Eta" and "Eta model" are two tags of the one concept: claimed twice, the user chooses; the narrower tag is not drawn into it.
+    expect(pairOf(r, 'c')).toMatchObject([{ conceptId: 'topic.eta-mixed', confidence: 'sure' }]);
+    const alone = run([node('p', 'Eta model'), node('c', 'Mixed eta chain')]);
+    expect(alone.matches.map((m) => [m.nodeId, m.conceptId, m.confidence])).toEqual([
+      ['c', 'topic.eta-mixed', 'sure'],
+      ['p', 'topic.eta-model', 'sure'],
+    ]);
+    expect(alone.conflicts).toBe(0);
+  });
+
   it('a spelling slip is probable, never sure', () => {
     const r = run([node('g', 'Delta chian')]);
     expect(pairOf(r, 'g')).toMatchObject([{ conceptId: 'topic.delta-chains', confidence: 'likely', rule: 'spelling' }]);

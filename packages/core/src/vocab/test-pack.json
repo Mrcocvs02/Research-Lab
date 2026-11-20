@@ -16,7 +16,9 @@
     { "id": "topic.gamma-flow", "label": "Gamma flow", "labelIt": "Flusso gamma", "aliases": ["GF"], "parent": "topic.alpha-theory" },
     { "id": "topic.delta-systems", "label": "Delta systems", "labelIt": "Sistemi delta", "aliases": ["delta system"] },
     { "id": "topic.delta-chains", "label": "Delta chains", "labelIt": "Catene delta", "aliases": ["delta chain"], "parent": "topic.delta-systems" },
-    { "id": "topic.epsilon-maps", "label": "Epsilon maps", "labelIt": "Mappe epsilon", "aliases": ["epsilon mapping"] }
+    { "id": "topic.epsilon-maps", "label": "Epsilon maps", "labelIt": "Mappe epsilon", "aliases": ["epsilon mapping", "conditional epsilon maps"] },
+    { "id": "topic.eta-model", "label": "Eta model", "labelIt": "Modello eta", "aliases": ["Eta"] },
+    { "id": "topic.eta-mixed", "label": "Mixed eta model", "labelIt": "Modello eta misto", "aliases": ["Mixed eta chain"], "parent": "topic.eta-model" }
    ]
   },
   {

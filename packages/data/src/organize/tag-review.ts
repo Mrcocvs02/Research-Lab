@@ -67,6 +67,8 @@ const VOWELS = 'aeio';
 /** Letters and digits of a name, lower case, accents stripped. */
 export const tokensOf = (s: string): string[] => normalizeName(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 export const formKey = (s: string): string => tokensOf(s).join('');
+/** Number of tokens of a name that are not stop words. */
+export const meaningfulCount = (s: string): number => tokensOf(s).filter((t) => !STOP.has(t)).length;
 const digitsOf = (s: string): string => s.replace(/\D+/g, '');
 
 /** The naming convention (D-493): `_` -> space, spaces collapsed, capital initial, the rest as written, at most 60 characters. */
@@ -122,7 +124,7 @@ export function tokenRelation(x: string, y: string): 0 | 1 | 2 {
 }
 
 /** Initials of the significant tokens of a name with at least two of them. */
-function acroOf(label: string): string | null {
+export function acroOf(label: string): string | null {
   const sig = tokensOf(label).filter((t) => !STOP.has(t));
   return sig.length >= 2 ? sig.map((t) => t.charAt(0)).join('') : null;
 }

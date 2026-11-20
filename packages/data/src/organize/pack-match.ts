@@ -1,5 +1,5 @@
 import type { PackFamilyMatch, PackMatch } from '@rl/core';
-import { buildIndex, formKey, namePairs, type Confidence, type ReviewNode } from './tag-review.js';
+import { acroOf, buildIndex, formKey, meaningfulCount, namePairs, type Confidence, type Pair, type ReviewNode } from './tag-review.js';
 
 /**
  * Pairing of a field vocabulary pack with the vocabulary of the library (D-517, section 20.1.2): which root of the library each pack family
@@ -63,6 +63,8 @@ export const MAX_ROWS = 2000;
 const MAX_DEPTH = 3;
 const CONCEPT = '\u0001';
 const RANK: Record<Confidence, number> = { sure: 0, likely: 1, maybe: 2 };
+/** Rules of the detector that make a sure match through an alias: form, plural, sigla in the name, alias in collision. */
+const SURE_RULES = new Set(['form', 'plural', 'acronym-in-name', 'alias']);
 
 export const packRef = (packId: string, conceptId: string): string => `${packId}/${conceptId}`;
 const pairKey = (a: string, b: string): string => `${a}\u0000${b}`;
@@ -158,14 +160,40 @@ export function matchPack(input: PackMatchInput): PackMatchResult {
     }
   }
 
+  // Spelling slips are probable matches; the other sure rules stay sure, an ambiguous sigla stays a maybe.
+  const asked = (p: { confidence: Confidence; rule: string }): Confidence => (p.confidence === 'sure' ? 'sure' : p.rule === 'spelling' ? 'likely' : p.confidence);
+  const worse = (a: Confidence, b: Confidence): Confidence => (RANK[a] >= RANK[b] ? a : b);
+  const userById = new Map(users.map((n) => [n.id, n]));
+  // A match that only an alias of the concept makes (neither its label nor its Italian label) is judged against that alias as a variant:
+  // sure only by the rules of form, plural, sigla in the name and alias in collision (R1, R2, R3, R6), and never when the alias has more
+  // meaningful words than the label (a narrower term, unless it is the label's own sigla spelled out): at most probable (D-560).
+  const viaAlias = (nodeId: string, c: PackConceptIn | undefined, base: Confidence): Confidence => {
+    const user = userById.get(nodeId);
+    if (!user || !c) return base;
+    const meet = (other: ReviewNode): Pair[] => {
+      const two = [reviewNode(user.id, user.label, user.aliases), other];
+      return namePairs(buildIndex({ nodes: two, docs: [] }), two, () => false);
+    };
+    if (meet(reviewNode(CONCEPT, c.label, c.labelIt ? [c.labelIt] : [])).length > 0) return base;
+    let best: Confidence | undefined;
+    for (const alias of c.aliases) {
+      const [p] = meet(reviewNode(CONCEPT, alias, [])).sort((x, y) => RANK[asked(x)] - RANK[asked(y)]);
+      if (!p) continue;
+      let conf = asked(p);
+      if (conf === 'sure' && !SURE_RULES.has(p.rule)) conf = 'likely';
+      if (meaningfulCount(alias) > meaningfulCount(c.label) && acroOf(alias) !== formKey(c.label)) conf = worse(conf, 'likely');
+      if (best === undefined || RANK[conf] < RANK[best]) best = conf;
+    }
+    return best === undefined ? base : worse(base, best);
+  };
+
   type Cand = { nodeId: string; conceptId: string; rule: string; confidence: Confidence };
   const cands = new Map<string, Cand>();
   for (const p of pairs) {
     const [nodeId, concept] = isConcept(p.a) ? [p.b, p.a] : [p.a, p.b];
     const conceptId = concept.slice(1);
     if (apart.has(pairKey(nodeId, conceptId))) continue;
-    // Spelling slips are probable matches; the other sure rules stay sure, an ambiguous sigla stays a maybe.
-    const confidence: Confidence = p.confidence === 'sure' ? 'sure' : p.rule === 'spelling' ? 'likely' : p.confidence;
+    const confidence = viaAlias(nodeId, concepts.get(conceptId), asked(p));
     const k = pairKey(nodeId, conceptId);
     const old = cands.get(k);
     if (!old || RANK[confidence] < RANK[old.confidence]) cands.set(k, { nodeId, conceptId, rule: p.rule, confidence });

@@ -4,7 +4,7 @@ Un *pack* è un file JSON in `packages/core/src/vocab/packs/` che fornisce un vo
 
 ## Struttura
 - Quattro famiglie: `topic` (gerarchia a 3 livelli: macro-area, sotto-area, dettaglio; multi-valore), `method` (famiglie di tecniche; valore singolo), `system` (modelli, piattaforme, materiali; multi-valore), `paperType` (tipo di articolo; valore singolo).
-- Ogni concetto ha un id stabile `famiglia.slug`, l'etichetta inglese canonica, l'etichetta italiana (se ovvia), gli alias (acronimi, varianti di grafia, plurali, sinonimi), `parent`, `distinctFrom` opzionale (coppie facili da confondere, per esempio entropia di entanglement contro entropia termodinamica o di Shannon) e suggerimenti di categorie arXiv.
+- Ogni concetto ha un id stabile `famiglia.slug`, l'etichetta inglese canonica, l'etichetta italiana (se ovvia), gli alias (solo varianti vere: acronimi e forme estese, grafie, plurali, ordine delle parole, sinonimi; un termine più specifico è un concetto figlio, mai un alias, D-560), `parent`, `distinctFrom` opzionale (coppie facili da confondere, per esempio entropia di entanglement contro entropia termodinamica o di Shannon) e suggerimenti di categorie arXiv.
 - Il test verifica: id unici, genitori esistenti nella stessa famiglia, profondità al massimo 3, nessuna etichetta o alias condiviso da due concetti (confronto senza maiuscole, trattini e spazi multipli), famiglie a valore singolo marcate.
 
 ## Fonti e licenze

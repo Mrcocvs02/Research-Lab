@@ -197,7 +197,8 @@ test('edit the Map by hand: drag into a block, keyboard, rename, merge, rectangl
     await expect(window.getByTestId('map-block-merge-confirm')).toBeVisible();
     await window.getByTestId('map-block-merge-ok').click();
     await expect.poll(async () => (await tagsOf(docIds[22]!)).includes(beta), { timeout: 15_000 }).toBe(true);
-    await window.getByTestId('toast-action').filter({ hasText: /^(Undo|Annulla)$/ }).last().click();
+    // The Undo of the merge notice itself: the notice of the rename is still up and its Undo would be a stale change.
+    await window.getByTestId('toast').filter({ hasText: /Merged|unito/ }).getByTestId('toast-action').filter({ hasText: /^(Undo|Annulla)$/ }).click();
     await expect.poll(async () => (await tagsOf(docIds[22]!)).includes(gamma), { timeout: 15_000 }).toBe(true);
     await settled(window);
 

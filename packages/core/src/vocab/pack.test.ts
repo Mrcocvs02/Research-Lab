@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { PACK_MAX_DEPTH, validatePackIntegrity, vocabPackSchema, type VocabPack } from './pack-schema.js';
+import { PACK_MAX_DEPTH, normalizePackTerm, validatePackIntegrity, vocabPackSchema, type VocabPack } from './pack-schema.js';
 
 const packsDir = new URL('./packs/', import.meta.url);
 const files = readdirSync(packsDir).filter((f) => f.endsWith('.json'));
@@ -56,6 +56,25 @@ describe.each(files)('pack %s', (file) => {
     expect(byId.get('system')!.singleValue).toBe(false);
     expect(byId.get('method')!.singleValue).toBe(true);
     expect(byId.get('paperType')!.singleValue).toBe(true);
+  });
+  it('keeps narrower terms out of the aliases of the broader concept (D-560): they have their own concept, under it', () => {
+    const byTerm = new Map<string, string>();
+    const concepts = pack.families.flatMap((f) => f.concepts);
+    for (const c of concepts) for (const t of [c.label, ...c.aliases]) byTerm.set(normalizePackTerm(t), c.id);
+    const under = (id: string, ancestor: string): boolean => {
+      for (let cur = concepts.find((c) => c.id === id); cur?.parent; cur = concepts.find((c) => c.id === cur?.parent)) if (cur.parent === ancestor) return true;
+      return false;
+    };
+    const narrower: Array<[string, string]> = [
+      ['conditional mutual information', 'topic.mutual-information'],
+      ['XXZ model', 'system.heisenberg-model'],
+    ];
+    for (const [term, broader] of narrower) {
+      const owner = byTerm.get(normalizePackTerm(term));
+      expect(owner, term).toBeDefined();
+      expect(owner, term).not.toBe(broader);
+      expect(under(owner as string, broader), term).toBe(true);
+    }
   });
   it('keeps the topic hierarchy within bounds', () => {
     const topic = pack.families.find((f) => f.id === 'topic')!;

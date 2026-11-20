@@ -187,6 +187,9 @@
       "consentAppOnly": "Solo nell'app"
     },
     "more": "Altro",
+    "annUndone": "Modifica alle annotazioni annullata",
+    "annRedone": "Modifica alle annotazioni ripetuta",
+    "litNote": "Riassunto: problema, metodo, risultati… ✦",
     "sideBySide": "Affianca un altro paper…",
     "openDefault": "Apri con il programma predefinito",
     "reveal": "Mostra nella cartella",

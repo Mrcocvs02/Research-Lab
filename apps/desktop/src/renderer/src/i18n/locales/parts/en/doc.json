@@ -15,6 +15,8 @@
     }
   },
   "docs": {
+    "summary": "Summary ✦",
+    "summaryHint": "The literature note: problem, contribution, method, results, data, limits. Opens in the reader; Claude writes it if it does not exist yet.",
     "readHint": "Open in the reader (shortcut: R on the list)",
     "openDefault": "Open with the default program",
     "open": "Open",

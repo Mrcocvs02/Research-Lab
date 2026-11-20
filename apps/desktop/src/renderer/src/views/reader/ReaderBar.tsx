@@ -75,6 +75,9 @@ interface Props {
   guide?: { on: boolean; onToggle(): void } | undefined;
   canUndo: boolean;
   onUndo(): void;
+  onLiterature(): void;
+  canRedo: boolean;
+  onRedo(): void;
   onOpenFile(): void;
   onReveal(): void;
   onClose(): void;
@@ -146,7 +149,9 @@ export function ReaderBar(p: Props) {
       id: 'a',
       items: [
         { id: 'undo', label: t('history.undo'), keys: 'Ctrl+Z', testId: 'reader-undo', ...(p.canUndo ? {} : { disabled: t('history.nothingToUndo') }), onSelect: p.onUndo },
+        { id: 'redo', label: t('history.redo'), keys: 'Ctrl+Y', testId: 'reader-redo', ...(p.canRedo ? {} : { disabled: t('history.nothingToRedo') }), onSelect: p.onRedo },
         { id: 'history', label: t('history.title'), keys: 'Ctrl+H', testId: 'reader-history', onSelect: () => setOpen('history') },
+        { id: 'lit', label: t('reader.litNote'), testId: 'reader-literature', onSelect: p.onLiterature },
         { id: 'side', label: p.split ? t('reader.unsplit') : t('reader.sideBySide'), testId: 'reader-side-by-side', onSelect: p.onSideBySide },
       ],
     },

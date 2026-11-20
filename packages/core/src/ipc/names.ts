@@ -256,6 +256,7 @@ export const CHANNEL_NAMES: readonly string[] = [
   'secrets:set',
   'settings:get',
   'settings:set',
+  'tagReview:aiCancel',
   'tagReview:aiPreview',
   'tagReview:aiRun',
   'tagReview:apply',
@@ -301,6 +302,7 @@ export const EVENT_NAMES: readonly string[] = [
   'library:changed',
   'mcp:changed',
   'scan:progress',
+  'tagReview:aiProgress',
   'watch:changed',
   'watch:progress',
 ];

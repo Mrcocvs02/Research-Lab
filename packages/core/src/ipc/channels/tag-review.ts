@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { itemIdSchema } from '../../common.js';
-import { defineChannels } from '../registry.js';
+import { defineChannels, defineEvents } from '../registry.js';
 import type { TaxonomyOp } from './taxonomy.js';
 
 /**
@@ -96,6 +96,13 @@ export interface TagAiPlan {
   /** Why the button is off; absent when it can run. */
   disabled?: 'no-folder' | 'no-pairs';
   model: string;
+  /** Calls the run makes (the questions are packed `batchSize` to a call) and the room of the monthly spending cap (D-515). */
+  batches: number;
+  batchSize: number;
+  /** Questions the cap leaves room for (all of `pairs` unless `overCap`), the cap in USD (null: none) and what this month already spent. */
+  fitsPairs: number;
+  capUsd: number | null;
+  monthUsd: number;
   /** The exact text that would be sent (names, family paths, counts; never titles or contents). */
   text: string;
   approxInputTokens: number;
@@ -103,6 +110,38 @@ export interface TagAiPlan {
   needsConfirmation: boolean;
   overCap: boolean;
 }
+
+/** The end of an `aiRun` (D-515): questions asked, left to the user, failed, and whether it was cancelled or limited by the cap. */
+export interface TagAiRunResult {
+  asked: number;
+  cached: number;
+  decided?: TagHaikuBatch | null;
+  left?: number;
+  errors?: number;
+  cancelled?: boolean;
+  /** Questions that did not fit the spending cap and were not asked. */
+  capped?: number;
+}
+
+/** Progress of Haiku deciding (D-515), from the manual run and the automatic mode: calls done, decisions so far, elapsed time from `startedAt`. */
+export const tagAiProgressSchema = z.object({
+  runId: z.string(),
+  state: z.enum(['running', 'done', 'cancelled', 'failed']),
+  auto: z.boolean(),
+  /** Questions answered or failed so far, out of `total`. */
+  done: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  batch: z.number().int().nonnegative(),
+  batches: z.number().int().nonnegative(),
+  decided: z.number().int().nonnegative(),
+  errors: z.number().int().nonnegative(),
+  startedAt: z.number(),
+  usd: z.number(),
+  message: z.string().optional(),
+});
+export type TagAiProgress = z.infer<typeof tagAiProgressSchema>;
+
+export const tagReviewEvents = defineEvents('tagReview', { aiProgress: tagAiProgressSchema });
 
 const rowId = z.string().min(1).max(80);
 const step = z.number().int().min(1).max(5);
@@ -137,7 +176,9 @@ export const tagReviewChannels = defineChannels('tagReview', {
   aiPreview: { request: z.object({ model: z.string().optional() }), response: z.custom<TagAiPlan>() },
   /** Sends the previewed text after the user's consent; answers are cached by pair of labels. */
   /** With `decide`, Haiku's high-confidence answers are applied as ONE undoable change (D-512); low-confidence ones stay for the user. */
-  aiRun: { request: z.object({ model: z.string().optional(), confirmed: z.boolean(), decide: z.boolean().optional() }), response: z.custom<{ asked: number; cached: number; decided?: TagHaikuBatch | null }>() },
+  aiRun: { request: z.object({ model: z.string().optional(), confirmed: z.boolean(), decide: z.boolean().optional() }), response: z.custom<TagAiRunResult>() },
+  /** Stops a running `aiRun` after the call in progress; what is already decided is kept as its own undoable change (D-515). */
+  aiCancel: { request: z.object({}), response: z.object({ ok: z.boolean() }) },
   /** Undo one step of the run (`step`) or all of it, in reverse order. */
   undoRun: { request: z.object({ step: step.optional() }), response: z.custom<{ undone: number; run: TagRun }>() },
 });

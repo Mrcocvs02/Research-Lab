@@ -191,7 +191,7 @@
         "what": "Verrebbero inviate a {{model}} {{count}} coppie incerte: solo i nomi dei tag con il percorso della famiglia e il numero di lavori, mai titoli o testi.",
         "noPrice": "prezzo non noto",
         "cost": "Circa {{tokens}} token in ingresso · {{usd}}",
-        "cap": "Si supererebbe il tetto giornaliero: non viene inviato nulla.",
+        "cap": "Si supererebbe il tetto di spesa: non viene inviato nulla.",
         "send": "Invia",
         "off": {
           "no-folder": "Nessuna cartella è abilitata all’AI: abilitane una nelle impostazioni della cartella.",
@@ -203,7 +203,10 @@
           "narrower": "Claude: più stretto",
           "related": "Claude: collegati",
           "different": "Claude: diversi"
-        }
+        },
+        "batches": "{{count}} chiamate da al più {{size}} domande, una dopo l'altra, con le istruzioni condivise.",
+        "capFits": "Il tetto di spesa ({{cap}}, già usati {{spent}} questo mese) lascia spazio a {{fits}} domande su {{count}}: le altre restano per dopo.",
+        "answered": "Risposte ricevute: {{count}} · errori: {{errors}}"
       },
       "acceptAll": "Accetta tutte ({{count}})"
     },
@@ -308,7 +311,17 @@
         "merge": "unite «{{a}}» e «{{b}}»",
         "parent": "«{{b}}» o «{{a}}»: genitore e figlio",
         "distinct": "«{{a}}» e «{{b}}» restano distinti"
-      }
+      },
+      "progress": "Haiku sta decidendo… {{done}}/{{total}}",
+      "progressDetail": "Chiamata {{batch}} di {{batches}} · {{time}} · decise finora: {{decided}}",
+      "stop": "Annulla",
+      "hide": "Chiudi (continua in sottofondo)",
+      "background": "Puoi chiudere questa finestra: l'avanzamento resta nel riquadro Attività. Annullando, quanto già deciso viene tenuto (come una modifica che si può annullare).",
+      "finished": "Haiku ha finito",
+      "stopped": "Haiku è stato fermato",
+      "failed": "Haiku non ha potuto decidere",
+      "summary": "Decise: {{decided}} · lasciate a te: {{left}} · errori: {{errors}}",
+      "capped": "{{count}} domande non sono state inviate perché oltre il tetto di spesa: restano per dopo."
     }
   }
 }

@@ -191,7 +191,7 @@
         "what": "{{count}} uncertain pairs would be sent to {{model}}: only tag names with their family path and paper counts, never titles or texts.",
         "noPrice": "price not known",
         "cost": "About {{tokens}} input tokens · {{usd}}",
-        "cap": "The daily cap would be exceeded: nothing is sent.",
+        "cap": "The spending cap would be exceeded: nothing is sent.",
         "send": "Send",
         "off": {
           "no-folder": "No folder is enabled for AI: enable one in the folder settings.",
@@ -203,7 +203,10 @@
           "narrower": "Claude: narrower",
           "related": "Claude: related",
           "different": "Claude: different"
-        }
+        },
+        "batches": "{{count}} calls of at most {{size}} questions, one after the other, sharing the instructions.",
+        "capFits": "The spending cap ({{cap}}, {{spent}} already used this month) leaves room for {{fits}} of {{count}} questions: the rest stay for later.",
+        "answered": "Answers received: {{count}} · errors: {{errors}}"
       },
       "acceptAll": "Accept all ({{count}})"
     },
@@ -308,7 +311,17 @@
         "merge": "merged \"{{a}}\" and \"{{b}}\"",
         "parent": "parent and child: \"{{a}}\" and \"{{b}}\"",
         "distinct": "\"{{a}}\" and \"{{b}}\" stay distinct"
-      }
+      },
+      "progress": "Haiku is deciding… {{done}}/{{total}}",
+      "progressDetail": "Call {{batch}} of {{batches}} · {{time}} · decided so far: {{decided}}",
+      "stop": "Cancel",
+      "hide": "Close (keeps running)",
+      "background": "You can close this window: progress stays in the Activity panel. If you cancel, what is already decided is kept (as an undoable change).",
+      "finished": "Haiku has finished",
+      "stopped": "Haiku was stopped",
+      "failed": "Haiku could not decide",
+      "summary": "Decided: {{decided}} · left to you: {{left}} · errors: {{errors}}",
+      "capped": "{{count}} questions were not sent because they are over the spending cap: they stay for later."
     }
   }
 }

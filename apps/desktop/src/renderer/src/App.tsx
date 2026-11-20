@@ -23,14 +23,14 @@ import { AppProvider, useApp } from './state/app-context';
 // No view is part of the first chunk (docs/RULES.md, lightness). The Library is the first screen: it starts loading with the app (see `App`).
 const LibraryView = lazyView(() => import('./views/library/LibraryView').then((m) => ({ default: m.LibraryView })), ['library']);
 const Settings = lazyView(() => import('./settings/Settings').then((m) => ({ default: m.Settings })), ['settings', 'settings-wizard']);
-const ProjectsView = lazyView(() => import('./views/projects/ProjectsView').then((m) => ({ default: m.ProjectsView })), ['doc-projects-reader', 'projects']);
+const ProjectsView = lazyView(() => import('./views/projects/ProjectsView').then((m) => ({ default: m.ProjectsView })), ['doc-projects-reader', 'mapExtras', 'projects']);
 // The reader (and pdf.js with it) loads the first time a document is opened in it.
 const ReaderView = lazyView(() => import('./views/reader/ReaderView').then((m) => ({ default: m.ReaderView })), ['doc-projects-reader', 'doc-reader', 'reader']);
 // Two papers side by side (feature 3) load their own chunk the first time they are asked for.
 const SplitReader = lazyView(() => import('./views/reader/SplitReader').then((m) => ({ default: m.SplitReader })), ['doc-projects-reader', 'doc-reader', 'reader']);
 const InboxView = lazyView(() => import('./views/inbox/InboxView').then((m) => ({ default: m.InboxView })), ['inbox']);
 const DiscoverView = lazyView(() => import('./views/discover/DiscoverView').then((m) => ({ default: m.DiscoverView })), ['discover']);
-const NetworkView = lazyView(() => import('./views/network/NetworkView').then((m) => ({ default: m.NetworkView })), ['network', 'vicinity', 'mapEdit']);
+const NetworkView = lazyView(() => import('./views/network/NetworkView').then((m) => ({ default: m.NetworkView })), ['mapExtras', 'mapEdit', 'network', 'vicinity']);
 // The welcome card of the first open after the wizard (D-262).
 const WelcomeCard = lazyView(() => import('./views/guide/WelcomeCard').then((m) => ({ default: m.WelcomeCard })), ['guide']);
 const Wizard = lazyView(() => import('./wizard/Wizard').then((m) => ({ default: m.Wizard })), ['settings-wizard', 'wizard']);

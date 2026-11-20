@@ -35,7 +35,8 @@
       "PackDialog": 16,
       "MapSelectionBar": 16,
       "BlockEdit": 16,
-      "MacroAreas": 16
+      "MacroAreas": 16,
+      "MapViews": 16
     }
   },
   "main": {

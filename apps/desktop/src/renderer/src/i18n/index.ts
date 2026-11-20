@@ -37,6 +37,7 @@ export type StringPart =
   | 'links'
   | 'literature'
   | 'mapEdit'
+  | 'mapExtras'
   | 'mcp'
   | 'network'
   | 'notes'

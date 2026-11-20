@@ -9,7 +9,7 @@ Stato di passaggio per riprendere il lavoro. Prima di fare qualunque cosa, legge
 1. `CLAUDE.md` (regole di lavoro, modelli per compito, commit, comandi);
 2. `docs/STATUS.md` (fase, onda, fatto, in corso, bloccato, prossimo);
 3. `docs/HANDOFF.md` (questo file);
-4. `docs/DECISIONS.md` (le ultime voci: D-492..D-510);
+4. `docs/DECISIONS.md` (le ultime voci: D-492..D-514);
 5. `docs/design/ARCHITETTURA-UI.md` §14 e §14.1 (ondate di implementazione e funzioni nuove);
 6. `docs/HISTORY.md` (facoltativo: cronologia).
 
@@ -18,11 +18,11 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 ## 2. Aggiornato
 
 - Data: 2026-11-20.
-- HEAD: vedi `git log`. Ondate 1–13 unite su `main` a `c2ce253`. L'aggiornamento di documentazione dell'onda 14 è sul ramo `docs14`.
-- Onda 14 (dopo la 1.0) fatta; nessun lavoro di ondata in corso. Fase 8 completa con tag `phase-8`.
+- HEAD: vedi `git log`. Ondate 1–13 unite su `main`; onda 14 unita. Documentazione del lavoro dopo la 1.1.0 sul ramo `docs15`, non ancora unita.
+- Onda 14 (dopo la 1.0) fatta; versione 1.1.0 rilasciata (tag `v1.1.0`); dopo la 1.1.0 altri lavori su `main` non rilasciati (sezione 3). Nessun lavoro di ondata in corso. Fase 8 completa con tag `phase-8`.
 - Worktree vecchi ancora su disco: rimuovibili. Non cancellare mai una junction `node_modules`.
 - Tag: `phase-0`..`phase-3`, `phase-6`, `phase-7`, `phase-8` pubblicati; `phase-4`, `phase-5` senza tag.
-- Installer di prova della fase 8 (116 MB, senza eseguibile di Claude): da rifare per la versione 1.1.0.
+- Installer: non rifatto per il lavoro dopo la 1.1.0 (si farà con la versione 1.2.0).
 
 ## 3. Cosa è successo in questa sessione
 
@@ -49,6 +49,12 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
   - X3 unita (`x3`, merge `c20886d`): note di letteratura, modelli, LaTeX, collegamenti per identificatore.
 - Budget: `88e9ca1` (tetti del main per le ondate rimanenti), `2cce6b4` (totali per le ondate 9-10), `renderer.chunkCapsKB` (D-465). Numeri in sezione 5.
 - Ondata 13 unita (D-477..D-491): gap di X7, X8, w12; funzione 49 (Z1a–Z1c) fatta; Mappa K1, L1, K2; gruppi di ricerca come tag `grp:` (D-488); "Raggruppa per" con famiglie (D-489); audit su copia di dati reali (D-490); famiglie di tag (D-491). Budget non più vincolanti (D-487).
+- Dopo la 1.1.0, su `main`, non rilasciato (D-511..D-514):
+  - Lettore: Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z e Annulla/Ripeti nel menu Altro per le annotazioni (diario, poi cronologia della libreria); riassunto strutturato ("Riassunto ✦" sulla scheda e in Altro).
+  - Rete: tutte le famiglie di "Raggruppa per" selezionabili (blocchi parziali, Riordina i tag, 0 % nascosto; gruppi da fonte dei tag rimossi); percorso di vicinato; Allarga/Restringi; Indietro/Avanti nella sezione.
+  - Tag: "Accetta tutte (N)"; quattro modalità di accettazione automatica; "Lascia decidere a Haiku" (D-512); gestore dei tag dalla barra laterale, Alt+6, comandi della tavolozza, "Gestisci i tag…".
+  - Pannelli laterali ridimensionabili con tastiera, reset con doppio clic, larghezze ricordate (D-513).
+  - Tetti di budget alzati (D-511, D-514); valori in `CLAUDE.md`.
 - Onda 14, dopo la 1.0 (D-492..D-510). Feedback dell'utente: rete illeggibile, schede della libreria illeggibili, multi-selezione che mostrava tutto, Sorprendimi con collegamenti noti, Discover con classici banali; priorità alla qualità dei tag. Fatto:
   - Sorprendimi e Discover (D-492), con "Includi classici" spento di default.
   - Diagnosi su dati reali (audit "Diagnosi rete e libreria (post 1.0)"); design §19 (D-493..D-501).
@@ -61,6 +67,7 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 ## 4. Test: eseguiti
 
 - **Verifica finale (D-443), su `main` a `6d2018e`:** unitari 2708 passati, 1 instabile (`export.test.ts` "cancelled or failed", passa da solo); e2e uno alla volta 40 su 42 verdi, con `qa-budget` `firstContentMs` instabile (534, 604 contro 530, non alzato); heavy tutti verdi (6 file unitari, `qa-search-perf`, `security-hostile-scan`). Le sezioni seguenti descrivono lo stato prima di questa verifica e restano come storia dei punti di revisione.
+- Dopo la 1.1.0 (D-511..D-514): la suite completa non è stata rifatta dopo questi merge; ogni agente ha eseguito i test unitari e gli e2e dei file che ha toccato. Da fare nella verifica finale.
 - Onda 14: unitari 3005/3005; heavy verdi; e2e verdi tranne `qa-budget` `firstContentMs` (instabile, noto).
 - Ondata 13: unitari ed e2e verdi tranne `qa-budget` `firstContentMs` (instabile, noto); heavy verdi.
 - Prima della verifica finale, dal D-443 nessun test era stato eseguito (anche i test scritti in G4a, G4c, N4 e nelle ondate 7-8, vedi sotto). Durante le ondate si eseguono solo `npm run typecheck`, `npm run build`, `npm run check:budget` e `npm run check:generality`. I task scrivono i test ma non li eseguono.
@@ -91,12 +98,13 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 
 ## 5. Stato e prossimi passi
 
-Ondate 1–13 unite su `main` a `c2ce253`; onda 14 (dopo la 1.0) fatta. Fase 8 completa con tag `phase-8`. `PDF_WRITE_ENABLED` è acceso (D-473); nei test e2e di sviluppo resta spento salvo `RL_E2E_PDF_WRITE=1`.
+Ondate 1–13 unite su `main`; onda 14 (dopo la 1.0) fatta; versione 1.1.0 rilasciata (tag `v1.1.0`). Fase 8 completa con tag `phase-8`. `PDF_WRITE_ENABLED` è acceso (D-473); nei test e2e di sviluppo resta spento salvo `RL_E2E_PDF_WRITE=1`.
+
+Lavoro dopo la 1.1.0 (sezione 3): su `main`, non rilasciato.
 
 Passi, in ordine:
-1. Versione 1.1.0.
-2. Installer: rifare `npm run dist` con la versione 1.1.0, senza eseguibile di Claude Code (D-474).
-3. Tag `v1.1.0`.
+1. Verifica finale completa (D-443) su `main`, pesanti uno alla volta.
+2. Versione 1.2.0, quando l'utente è pronto; installer senza eseguibile di Claude Code (D-474).
 
 Lacune note dopo l'onda 14 (da chiudere con il feedback, non bloccano la 1.1.0):
 - Duplicati: concetti duplicati risolti ~12 su 18 sulla libreria reale (obiettivo 90%).

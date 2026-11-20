@@ -5,7 +5,7 @@ import { isDarkTheme } from '../../lib/theme';
 import { reducedMotion } from './camera';
 import { withAlpha, haloSprite, mix, readTheme, type MapTheme } from './colors';
 import { boundsOf, fitView, PointGrid, toScreenX, toScreenY, toWorldX, toWorldY, type View } from './geometry';
-import { Menu } from '../../components/Menu';
+import { Menu, type MenuItem } from '../../components/Menu';
 import type { BridgePath } from './BridgePath';
 import { bridgeGeo, bridgeView, drawBridge } from './bridgeLayer';
 import { DocCard, HoverCard, useRestingHover } from './HoverCard';
@@ -14,11 +14,13 @@ import { areaSummary, shareIn, withUserTints, type AreaDef } from './areaColors'
 import { FREE_LABEL_CAP, placeTopicLabels, shortLabel, type TopicLabelItem } from './labelsLod';
 import { firstNode, mapAction, nearestInDirection } from './mapKeyboard';
 import { clusterText, nodeRadius, paintPoints, pointsInView, stepPoint, type PointPaint, type PreparedMap } from './mapModel';
-import { blockView, DOT_X, DOT_Y, dotX, dotY, drawBlocks, hitBlocks, paintLabels, type BlockView } from './blocksDraw';
+import { blockView, DOT_X, DOT_Y, dotX, dotY, drawBlocks, hitBlocks, paintLabels, type BlocksExtras, type BlocksFrame, type BlockView } from './blocksDraw';
 import { adjacency, bundleEdges, selectEdges, type EdgeMode, type EvEdge } from './edges';
 import { centralPapers } from './labelsLod';
 import { MiniMap } from './MiniMap';
-import { useCanvasView } from './useCanvasView';
+import { isMod, useCanvasView } from './useCanvasView';
+import { actionIds, blockAt, blockIds, canDropOn, dropOutcome, editableFamily, editKey, idsInView, pressAction, rectIds, type SelectMode } from './edit/editModel';
+import type { At } from './edit/BlockEdit';
 import { safeText } from '../library/safeText';
 import { useDocTitle } from '../chat/useLabels';
 
@@ -37,6 +39,9 @@ export interface MapHandle {
   canvas(): HTMLCanvasElement | null;
   /** Lights a group (legend hover or focus) or none (null). */
   light(id: string | null): void;
+  /** The camera (centre and zoom), or null; `frame` shows everything, some blocks, some papers or an exact camera (saved views). */
+  camera(): { cx: number; cy: number; k: number } | null;
+  frame(f: { kind: 'fit' } | { kind: 'blocks'; ids: string[] } | { kind: 'docs'; ids: string[] } | { kind: 'camera'; cx: number; cy: number; k: number }): void;
   /** Lights an area of the legend (nodes with less than 20 % in it fade to 25 %) or none. */
   lightArea(area: number | null): void;
   /** Isolates an area (the others fade to 15 %) or releases it. */
@@ -83,9 +88,46 @@ interface Props {
   edgeMode?: EdgeMode;
   /** Where the minimap goes (the side column), shown only beyond 150 papers. */
   minimapSlot?: HTMLElement | null;
+  /** Papers selected beside `selected` (Ctrl+click, rectangle, Ctrl+A); empty: only `selected`. */
+  multi?: ReadonlySet<string>;
+  /** A gesture changed the selection: `ids` replace it, join it, or toggle in it; `capped`: the cap of 5000 cut the list. */
+  onSelectMany?(ids: string[], mode: SelectMode, capped?: boolean): void;
+  onClearMulti?(): void;
+  /** Editing the blocks by hand (section 20.3). */
+  edit?: EditState | null;
+  /** Papers dropped on a block (or "No value"): `removeFrom` = Shift at the release. */
+  onMove?(m: { docIds: string[]; to: string | null; from: string[]; removeFrom: boolean }): void;
+  /** "Move to..." for these papers, anchored at a point of the window. */
+  onMoveMenu?(docIds: string[], at: At): void;
+  /** The menu of a block (or its rename field), anchored at a point of the window. */
+  onBlockMenu?(blockId: string, at: At, step: 'menu' | 'rename'): void;
+  /** A drag from a selected paper in Automatic: the view moves and the pill says once why nothing was moved. */
+  onAutoNo?(): void;
+  /** Shift+click on another paper: the path from the selected one to it. */
+  onPath?(a: string, b: string): void;
+  extras?: CanvasExtras;
+  /** More entries for the menu of the card (Next to read, Find a bridge, Discover from here). */
+  paperItems?(docId: string): MenuItem[];
+  /** Announced to screen readers in `map-focus` (a move, the count of the selection). */
+  live?: string;
 }
 export interface BlocksProp {
   view: BlockView;
+  /** The blocks changed because of an edit by hand: the papers fly to their new cells and the view stays where it is. */
+  keep?: boolean;
+}
+
+/** What the canvas shows beside the blocks, from the gaps section (`useMapExtras`): ids, turned into cell indices for the drawing. The reading marks are the view's own `st`. */
+export interface CanvasExtras {
+  isolated?: ReadonlySet<string>;
+  pairLit?: readonly [number, number] | null;
+}
+
+/** How the family of the blocks can be edited: by hand (Topic, a root), not at all (Automatic is no tag), or not offered. */
+export interface EditState {
+  family: string;
+  editable: boolean;
+  auto: boolean;
 }
 
 const OPEN_MAX = 600;
@@ -105,12 +147,12 @@ function BridgePick({ docId, onCancel }: { docId: string; onCancel(): void }) {
 }
 
 /** Names the point the keyboard cursor is on for screen readers (the canvas itself has no children to focus). */
-function Announce({ docId, topic }: { docId: string; topic: string }) {
+function Announce({ docId, topic, message }: { docId: string | null; topic: string; message?: string | undefined }) {
   const { t } = useTranslation();
   const title = useDocTitle(docId);
   return (
     <span className="visually-hidden" aria-live="polite" data-testid="map-focus">
-      {t('network.announce.doc', { title: safeText(title ?? docId.slice(0, 8)), topic })}
+      {message ? message : docId ? t('network.announce.doc', { title: safeText(title ?? docId.slice(0, 8)), topic }) : ''}
     </span>
   );
 }
@@ -778,6 +820,8 @@ function FreeCanvas({ map, level, selected, onSelect, onRead, onExplore, onVicin
         focusLit.current = lit.current >= 0;
         view.requestDraw();
       },
+      camera: () => null,
+      frame: () => undefined,
       lightArea(area) {
         litArea.current = area ?? -1;
         view.requestDraw();
@@ -933,7 +977,9 @@ function papersInView(bv: BlockView, v: View, w: number, h: number): number[] {
  * The Map in blocks (D-498): one block per value of the family, each paper in its cell with its title, evidence edges only for the selected or
  * hovered paper (or the strongest, bundled between blocks). The same camera, card and keyboard as the free layout; nothing runs at rest.
  */
-function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, onSelect, onRead, onExplore, onVicinity, label, fitKey, handle, allow, minimap, minimapSlot, onBridge, onFindLinks }: Props & { blocks: BlocksProp }) {
+const NO_IDS: ReadonlySet<string> = new Set();
+
+function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, onSelect, onRead, onExplore, onVicinity, label, fitKey, handle, allow, minimap, minimapSlot, onBridge, onFindLinks, multi = NO_IDS, onSelectMany, onClearMulti, edit = null, onMove, onMoveMenu, onBlockMenu, onAutoNo, onPath, extras, paperItems, live }: Props & { blocks: BlocksProp }) {
   const { t } = useTranslation();
   const bv = blocks.view;
   const [hover, setHover, holdHover] = useRestingHover<{ idx: number; x: number; y: number }>(150, 250);
@@ -956,6 +1002,30 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
   selRef.current = selIdx;
   const allowRef = useRef(allow);
   allowRef.current = allow;
+  // The papers a gesture acts on: the multiple selection, else the one selected.
+  const selSet = useMemo<ReadonlySet<string>>(() => (multi.size > 0 ? multi : selected !== null ? new Set([selected]) : NO_IDS), [multi, selected]);
+  const selRef2 = useRef(selSet);
+  selRef2.current = selSet;
+  const multiIdx = useMemo(() => {
+    const out = new Set<number>();
+    for (const id of multi) {
+      const i = bv.index.get(id);
+      if (i !== undefined) out.add(i);
+    }
+    return out;
+  }, [multi, bv]);
+  // What `drawBlocks` is given beside the blocks: the reading marks and the isolated papers by cell, the multiple selection, then the drag (ghost, block under it).
+  const staticExtras = useMemo<BlocksExtras>(() => {
+    const out: BlocksExtras = {};
+    if (extras?.pairLit) out.pairLit = extras.pairLit;
+    if (extras?.isolated && extras.isolated.size > 0) out.isolated = new Set([...extras.isolated].flatMap((id) => bv.index.get(id) ?? []));
+    if (multiIdx.size > 0) out.multi = multiIdx;
+    return out;
+  }, [extras, bv, multiIdx]);
+  const dragRef = useRef<{ idx: number; over: number; valid: boolean; sx: number; sy: number } | null>(null);
+  const rectRef = useRef<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const edRef = useRef({ edit, onAutoNo });
+  edRef.current = { edit, onAutoNo };
   const adj = useMemo(() => adjacency(evidence), [evidence]);
   const central = useMemo(() => centralPapers(Float64Array.from(bv.ids, (id) => adj.get(id)?.length ?? 0), bv.block), [bv, adj]);
   const strong = useMemo(() => {
@@ -966,12 +1036,24 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
     const out = new Set<number>();
     if (selected !== null) for (const e of (adj.get(selected) ?? []).slice(0, 5)) out.add(bv.index.get(e.a === selected ? e.b : e.a) ?? -1);
     out.delete(-1);
+    // The papers of a multiple selection keep their labels.
+    for (const i of multiIdx) out.add(i);
     return out;
-  }, [selected, adj, bv]);
-  const stateRef = useRef({ adj, central, strong, neighbors, edgeMode, bv, selected });
-  stateRef.current = { adj, central, strong, neighbors, edgeMode, bv, selected };
+  }, [selected, adj, bv, multiIdx]);
+  const stateRef = useRef({ adj, central, strong, neighbors, edgeMode, bv, selected, staticExtras });
+  stateRef.current = { adj, central, strong, neighbors, edgeMode, bv, selected, staticExtras };
   const focusLit = useRef(false);
   const probeOut = useRef<{ labels: unknown[]; names: unknown[]; edges: EvEdge[]; bundles: number } | null>(null);
+
+  /** The ... over the name of a block (it appears while the pointer is over the name, and stays a moment so the pointer can reach it). */
+  const [nameBtn, setNameBtn] = useState<number | null>(null);
+  const nameTimer = useRef(0);
+  const showNameButton = (b: number): void => {
+    window.clearTimeout(nameTimer.current);
+    if (b >= 0 && onBlockMenu) setNameBtn(b);
+    else if (onBlockMenu) nameTimer.current = window.setTimeout(() => setNameBtn(null), 450);
+  };
+  useEffect(() => () => window.clearTimeout(nameTimer.current), []);
 
   const view = useCanvasView<number>({
     draw(ctx, w, h, v) {
@@ -989,7 +1071,19 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
       }
       const hoverId = hoverIdx.current >= 0 ? st.bv.ids[hoverIdx.current]! : null;
       const shown = st.edgeMode === 'strong' ? st.strong : { single: selectEdges(st.edgeMode, st.adj, [st.selected, hoverId]), bundles: [] };
-      const out = drawBlocks({ ctx, w, h, v, bv: st.bv, th, hover: hoverIdx.current, sel: selRef.current, cursor: cursor.current, lit: lit.current, edges: shown.single, bundles: shown.bundles, forced: st.neighbors, central: st.central, allow: allowRef.current, fly: flyRef.current, redraw: () => view.requestDraw() });
+      const d = dragRef.current;
+      const extrasNow: BlocksExtras = { ...st.staticExtras, ...(d ? { drop: d.over >= 0 ? { block: d.over, valid: d.valid } : null, ghost: { sx: d.sx, sy: d.sy, idx: d.idx, count: selRef2.current.has(st.bv.ids[d.idx]!) ? selRef2.current.size : 1 } } : {}) };
+      const frame: BlocksFrame = { ctx, w, h, v, bv: st.bv, th, hover: hoverIdx.current, sel: selRef.current, cursor: cursor.current, lit: lit.current, edges: shown.single, bundles: shown.bundles, forced: st.neighbors, central: st.central, allow: allowRef.current, fly: flyRef.current, redraw: () => view.requestDraw(), extras: extrasNow };
+      const out = drawBlocks(frame);
+      // The rectangle of a Ctrl+drag: a 1 px border and a light fill in the accent colour.
+      const rc = rectRef.current;
+      if (rc) {
+        ctx.fillStyle = withAlpha(th.accent, 0.08);
+        ctx.fillRect(Math.min(rc.x0, rc.x1), Math.min(rc.y0, rc.y1), Math.abs(rc.x1 - rc.x0), Math.abs(rc.y1 - rc.y0));
+        ctx.strokeStyle = th.accent;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(Math.min(rc.x0, rc.x1) + 0.5, Math.min(rc.y0, rc.y1) + 0.5, Math.abs(rc.x1 - rc.x0), Math.abs(rc.y1 - rc.y0));
+      }
       probeOut.current = { labels: out.labels, names: out.names, edges: shown.single, bundles: shown.bundles.length };
       const sig = `${out.labels.length}`;
       if (ctx.canvas.dataset['labels'] !== sig) ctx.canvas.dataset['labels'] = sig;
@@ -1024,8 +1118,56 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
       if (animating) view.requestDraw();
     },
     hit: (sx, sy, v, w, h) => hitBlocks(bv, toWorldX(v, sx, w), toWorldY(v, sy, h)),
+    edgeScroll: true,
+    dragStart(idx, wx, wy) {
+      const e = edRef.current;
+      const press = pressAction({ hit: idx, ids: bv.ids, selected: selRef2.current, family: e.edit?.family ?? '', mod: false });
+      if (press === 'auto-no') e.onAutoNo?.();
+      if (press !== 'drag') return false;
+      const { w, h } = view.size.current;
+      dragRef.current = { idx, over: -1, valid: false, sx: toScreenX(view.view.current, wx, w), sy: toScreenY(view.view.current, wy, h) };
+      return true;
+    },
+    dragMove(_idx, wx, wy) {
+      const d = dragRef.current;
+      if (!d) return;
+      const { w, h } = view.size.current;
+      const v = view.view.current;
+      d.sx = toScreenX(v, wx, w);
+      d.sy = toScreenY(v, wy, h);
+      d.over = blockAt(bv, wx, wy);
+      d.valid = canDropOn(bv, d.over, edRef.current.edit?.family ?? '');
+      if (view.canvas.current) view.canvas.current.style.cursor = d.valid ? 'grabbing' : 'not-allowed';
+    },
+    dragEnd(idx, end) {
+      const d = dragRef.current;
+      dragRef.current = null;
+      if (view.canvas.current) view.canvas.current.style.cursor = '';
+      view.requestDraw();
+      if (!d || end?.cancelled) return;
+      const out = dropOutcome({ bv, family: edRef.current.edit?.family ?? '', grabbed: idx, selected: selRef2.current, block: d.over });
+      if (out) onMove?.({ ...out, removeFrom: end?.shift === true });
+    },
+    rect: {
+      move(r) {
+        rectRef.current = r;
+        view.requestDraw();
+      },
+      end(r, add) {
+        rectRef.current = null;
+        const { w, h } = view.size.current;
+        const got = rectIds(bv, view.view.current, w, h, r);
+        onSelectMany?.(got.ids, add ? 'add' : 'replace', got.capped);
+        view.requestDraw();
+      },
+      cancel() {
+        rectRef.current = null;
+        view.requestDraw();
+      },
+    },
     onHover(idx, sx, sy) {
-      if (view.canvas.current) view.canvas.current.style.cursor = idx !== null && idx <= -2 ? 'pointer' : '';
+      if (view.canvas.current) view.canvas.current.style.cursor = idx !== null && idx <= -2 ? 'pointer' : idx !== null && idx >= 0 && edit?.editable && selSet.has(bv.ids[idx]!) ? 'grab' : '';
+      showNameButton(idx !== null && idx <= -2 ? -2 - idx : -1);
       if (idx !== null) focusLit.current = false;
       if (!focusLit.current) {
         const b = idx !== null && idx <= -2 ? -2 - idx : -1;
@@ -1040,7 +1182,11 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
       setHover(i < 0 ? null : { idx: i, x: sx, y: sy });
       view.requestDraw();
     },
-    onClick(idx) {
+    onClick(idx, shift, mod) {
+      if (mod) {
+        if (idx !== null && idx >= 0) onSelectMany?.([bv.ids[idx]!], 'toggle');
+        return;
+      }
       if (idx !== null && idx <= -2) {
         const b = -2 - idx;
         lit.current = lit.current === b && focusLit.current ? -1 : b;
@@ -1052,6 +1198,10 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
       if (s2 !== null) {
         setSecond(null);
         if (idx !== null && idx >= 0 && idx !== s2) onBridge?.(bv.ids[s2]!, bv.ids[idx]!);
+        return;
+      }
+      if (shift && idx !== null && idx >= 0 && selected !== null && selected !== bv.ids[idx] && onPath) {
+        onPath(selected, bv.ids[idx]!);
         return;
       }
       if (idx === null || idx < 0) {
@@ -1097,8 +1247,9 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
     focusLit.current = false;
     setHover(null);
     setFocused(null);
+    dragRef.current = null;
     if (first.current) first.current = false;
-    else view.fit(true);
+    else if (!blocks.keep) view.fit(true);
     view.requestDraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bv]);
@@ -1111,7 +1262,7 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
   useEffect(() => {
     view.requestDraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allow, selIdx, evidence, edgeMode]);
+  }, [allow, selIdx, evidence, edgeMode, staticExtras]);
 
   function startBridge(i: number): void {
     const a = bv.ids[i]!;
@@ -1132,6 +1283,71 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
       view.requestDraw();
     };
     const list = papersInView(bv, v, w, h);
+    // The keys of editing and selecting come before the map's own (M is `mode` there and does nothing on the blocks, D-531).
+    const key = editKey(e, { dragging: dragRef.current !== null || rectRef.current !== null, multi: multi.size > 0, cursor: cursor.current >= 0 }, isMod(e));
+    if (key) {
+      const cur = cursor.current >= 0 ? cursor.current : selRef.current;
+      const at = (i: number): At => {
+        const r = view.canvas.current?.getBoundingClientRect();
+        return { x: (r?.left ?? 0) + (i >= 0 ? toScreenX(v, dotX(bv, i), w) : w / 2), y: (r?.top ?? 0) + (i >= 0 ? toScreenY(v, dotY(bv, i), h) : h / 2) + 12 };
+      };
+      let handled = true;
+      switch (key.type) {
+        case 'cancel-drag':
+          view.cancelGesture();
+          dragRef.current = null;
+          rectRef.current = null;
+          view.requestDraw();
+          break;
+        case 'clear-multi':
+          onClearMulti?.();
+          break;
+        case 'select-all': {
+          const got = idsInView(bv, v, w, h);
+          onSelectMany?.(got.ids, 'replace', got.capped);
+          break;
+        }
+        case 'toggle':
+          onSelectMany?.([bv.ids[cursor.current]!], 'toggle');
+          break;
+        case 'extend': {
+          if (cur < 0 || !list.includes(cur)) break;
+          const sx = new Float64Array(bv.ids.length);
+          const sy = new Float64Array(bv.ids.length);
+          for (const i of list) {
+            sx[i] = toScreenX(v, dotX(bv, i), w);
+            sy[i] = toScreenY(v, dotY(bv, i), h);
+          }
+          const next = nearestInDirection(sx, sy, cur, key.dir, list);
+          if (next < 0) break;
+          setCursor(next);
+          onSelectMany?.([bv.ids[cur]!, bv.ids[next]!], 'add');
+          break;
+        }
+        case 'move-menu': {
+          const ids = actionIds(multi, selected, cursor.current >= 0 ? bv.ids[cursor.current]! : null);
+          if (ids.length === 0) {
+            handled = false;
+            break;
+          }
+          if (edit?.editable) onMoveMenu?.(ids, at(cur));
+          else if (edit?.auto) onAutoNo?.();
+          else handled = false;
+          break;
+        }
+        case 'rename':
+        case 'block-menu': {
+          const b = cur >= 0 ? bv.block[cur]! : lit.current;
+          if (b < 0 || !onBlockMenu) {
+            handled = false;
+            break;
+          }
+          onBlockMenu(bv.blocks[b]!.id, at(cur), key.type === 'rename' ? 'rename' : 'menu');
+          break;
+        }
+      }
+      if (handled) return e.preventDefault();
+    }
     if (e.key === ']' || e.key === '[') {
       const next = stepPoint(list, cursor.current >= 0 ? cursor.current : selRef.current, e.key === ']');
       if (next < 0) return;
@@ -1228,6 +1444,31 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
         focusLit.current = lit.current >= 0;
         view.requestDraw();
       },
+      camera: () => ({ ...view.view.current }),
+      frame(f) {
+        const { w, h } = view.size.current;
+        if (f.kind === 'fit') return view.fit(true);
+        if (f.kind === 'camera') return view.flyTo(f.cx, f.cy, f.k);
+        // Blocks or papers: the rectangle that holds them, framed with a margin.
+        let x0 = Infinity;
+        let y0 = Infinity;
+        let x1 = -Infinity;
+        let y1 = -Infinity;
+        const grow = (ax: number, ay: number, bx: number, by: number) => {
+          x0 = Math.min(x0, ax);
+          y0 = Math.min(y0, ay);
+          x1 = Math.max(x1, bx);
+          y1 = Math.max(y1, by);
+        };
+        if (f.kind === 'blocks') for (const k of bv.blocks) if (f.ids.includes(k.id)) grow(k.x, k.y, k.x + k.w, k.y + k.h);
+        if (f.kind === 'docs') for (const id of f.ids) {
+          const i = bv.index.get(id);
+          if (i !== undefined) grow(dotX(bv, i) - 80, dotY(bv, i) - 40, dotX(bv, i) + 80, dotY(bv, i) + 40);
+        }
+        if (x1 < x0) return view.fit(true);
+        const target = blockView({ ...bv.blocks[0]!, x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, w || 800, h || 600);
+        view.flyTo(target.cx, target.cy, target.k);
+      },
       lightArea() {},
       isolateArea() {},
       flyToDoc(docId) {
@@ -1297,10 +1538,39 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
         aria-label={label}
         data-testid="map-canvas"
         data-points={bv.ids.length}
+        data-selected={selSet.size}
         {...view.handlers}
         onKeyDown={onKeyDown}
+        onContextMenu={(e) => {
+          if (!onBlockMenu) return;
+          const r = e.currentTarget.getBoundingClientRect();
+          const { w, h } = view.size.current;
+          const at = hitBlocks(bv, toWorldX(view.view.current, e.clientX - r.left, w), toWorldY(view.view.current, e.clientY - r.top, h));
+          if (at > -2) return;
+          e.preventDefault();
+          onBlockMenu(bv.blocks[-2 - at]!.id, { x: e.clientX, y: e.clientY }, 'menu');
+        }}
       />
-      {focused !== null && <Announce docId={bv.ids[focused]!} topic={bv.blocks[bv.block[focused]!]?.label ?? ''} />}
+      {nameBtn !== null && bv.blocks[nameBtn] && onBlockMenu && (
+        <button
+          type="button"
+          className="icon-button map-block-more"
+          style={{ left: Math.min(Math.max(toScreenX(view.view.current, bv.blocks[nameBtn]!.x + bv.blocks[nameBtn]!.w, view.size.current.w) - 34, 4), view.size.current.w - 30), top: Math.min(Math.max(toScreenY(view.view.current, bv.blocks[nameBtn]!.y, view.size.current.h) + 4, 4), view.size.current.h - 30) }}
+          aria-haspopup="menu"
+          aria-label={t('mapEdit.blockMenu', { name: bv.blocks[nameBtn]!.label })}
+          title={t('mapEdit.blockMenu', { name: bv.blocks[nameBtn]!.label })}
+          onMouseEnter={() => window.clearTimeout(nameTimer.current)}
+          onMouseLeave={() => showNameButton(-1)}
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            onBlockMenu(bv.blocks[nameBtn]!.id, { x: r.left, y: r.bottom }, 'menu');
+          }}
+          data-testid="map-block-more"
+        >
+          <span aria-hidden="true">⋯</span>
+        </button>
+      )}
+      <Announce docId={focused !== null ? bv.ids[focused]! : null} topic={focused !== null ? (bv.blocks[bv.block[focused]!]?.label ?? '') : ''} message={live} />
       {hover && (
         <HoverCard x={hover.x} y={hover.y} width={view.size.current.w} height={view.size.current.h} testId="map-tooltip" live={onBridge ? { label: t('network.card.actions'), onEnter: () => holdHover(true), onLeave: () => menuFor === null && holdHover(false) } : undefined}>
           <DocCard docId={bv.ids[hover.idx]!} topic={hoverBlock} />
@@ -1319,7 +1589,33 @@ function BlocksCanvas({ blocks, evidence = [], edgeMode = 'selected', selected, 
           setMenuFor(null);
           holdHover(false);
         }}
-        groups={[{ id: 'doc', items: [{ id: 'bridge', testId: 'map-card-bridge', label: t('network.bridge.find'), onSelect: () => menuFor !== null && startBridge(menuFor) }, ...(onFindLinks ? [{ id: 'links', testId: 'map-card-links', label: t('network.edge.findLinks'), onSelect: () => menuFor !== null && onFindLinks(bv.ids[menuFor]!) }] : [])] }]}
+        groups={[
+          {
+            id: 'doc',
+            items: [
+              { id: 'bridge', testId: 'map-card-bridge', label: t('network.bridge.find'), onSelect: () => menuFor !== null && startBridge(menuFor) },
+              ...(onFindLinks ? [{ id: 'links', testId: 'map-card-links', label: t('network.edge.findLinks'), onSelect: () => menuFor !== null && onFindLinks(bv.ids[menuFor]!) }] : []),
+              ...(onMoveMenu
+                ? [
+                    edit?.editable
+                      ? {
+                          id: 'move',
+                          testId: 'map-card-move',
+                          label: t('mapEdit.moveTo'),
+                          onSelect: () => {
+                            if (menuFor === null) return;
+                            const r = moreBtn.current?.getBoundingClientRect();
+                            const id = bv.ids[menuFor]!;
+                            onMoveMenu(selSet.has(id) ? [...selSet] : [id], { x: r?.left ?? 0, y: r?.bottom ?? 0 });
+                          },
+                        }
+                      : { id: 'move', testId: 'map-card-move', label: t('mapEdit.moveTo'), onSelect: () => undefined, disabled: true as const, disabledReason: edit?.auto ? t('mapEdit.autoNo') : t('mapEdit.moveOnly') },
+                  ]
+                : []),
+              ...(menuFor !== null && paperItems ? paperItems(bv.ids[menuFor]!) : []),
+            ],
+          },
+        ]}
       />
       {second !== null && <BridgePick docId={bv.ids[second]!} onCancel={() => setSecond(null)} />}
       {minimapSlot && minimap && bv.ids.length > 150 && createPortal(<MiniMap bounds={bv.bounds} view={view.view} size={view.size} hooks={view.hooks} paint={paintMini} onMove={(x, y) => view.jump({ ...view.view.current, cx: x, cy: y })} label={t('network.minimapLabel')} version={bv} />, minimapSlot)}

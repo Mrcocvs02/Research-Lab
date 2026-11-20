@@ -70,6 +70,7 @@ export const PALETTE_ACTIONS = [
   { id: 'manageTags', group: 'goto', shortcut: 'tags.manage' },
   { id: 'tidyTags', group: 'goto' },
   { id: 'reviewTags', group: 'goto' },
+  { id: 'macroPropose', group: 'goto' },
   { id: 'openActivity', group: 'goto' },
   { id: 'scanNow', group: 'actions' },
   { id: 'backupNow', group: 'actions' },

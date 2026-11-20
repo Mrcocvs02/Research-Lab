@@ -280,7 +280,10 @@
         "many": "Allow many values",
         "topic": "Put under Topic"
       },
-      "acceptAll": "Accept all ({{count}})"
+      "acceptAll": "Accept all ({{count}})",
+      "macro": "Suggest macro-areas",
+      "macroApplied_one": "Macro-areas changed ({{count}} move)",
+      "macroApplied_other": "Macro-areas changed ({{count}} moves)"
     },
     "board": {
       "unsorted": "To sort ({{count}})",

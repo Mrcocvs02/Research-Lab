@@ -1,4 +1,5 @@
 import { openTagManager } from '../../lib/libraryIntent';
+import { setMapIntent } from '../../lib/mapIntent';
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ShortcutId } from '@rl/core';
@@ -114,7 +115,7 @@ export function Palette({ onClose }: { onClose(): void }) {
     const reason = (id: PaletteActionId): string | undefined => {
       if (id === 'undo') return !hasLibrary ? noLibrary : history.canUndo ? undefined : t('history.nothingToUndo');
       if (id === 'redo') return !hasLibrary ? noLibrary : history.canRedo ? undefined : t('history.nothingToRedo');
-      if (['scanNow', 'backupNow', 'addPdf', 'addFromId', 'addResource', 'goReview', 'goProjects', 'goDiscover', 'goMap', 'manageTags', 'tidyTags', 'reviewTags'].includes(id) && !hasLibrary) return noLibrary;
+      if (['scanNow', 'backupNow', 'addPdf', 'addFromId', 'addResource', 'goReview', 'goProjects', 'goDiscover', 'goMap', 'manageTags', 'tidyTags', 'reviewTags', 'macroPropose'].includes(id) && !hasLibrary) return noLibrary;
       return undefined;
     };
     const actions: Item[] = PALETTE_ACTIONS.filter((a) => a.id !== 'resume' || resume !== null).map((a) => ({
@@ -162,6 +163,9 @@ export function Palette({ onClose }: { onClose(): void }) {
         return openTagManager(() => goTo('library'), 'cleanup');
       case 'reviewTags':
         return openTagManager(() => goTo('library'), 'review');
+      case 'macroPropose':
+        setMapIntent({ macro: true });
+        return goTo('network');
       case 'openActivity':
         return setActivityOpen(true);
       case 'scanNow':

@@ -108,6 +108,9 @@
       },
       "reviewTags": {
         "label": "Proposte da rivedere"
+      },
+      "macroPropose": {
+        "label": "Proponi macro-aree"
       }
     },
     "paletteGroups": {

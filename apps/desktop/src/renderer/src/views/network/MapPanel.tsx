@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channels, RequestOf } from '@rl/core';
 import { EmptyState } from '../../components/EmptyState';
@@ -6,6 +6,8 @@ import { Menu } from '../../components/Menu';
 import { Lazy, lazyView } from '../../components/Lazy';
 import { ErrorNote } from '../../components/ui';
 import { useNotify } from '../../lib/notify';
+import { useChangeVersion, useLibraryEvents } from '../../lib/events';
+import { useApp } from '../../state/app-context';
 import { errorMessage } from '../../lib/errors';
 import { useAiUi } from '../../lib/aiUi';
 import { setDiscoverIntent } from '../../lib/discoverIntent';
@@ -23,7 +25,7 @@ import { GroupBy, NameFamilyButton, NameFamilyDialog } from './GroupBy';
 import { buildBlockView, type FamilyResponse } from './blocksDraw';
 import { filterKinds, type EdgeMode, type EvEdge, type EvFilter } from './edges';
 import { MapSide, MapStrip, useWide, type EvidenceControls, type SideBlock, type Strictness } from './MapSide';
-import { NONE_FAMILY, useFamilies, useFamily, useFamilyRev } from './grouping';
+import { bumpFamilyNames, clearShare, familyLabel, NONE_FAMILY, useFamilies, useFamily, useFamilyRev } from './grouping';
 import { areaFallback, assignAreaSlots, loadAreaMemo, saveAreaMemo } from './areaColors';
 import { adjacencyOf, assignTints, type TintMemo } from './colors';
 import { rng } from './playful';
@@ -35,6 +37,15 @@ import { useTimeline } from './timeline';
 import type { ScopeOptions } from './useScopes';
 import type { GraphStatus } from './useGraphModel';
 
+import './edit/edit.css';
+import { actionIds, blockIds, combineSelection, editableFamily, summarizeMove, type SelectMode } from './edit/editModel';
+import { useMapExtras, type ViewBridge } from './mapExtras';
+import type { At } from './edit/BlockEdit';
+
+const BlockMenu = lazyView(() => import('./edit/BlockEdit').then((m) => ({ default: m.BlockMenu })), ['mapEdit']);
+const MoveMenu = lazyView(() => import('./edit/BlockEdit').then((m) => ({ default: m.MoveMenu })), ['mapEdit']);
+const MapSelectionBar = lazyView(() => import('./edit/MapSelectionBar'), ['mapEdit', 'addToProject', 'projects', 'doc']);
+const MacroAreas = lazyView(() => import('./edit/MacroAreas'), ['pack']);
 const LabelsDialog = lazyView(() => import('./LabelsDialog').then((m) => ({ default: m.LabelsDialog })), ['network']);
 const LinkFinderDialog = lazyView(() => import('../links/LinkFinderDialog').then((m) => ({ default: m.LinkFinderDialog })), ['links']);
 
@@ -59,10 +70,25 @@ interface Props {
   onInfo?(i: { topics: number } | null): void;
   /** "Show on the map" from the unexpected neighbours: the same highlight as the surprise. */
   highlight?: { a: string; b: string; terms: string[]; nonce: number } | null;
+  /** Shift+click on a paper: the path from the selected one (section 19.2.5). */
+  onPath?(a: string, b: string): void;
+  /** What another view asked of the Map (`mapIntent`): the macro-areas dialog, papers to select, "Move to..." for a paper. */
+  request?: { macro?: boolean; select?: string[]; move?: string[]; nonce: number } | null;
 }
 
+const NO_IDS: ReadonlySet<string> = new Set();
+const MACRO_OFF = 'rl.map.macroPillOff';
+const readOff = (): string[] => {
+  try {
+    const v: unknown = JSON.parse(window.localStorage.getItem(MACRO_OFF) ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
 /** The map tab: scope, level, the canvas, the legend of clusters and the labels by Claude. */
-export function MapPanel({ active, status, mapVersion, scopes, selected, onSelect, onMapChanged, onRead, onExplore, onVicinity, onBuild, onInfo, highlight, light }: Props) {
+export function MapPanel({ active, status, mapVersion, scopes, selected, onSelect: onSelectRaw, onMapChanged, onRead, onExplore, onVicinity, onBuild, onInfo, highlight, light, onPath, request }: Props) {
   const { t } = useTranslation();
   const { openExport } = useAiUi();
   const [kind, setKind] = useState<ScopeKind>('all');
@@ -88,6 +114,46 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const [surprise, setSurprise] = useState<{ terms: string[] } | null>(null);
   const rand = useRef(rng(Date.now() & 0xffff));
   const nav = useNav();
+  const { info, fail, reportError } = useNotify();
+  const { invalidate, invalidateAll } = useLibraryEvents();
+  const app = useApp();
+  // Selection beyond one paper (D-524): the set, and whether the cap of 5000 cut it.
+  const [multi, setMulti] = useState<ReadonlySet<string>>(NO_IDS);
+  const [capped, setCapped] = useState(false);
+  const [live, setLive] = useState('');
+  const [moveFor, setMoveFor0] = useState<{ docIds: string[]; at: At } | null>(null);
+  const [blockFor, setBlockFor0] = useState<{ id: string; at: At; step: 'menu' | 'rename' } | null>(null);
+  // The menus remember where the focus was and give it back when they close (a menu opened from the keyboard returns to the canvas, one from the side list to its button).
+  const back = useRef<HTMLElement | null>(null);
+  const setMoveFor = (v: { docIds: string[]; at: At } | null) => {
+    if (v) back.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setMoveFor0(v);
+  };
+  const setBlockFor = (v: { id: string; at: At; step: 'menu' | 'rename' } | null) => {
+    if (v) back.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setBlockFor0(v);
+  };
+  const giveBack = () => {
+    const el = back.current;
+    back.current = null;
+    window.setTimeout(() => el?.isConnected && el.focus(), 0);
+  };
+  const [macroOpen, setMacroOpen] = useState(false);
+  const [autoNo, setAutoNo] = useState(false);
+  const autoNoSeen = useRef(false);
+  const [famKind, setFamKind] = useState<'one' | 'many' | null>(null);
+  /** Set by an edit: the blocks that come back keep the view (the papers fly to their new cells) instead of fitting it again. */
+  const keepNext = useRef(false);
+  const [keep, setKeep] = useState(false);
+  const docVersion = useChangeVersion('documents');
+  const taxVersion = useChangeVersion('taxonomy');
+  const [macroOff, setMacroOff] = useState<string[]>(readOff);
+  /** A plain click or a pick of the search: one paper selected, the multiple selection gone. */
+  const onSelect = (id: string | null) => {
+    setMulti(NO_IDS);
+    setCapped(false);
+    onSelectRaw(id);
+  };
   // "Tidy the tags" opens the guided cleanup of the vocabulary, not the Settings (D-508).
   const tidyTags = () => {
     setLibraryIntent({ cleanup: true });
@@ -141,6 +207,8 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     rl.invoke('graph:family', { family: effective, ...(scope ? { scope } : {}), aspect }).then(
       (r) => {
         if (!live) return;
+        setKeep(keepNext.current);
+        keepNext.current = false;
         setFam(r);
       },
       () => live && setFam(null),
@@ -148,9 +216,10 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     return () => {
       live = false;
     };
-  }, [usable, effective, scope, aspect, !!rawMap, famRev, mapVersion, status.documents, status.pending, status.builtAt]);
+  }, [usable, effective, scope, aspect, !!rawMap, famRev, mapVersion, status.documents, status.pending, status.builtAt, docVersion, taxVersion]);
   const blocksView = useMemo(() => (fam?.blocks && !freeMode ? buildBlockView(fam.items, fam.blocks) : null), [fam, freeMode]);
-  const blocks = blocksView && blocksView.ids.length > 0 ? { view: blocksView } : null;
+  const blocks = blocksView && blocksView.ids.length > 0 ? { view: blocksView, keep } : null;
+  const editable = !!effective && editableFamily(effective) && !!blocksView;
   // Evidence between papers (D-499): the threshold of the library and at most 5 edges per paper; the chips and the mode choose what is drawn.
   const [edgeMode, setEdgeMode] = useChoice<EdgeMode>('rl.map.edges', 'selected', ['selected', 'strong', 'none']);
   const [strict, setStrict] = useChoice<Strictness>('rl.map.strict', 'normal', ['strict', 'normal', 'wide']);
@@ -171,6 +240,145 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   }, [usable, scope, strict, mapVersion, status.documents, status.pending, status.builtAt]);
   const kinds = useMemo<EvFilter>(() => ({ cites: kCites, linked: kLinked, similar: kSimilar }), [kCites, kLinked, kSimilar]);
   const edges = useMemo(() => filterKinds(evidence?.edges ?? [], kinds), [evidence, kinds]);
+
+  // ---- Editing and selecting by hand (sections 20.2.3, 20.3, 20.4) ----
+  // Whether a family of roots has one value or several (the notice after a move and the box "Remove the old value" depend on it).
+  useEffect(() => {
+    if (!effective?.startsWith('root:')) return setFamKind(null);
+    let live = true;
+    rl.invoke('taxonomy:get', {}).then(
+      (v) => live && setFamKind(v.nodes.find((n) => n.id === effective.slice(5))?.family === 'one' ? 'one' : 'many'),
+      () => live && setFamKind(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [effective, taxVersion]);
+  const many = effective === 'topic' || famKind === 'many';
+  // The selection belongs to the papers of this scope and family.
+  useEffect(() => {
+    setMulti(NO_IDS);
+    setCapped(false);
+  }, [scope, effective]);
+  /** A gesture changed the selection: the set after it, the focus (the last paper clicked) and the count said to screen readers. */
+  const select = (ids: string[], mode: SelectMode, cut = false) => {
+    const cur = multi.size > 0 ? multi : selected !== null ? new Set([selected]) : NO_IDS;
+    const r = combineSelection(cur, ids, mode);
+    setCapped(cut || r.capped);
+    if (r.set.size <= 1) {
+      setMulti(NO_IDS);
+      onSelectRaw([...r.set][0] ?? null);
+    } else {
+      setMulti(r.set);
+      const last = ids[ids.length - 1];
+      onSelectRaw(mode !== 'replace' && last !== undefined && r.set.has(last) ? last : selected !== null && r.set.has(selected) ? selected : null);
+    }
+    setLive(t('mapSel.count', { count: r.set.size }));
+  };
+  const clearMulti = () => {
+    setMulti(NO_IDS);
+    setCapped(false);
+    setLive(t('mapSel.cleared'));
+  };
+  const multiIds = useMemo(() => [...multi], [multi]);
+  const undoChange = useCallback(
+    async (changeId: string) => {
+      try {
+        keepNext.current = true;
+        const r = await rl.invoke('history:undo', { changeId });
+        info(t('history.undone', { summary: r.summary }));
+        invalidateAll();
+        bumpFamilyNames();
+      } catch (e) {
+        keepNext.current = false;
+        reportError(e);
+      }
+    },
+    [info, invalidateAll, reportError, t],
+  );
+  const undoAction = (changeId: string | null | undefined) => (changeId ? [{ label: t('mapEdit.undo'), run: () => void undoChange(changeId) }] : []);
+  /** Papers into a block (or "No value"): one change, a notice that says what stays and offers to take the old value off. */
+  const move = async (m: { docIds: string[]; to: string | null; from: string[]; removeFrom?: boolean }): Promise<void> => {
+    if (!effective || !blocksView) return;
+    const named = (id: string | null): string => {
+      const b = blocksView.blocks.find((x) => (id === null ? x.none : x.id === id));
+      return !b || b.none ? t('mapEdit.noValue') : b.label;
+    };
+    keepNext.current = true;
+    try {
+      const r = await rl.invoke('mapEdit:move', { family: effective, docIds: m.docIds, to: m.to, ...(m.removeFrom ? { removeFrom: true } : {}), ...(scope ? { scope } : {}) });
+      invalidate('documents');
+      bumpFamilyNames();
+      if (r.changed === 0) {
+        keepNext.current = false;
+        return;
+      }
+      const sum = summarizeMove({ many, removeFrom: !!m.removeFrom, n: r.changed, already: r.already, to: safeText(named(m.to)), fromLabels: m.from.map((id) => safeText(named(id))) });
+      const text = t(`mapEdit.${sum.key}`, { to: sum.to, from: sum.from ?? '', n: sum.n }) + (r.removed.length > 0 ? ` · ${t('mapEdit.alsoRemoved', { names: r.removed.map(safeText).join(', ') })}` : '');
+      const again = sum.offerRemove && r.changeId ? [{ label: sum.from ? t('mapEdit.alsoRemove', { from: sum.from }) : t('mapEdit.alsoRemoveMany'), run: () => void undoChange(r.changeId!).then(() => move({ ...m, removeFrom: true })) }] : [];
+      info(text, [...again, ...undoAction(r.changeId)]);
+      setLive(text);
+    } catch {
+      keepNext.current = false;
+      fail(t('mapEdit.moveFailed'));
+    }
+  };
+  /** "Move to..." picked a block for these papers. */
+  const moveTo = (docIds: string[], to: string | null, removeFrom: boolean) => {
+    if (!blocksView) return;
+    const ids: string[] = [];
+    const from: string[] = [];
+    for (const id of docIds) {
+      const i = blocksView.index.get(id);
+      const b = i === undefined ? undefined : blocksView.blocks[blocksView.block[i]!];
+      if (!b || (to === null ? b.none : b.id === to)) continue;
+      ids.push(id);
+      from.push(b.id);
+    }
+    if (ids.length > 0) void move({ docIds: ids, to, from, removeFrom });
+  };
+  const showAutoNo = () => {
+    if (autoNoSeen.current) return;
+    autoNoSeen.current = true;
+    setAutoNo(true);
+  };
+  const toLibrary = (docIds: string[]) => {
+    setLibraryIntent({ docIds });
+    nav.navigate({ view: 'library' });
+  };
+
+  // What a saved view reads and writes of this panel: the filters, the scope and the camera.
+  const viewBridge: ViewBridge = {
+    read: () => ({ years, kinds: (['cites', 'linked', 'similar'] as const).filter((k) => kinds[k]), strictness: strict, edgeMode, camera: handle.current?.camera() ?? null, size: stage.current ? { w: stage.current.clientWidth, h: stage.current.clientHeight } : null }),
+    write: (v) => {
+      const s0 = v.scope;
+      setKind(s0?.folder !== undefined ? 'folder' : s0?.projectId !== undefined ? 'project' : s0?.tagId !== undefined ? 'tag' : 'all');
+      setValue(s0?.folder ?? s0?.projectId ?? s0?.tagId ?? '');
+      setYears(v.years);
+      setKCites(v.kinds.includes('cites'));
+      setKLinked(v.kinds.includes('linked'));
+      setKSimilar(v.kinds.includes('similar'));
+      setStrict(v.strictness);
+      setEdgeMode(v.edgeMode);
+    },
+    frame: (f) => handle.current?.frame(f),
+  };
+  // Evidence goes in unfiltered by the chips (isolation counts every kind); a saved view opened by the extras changes the family and the selection through the same callbacks as a click, so Back and Forward record it.
+  const extras = useMapExtras({ blocks: blocksView, evidence, selected, multi, family: effective ?? NONE_FAMILY, scope, onFly: (id) => handle.current?.flyToDoc(id), onSelect: (id) => onSelect(id), onSelectMany: (ids) => select(ids, 'replace'), bridge: viewBridge, familyName: familyLabel(t, families.find((f) => f.id === effective) ?? { id: effective ?? '', label: effective ?? '' }), active });
+
+  // What another view asked for (the intent mailbox, read by NetworkView): papers to select, the dialog, "Move to..." for a paper.
+  const lastRequest = useRef(0);
+  useEffect(() => {
+    if (!request || request.nonce === lastRequest.current || !rawMap) return;
+    lastRequest.current = request.nonce;
+    if (request.select) select(request.select.filter((id) => rawMap.indexOf.has(id)).slice(0, 5000), 'replace');
+    if (request.macro) setMacroOpen(true);
+    if (request.move && request.move.length > 0) {
+      const r = stage.current?.getBoundingClientRect();
+      setMoveFor({ docIds: request.move, at: { x: (r?.left ?? 0) + (r?.width ?? 0) / 2, y: (r?.top ?? 0) + 80 } });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request, rawMap]);
   // Colour by macro-area (D-483): with no area, one area, or colouring switched off, the topics colour the points.
   const fallback = useMemo(() => (map ? areaFallback(map.areas, map.withArea, map.n) : { use: 'topics' as const, reason: 'none' as const }), [map]);
   const areaSlots = useMemo(() => {
@@ -225,7 +433,6 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
 
   const scopeValues = kind === 'folder' ? scopes.folders.map((f) => ({ id: f, label: f || '/' })) : kind === 'project' ? scopes.projects.map((p) => ({ id: p.id, label: p.name })) : kind === 'tag' ? scopes.tags : [];
   const chrome = useContext(ChromeCtx);
-  const { info } = useNotify();
   const [hint, dismissHint] = useHint(active && !!map && map.n >= 3);
   const [legendFor, setLegendFor] = useState<{ id: string; text: string } | null>(null);
   const legendAnchor = useRef<HTMLElement | null>(null);
@@ -272,11 +479,40 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     );
   };
 
+  // The filters of the years and of the timeline, and the ones of the reading section: a paper must pass all of them.
+  const baseAllow = tl.only ?? allow;
+  const mapAllow = useMemo<ReadonlySet<string> | null>(() => (extras.allow ? (baseAllow ? new Set([...baseAllow].filter((id) => extras.allow!.has(id))) : extras.allow) : baseAllow), [baseAllow, extras.allow]);
+  // The macro-areas pill (D-520): the family chosen (Topic when the groups are automatic) groups clearly less than 70 % of the papers.
+  const macroTarget = editableFamily(family) ? family : family === 'auto' ? 'topic' : null;
+  const macroInfo = macroTarget ? families.find((f) => f.id === macroTarget) : undefined;
+  const offKey = `${app.activeProfile?.id ?? ''}|${macroTarget ?? ''}`;
+  const macroPill = !freeMode && macroInfo?.reason && macroInfo.reason.values >= 2 && clearShare(macroInfo) < 70 && !macroOff.includes(offKey) ? { family: familyLabel(t, macroInfo), pct: clearShare(macroInfo) } : null;
+  const hideMacro = () => {
+    const next = [...macroOff, offKey];
+    setMacroOff(next);
+    try {
+      window.localStorage.setItem(MACRO_OFF, JSON.stringify(next.slice(-50)));
+    } catch {
+      /* storage unavailable: the pill stays hidden until the next load */
+    }
+  };
+  useEffect(() => {
+    if (!autoNo) return;
+    const id = window.setTimeout(() => setAutoNo(false), 7000);
+    return () => window.clearTimeout(id);
+  }, [autoNo]);
+
   // One pill at a time: the choice of a bridge, the bridge, the surprise, the filters, the cap, the first-use hint.
   const shownCount = allow && map ? [...allow].filter((id) => map.indexOf.has(id)).length : 0;
   let pill: React.ReactNode = null;
   if (map && !tooFew) {
-    if (bridge) {
+    if (autoNo) {
+      pill = (
+        <Pill testId="map-auto-no" onClose={() => setAutoNo(false)}>
+          {t('mapEdit.autoNo')}
+        </Pill>
+      );
+    } else if (bridge) {
       pill = (
         <Pill testId="map-bridge-note" onClose={() => setBridge(null)}>
           {t('network.bridge.note', { a: safeText(bridge.nodes[0].title), b: safeText(bridge.nodes[2].title) })}
@@ -307,6 +543,15 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
       pill = <Pill testId="map-omitted">{t('network.mapOmitted', { count: map.omitted, shown: map.n })}</Pill>;
     } else if (hint) {
       pill = <Pill testId="map-hint">{t('network.blocks.hint')}</Pill>;
+    } else if (macroPill) {
+      pill = (
+        <Pill testId="map-macro-pill" onClose={hideMacro}>
+          {t('mapEdit.macroPill', macroPill)}{' '}
+          <button type="button" className="link" onClick={() => setMacroOpen(true)} data-testid="map-macro-propose">
+            {t('mapEdit.macroPropose')}
+          </button>
+        </Pill>
+      );
     } else if (byArea && fallback.use === 'topics') {
       pill = (
         <Pill testId="map-color-note">
@@ -372,6 +617,42 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const shown = !freeMode && blocks ? blocks.view.ids.length : (map?.n ?? 0);
   const controls: EvidenceControls = { mode: edgeMode, setMode: setEdgeMode, kinds, setKind: (k, on) => (k === 'cites' ? setKCites(on) : k === 'linked' ? setKLinked(on) : setKSimilar(on)), strict, setStrict, tau: evidence?.tau ?? null };
   const noMapReason = t('network.noMapTitle');
+  // The blocks "Move to..." offers: every block but "Other", and "No value" even when no paper is in it yet.
+  const menuBlocks = useMemo(() => {
+    const all = blocksView?.blocks ?? [];
+    return all.some((b) => b.none) ? all : [...all, { id: '__none', label: '', count: 0, x: 0, y: 0, w: 0, h: 0, sub: [], none: true, other: false, tint: 8 }];
+  }, [blocksView]);
+  const selbar =
+    multi.size >= 2 && !freeMode ? (
+      <Lazy>
+        <MapSelectionBar
+          ids={multiIds}
+          capped={capped}
+          wide={wide}
+          canMove={editable}
+          moveReason={effective === 'auto' ? t('mapEdit.autoNo') : t('mapEdit.moveOnly')}
+          onClear={clearMulti}
+          onMove={(at) => setMoveFor({ docIds: multiIds, at })}
+          onLibrary={() => toLibrary(multiIds)}
+          onNext={() => extras.nextToRead(multiIds)}
+        />
+      </Lazy>
+    ) : null;
+  /** F2 and the Menu key on a block of the list or of the strip open the menu of the block, like the right click. */
+  const blockOf = (el: EventTarget | null): string | null => (el instanceof Element ? (el.closest<HTMLElement>('[data-testid="map-block"]')?.dataset['value'] ?? null) : null);
+  const onBlockKey = (e: React.KeyboardEvent) => {
+    const id = blockOf(e.target);
+    if (id === null || !(e.key === 'F2' || e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey))) return;
+    const r = (e.target as HTMLElement).getBoundingClientRect();
+    e.preventDefault();
+    setBlockFor({ id, at: { x: r.left, y: r.bottom }, step: e.key === 'F2' ? 'rename' : 'menu' });
+  };
+  const onBlockContext = (e: React.MouseEvent) => {
+    const id = blockOf(e.target);
+    if (id === null) return;
+    e.preventDefault();
+    setBlockFor({ id, at: { x: e.clientX, y: e.clientY }, step: 'menu' });
+  };
   return (
     <div className="net-tab map-tab" data-testid="map-panel">
       {stripNaming && !wide && <NameFamilyDialog scope={scope} onClose={() => setStripNaming(false)} />}
@@ -452,6 +733,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
                 ))}
               </select>
             </label>
+            {extras.filterRows}
           </div>
         </ChipPop>
         <span className="map-actions">
@@ -488,6 +770,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
                 onSelect: () => void copyCanvasImage(handle.current?.canvas() ?? null).then((ok) => info(ok ? t('network.imageCopied') : t('network.imageFailed'))),
               },
               map && depth > 0 ? { id: 'labels', label: `✦ ${t('network.labels.open')}`, testId: 'map-label-clusters', onSelect: () => setLabelsOpen(true) } : { id: 'labels', label: `✦ ${t('network.labels.open')}`, testId: 'map-label-clusters', onSelect: () => undefined, disabled: true, disabledReason: noMapReason },
+              ...extras.moreItems,
             ],
           },
         ]}
@@ -525,9 +808,9 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
         </EmptyState>
       )}
       {map && !tooFew && (
-        <div className={wide ? 'map-body has-side' : 'map-body'}>
+        <div className={wide ? 'map-body has-side' : 'map-body'} onKeyDown={onBlockKey} onContextMenu={onBlockContext}>
           <div className="map-stage" ref={stage}>
-            {!wide && <MapStrip blocks={sideBlocks} legend={legend} controls={controls} count={shown} extra={family === 'auto' ? <NameFamilyButton onClick={() => setStripNaming(true)} /> : undefined} onLight={(id) => handle.current?.light(id)} onFly={(id) => handle.current?.focusCluster(id)} />}
+            {!wide && (selbar ?? <MapStrip blocks={sideBlocks} legend={legend} controls={controls} count={shown} extra={family === 'auto' || extras.sideSections ? <>{family === 'auto' ? <NameFamilyButton onClick={() => setStripNaming(true)} /> : null}{extras.sideSections}</> : undefined} onLight={(id) => handle.current?.light(id)} onFly={(id) => handle.current?.focusCluster(id)} />)}
             {pill && <div className="map-notes">{pill}</div>}
             {!freeMode && !blocks && !fam ? (
               <div className="map-wrap map-loading" role="status" data-testid="map-blocks-loading">
@@ -542,12 +825,24 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
                   dismissHint();
                   onSelect(id);
                 }}
+                multi={multi}
+                onSelectMany={select}
+                onClearMulti={clearMulti}
+                edit={freeMode || !effective ? null : { family: effective, editable, auto: effective === 'auto' }}
+                onMove={(m) => void move(m)}
+                onMoveMenu={(docIds, at) => setMoveFor({ docIds, at })}
+                onBlockMenu={(id, at, step) => setBlockFor({ id, at, step })}
+                onAutoNo={showAutoNo}
+                onPath={onPath}
+                extras={extras}
+                paperItems={extras.paperItems}
+                live={live}
                 onRead={onRead}
                 onExplore={onExplore}
                 onVicinity={onVicinity}
                 tints={tints}
                 areas={areaProp}
-                allow={tl.only ?? allow}
+                allow={mapAllow}
                 minimap={mini}
                 minimapSlot={wide && sideOpen ? slot : null}
                 blocks={freeMode ? null : blocks}
@@ -567,8 +862,77 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
               />
             )}
           </div>
-          {wide && <MapSide open={sideOpen} onToggle={() => setSideOpen(!sideOpen)} minimapRef={setSlot} blocks={sideBlocks} legend={legend} controls={controls} count={shown} onLight={(id) => handle.current?.light(id)} onFly={(id) => handle.current?.focusCluster(id)} />}
+          {wide && <MapSide open={sideOpen} onToggle={() => setSideOpen(!sideOpen)} minimapRef={setSlot} blocks={sideBlocks} legend={legend} controls={controls} count={shown} onLight={(id) => handle.current?.light(id)} onFly={(id) => handle.current?.focusCluster(id)} top={selbar} extra={extras.sideSections} />}
         </div>
+      )}
+      {moveFor && blocksView && (
+        <Lazy>
+          <MoveMenu
+            at={moveFor.at}
+            blocks={menuBlocks}
+            current={new Set(moveFor.docIds.flatMap((id) => (blocksView.index.has(id) ? [blocksView.blocks[blocksView.block[blocksView.index.get(id)!]!]!.id] : [])))}
+            many={many}
+            count={moveFor.docIds.length}
+            onPick={(to, removeFrom) => moveTo(moveFor.docIds, to, removeFrom)}
+            onClose={() => {
+              setMoveFor0(null);
+              giveBack();
+            }}
+          />
+        </Lazy>
+      )}
+      {blockFor && blocksView && blocksView.blocks.some((b) => b.id === blockFor.id) && (
+        <Lazy>
+          <BlockMenu
+            key={`${blockFor.id}:${blockFor.step}`}
+            block={blocksView.blocks.find((b) => b.id === blockFor.id)!}
+            blocks={blocksView.blocks}
+            family={effective ?? ''}
+            scope={scope}
+            at={blockFor.at}
+            step={blockFor.step}
+            onSelect={() => {
+              const r = blockIds(blocksView, blocksView.blocks.findIndex((b) => b.id === blockFor.id));
+              select(r.ids, 'replace', r.capped);
+            }}
+            onLibrary={() => {
+              const b = blocksView.blocks.find((x) => x.id === blockFor.id)!;
+              if (editable && !b.none && !b.other) {
+                setLibraryIntent({ tags: [b.id] });
+                nav.navigate({ view: 'library' });
+              } else toLibrary(blockIds(blocksView, blocksView.blocks.indexOf(b)).ids);
+            }}
+            onMacro={() => setMacroOpen(true)}
+            onChanged={(text, changeId) => {
+              keepNext.current = true;
+              invalidate('taxonomy');
+              invalidate('documents');
+              bumpFamilyNames();
+              info(text, undoAction(changeId));
+              setLive(text);
+            }}
+            onClose={() => {
+              setBlockFor0(null);
+              giveBack();
+            }}
+          />
+        </Lazy>
+      )}
+      {macroOpen && (
+        <Lazy>
+          <MacroAreas
+            family={macroTarget ?? 'topic'}
+            scope={scope}
+            onClose={() => setMacroOpen(false)}
+            onApplied={(changeId, n) => {
+              invalidate('taxonomy');
+              invalidate('documents');
+              bumpFamilyNames();
+              info(t('mapEdit.macroApplied', { count: n }), undoAction(changeId));
+            }}
+            onSelectUnclear={(ids) => select(ids.filter((id) => rawMap?.indexOf.has(id)), 'replace')}
+          />
+        </Lazy>
       )}
       <Menu
         anchor={legendAnchor}

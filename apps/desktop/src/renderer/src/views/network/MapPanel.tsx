@@ -19,6 +19,7 @@ import { rl } from '../../lib/rl';
 import { RlError } from '../../lib/rl-error';
 import { safeText } from '../library/safeText';
 import { Segmented } from '../../components/Segmented';
+import { Switch } from '../../components/Switch';
 import { AreaLegend, useAreaColors } from './AreaLegend';
 import { setLibraryIntent } from '../../lib/libraryIntent';
 import { GroupBy, NameFamilyButton, NameFamilyDialog } from './GroupBy';
@@ -74,6 +75,8 @@ interface Props {
   onPath?(a: string, b: string): void;
   /** What another view asked of the Map (`mapIntent`): the macro-areas dialog, papers to select, "Move to..." for a paper. */
   request?: { macro?: boolean; select?: string[]; move?: string[]; nonce: number } | null;
+  /** A saved view was opened: the owner records a Back / Forward state for it. */
+  onViewOpened?(): void;
 }
 
 const NO_IDS: ReadonlySet<string> = new Set();
@@ -88,7 +91,7 @@ const readOff = (): string[] => {
 };
 
 /** The map tab: scope, level, the canvas, the legend of clusters and the labels by Claude. */
-export function MapPanel({ active, status, mapVersion, scopes, selected, onSelect: onSelectRaw, onMapChanged, onRead, onExplore, onVicinity, onBuild, onInfo, highlight, light, onPath, request }: Props) {
+export function MapPanel({ active, status, mapVersion, scopes, selected, onSelect: onSelectRaw, onMapChanged, onRead, onExplore, onVicinity, onBuild, onInfo, highlight, light, onPath, request, onViewOpened }: Props) {
   const { t } = useTranslation();
   const { openExport } = useAiUi();
   const [kind, setKind] = useState<ScopeKind>('all');
@@ -364,7 +367,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     frame: (f) => handle.current?.frame(f),
   };
   // Evidence goes in unfiltered by the chips (isolation counts every kind); a saved view opened by the extras changes the family and the selection through the same callbacks as a click, so Back and Forward record it.
-  const extras = useMapExtras({ blocks: blocksView, evidence, selected, multi, family: effective ?? NONE_FAMILY, scope, onFly: (id) => handle.current?.flyToDoc(id), onSelect: (id) => onSelect(id), onSelectMany: (ids) => select(ids, 'replace'), bridge: viewBridge, familyName: familyLabel(t, families.find((f) => f.id === effective) ?? { id: effective ?? '', label: effective ?? '' }), active });
+  const extras = useMapExtras({ blocks: blocksView, evidence, selected, multi, family: effective ?? NONE_FAMILY, scope, onFly: (id) => handle.current?.flyToDoc(id), onSelect: (id) => onSelect(id), onSelectMany: (ids) => select(ids, 'replace'), bridge: viewBridge, onApply: onViewOpened, familyName: familyLabel(t, families.find((f) => f.id === effective) ?? { id: effective ?? '', label: effective ?? '' }), active });
 
   // What another view asked for (the intent mailbox, read by NetworkView): papers to select, the dialog, "Move to..." for a paper.
   const lastRequest = useRef(0);
@@ -733,6 +736,12 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
                 ))}
               </select>
             </label>
+            <div className="net-field net-pop-row">
+              <Switch checked={tl.active} onChange={() => tl.toggle()} label={t('network.timeline.byYear')} disabled={!map} disabledReason={noMapReason} data-testid="map-timeline-toggle" />
+            </div>
+            <div className="net-field net-pop-row">
+              <Switch checked={mini} onChange={setMini} label={t('network.minimap')} data-testid="map-minimap-toggle" />
+            </div>
             {extras.filterRows}
           </div>
         </ChipPop>
@@ -753,13 +762,6 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
         testId="map-more"
         groups={[
           chrome.model,
-          {
-            id: 'view',
-            items: [
-              map ? { id: 'timeline', label: t('network.timeline.byYear'), icon: <span>{tl.active ? '☑' : '☐'}</span>, testId: 'map-timeline-toggle', onSelect: tl.toggle } : { id: 'timeline', label: t('network.timeline.byYear'), testId: 'map-timeline-toggle', onSelect: () => undefined, disabled: true, disabledReason: noMapReason },
-              { id: 'minimap', label: t('network.minimap'), icon: <span>{mini ? '☑' : '☐'}</span>, testId: 'map-minimap-toggle', onSelect: () => setMini(!mini) },
-            ],
-          },
           {
             id: 'out',
             items: [

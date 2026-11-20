@@ -21,7 +21,7 @@ describe('review list model', () => {
     const list = [p('1'), p('2', { kind: 'twins' }), p('3', { kind: 'name' })];
     expect(filterProposals(list, new Set()).length).toBe(3);
     expect(filterProposals(list, new Set(['twins', 'name'] as const)).map((x) => x.id)).toEqual(['2', '3']);
-    expect(countByKind(list)).toEqual({ merge: 1, twins: 1, parent: 0, name: 1, metadata: 0 });
+    expect(countByKind(list)).toEqual({ merge: 1, twins: 1, parent: 0, name: 1, metadata: 0, promote: 0 });
   });
   it('takes the sure merges and renames only', () => {
     const list = [p('1'), p('2', { kind: 'twins' }), p('3', { kind: 'name' }), p('4', { confidence: 'likely' }), p('5', { kind: 'metadata' })];

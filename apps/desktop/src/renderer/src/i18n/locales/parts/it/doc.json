@@ -22,10 +22,6 @@
     "open": "Apri",
     "moreActions": "Altre azioni"
   },
-  "tags": {
-    "changed_one": "Tag aggiornati su {{count}} documento.",
-    "changed_other": "Tag aggiornati su {{count}} documenti."
-  },
   "bulk": {
     "title_one": "{{count}} documento selezionato",
     "title_other": "{{count}} documenti selezionati",

@@ -23,9 +23,9 @@ import { useWide, type Strictness } from './MapSide';
 import './mapExtras.css';
 
 // The viewer's saved views and the export live in their own chunk, loaded when the section is opened or a menu entry is chosen.
-const ViewsSection = lazyView(() => import('./export/MapViews').then((m) => ({ default: m.ViewsSection })), ['mapExtras']);
-const ViewsDialog = lazyView(() => import('./export/MapViews').then((m) => ({ default: m.ViewsDialog })), ['mapExtras']);
-const ExportDialog = lazyView(() => import('./export/MapViews').then((m) => ({ default: m.ExportDialog })), ['mapExtras']);
+const ViewsSection = lazyView(() => import('./export/MapViews').then((m) => ({ default: m.ViewsSection })), ['mapExtras', 'network']);
+const ViewsDialog = lazyView(() => import('./export/MapViews').then((m) => ({ default: m.ViewsDialog })), ['mapExtras', 'network']);
+const ExportDialog = lazyView(() => import('./export/MapViews').then((m) => ({ default: m.ExportDialog })), ['mapExtras', 'network']);
 
 /** What the Map's reading state, isolated papers, saved views and export need from the panel (section 20.10). */
 type MapScope = NonNullable<RequestOf<Channels, 'graph:map'>['scope']>;
@@ -55,6 +55,8 @@ export interface MapExtrasInput {
   onSelectMany(ids: string[]): void;
   /** Optional: what `MapPanel` holds (without it a saved view keeps only family, reading filters, selection and a fit frame). */
   bridge?: ViewBridge;
+  /** Called when a saved view is opened, whoever asked (dialog, section or shortcut): the owner of the Back / Forward stack records the place. */
+  onApply?(): void;
   /** Optional: the name of the family for the default name of a view and the file name of an export. */
   familyName?: string;
   /** False while the Map tab is hidden (the shortcut Ctrl+Shift+S then does nothing). */
@@ -325,6 +327,7 @@ export function useMapExtras(p: MapExtrasInput): MapExtras {
   const pending = useRef<{ v: MapViewState; waitFor: BlockView | null } | null>(null);
   const [tick, setTick] = useState(0);
   const applyView = (v: MapViewState): void => {
+    p.onApply?.();
     setOnlyUnread(!!v.filters.onlyUnread);
     setGaps(!!v.filters.gaps);
     p.bridge?.write({ scope: v.scope, years: v.years && v.years.length === 2 ? [v.years[0]!, v.years[1]!] : null, kinds: v.filters.kinds, strictness: v.filters.strictness, edgeMode: v.filters.edgeMode });

@@ -65,7 +65,7 @@ test('edit the Map by hand: drag into a block, keyboard, rename, merge, rectangl
     const list = await ipcData<{ items: Array<{ docId: string }> }>(window, 'documents:list', { limit: 50 });
     const docIds = list.items.map((i) => i.docId);
 
-    // Invented tags: Topic (several values) with three values, Stage (one value) with two.
+    // Invented tags: Topic (several values) with three values (Alpha is on more than half of the 30 papers), Stage (one value) with two.
     const make = async (label: string, parents: string[], docs: number[], extra: object[] = []): Promise<string> => {
       const r = await ipcData<Created>(window, 'taxonomy:apply', { ops: [{ op: 'create', label, ...(parents.length ? { parents } : {}) }, ...extra] });
       const id = r.created[0]!.id;
@@ -75,9 +75,9 @@ test('edit the Map by hand: drag into a block, keyboard, rename, merge, rectangl
     const range = (a: number, b: number) => Array.from({ length: b - a }, (_, i) => a + i);
     const topic = await make('Topic', [], []);
     await ipcData(window, 'taxonomy:apply', { ops: [{ op: 'setFamily', id: topic, family: 'many' }] });
-    const alpha = await make('Alpha', [topic], range(0, 12));
-    const beta = await make('Beta', [topic], range(12, 20));
-    const gamma = await make('Gamma', [topic], range(20, 26));
+    const alpha = await make('Alpha', [topic], range(0, 16));
+    const beta = await make('Beta', [topic], range(16, 22));
+    const gamma = await make('Gamma', [topic], range(22, 26));
     const stage = await make('Stage', [], []);
     await ipcData(window, 'taxonomy:apply', { ops: [{ op: 'setFamily', id: stage, family: 'one' }] });
     const draft = await make('Draft', [stage], range(0, 14));
@@ -196,9 +196,9 @@ test('edit the Map by hand: drag into a block, keyboard, rename, merge, rectangl
     await window.locator(`[data-testid="map-block-merge-target"][data-block="${beta}"]`).click();
     await expect(window.getByTestId('map-block-merge-confirm')).toBeVisible();
     await window.getByTestId('map-block-merge-ok').click();
-    await expect.poll(async () => (await tagsOf(docIds[20]!)).includes(beta), { timeout: 15_000 }).toBe(true);
+    await expect.poll(async () => (await tagsOf(docIds[22]!)).includes(beta), { timeout: 15_000 }).toBe(true);
     await window.getByTestId('toast-action').filter({ hasText: /^(Undo|Annulla)$/ }).last().click();
-    await expect.poll(async () => (await tagsOf(docIds[20]!)).includes(gamma), { timeout: 15_000 }).toBe(true);
+    await expect.poll(async () => (await tagsOf(docIds[22]!)).includes(gamma), { timeout: 15_000 }).toBe(true);
     await settled(window);
 
     // 8. A rectangle with Ctrl selects the papers in it; the bar shows the count, "Copy BibTeX" copies them, Esc empties the selection.
@@ -237,8 +237,9 @@ test('edit the Map by hand: drag into a block, keyboard, rename, merge, rectangl
     await window.getByTestId('path-close').click();
     await window.getByTestId('net-tab-map').click();
 
-    // 10. Macro-areas with the synthetic test pack: the dialog opens from the menu of a block, says that the tags do not change, and applying then
-    // undoing gives the taxonomy back (what changes is only where the values stand in the tree).
+    // 10. Macro-areas with the synthetic test pack, always with a proposal: Alpha sits on 16 of 30 papers (generic) and gets four sub-values of four
+    // papers each, so the cut splits it. The dialog opens from the menu of a block, says that the tags do not change, and applying then undoing
+    // gives the taxonomy back (what changes is only where the values stand in the tree).
     const pv = await ipcData<{ families: Array<{ packFamily: string; root: string }>; matches: Array<{ nodeId: string; conceptId: string; confidence: string }>; place: Array<{ nodeId: string; parentId: string | null }> }>(window, 'vocabPack:preview', { packId: 'test-pack' });
     await ipcData(window, 'vocabPack:enable', {
       packId: 'test-pack',
@@ -246,25 +247,23 @@ test('edit the Map by hand: drag into a block, keyboard, rename, merge, rectangl
       accept: { matches: pv.matches.filter((m) => m.confidence === 'sure').map((m) => ({ nodeId: m.nodeId, conceptId: m.conceptId })), place: [] },
       reject: [],
     });
+    for (const [i, label] of ['Alpha one', 'Alpha two', 'Alpha three', 'Alpha four'].entries()) await make(label, [alpha], range(0, 16).filter((d) => d % 4 === i));
     const snapshot = async () => JSON.stringify((await nodes()).map(({ counts: _c, revision: _r, updatedAt: _u, ...n }) => n).sort((x, y) => x.id.localeCompare(y.id)));
     const taxBefore = await snapshot();
+    await expect(chip(alpha)).toBeVisible({ timeout: 30_000 });
     await chip(alpha).click({ button: 'right' });
     await window.getByTestId('map-block-macro').click();
     await expect(window.getByTestId('macro-dialog')).toBeVisible();
     await expect(window.getByTestId('macro-note')).toBeVisible();
-    await expect(window.getByTestId('macro-stats').or(window.getByTestId('macro-none'))).toBeVisible({ timeout: 30_000 });
-    if ((await window.getByTestId('macro-move').count()) > 0) {
-      await expect(window.getByTestId('macro-tree').first()).toBeVisible();
-      for (const box of await window.getByTestId('macro-name').all()) await expect(box).not.toHaveValue('');
-      await window.getByTestId('macro-apply').click();
-      await expect(window.getByTestId('macro-dialog')).toBeHidden({ timeout: 30_000 });
-      expect(await snapshot()).not.toBe(taxBefore);
-      await window.getByTestId('toast-action').filter({ hasText: /^(Undo|Annulla)$/ }).last().click();
-      await expect.poll(snapshot, { timeout: 30_000 }).toBe(taxBefore);
-    } else {
-      await window.getByTestId('macro-cancel').click();
-      await expect(window.getByTestId('macro-dialog')).toBeHidden();
-    }
+    await expect(window.getByTestId('macro-stats')).toBeVisible({ timeout: 30_000 });
+    await expect(window.getByTestId('macro-move').first()).toBeVisible();
+    await expect(window.getByTestId('macro-tree').first()).toBeVisible();
+    for (const box of await window.getByTestId('macro-name').all()) await expect(box).not.toHaveValue('');
+    await window.getByTestId('macro-apply').click();
+    await expect(window.getByTestId('macro-dialog')).toBeHidden({ timeout: 30_000 });
+    expect(await snapshot()).not.toBe(taxBefore);
+    await window.getByTestId('toast-action').filter({ hasText: /^(Undo|Annulla)$/ }).last().click();
+    await expect.poll(snapshot, { timeout: 30_000 }).toBe(taxBefore);
     // The papers kept every tag they had.
     expect(await tagsOf(docIds[0]!)).toEqual(expect.arrayContaining([alpha, draft]));
   } finally {

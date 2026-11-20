@@ -320,15 +320,8 @@
         "parent": "«{{b}}» o «{{a}}»: genitore e figlio",
         "distinct": "«{{a}}» e «{{b}}» restano distinti"
       },
-      "progress": "Haiku sta decidendo… {{done}}/{{total}}",
-      "progressDetail": "Chiamata {{batch}} di {{batches}} · {{time}} · decise finora: {{decided}}",
-      "stop": "Annulla",
       "hide": "Chiudi (continua in sottofondo)",
       "background": "Puoi chiudere questa finestra: l'avanzamento resta nel riquadro Attività. Annullando, quanto già deciso viene tenuto (come una modifica che si può annullare).",
-      "finished": "Haiku ha finito",
-      "stopped": "Haiku è stato fermato",
-      "failed": "Haiku non ha potuto decidere",
-      "summary": "Decise: {{decided}} · lasciate a te: {{left}} · errori: {{errors}}",
       "capped": "{{count}} domande non sono state inviate perché oltre il tetto di spesa: restano per dopo."
     }
   }

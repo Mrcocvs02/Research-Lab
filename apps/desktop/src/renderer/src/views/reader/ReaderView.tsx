@@ -8,7 +8,7 @@ import { ErrorNote } from '../../components/ui';
 import { useAiUi } from '../../lib/aiUi';
 import { errorMessage } from '../../lib/errors';
 import { useHistory } from '../../lib/history';
-import { resolveShortcut, useEffectiveShortcuts, useShortcutMatcher } from '../../lib/keymap';
+import { isTextTarget, resolveShortcut, useEffectiveShortcuts, useShortcutMatcher } from '../../lib/keymap';
 import { useNotify } from '../../lib/notify';
 import { EXPERIMENTAL_KEY, useReader, type ReaderTarget } from '../../lib/reader';
 import { rl } from '../../lib/rl';
@@ -119,7 +119,7 @@ export function ReaderView({ target, onClose, split }: Props) {
   const [findText, setFindText] = useState('');
   const [findState, setFindState] = useState<FindState>({ state: 'idle', current: 0, total: 0 });
   const [side, setSide] = useState<Side>(target.panel === undefined || target.panel === 'annotations' ? 'annotations' : 'notes');
-  const [scope, setScope] = useState<Scope>(target.panel === 'fileNote' || target.panel === 'notes' ? target.panel : 'pageNote');
+  const [scope, setScope] = useState<Scope>(target.panel === 'fileNote' || target.panel === 'notes' || target.panel === 'literature' ? target.panel : 'pageNote');
   const [sideOpen, setSideOpen] = useLocalFlag('rl.readerSide', true);
   const [pending, setPending] = useState<SelectionPiece[] | null>(null);
   /** Pages inside the selection that were not drawn yet and so were left out (shown with the popover). */
@@ -184,7 +184,9 @@ export function ReaderView({ target, onClose, split }: Props) {
   };
   const closeReader = useCallback(() => closeRef.current(), []);
   const history = useHistory();
-  const repair = useRepair({ ready, loaded: ann.loaded, annotations: ann.annotations, layers, viewerRef, save: ann.save, info: notifyInfo, docId });
+  // The repair of a moved annotation saves by itself: it is not a change of the user, so Ctrl+Z skips it.
+  const quietSave = useCallback((a: Parameters<typeof ann.save>[0]) => ann.save(a, { quiet: true }), [ann.save]);
+  const repair = useRepair({ ready, loaded: ann.loaded, annotations: ann.annotations, layers, viewerRef, save: quietSave, info: notifyInfo, docId });
   const selected = ann.annotations.find((a) => a.id === selectedId) ?? null;
   const annotationsRef = useRef<readonly Annotation[]>([]);
   annotationsRef.current = ann.annotations;
@@ -257,6 +259,11 @@ export function ReaderView({ target, onClose, split }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [info]);
 
+  useEffect(() => {
+    if (target.panel === 'literature') setSideOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Another request for the same document (a search hit, a link): go to its page and tab.
   const firstNonce = useRef(target.nonce);
   useEffect(() => {
@@ -264,6 +271,7 @@ export function ReaderView({ target, onClose, split }: Props) {
     if (target.page !== undefined) viewerRef.current?.goTo(target.page);
     if (target.panel) {
       setSide(target.panel === 'annotations' ? 'annotations' : 'notes');
+      if (target.panel === 'literature') setSideOpen(true);
       if (target.panel !== 'annotations') setScope(target.panel);
     }
   }, [target.nonce, target.page, target.panel]);
@@ -281,6 +289,26 @@ export function ReaderView({ target, onClose, split }: Props) {
   const goTo = (n: number, y?: number) => viewerRef.current?.goTo(Math.min(Math.max(1, Math.round(n)), Math.max(1, pages)), y);
   const matches = useShortcutMatcher();
   const keys = useEffectiveShortcuts();
+  // Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z undo and redo the highlights and underlines first; with none left they fall through to the
+  // library history. Text fields keep their own undo. In a split reader only the side that has the focus answers.
+  const annUndoRef = useRef<(dir: 'undo' | 'redo') => void>(() => {});
+  annUndoRef.current = (dir) => {
+    void (dir === 'undo' ? ann.undo() : ann.redo()).then((done) => done && notifyInfo(t(dir === 'undo' ? 'reader.annUndone' : 'reader.annRedone')));
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing || isTextTarget(e.target) || document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      if (split && !containerRef.current?.contains(document.activeElement)) return;
+      const shiftZ = (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z';
+      const dir = matches(e, 'history.undo') ? 'undo' : matches(e, 'history.redo') || (shiftZ && keys['history.undo'] === 'Ctrl+Z') ? 'redo' : null;
+      if (!dir || !(dir === 'undo' ? ann.canUndo : ann.canRedo)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      annUndoRef.current(dir);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [matches, keys, split, ann.canUndo, ann.canRedo]);
   const findOpenRef = useRef(false);
   findOpenRef.current = findOpen;
   const hintTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -803,8 +831,15 @@ export function ReaderView({ target, onClose, split }: Props) {
       split={!!split}
       onSideBySide={() => (split ? split.onUnsplit() : setPicker(true))}
       guide={experimental ? { on: guideFlag, onToggle: () => setGuideFlag(!guideFlag) } : undefined}
-      canUndo={history.canUndo}
-      onUndo={() => void history.undo()}
+      canUndo={ann.canUndo || history.canUndo}
+      onUndo={() => (ann.canUndo ? annUndoRef.current('undo') : void history.undo())}
+      onLiterature={() => {
+        setSideOpen(true);
+        setSide('notes');
+        setScope('literature');
+      }}
+      canRedo={ann.canRedo || history.canRedo}
+      onRedo={() => (ann.canRedo ? annUndoRef.current('redo') : void history.redo())}
       onOpenFile={() => void rl.invoke('documents:open', { docId }).catch(reportError)}
       onReveal={() => void rl.invoke('documents:reveal', { docId }).catch(reportError)}
       onClose={closeReader}

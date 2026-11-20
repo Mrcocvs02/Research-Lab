@@ -187,6 +187,9 @@
       "consentAppOnly": "Only in the app"
     },
     "more": "More",
+    "annUndone": "Annotation change undone",
+    "annRedone": "Annotation change redone",
+    "litNote": "Summary: problem, method, results… ✦",
     "sideBySide": "Open another paper beside this one…",
     "openDefault": "Open with the default program",
     "reveal": "Show in the folder",

@@ -404,6 +404,11 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
             {t('docs.open')}
           </Button>
         )}
+        {readable && (
+          <Button onClick={() => openReader(docId, undefined, { panel: 'literature' })} title={t('docs.summaryHint')} data-testid="open-summary">
+            {t('docs.summary')}
+          </Button>
+        )}
         <Button className="card-actions__ai" icon={<IconClaude size={16} />} onClick={() => setChatOpen(true)} data-testid="doc-ask-claude">
           {t('doc.askClaude')}
         </Button>

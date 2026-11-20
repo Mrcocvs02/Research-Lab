@@ -15,7 +15,7 @@ export interface ReaderTarget {
 }
 /** Settings › Advanced › "Experimental features": a per-viewer flag (the experiments, like the guide, exist only while it is on). */
 export const EXPERIMENTAL_KEY = 'rl.experimental';
-export type ReaderPanel = 'annotations' | 'pageNote' | 'fileNote' | 'notes';
+export type ReaderPanel = 'annotations' | 'pageNote' | 'fileNote' | 'notes' | 'literature';
 
 interface ReaderValue {
   target: ReaderTarget | null;

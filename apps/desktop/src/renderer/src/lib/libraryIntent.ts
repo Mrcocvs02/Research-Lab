@@ -11,7 +11,23 @@ export interface LibraryIntent {
   docIds?: string[];
   /** Open the vocabulary with the guided cleanup ("Tidy the tags" from the Map, D-508). */
   cleanup?: boolean;
+  /** Open the tag manager directly (palette, shortcut, sidebar, facet): the tree, "To review" or the guided cleanup. */
+  manage?: TagPlace;
 }
+
+export type TagPlace = 'manage' | 'review' | 'cleanup';
+/** Sent when the Library is already on screen (a mailbox read at mount does not reach it). */
+export const TAG_MANAGER_EVENT = 'rl:tag-manager';
+
+/** The direct way into the tag manager: leaves the request and moves to the Library (`toLibrary`) unless it is there already. */
+export function openTagManager(toLibrary: () => void, place: TagPlace = 'manage'): void {
+  setLibraryIntent({ manage: place });
+  window.dispatchEvent(new Event(TAG_MANAGER_EVENT));
+  toLibrary();
+}
+
+/** The place an intent asks for (the Map's `cleanup` flag is the old way to say `cleanup`). */
+export const tagPlaceOf = (i: LibraryIntent | null): TagPlace | null => i?.manage ?? (i?.cleanup ? 'cleanup' : null);
 
 let pending: LibraryIntent | null = null;
 

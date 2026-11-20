@@ -537,7 +537,7 @@ describe('command palette', () => {
     const palette = await screen.findByTestId('command-palette');
     const ids = () => within(palette).getAllByTestId('palette-item').map((i) => i.getAttribute('data-command'));
     // Without text: the go-to group, then the actions (3.4); no commands for Claude, no documents.
-    expect(ids()).toEqual(['app-goLibrary', 'app-goReview', 'app-goProjects', 'app-goDiscover', 'app-goMap', 'app-goSettings', 'app-openActivity', 'app-scanNow', 'app-backupNow', 'app-addPdf', 'app-addFromId', 'app-addResource', 'app-newLibrary', 'app-undo', 'app-redo', 'app-theme', 'app-switchLanguage', 'app-openGuide', 'app-showShortcuts']);
+    expect(ids()).toEqual(['app-goLibrary', 'app-goReview', 'app-goProjects', 'app-goDiscover', 'app-goMap', 'app-goSettings', 'app-manageTags', 'app-tidyTags', 'app-reviewTags', 'app-openActivity', 'app-scanNow', 'app-backupNow', 'app-addPdf', 'app-addFromId', 'app-addResource', 'app-newLibrary', 'app-undo', 'app-redo', 'app-theme', 'app-switchLanguage', 'app-openGuide', 'app-showShortcuts']);
     expect(within(palette).getAllByRole('listbox')[0]!.querySelectorAll('.palette-group')).toHaveLength(2);
     type('describe');
     const items = within(palette).getAllByTestId('palette-item');
@@ -553,7 +553,7 @@ describe('command palette', () => {
     setup({ palette: true, commands: [{ id: 'mine', label: 'My own command', prompt: 'Do my thing' }] });
     await ready();
     const box = await screen.findByTestId('palette-input');
-    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(19));
+    await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(22));
     fireEvent.change(box, { target: { value: 'my own' } });
     await waitFor(() => expect(screen.getAllByTestId('palette-item')).toHaveLength(1));
     const only = screen.getAllByTestId('palette-item');

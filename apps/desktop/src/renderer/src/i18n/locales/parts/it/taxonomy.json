@@ -204,7 +204,8 @@
           "related": "Claude: collegati",
           "different": "Claude: diversi"
         }
-      }
+      },
+      "acceptAll": "Accetta tutte ({{count}})"
     },
     "cleanup": {
       "open": "Riordina…",
@@ -270,13 +271,44 @@
         "pick": "Un valore per lavoro",
         "many": "Consenti più valori",
         "topic": "Metti sotto Topic"
-      }
+      },
+      "acceptAll": "Accetta tutte ({{count}})"
     },
     "board": {
       "unsorted": "Da sistemare ({{count}})",
       "families": "Famiglie",
       "putIn": "Metti in…",
       "put": "Metti in ({{count}})"
+    },
+    "acceptAll": {
+      "title": "Accettare tutte le proposte?",
+      "what": "Verranno applicate {{sure}} proposte sicure e {{likely}} probabili.",
+      "undo": "È un'unica modifica: un solo Annulla rimette tutto com'era.",
+      "confirm": "Accetta {{count}}"
+    },
+    "auto": {
+      "label": "Accetta automaticamente le proposte",
+      "mode": {
+        "off": "No",
+        "sure": "Solo le sicure",
+        "sureHaiku": "Sicure + Haiku decide le incerte",
+        "all": "Tutte"
+      },
+      "notice": "{{count}} proposte accettate automaticamente"
+    },
+    "haiku": {
+      "title": "Lascia decidere a Haiku",
+      "what": "Haiku decide le domande incerte (unire o no, quale nome tenere, quale genitore, coppie diverse). Riceve solo nomi, alias, conteggi e percorso di famiglia, mai il contenuto dei lavori. Le risposte sicure sono applicate in una sola modifica che si può annullare; quelle incerte restano a te, e le regole di prudenza valgono come sempre.",
+      "send": "Invia e applica",
+      "button": "Lascia decidere a Haiku ({{count}})",
+      "autoHint": "Haiku riceve solo nomi e conteggi, entro i tetti di spesa.",
+      "batch": "Deciso da Haiku: {{count}}",
+      "decided": "deciso da Haiku",
+      "kind": {
+        "merge": "unite «{{a}}» e «{{b}}»",
+        "parent": "«{{b}}» o «{{a}}»: genitore e figlio",
+        "distinct": "«{{a}}» e «{{b}}» restano distinti"
+      }
     }
   }
 }

@@ -6,8 +6,9 @@ import { rl } from '../../../lib/rl';
 import { safeText } from '../safeText';
 import { useTaxonomy } from '../useTaxonomy';
 import { FamilyBoard } from './FamilyBoard';
+import { TagAcceptAll } from './TagAcceptAll';
 import { TagAiConfirm } from './TagAiConfirm';
-import { STEPS, SUMMARY, appliedSteps, currentStep, docEdits, ghosts, rowChecked, rowVariant, rowsToApply, stepState, summaryLines, type RowState } from './tagCleanupModel';
+import { STEPS, SUMMARY, appliedSteps, currentStep, docEdits, ghosts, rowChecked, rowVariant, rowsAcceptAll, rowsToApply, stepState, summaryLines, type RowState } from './tagCleanupModel';
 import { useTagChange, useTagReview } from './useTagReview';
 
 /**
@@ -21,6 +22,8 @@ export function TagCleanup({ initialStep, onClose, onMap }: { initialStep: numbe
   const [picked, setPicked] = useState<number | null>(initialStep);
   const [state, setState] = useState<Record<string, RowState>>({});
   const [asking, setAsking] = useState(false);
+  const [confirmAll, setConfirmAll] = useState(false);
+  const [haiku, setHaiku] = useState(false);
   const [busy, setBusy] = useState(false);
   const { data: d } = useTagReview(picked !== null && picked < SUMMARY ? picked : undefined);
   // Resuming: the run tells which step is next (the rows of that step then load).
@@ -35,11 +38,13 @@ export function TagCleanup({ initialStep, onClose, onMap }: { initialStep: numbe
   const setRow = (id: string, s: RowState) => setState((cur) => ({ ...cur, [id]: { ...cur[id], ...s } }));
   const ticked = rowsToApply(rows, state);
 
+  const everything = useMemo(() => rowsAcceptAll(rows, new Set((d?.proposals ?? []).map((p) => p.id)), new Set(d?.acceptable ?? [])), [rows, d]);
+
   const go = (n: number) => setPicked(n);
-  const apply = async () => {
+  const apply = async (picked: Array<{ id: string; variant?: string }> = ticked) => {
     if (!d || busy) return;
     setBusy(true);
-    const r = await run(() => rl.invoke('tagReview:apply', { step: step as 1, rows: ticked, expectedRevision: d.revision }));
+    const r = await run(() => rl.invoke('tagReview:apply', { step: step as 1, rows: picked, expectedRevision: d.revision }));
     setBusy(false);
     if (!r) return;
     offerUndo(t('tax.cleanup.applied', { step, count: r.applied }), r.changeId);
@@ -107,6 +112,12 @@ export function TagCleanup({ initialStep, onClose, onMap }: { initialStep: numbe
             <Button variant="primary" busy={busy} disabled={status === 'applied' || ticked.length === 0} onClick={() => void apply()} data-testid="tag-cleanup-apply">
               {t('tax.cleanup.apply', { count: ticked.length, docs: docEdits(rows, state) })}
             </Button>
+            <Button disabled={status === 'applied' || (d?.proposals.filter((p) => p.confidence !== 'sure' && !p.ai).length ?? 0) === 0} onClick={() => setHaiku(true)} data-testid="tag-cleanup-haiku">
+              {t('tax.haiku.button', { count: d?.proposals.filter((p) => p.confidence !== 'sure' && !p.ai).length ?? 0 })}
+            </Button>
+            <Button disabled={status === 'applied' || everything.rows.length === 0 || busy} onClick={() => setConfirmAll(true)} data-testid="tag-cleanup-accept-all">
+              {t('tax.cleanup.acceptAll', { count: everything.rows.length })}
+            </Button>
             <Button onClick={() => void skip()} disabled={status === 'skipped' || status === 'applied'} data-testid="tag-cleanup-skip">
               {t('tax.cleanup.skip')}
             </Button>
@@ -148,6 +159,28 @@ export function TagCleanup({ initialStep, onClose, onMap }: { initialStep: numbe
             </Button>
           </div>
         </div>
+      )}
+      {confirmAll && (
+        <TagAcceptAll
+          sure={everything.sure}
+          likely={everything.likely}
+          busy={busy}
+          onClose={() => setConfirmAll(false)}
+          onConfirm={() => {
+            setConfirmAll(false);
+            void apply(everything.rows);
+          }}
+        />
+      )}
+      {haiku && (
+        <TagAiConfirm
+          decide
+          onClose={() => setHaiku(false)}
+          onDone={() => {
+            setHaiku(false);
+            changed();
+          }}
+        />
       )}
       {asking && (
         <TagAiConfirm

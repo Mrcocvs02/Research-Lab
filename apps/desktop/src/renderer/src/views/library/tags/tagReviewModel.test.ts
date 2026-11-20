@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TagProposal } from '@rl/core';
-import { applyItem, countByKind, filterProposals, keepOptions, moveIndex, paperTotal, proposalsFor, sortProposals, sureOnes, uncertainCount } from './tagReviewModel';
+import { acceptAll, applyItem, countByKind, filterProposals, keepOptions, moveIndex, paperTotal, proposalsFor, sortProposals, sureOnes, uncertainCount } from './tagReviewModel';
 
 const p = (id: string, over: Partial<TagProposal> = {}): TagProposal => ({
   id,
@@ -50,5 +50,15 @@ describe('review list model', () => {
   });
   it('finds the rows that touch a tag', () => {
     expect(proposalsFor([p('1'), p('2', { tags: ['c', 'd'] }), p('3', { kind: 'parent' })], 'a').map((x) => x.id)).toEqual(['1']);
+  });
+});
+
+describe('accept all (D-512)', () => {
+  it('takes what main marked acceptable and counts sure and likely', () => {
+    const list = [p('1'), p('2', { confidence: 'likely' }), p('3', { confidence: 'maybe' }), p('4', { kind: 'twins' })];
+    const r = acceptAll(list, ['1', '2', '4']);
+    expect(r.items.map((x) => x.id)).toEqual(['1', '2', '4']);
+    expect([r.sure, r.likely]).toEqual([2, 1]);
+    expect(acceptAll(list, []).items).toEqual([]);
   });
 });

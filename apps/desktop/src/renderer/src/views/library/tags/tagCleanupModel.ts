@@ -86,3 +86,10 @@ export function ghostsByParent(g: readonly Ghost[]): Map<string | null, Ghost[]>
   for (const x of g) out.set(x.parentId, [...(out.get(x.parentId) ?? []), x]);
   return out;
 }
+
+/** Rows "Accept all" takes in a step (D-512): the row of a proposal only if main finds it acceptable; other rows unless they are "maybe". Default variants. */
+export function rowsAcceptAll(rows: readonly TagCleanupRow[], proposalIds: ReadonlySet<string>, acceptable: ReadonlySet<string>): { rows: Array<{ id: string }>; sure: number; likely: number } {
+  const take = rows.filter((r) => (proposalIds.has(r.id) ? acceptable.has(r.id) : r.confidence !== 'maybe'));
+  const sure = take.filter((r) => r.confidence === 'sure' || r.confidence === undefined).length;
+  return { rows: take.map((r) => ({ id: r.id })), sure, likely: take.length - sure };
+}

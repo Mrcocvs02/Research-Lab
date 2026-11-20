@@ -66,6 +66,21 @@ export interface TagCleanupRow {
   variants: Record<string, { ops: TaxonomyOp[]; docEdits: number }>;
 }
 
+/** Automatic acceptance of new proposals (D-512): off, the sure ones, or all (sure + likely); `last` is the latest automatic batch. */
+export type TagAutoMode = 'off' | 'sure' | 'sureHaiku' | 'all';
+/** What Haiku decided on a batch (D-512): each decision with its one-line reason. */
+export interface TagHaikuBatch {
+  changeId: string;
+  at: string;
+  items: Array<{ kind: 'merge' | 'parent' | 'distinct'; labels: string[]; note: string }>;
+}
+export interface TagAutoState {
+  mode: TagAutoMode;
+  last: { n: number; sure: number; likely: number; changeId: string; at: string } | null;
+  /** The latest batch Haiku decided (by hand from the list or by the automatic mode). */
+  haiku: TagHaikuBatch | null;
+}
+
 /** The state of the run (steps done and their change ids), kept in `<dataDir>/tag-review.json`. */
 export interface TagRun {
   startedAt: string | null;
@@ -94,10 +109,10 @@ const step = z.number().int().min(1).max(5);
 const run = z.custom<TagRun>();
 
 export const tagReviewChannels = defineChannels('tagReview', {
-  /** Proposals (review list), health strip and run state; with `step`, the rows of that step of the cleanup. */
+  /** Proposals (review list; `acceptable` = ids "Accept all" takes: sure and likely, past the guardrails of D-512), health strip and run state; with `step`, the rows of that step of the cleanup. */
   get: {
     request: z.object({ step: step.optional() }),
-    response: z.custom<{ revision: number; proposals: TagProposal[]; health: TagHealthItem[]; stats: TagStats; run: TagRun; rows?: TagCleanupRow[] }>(),
+    response: z.custom<{ revision: number; proposals: TagProposal[]; health: TagHealthItem[]; stats: TagStats; run: TagRun; rows?: TagCleanupRow[]; acceptable: string[]; auto: TagAutoState }>(),
   },
   /**
    * Applies proposals (`items`: by id, with the survivor / label / action chosen) or the ticked rows of a cleanup `step`
@@ -112,6 +127,8 @@ export const tagReviewChannels = defineChannels('tagReview', {
     }),
     response: z.custom<{ changeId: string; changeIds: string[]; applied: number; documentsChanged: number; run: TagRun }>(),
   },
+  /** Sets the automatic acceptance mode (`mode`) and/or forgets the notice of the last automatic batch (`dismiss`). */
+  setAuto: { request: z.object({ mode: z.enum(['off', 'sure', 'sureHaiku', 'all']).optional(), dismiss: z.boolean().optional() }), response: z.custom<TagAutoState>() },
   /** "Not the same": the pairs of the proposals are marked distinct (undoable); other kinds are dismissed in `tag-review.json`. */
   reject: { request: z.object({ ids: z.array(rowId).min(1).max(500) }), response: z.custom<{ changeId: string | null; rejected: number }>() },
   /** "Skip" a step of the run (no change). */
@@ -119,7 +136,8 @@ export const tagReviewChannels = defineChannels('tagReview', {
   /** What the AI confirmation would send, and its cost (spends and sends nothing). */
   aiPreview: { request: z.object({ model: z.string().optional() }), response: z.custom<TagAiPlan>() },
   /** Sends the previewed text after the user's consent; answers are cached by pair of labels. */
-  aiRun: { request: z.object({ model: z.string().optional(), confirmed: z.boolean() }), response: z.custom<{ asked: number; cached: number }>() },
+  /** With `decide`, Haiku's high-confidence answers are applied as ONE undoable change (D-512); low-confidence ones stay for the user. */
+  aiRun: { request: z.object({ model: z.string().optional(), confirmed: z.boolean(), decide: z.boolean().optional() }), response: z.custom<{ asked: number; cached: number; decided?: TagHaikuBatch | null }>() },
   /** Undo one step of the run (`step`) or all of it, in reverse order. */
   undoRun: { request: z.object({ step: step.optional() }), response: z.custom<{ undone: number; run: TagRun }>() },
 });

@@ -19,6 +19,8 @@ export const SHORTCUT_COMMANDS: Record<ShortcutId, { scope: ShortcutScope; defau
   'nav.discover': { scope: 'global', default: 'Alt+4' },
   'nav.map': { scope: 'global', default: 'Alt+5' },
   'nav.settings': { scope: 'global', default: 'Ctrl+,' },
+  // The tag manager, directly (after the five views of the sidebar, like its "Tag" entry).
+  'tags.manage': { scope: 'global', default: 'Alt+6' },
   'guide.open': { scope: 'global', default: 'F1' },
   'shortcuts.show': { scope: 'global', default: 'Ctrl+/' },
   'resume.open': { scope: 'global', default: 'Ctrl+Shift+R' },

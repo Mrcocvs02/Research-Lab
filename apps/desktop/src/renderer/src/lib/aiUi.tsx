@@ -1,3 +1,4 @@
+import { openTagManager } from './libraryIntent';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useShortcut } from './keymap';
 import { useLocalFlag } from './useLocalFlag';
@@ -175,6 +176,7 @@ export function AiUiProvider({ children }: { children: ReactNode }) {
   useShortcut('nav.discover', () => goTo('discover'));
   useShortcut('nav.review', () => goTo('review'));
   useShortcut('nav.settings', () => goTo('settings'));
+  useShortcut('tags.manage', () => openTagManager(() => goTo('library')));
   useShortcut('guide.open', () => openGuide('guide'), { inModal: true });
   useShortcut('shortcuts.show', () => openGuide('shortcuts'), { inModal: true });
 

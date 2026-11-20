@@ -475,7 +475,7 @@ function NewFamilyForm({ onDone }: { onDone(createdId: string | null): void }) {
 }
 
 /** The vocabulary: health strip, the tree (families, "To sort", Keywords) and "To review" in tabs, the node editor, and the guided cleanup. */
-export function TaxonomyManager({ onBack, startCleanup = false }: { onBack(): void; /** Open on the guided cleanup (from the Map's "Tidy the tags"). */ startCleanup?: boolean }) {
+export function TaxonomyManager({ onBack, start = 'manage' }: { onBack(): void; /** Where to open: the tree, "To review" or the guided cleanup (Map, palette, shortcut, sidebar). */ start?: 'manage' | 'review' | 'cleanup' }) {
   const { t } = useTranslation();
   const { model, loaded, error, apply, view } = useTaxonomy();
   const { fail } = useNotify();
@@ -486,10 +486,10 @@ export function TaxonomyManager({ onBack, startCleanup = false }: { onBack(): vo
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
   const [newFamily, setNewFamily] = useState(false);
-  const [tab, setTab] = useState<'tree' | 'review'>('tree');
+  const [tab, setTab] = useState<'tree' | 'review'>(start === 'review' ? 'review' : 'tree');
   const [filter, setFilter] = useState<ReviewFilter | null>(null);
   const [only, setOnly] = useState<Set<string> | null>(null);
-  const [cleanup, setCleanup] = useState<{ step: number | null } | null>(startCleanup ? { step: null } : null);
+  const [cleanup, setCleanup] = useState<{ step: number | null } | null>(start === 'cleanup' ? { step: null } : null);
   const queryId = useId();
   const { data: review } = useTagReview();
 

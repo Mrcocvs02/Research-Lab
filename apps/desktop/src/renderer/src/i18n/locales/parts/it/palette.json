@@ -99,6 +99,15 @@
       },
       "addResource": {
         "label": "Aggiungi una risorsa…"
+      },
+      "manageTags": {
+        "label": "Gestisci i tag"
+      },
+      "tidyTags": {
+        "label": "Riordina i tag"
+      },
+      "reviewTags": {
+        "label": "Proposte da rivedere"
       }
     },
     "paletteGroups": {

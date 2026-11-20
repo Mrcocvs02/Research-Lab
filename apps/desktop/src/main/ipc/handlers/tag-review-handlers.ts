@@ -8,6 +8,7 @@ export const tagReviewHandlers = (s: MainServices): DomainHandlers<'tagReview'> 
   'tagReview:get': async (r) => (await feature()).getReview(s, r),
   'tagReview:apply': async (r) => (await feature()).applyReview(s, r),
   'tagReview:reject': async (r) => (await feature()).rejectReview(s, r),
+  'tagReview:setAuto': async (r) => (await feature()).setAuto(s, r),
   'tagReview:skip': async (r) => (await feature()).skipStep(s, r),
   'tagReview:aiPreview': async (r) => (await feature()).aiPreview(s, r),
   'tagReview:aiRun': async (r) => (await feature()).aiRun(s, r),

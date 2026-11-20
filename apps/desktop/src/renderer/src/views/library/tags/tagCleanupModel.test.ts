@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TagCleanupRow, TagRun } from '@rl/core';
-import { appliedSteps, currentStep, docEdits, ghosts, ghostsByParent, rowsToApply, stepState, summaryLines } from './tagCleanupModel';
+import { appliedSteps, currentStep, docEdits, ghosts, ghostsByParent, rowsAcceptAll, rowsToApply, stepState, summaryLines } from './tagCleanupModel';
 
 const run = (steps: TagRun['steps']): TagRun => ({ startedAt: null, steps, before: null, dismissed: 0 });
 const s = (step: number, status: 'applied' | 'skipped' | 'undone') => ({ step, status, changeIds: [], at: '' });
@@ -58,5 +58,14 @@ describe('cleanup rows', () => {
       { rowId: 'c', tagId: 'fam', parentId: null, family: 'one' },
     ]);
     expect([...ghostsByParent(g).keys()]).toEqual(['topic', null]);
+  });
+});
+
+describe('accept all in a step (D-512)', () => {
+  it('a proposal row needs main to find it acceptable; other rows only must not be maybe; defaults only', () => {
+    const rows = [row('p1', { confidence: 'sure' }), row('p2', { confidence: 'likely' }), row('f1'), row('f2', { confidence: 'maybe' })];
+    const r = rowsAcceptAll(rows, new Set(['p1', 'p2']), new Set(['p1']));
+    expect(r.rows).toEqual([{ id: 'p1' }, { id: 'f1' }]);
+    expect([r.sure, r.likely]).toEqual([2, 0]);
   });
 });

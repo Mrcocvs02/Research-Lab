@@ -204,7 +204,8 @@
           "related": "Claude: related",
           "different": "Claude: different"
         }
-      }
+      },
+      "acceptAll": "Accept all ({{count}})"
     },
     "cleanup": {
       "open": "Tidy up…",
@@ -270,13 +271,44 @@
         "pick": "One value per paper",
         "many": "Allow many values",
         "topic": "Put under Topic"
-      }
+      },
+      "acceptAll": "Accept all ({{count}})"
     },
     "board": {
       "unsorted": "To sort ({{count}})",
       "families": "Families",
       "putIn": "Put in…",
       "put": "Put in ({{count}})"
+    },
+    "acceptAll": {
+      "title": "Accept all proposals?",
+      "what": "{{sure}} sure and {{likely}} likely proposals will be applied.",
+      "undo": "It is a single change: one Undo puts everything back.",
+      "confirm": "Accept {{count}}"
+    },
+    "auto": {
+      "label": "Accept proposals automatically",
+      "mode": {
+        "off": "Off",
+        "sure": "Only the sure ones",
+        "sureHaiku": "Sure ones + Haiku decides the uncertain",
+        "all": "All"
+      },
+      "notice": "{{count}} proposals accepted automatically"
+    },
+    "haiku": {
+      "title": "Let Haiku decide",
+      "what": "Haiku decides the uncertain questions (merge or not, which name to keep, which parent, different pairs). It receives only names, aliases, counts and the family path, never the contents of the papers. Its confident answers are applied as one undoable change; the uncertain ones stay with you, and the guardrails apply as always.",
+      "send": "Send and apply",
+      "button": "Let Haiku decide ({{count}})",
+      "autoHint": "Haiku receives only names and counts, within the spending caps.",
+      "batch": "Decided by Haiku: {{count}}",
+      "decided": "decided by Haiku",
+      "kind": {
+        "merge": "merged \"{{a}}\" and \"{{b}}\"",
+        "parent": "parent and child: \"{{a}}\" and \"{{b}}\"",
+        "distinct": "\"{{a}}\" and \"{{b}}\" stay distinct"
+      }
     }
   }
 }

@@ -5,8 +5,10 @@ import { Button } from '../../../components/Button';
 import { rl } from '../../../lib/rl';
 import { safeText } from '../safeText';
 import { useTaxonomy } from '../useTaxonomy';
+import { TagAcceptAll } from './TagAcceptAll';
 import { TagAiConfirm } from './TagAiConfirm';
-import { REVIEW_FILTERS, applyItem, countByKind, filterProposals, isFolded, keepOptions, moveIndex, paperTotal, sortProposals, sureOnes, uncertainCount, type ReviewFilter, type RowChoice } from './tagReviewModel';
+import { REVIEW_FILTERS, acceptAll, applyItem, countByKind, filterProposals, isFolded, keepOptions, moveIndex, paperTotal, sortProposals, sureOnes, uncertainCount, type ReviewFilter, type RowChoice } from './tagReviewModel';
+import { TagAutoSetting } from './TagAutoSetting';
 import { useTagChange, type TagData } from './useTagReview';
 
 const DOT = { sure: '●', likely: '◐', maybe: '○' } as const;
@@ -20,6 +22,8 @@ export function TagReview({ data, initial }: { data: TagData; initial: ReviewFil
   const [choices, setChoices] = useState<Record<string, RowChoice>>({});
   const [editing, setEditing] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  const [confirmAll, setConfirmAll] = useState(false);
+  const [haiku, setHaiku] = useState(false);
   const [focus, setFocus] = useState(0);
   const [busy, setBusy] = useState(false);
   const list = useRef<HTMLDivElement>(null);
@@ -28,6 +32,7 @@ export function TagReview({ data, initial }: { data: TagData; initial: ReviewFil
   const rows = useMemo(() => filterProposals(all, on), [all, on]);
   const counts = useMemo(() => countByKind(all), [all]);
   const sure = useMemo(() => sureOnes(rows), [rows]);
+  const everything = useMemo(() => acceptAll(all, data.acceptable), [all, data.acceptable]);
   const uncertain = uncertainCount(all);
   const name = (id: string) => safeText(labelOf(id));
   const choose = (id: string, c: RowChoice) => setChoices((cur) => ({ ...cur, [id]: { ...cur[id], ...c } }));
@@ -74,6 +79,9 @@ export function TagReview({ data, initial }: { data: TagData; initial: ReviewFil
         <Button variant="primary" size="sm" disabled={sure.length === 0 || busy} onClick={() => void apply(sure)} data-testid="tag-review-accept-sure">
           {t('tax.review.acceptSure', { count: sure.length })}
         </Button>
+        <Button size="sm" variant="primary" disabled={everything.items.length === 0 || busy} onClick={() => setConfirmAll(true)} data-testid="tag-review-accept-all">
+          {t('tax.review.acceptAll', { count: everything.items.length })}
+        </Button>
         <span className="tag-review__show" role="group" aria-label={t('tax.review.show')}>
           {REVIEW_FILTERS.map((k) => (
             <button key={k} type="button" className={on.has(k) ? 'rl-chip rl-chip--filter is-selected' : 'rl-chip rl-chip--filter'} aria-pressed={on.has(k)} onClick={() => toggle(k)} data-testid={`tag-review-filter-${k}`}>
@@ -81,10 +89,14 @@ export function TagReview({ data, initial }: { data: TagData; initial: ReviewFil
             </button>
           ))}
         </span>
+        <Button size="sm" disabled={uncertain === 0} disabledReason={t('tax.review.ai.none')} onClick={() => setHaiku(true)} data-testid="tag-review-haiku">
+          {t('tax.haiku.button', { count: uncertain })}
+        </Button>
         <Button size="sm" disabled={uncertain === 0} disabledReason={t('tax.review.ai.none')} onClick={() => setAsking(true)} data-testid="tag-review-ai">
           {t('tax.review.ai.button', { count: uncertain })}
         </Button>
       </div>
+      <TagAutoSetting auto={data.auto} />
       {rows.length === 0 ? (
         <p className="empty" data-testid="tag-review-empty">{t('tax.review.empty')}</p>
       ) : (
@@ -155,6 +167,28 @@ export function TagReview({ data, initial }: { data: TagData; initial: ReviewFil
             );
           })}
         </div>
+      )}
+      {confirmAll && (
+        <TagAcceptAll
+          sure={everything.sure}
+          likely={everything.likely}
+          busy={busy}
+          onClose={() => setConfirmAll(false)}
+          onConfirm={() => {
+            setConfirmAll(false);
+            void apply(everything.items);
+          }}
+        />
+      )}
+      {haiku && (
+        <TagAiConfirm
+          decide
+          onClose={() => setHaiku(false)}
+          onDone={() => {
+            setHaiku(false);
+            void run(async () => undefined);
+          }}
+        />
       )}
       {asking && (
         <TagAiConfirm

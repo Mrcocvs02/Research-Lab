@@ -42,6 +42,7 @@ import { configureRuntime, resolveRuntimeConfig } from './runtime.js';
 import { PDF_WRITE_ENABLED } from '@rl/core';
 import { flushPdfWrites } from './study/pdf-sync.js';
 import { FileSecretStore } from './secret-store.js';
+import { bindAutoAccept, noteLibraryChange } from './features/tag-review/auto-hook.js';
 import { installGlobalSecurity, isTrustedUrl, registerPrivilegedSchemes, rendererOrigin, serveDocuments, serveRenderer, serveThumbnails } from './security.js';
 import { SettingsStore } from './settings-store.js';
 import { createMainWindow } from './window.js';
@@ -68,6 +69,7 @@ const log = createFileLogger({ dir: path.join(dirs.localData, 'logs'), name: 'ma
 for (const warning of runtime.warnings) log.warn(warning);
 
 function emit<K extends EventName>(event: K, payload: unknown): void {
+  if (event === 'library:changed') noteLibraryChange((payload as { kind?: string }).kind ?? '');
   const parsed = events[event].safeParse(payload);
   if (!parsed.success) {
     log.error('invalid event payload', { event });
@@ -195,6 +197,7 @@ async function main(): Promise<void> {
   };
 
   // The reader loads PDFs through rl-doc://; every request looks the document up in the active library again.
+  bindAutoAccept(services);
   serveDocuments(session.defaultSession, createDocHandler({ resolve: (id) => presentPdf(services, id as DocumentId), allowedOrigin: rendererOrigin }));
 
   // Grid thumbnails through rl-thumb://: only files of the cache folder of the active library (D-196).

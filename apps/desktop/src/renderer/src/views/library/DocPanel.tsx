@@ -26,6 +26,7 @@ import { NotesSection } from './docpanel/NotesSection';
 import { baseName } from './fileName';
 import { formatSize } from './formatSize';
 import { safeText } from './safeText';
+import { openTagManager } from '../../lib/libraryIntent';
 import { TagChip, TagPicker } from './TagParts';
 import { useTagActions } from './useTagActions';
 import { oneFamilyRemoval, tagRowsOf } from './tagRows';
@@ -444,6 +445,9 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
 
       <div className="card-tags" data-testid="doc-tags-section">
         <span className="card-state__label">{t('doc.tags')}</span>
+        <button type="button" className="link" onClick={() => openTagManager(() => undefined)} data-testid="doc-tags-manage">
+          {t('library.manageTagsLink')}
+        </button>
         <div className="tag-list" data-testid="doc-tag-list">
           {doc.tags.length === 0 && <span className="hint">{t('doc.noTags')}</span>}
           {tagRows.map((row) => (

@@ -183,8 +183,20 @@ async function applyNow(s: MainServices, rt: LibraryRuntime, decisions: Decision
   // 1. Taxonomy: one node per distinct label that no live node has (a deprecated node is not reused); new ones get origin 'ai'.
   const existing = new Map<string, string>();
   for (const n of tax.nodes) if (n.status !== 'deprecated') for (const t of [n.label, ...n.aliases]) existing.set(norm(t), n.id);
+  // A proposal "from the field" (D-519) is linked to its concept and brings the ancestors it lacks, in the same change; it falls back to a plain new
+  // tag when the library no longer uses that pack.
+  const pk = plans.some((p) => p.newNodes.some((t) => t.pack !== undefined)) ? await import('../features/vocab-pack/review-hook.js').then(async (m) => ({ m, ctx: await m.packContext(rt.store.dataDir, (await s.settings.get()).uiLanguage === 'en' ? 'en' : 'it') })) : null;
+  const fromField = (t: AiNewTag): string | null => (pk?.ctx && t.pack !== undefined ? pk.m.conceptOf(pk.ctx, t.pack) : null);
   const toCreate = new Map<string, AiNewTag>();
-  for (const p of plans) for (const t of p.newNodes) if (!existing.has(norm(t.label)) && !toCreate.has(norm(t.label))) toCreate.set(norm(t.label), t);
+  const packNew = new Map<string, { t: AiNewTag; concept: string }>();
+  for (const p of plans) {
+    for (const t of p.newNodes) {
+      if (existing.has(norm(t.label)) || toCreate.has(norm(t.label)) || packNew.has(norm(t.label))) continue;
+      const concept = fromField(t);
+      if (concept !== null) packNew.set(norm(t.label), { t, concept });
+      else toCreate.set(norm(t.label), t);
+    }
+  }
   const idByLabel = new Map<string, string>(existing);
   const created = new Set<string>();
   if (toCreate.size > 0) {
@@ -201,6 +213,7 @@ async function applyNow(s: MainServices, rt: LibraryRuntime, decisions: Decision
       return r.taxonomy;
     });
   }
+  if (packNew.size > 0 && pk?.ctx) await pk.m.createFromField(s.log, rt.store.dataDir, cs, pk.ctx, [...packNew.entries()], idByLabel, created, now);
   /** Removes the nodes this call created that no written document uses (no orphan nodes). */
   const dropUnused = async (used: Set<string>) => {
     const drop = new Set([...created].filter((id) => !used.has(id)));

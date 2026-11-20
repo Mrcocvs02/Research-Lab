@@ -125,8 +125,8 @@ export function TagReview({ data, initial }: { data: TagData; initial: ReviewFil
                 <span className="tag-review__tags">{p.tags.map(name).join(' · ')}</span>
                 {p.ai && <span className="badge badge-ai" data-testid="tag-review-ai-note" title={safeText(p.ai.note)}>{t(`tax.review.ai.verdict.${p.ai.verdict}`)}</span>}
                 <span className="tag-review__to">
-                  {(p.kind === 'merge' || p.kind === 'parent') && (
-                    <select value={keep} aria-label={t(p.kind === 'parent' ? 'tax.review.parentOf' : 'tax.review.keep')} onChange={(e) => choose(p.id, { keep: e.target.value })} data-testid="tag-review-keep">
+                  {(p.kind === 'merge' || p.kind === 'parent' || p.kind === 'promote') && (
+                    <select value={keep} aria-label={t(p.kind === 'merge' ? 'tax.review.keep' : 'tax.review.parentOf')} onChange={(e) => choose(p.id, { keep: e.target.value })} data-testid="tag-review-keep">
                       {keepOptions(p).map((id) => (
                         <option key={id} value={id}>
                           {name(id)}

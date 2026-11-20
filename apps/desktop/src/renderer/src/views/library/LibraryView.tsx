@@ -33,7 +33,7 @@ import './library.css';
 // The detail panel, the selection summary, the taxonomy manager and the project dialog load when they are first used.
 const DocumentCard = lazyView(() => import('./DocPanel').then((m) => ({ default: m.DocumentCard })), ['doc', 'library', 'doc-projects-reader', 'doc-reader', 'doc-review']);
 const SelectionSummary = lazyView(() => import('./selection/SelectionSummary'), ['doc', 'library']);
-const TaxonomyManager = lazyView(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })), ['taxonomy']);
+const TaxonomyManager = lazyView(() => import('./TaxonomyManager').then((m) => ({ default: m.TaxonomyManager })), ['taxonomy', 'pack']);
 const LiteratureDialog = lazyView(() => import('../literature/LiteratureNote').then((m) => ({ default: m.LiteratureDialog })), ['literature', 'reader']);
 const JobDialog = lazyView(() => import('../ai/JobDialog').then((m) => ({ default: m.JobDialog })), ['jobs']);
 const ResourcesPane = lazyView(() => import('../resources/ResourcesPane'), ['resources', 'library']);

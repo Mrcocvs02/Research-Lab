@@ -9,6 +9,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./node": "./src/node/index.ts",
-    "./ipc-names": "./src/ipc/names.ts"
+    "./ipc-names": "./src/ipc/names.ts",
+    "./vocab": "./src/vocab/index.ts"
   }
 }

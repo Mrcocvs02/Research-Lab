@@ -31,12 +31,13 @@
       "TagCleanup": 16,
       "TagAiConfirm": 16,
       "SelectionSummary": 16,
-      "VocabularyTree": 16
+      "VocabularyTree": 16,
+      "PackDialog": 16
     }
   },
   "main": {
-    "entryJsKB": 1139,
-    "lazyJsKB": 640,
+    "entryJsKB": 1145,
+    "lazyJsKB": 680,
     "lazyChunkKB": 30,
     "lazyChunkOverrides": {
       "writer": 48

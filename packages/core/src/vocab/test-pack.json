@@ -1,0 +1,33 @@
+{
+ "version": 1,
+ "id": "test-pack",
+ "label": "Synthetic test pack",
+ "labelIt": "Pacchetto sintetico di prova",
+ "language": "en",
+ "families": [
+  {
+   "id": "topic",
+   "label": "Topic",
+   "singleValue": false,
+   "concepts": [
+    { "id": "topic.alpha-theory", "label": "Alpha theory", "labelIt": "Teoria alfa", "aliases": ["alpha-theory models", "AT"], "arxiv": ["abc"] },
+    { "id": "topic.beta-states", "label": "Beta states", "labelIt": "Stati beta", "aliases": ["beta state"], "parent": "topic.alpha-theory" },
+    { "id": "topic.beta-spectrum", "label": "Beta spectrum", "labelIt": "Spettro beta", "aliases": ["beta spectra"], "parent": "topic.beta-states", "distinctFrom": ["Gamma spectrum"] },
+    { "id": "topic.gamma-flow", "label": "Gamma flow", "labelIt": "Flusso gamma", "aliases": ["GF"], "parent": "topic.alpha-theory" },
+    { "id": "topic.delta-systems", "label": "Delta systems", "labelIt": "Sistemi delta", "aliases": ["delta system"] },
+    { "id": "topic.delta-chains", "label": "Delta chains", "labelIt": "Catene delta", "aliases": ["delta chain"], "parent": "topic.delta-systems" },
+    { "id": "topic.epsilon-maps", "label": "Epsilon maps", "labelIt": "Mappe epsilon", "aliases": ["epsilon mapping"] }
+   ]
+  },
+  {
+   "id": "method",
+   "label": "Method",
+   "singleValue": true,
+   "concepts": [
+    { "id": "method.sampling", "label": "Sampling methods", "labelIt": "Metodi di campionamento", "aliases": ["sampling method", "sampling"] },
+    { "id": "method.fast-sampling", "label": "Fast sampling", "labelIt": "Campionamento rapido", "aliases": ["quick sampling"], "parent": "method.sampling" },
+    { "id": "method.zeta-solver", "label": "Zeta solver", "labelIt": "Risolutore zeta", "aliases": ["ZS"] }
+   ]
+  }
+ ]
+}

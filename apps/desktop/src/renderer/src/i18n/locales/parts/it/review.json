@@ -38,6 +38,8 @@
     "rejectField": "Rifiuta: {{field}}",
     "acceptDoc": "Accetta il documento",
     "confirmMany": "Conferma: {{count}} proposte",
-    "emptyTitle": "Tutto fatto"
+    "emptyTitle": "Tutto fatto",
+    "fromField": "Dal vocabolario del campo",
+    "fromFieldHint": "Questo tag viene dal vocabolario del campo: accettandolo si collega al suo concetto e va al suo posto."
   }
 }

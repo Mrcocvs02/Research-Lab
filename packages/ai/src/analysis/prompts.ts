@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { AiNewTag, AiTagScore, TaxonomyFile } from '@rl/core';
-import { cleanSuggestion, limitOneFamilies, SUGGEST_LIMITS, tagResolver, vocabularyOf, type CleanOptions, type SuggestField } from '../suggest.js';
+import { addPackProposal, cleanSuggestion, limitOneFamilies, SUGGEST_LIMITS, tagResolver, vocabularyOf, type CleanOptions, type SuggestField } from '../suggest.js';
 import { candidateBlock, type Candidate, type CandidateNode } from './candidates.js';
 import { closeTags, TAG_HARD_CAP, TAG_MIN_WEIGHT, type GraphNode } from './closure.js';
 import { type Section } from './litnote.js';
@@ -144,6 +144,9 @@ export function cleanAnalysis(raw: AnalysisRaw, fields: readonly SuggestField[],
     const nodes = tax?.nodes ?? [];
     const voc = vocabularyOf(nodes);
     const active: GraphNode[] = nodes.filter((n) => n.status === 'active').map((n) => ({ id: n.id, parents: n.parents, implies: n.implies }));
+    const fromField: AiNewTag[] = [];
+    // A concept of the field the prompt offered (`f…`): a proposal "from the field", not a tag of the library (D-519).
+    for (const t of raw.tags ?? []) if (resolve(t.id) === null && t.weight >= TAG_MIN_WEIGHT) addPackProposal(fromField, opts.latent?.byShort(t.id.trim().toLowerCase()), clip(oneLine(t.reason ?? ''), SUGGEST_LIMITS.reason));
     const picked = (raw.tags ?? [])
       .map((t) => ({ id: resolve(t.id), weight: Number.isFinite(t.weight) ? Math.min(1, Math.max(0, t.weight)) : 0, reason: clip(oneLine(t.reason ?? ''), SUGGEST_LIMITS.reason) }))
       .filter((t): t is { id: string; weight: number; reason: string } => t.id !== null && voc.tags.has(t.id) && t.weight >= TAG_MIN_WEIGHT)
@@ -156,6 +159,11 @@ export function cleanAnalysis(raw: AnalysisRaw, fields: readonly SuggestField[],
     const cands: Array<AiNewTag & { weight: number; same?: string }> = [];
     for (const t of raw.newTags ?? []) {
       const label = clip(oneLine(t.label), SUGGEST_LIMITS.label);
+      const field = label && t.weight >= TAG_MIN_WEIGHT && !known.has(norm(label)) ? opts.latent?.byLabel(label) : undefined;
+      if (field) {
+        addPackProposal(fromField, field, clip(oneLine(t.reason ?? ''), SUGGEST_LIMITS.reason));
+        continue;
+      }
       const parentId = t.parentId ? resolve(t.parentId) : null;
       if (!label || !parentId || !voc.parents.has(parentId) || cands.some((f) => norm(f.label) === norm(label)) || !(t.weight >= TAG_MIN_WEIGHT)) continue;
       const same = known.get(norm(label));
@@ -181,7 +189,7 @@ export function cleanAnalysis(raw: AnalysisRaw, fields: readonly SuggestField[],
     }
     out.scores = closeTags(active, chosen).filter((x) => voc.tags.has(x.id));
     out.tags = out.scores.map((x) => x.id);
-    out.newTags = fresh;
+    out.newTags = [...fresh, ...fromField];
   }
   return out;
 }

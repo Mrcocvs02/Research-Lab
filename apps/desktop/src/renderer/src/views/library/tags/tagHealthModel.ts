@@ -1,7 +1,7 @@
 import type { TagHealthItem } from '@rl/core';
 
 export type HealthKind = TagHealthItem['kind'];
-export type ReviewFilter = 'merge' | 'twins' | 'parent' | 'name' | 'metadata';
+export type ReviewFilter = 'merge' | 'twins' | 'parent' | 'name' | 'metadata' | 'promote';
 
 /** The order of the chips of the health strip (D-494). */
 export const HEALTH_ORDER: readonly HealthKind[] = ['dupes', 'twins', 'singletons', 'generic', 'orphans', 'multiparent', 'onevalue', 'styles', 'metadata', 'unused', 'depth'];

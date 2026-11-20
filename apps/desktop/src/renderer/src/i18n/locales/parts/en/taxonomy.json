@@ -119,7 +119,8 @@
         "twins": "Twins",
         "parent": "Parents",
         "name": "Names",
-        "metadata": "Metadata"
+        "metadata": "Metadata",
+        "promote": "Promote"
       },
       "conf": {
         "sure": "Sure",
@@ -141,7 +142,8 @@
         "author": "author name",
         "underscore": "underscore",
         "case": "capitalisation",
-        "long": "too long"
+        "long": "too long",
+        "promote": "used on many papers"
       },
       "keep": "Keep",
       "parentOf": "Put under",
@@ -165,21 +167,24 @@
         "twins": "Apply",
         "parent": "Put under",
         "name": "Rename",
-        "metadata": "Move to the field"
+        "metadata": "Move to the field",
+        "promote": "Put in the family"
       },
       "reject": {
         "merge": "Not the same",
         "twins": "Leave",
         "parent": "No",
         "name": "No",
-        "metadata": "No"
+        "metadata": "No",
+        "promote": "No"
       },
       "done": {
         "merge": "Merged {{count}} tags into “{{name}}”",
         "twins": "Twins applied",
         "parent": "Tag placed",
         "name": "Renamed to “{{name}}”",
-        "metadata": "Moved to the field"
+        "metadata": "Moved to the field",
+        "promote": "Tag placed in its family"
       },
       "doneMany": "Changes applied: {{count}}",
       "rejected_one": "Marked as not the same",

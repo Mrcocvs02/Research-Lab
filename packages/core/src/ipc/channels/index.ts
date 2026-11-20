@@ -38,6 +38,7 @@ import { citectxChannels, compareChannels, groupsChannels } from './synthesis.js
 import { taxonomyChannels } from './taxonomy.js';
 import { tagReviewChannels, tagReviewEvents } from './tag-review.js';
 import { thumbsChannels } from './thumbs.js';
+import { vocabPackChannels } from './vocab-pack.js';
 import { watchChannels, watchEvents } from './watch.js';
 import { scanChannels, scanEvents } from './scan.js';
 import { indexChannels, searchChannels } from './search.js';
@@ -55,6 +56,7 @@ export const channels = mergeRegistries(appChannels, settingsChannels, libraryCh
   projectSchemaChannels,
   mapEditChannels,
   mapViewsChannels,
+  vocabPackChannels,
 );
 
 export const events = mergeRegistries(aiEvents, annotationsEvents, appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, tagReviewEvents, watchEvents, graphEvents, exportEvents, mcpEvents, backupEvents);
@@ -97,4 +99,6 @@ export { RESOURCE_KINDS, type ResourceKind, type ResourceView, type ImportIdItem
 export { CITECTX_LIMITS, COMPARE_LIMITS, GROUPS_LIMITS, compareCellSchema, compareColumnSchema, compareRowSchema, compareTableSchema, groupsOverviewSchema, type CompareCell, type CompareColumn, type CompareRow, type CompareTable, type GroupsOverview } from './synthesis.js';
 export { MAP_EDIT_LIMITS, type MacroChild, type MacroCutItem, type MacroMove, type MacroProposal, type MacroStats, type MapView, type MapViewFrame, type MapViewInput, type MapViewState } from './map-edit.js';
 export { REFS_LIMITS, type GuidePassage, type RefEntry } from './refs.js';
+export type { PackConfidence, PackFamilyInfo, PackFamilyMatch, PackInfo, PackListResult, PackMatch, PackPreview, PackSearchItem, PackState } from './vocab-pack.js';
+export { VOCAB_PACK_LIMITS } from './vocab-pack.js';
 export type { TagProposal, TagRun, TagCleanupRow, TagHealthItem, TagStats, TagAiPlan, TagAiProgress, TagAiRunResult, TagAutoMode, TagAutoState, TagHaikuBatch } from './tag-review.js';

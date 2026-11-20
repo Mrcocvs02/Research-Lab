@@ -545,5 +545,8 @@
     "untitled": "Untitled document",
     "recent": "Latest documents",
     "menu": "Resume or add"
+  },
+  "tagPicker": {
+    "pack": "From the field vocabulary"
   }
 }

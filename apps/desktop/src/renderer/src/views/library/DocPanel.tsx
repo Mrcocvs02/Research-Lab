@@ -486,6 +486,7 @@ export function DocumentCard({ docId, onClose }: { docId: string; onClose(): voi
           placeholder={t('tags.addPlaceholder')}
           onPick={(id) => void tag([docId], { add: [id], ...oneFamilyRemoval(model, doc.tags, id) })}
           onCreate={(label) => createAndAdd([docId], label)}
+          pack={{ docIds: [docId] }}
           testId="tag-input"
         />
         {(doc.groups?.length ?? 0) > 0 && (

@@ -7,7 +7,7 @@ import { normalizeName } from '../normalize.js';
  */
 
 export type Confidence = 'sure' | 'likely' | 'maybe';
-export type ProposalKind = 'merge' | 'twins' | 'parent' | 'name' | 'metadata';
+export type ProposalKind = 'merge' | 'twins' | 'parent' | 'name' | 'metadata' | 'promote';
 
 export interface ReviewNode {
   id: string;
@@ -255,7 +255,7 @@ const evidenceOf = (ix: Index, tags: readonly string[]): Evidence => {
 
 /* ------------------------------------------------------------------ pair rules */
 
-interface Pair {
+export interface Pair {
   a: string;
   b: string;
   rule: string;
@@ -266,7 +266,7 @@ const forms = (n: ReviewNode): string[] => [n.label, ...n.aliases];
 const pairKey = (a: string, b: string): string => (a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`);
 
 /** Rules R1-R6 over the buckets of keys: only nodes that share a bucket are ever compared. */
-function namePairs(ix: Index, active: ReviewNode[], excluded: (a: string, b: string) => boolean): Pair[] {
+export function namePairs(ix: Index, active: ReviewNode[], excluded: (a: string, b: string) => boolean): Pair[] {
   const out = new Map<string, Pair>();
   const rank: Record<Confidence, number> = { sure: 3, likely: 2, maybe: 1 };
   const put = (a: string, b: string, rule: string, confidence: Confidence): void => {
@@ -746,6 +746,41 @@ export function reviewTags(input: ReviewInput): ReviewResult {
         proposals.push({ id: proposalId('metadata', [n.id]), kind: 'metadata', tags: [n.id], keep: n.id, confidence: 'likely', reason: venue !== undefined ? 'venue' : 'status', meta: venue !== undefined ? { field: 'venue', value: venue } : { field: 'status', value: status as string }, evidence: evidenceOf(ix, [n.id]) });
         break;
       }
+    }
+  }
+
+  // --- promotion (D-518): a loose tag ("To sort" or Keywords) used on max(3; 10 %) of the papers earns a place in a many-value family,
+  // under the value that holds most of its papers relative to its size (the lift rule of the cleanup, step 4), at level 1-3 of the family.
+  const need = Math.max(3, Math.ceil(input.docs.length * 0.1));
+  const famRoots = live.filter((n) => n.family === 'many' && n.parents.length === 0);
+  if (famRoots.length > 0) {
+    const levelOf = (id: string): number => {
+      let d = 0;
+      for (let cur = id; d < 20; d++) {
+        const p = ix.byId.get(cur)?.parents.find((x) => ix.byId.has(x));
+        if (p === undefined) break;
+        cur = p;
+      }
+      return d;
+    };
+    const hasKids = new Set(live.flatMap((n) => n.parents));
+    const inFamily = live.filter((n) => n.family === undefined && ix.byId.get(ix.rootOf.get(n.id) as string)?.family === 'many');
+    const biggest = [...famRoots].sort((a, b) => inFamily.filter((n) => ix.rootOf.get(n.id) === b.id).length - inFamily.filter((n) => ix.rootOf.get(n.id) === a.id).length || (a.id < b.id ? -1 : 1))[0] as ReviewNode;
+    for (const n of live) {
+      const root = ix.byId.get(ix.rootOf.get(n.id) as string);
+      if (n.family !== undefined || hasKids.has(n.id) || (root?.family !== undefined && root.family !== 'keywords') || countOf(ix, n.id) < need) continue;
+      const mine = countOf(ix, n.id);
+      let best: { id: string; lift: number; size: number } | undefined;
+      for (const c of inFamily) {
+        if (levelOf(c.id) > 2) continue;
+        const size = countOf(ix, c.id);
+        const p = size === 0 ? 0 : overlap(ix, n.id, c.id).shared / mine;
+        if (p < 0.5 || size === 0) continue;
+        const lift = p / (size / Math.max(1, input.docs.length));
+        if (!best || lift > best.lift || (lift === best.lift && (size < best.size || (size === best.size && c.id < best.id)))) best = { id: c.id, lift, size };
+      }
+      const parent = best?.id ?? biggest.id;
+      proposals.push({ id: proposalId('promote', [parent, n.id]), kind: 'promote', tags: [parent, n.id], keep: parent, confidence: 'likely', reason: 'promote', evidence: evidenceOf(ix, [parent, n.id]) });
     }
   }
 

@@ -1,7 +1,7 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 import type { Plugin } from 'vite';
-import { cpSync, createReadStream, existsSync, statSync } from 'node:fs';
+import { cpSync, createReadStream, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, normalize, resolve, sep } from 'node:path';
 
@@ -63,12 +63,34 @@ function stripDeadShim(): Plugin {
   };
 }
 
+/**
+ * The field vocabulary packs (D-516, section 20.1.5) are data, not code: each `packages/core/src/vocab/packs/<id>.json` is written
+ * minified to `out/main/packs/<id>.json`, next to a small `index.json` (id, version, names, families with their concept counts). The
+ * lazy `vocab-pack` chunk reads them with `fs` on first use, so they never enter a JS chunk and `check:budget` does not count them.
+ */
+function emitPacks(): Plugin {
+  const dir = resolve(import.meta.dirname, '../../packages/core/src/vocab/packs');
+  return {
+    name: 'rl-emit-packs',
+    apply: 'build',
+    generateBundle() {
+      const packs: unknown[] = [];
+      for (const f of readdirSync(dir).filter((x) => x.endsWith('.json')).sort()) {
+        const pack = JSON.parse(readFileSync(join(dir, f), 'utf8')) as { id: string; version: number; label: string; labelIt?: string; families: Array<{ id: string; label: string; singleValue: boolean; concepts: unknown[] }> };
+        this.emitFile({ type: 'asset', fileName: `packs/${pack.id}.json`, source: JSON.stringify(pack) });
+        packs.push({ id: pack.id, version: pack.version, label: pack.label, ...(pack.labelIt ? { labelIt: pack.labelIt } : {}), families: pack.families.map((x) => ({ id: x.id, label: x.label, singleValue: x.singleValue, concepts: x.concepts.length })) });
+      }
+      this.emitFile({ type: 'asset', fileName: 'packs/index.json', source: JSON.stringify({ packs }) });
+    },
+  };
+}
+
 /** Workspace packages ship TypeScript sources: they must be bundled, not externalized. */
 const workspacePackages = ['@rl/core', '@rl/data', '@rl/search', '@rl/ai', '@rl/citations', '@rl/graph', '@rl/export', '@rl/mcp'];
 
 export default defineConfig({
   main: {
-    plugins: [stripDeadShim()],
+    plugins: [stripDeadShim(), emitPacks()],
     // True only in the test build of the packaged app (`npm run dist:test-dir`, RL_PACKAGED_TEST=1 at build time): the
     // one build that accepts a remote debugging port and `--user-data-dir` (D-296). Any other build refuses them.
     define: { __RL_PACKAGED_TEST__: JSON.stringify(process.env.RL_PACKAGED_TEST === '1') },

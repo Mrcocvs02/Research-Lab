@@ -5,7 +5,7 @@ import { isoDateSchema, itemIdSchema, legacySchema, schemaVersionSchema } from '
  * Upper bounds of a taxonomy file (the file is synced and untrusted). Texts and per-node lists match what the
  * `taxonomy:apply` channel accepts; the totals are far above any real library.
  */
-export const TAXONOMY_FILE_LIMITS = { nodes: 50_000, types: 2_000, venues: 20_000, label: 200, aliases: 500, links: 200, mergedFrom: 5_000, group: 100, distinct: 5_000 } as const;
+export const TAXONOMY_FILE_LIMITS = { nodes: 50_000, types: 2_000, venues: 20_000, label: 200, aliases: 500, links: 200, mergedFrom: 5_000, group: 100, distinct: 5_000, pack: 120 } as const;
 const L = TAXONOMY_FILE_LIMITS;
 const labelText = z.string().min(1).max(L.label);
 const aliasList = z.array(z.string().max(L.label)).max(L.aliases);
@@ -42,6 +42,8 @@ export const taxonomyNodeSchema = z.object({
   group: z.string().max(L.group).optional(),
   /** Only on a root: this node is a family of the controlled vocabulary (D-493). */
   family: taxonomyFamilySchema.optional(),
+  /** Link to a concept of the field vocabulary pack, `<packId>/<conceptId>` (D-516). The aliases of the concept are used for recognition only. */
+  pack: z.string().min(3).max(L.pack).optional(),
   createdAt: isoDateSchema.optional(),
   legacy: legacySchema.optional(),
 });

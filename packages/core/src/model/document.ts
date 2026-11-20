@@ -66,6 +66,8 @@ export const aiNewTagSchema = z.object({
   aliases: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
   /** One line: why no existing node fits. */
   reason: z.string().max(500).optional(),
+  /** The proposal is a concept of the field vocabulary (`<packId>/<conceptId>`, D-519): accepting it links the new node to the concept. */
+  pack: z.string().min(3).max(120).optional(),
 });
 export type AiNewTag = z.infer<typeof aiNewTagSchema>;
 

@@ -46,7 +46,7 @@ export function acceptableIds(proposals: readonly Proposal[], nodes: readonly Au
     if (p.confidence === 'maybe' || (sureOnly && !(p.confidence === 'sure' && (p.kind === 'merge' || p.kind === 'name')))) return false;
     if (isMerge(p)) return g.merge(p.tags);
     if (p.kind === 'twins') return g.keywords(p.tags);
-    if (p.kind === 'parent') return g.parent(p.tags[0] as string, p.tags[1] as string);
+    if (p.kind === 'parent' || p.kind === 'promote') return g.parent(p.tags[0] as string, p.tags[1] as string);
     return true;
   };
   if (!dedupe) return proposals.filter(ok).map((p) => p.id);

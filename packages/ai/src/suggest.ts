@@ -153,11 +153,46 @@ export function activeTagNodes(tax: TaxonomyFile | null): TagNodeView[] {
 
 const oneLine = (t: string) => t.replace(/[\r\n|]+/g, ' ').replace(/<<<|>>>/g, ' ').trim();
 
+/* ------------------------------------------------ latent concepts of the field vocabulary (D-519) ------------------------------------------------ */
+
+/** Latent concepts of the field pack a tagging prompt offers, at most (inside the candidate limit). */
+export const LATENT_MAX = 15;
+/** A concept of the field pack no tag of the library stands for yet, under a short id (`f12`) that costs few tokens. */
+export interface LatentConcept {
+  short: string;
+  label: string;
+  aliases: readonly string[];
+  /** Labels of the ancestors, family first (`Topic › Area`); `''` when the concept sits right under the family. */
+  path: string;
+}
+/** Written once, in front of the latent lines, and only when there is at least one. */
+export const LATENT_RULE = '# Ids starting with f are field concepts not yet in the library: use one only if no library node fits';
+/** The latent lines, to go AFTER every line of the library: the rule, then `- f12 | Name | Family › Area` (the path is left out when it is only the family). */
+export function latentLines(latent: readonly LatentConcept[]): string[] {
+  if (latent.length === 0) return [];
+  const path = (p: string): string => (p.includes(' › ') ? ` ${oneLine(p)}` : '');
+  return [LATENT_RULE, ...latent.map((c) => `- ${c.short} | ${oneLine(c.label)} |${path(c.path)}`)];
+}
+/** What cleaning an answer needs to turn an `f…` id, or a free new tag naming a latent concept, into a proposal "from the field". */
+export interface LatentTag {
+  label: string;
+  /** The nearest existing tag above the concept (null: its family root is created on first use). */
+  parentId: string | null;
+  /** `<packId>/<conceptId>`. */
+  pack: string;
+}
+export interface LatentLookup {
+  byShort(id: string): LatentTag | null;
+  byLabel(label: string): LatentTag | null;
+}
+/** Proposals from the field one answer may hold, besides the free new tags. */
+const PACK_NEW_TAGS = 8;
+
 /** The taxonomy as a delimited block: one node per line, `- id | label | parent path | aliases: a, b`. */
-export function taxonomyBlock(nodes: readonly TagNodeView[]): string {
+export function taxonomyBlock(nodes: readonly TagNodeView[], latent: readonly LatentConcept[] = []): string {
   const lines = nodes.map((n) => `- ${n.id} | ${oneLine(n.label)} | ${oneLine(n.path)} | aliases: ${n.aliases.map(oneLine).join(', ')}`);
   const rules = [...new Set(nodes.filter((n) => n.one && n.family).map((n) => oneLine(n.family as string)))].map((f) => `# at most one value of family ${f}`);
-  return `<<<TAXONOMY\n${[...rules, ...lines].join('\n')}\nTAXONOMY>>>`;
+  return `<<<TAXONOMY\n${[...rules, ...lines, ...latentLines(latent)].join('\n')}\nTAXONOMY>>>`;
 }
 
 const newTagSchema = z.object({
@@ -208,8 +243,8 @@ ${rules.join('\n')}`;
 }
 
 /** The prompt of one document: the delimited data and, for tags, the taxonomy. */
-export function suggestPrompt(fields: readonly SuggestField[], dataBlock: string, nodes: readonly TagNodeView[]): string {
-  return `${fields.includes('tags') ? `${taxonomyBlock(nodes)}\n` : ''}${dataBlock}\nFill: ${fields.join(', ')}.`;
+export function suggestPrompt(fields: readonly SuggestField[], dataBlock: string, nodes: readonly TagNodeView[], latent: readonly LatentConcept[] = []): string {
+  return `${fields.includes('tags') ? `${taxonomyBlock(nodes, latent)}\n` : ''}${dataBlock}\nFill: ${fields.join(', ')}.`;
 }
 
 const clip = (t: string, n: number) => (t.length > n ? t.slice(0, n).trimEnd() : t);
@@ -252,6 +287,17 @@ export interface SuggestClean {
 /** `resolveLabels`: label -> id of the existing tag it is a variant of (sure rules; `resolveIncomingLabels` of `@rl/data`, injected by the caller). */
 export interface CleanOptions {
   resolveLabels?: (labels: readonly string[]) => Record<string, string>;
+  /** Concepts of the field pack the prompt offered (D-519): an `f…` id or a new tag that names one becomes a proposal "from the field". */
+  latent?: LatentLookup;
+}
+
+/** A proposal "from the field": the concept as a new tag with its place and link; `reason` is the model's, when it gave one. */
+export function packProposal(t: LatentTag, reason?: string): AiNewTag {
+  return { label: t.label, parentId: t.parentId, aliases: [], pack: t.pack, ...(reason ? { reason } : {}) };
+}
+/** Adds a proposal from the field unless the same concept is already there, up to the cap of one answer. */
+export function addPackProposal(into: AiNewTag[], t: LatentTag | null | undefined, reason?: string): void {
+  if (t && into.length < PACK_NEW_TAGS && !into.some((x) => x.pack === t.pack)) into.push(packProposal(t, reason));
 }
 
 /** The model's answer made safe: only the requested fields, valid tag ids, capped texts and lists. */
@@ -265,7 +311,12 @@ export function cleanSuggestion(raw: SuggestRaw, fields: readonly SuggestField[]
     const add = (id: string | null) => {
       if (id && voc.tags.has(id) && !ids.includes(id)) ids.push(id);
     };
-    for (const r of raw.tagIds ?? []) add(resolve(r));
+    const fromField: AiNewTag[] = [];
+    for (const r of raw.tagIds ?? []) {
+      const id = resolve(r);
+      if (id === null) addPackProposal(fromField, opts.latent?.byShort(r.trim().toLowerCase()));
+      else add(id);
+    }
     const known = new Map<string, string>();
     for (const n of nodes) if (n.status !== 'deprecated') for (const x of [n.label, ...n.aliases]) if (!known.has(x.trim().toLowerCase())) known.set(x.trim().toLowerCase(), n.id);
     const cands: AiNewTag[] = [];
@@ -275,6 +326,11 @@ export function cleanSuggestion(raw: SuggestRaw, fields: readonly SuggestField[]
       const same = known.get(label.toLowerCase());
       if (same !== undefined) {
         add(same); // the label is an existing tag: that tag is the proposal, not a new one
+        continue;
+      }
+      const field = opts.latent?.byLabel(label);
+      if (field) {
+        addPackProposal(fromField, field, clip(t.reason.trim(), SUGGEST_LIMITS.reason));
         continue;
       }
       const parentId = t.parentId ? resolve(t.parentId) : null;
@@ -296,7 +352,7 @@ export function cleanSuggestion(raw: SuggestRaw, fields: readonly SuggestField[]
       if (fresh.length >= SUGGEST_LIMITS.newTags) break;
     }
     out.tags = limitOneFamilies(ids, nodes, voc).slice(0, SUGGEST_LIMITS.list);
-    out.newTags = fresh;
+    out.newTags = [...fresh, ...fromField];
   }
   if (fields.includes('description')) out.description = clip((raw.description ?? '').trim(), SUGGEST_LIMITS.description);
   if (fields.includes('summary')) out.summary = clip((raw.summary ?? '').trim(), SUGGEST_LIMITS.summary);

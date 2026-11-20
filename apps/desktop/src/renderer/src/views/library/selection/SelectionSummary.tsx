@@ -126,6 +126,7 @@ export default function SelectionSummary({ docIds, rows, onNeedRows, onProject, 
           placeholder={t('library.sel.addAll')}
           onPick={(id) => void tag(docIds, { add: [id] })}
           onCreate={(text) => createAndAdd(docIds, text)}
+          pack={docIds.length <= 500 ? { docIds } : undefined}
           testId="bulk-tag-input"
           disabled={busy}
         />

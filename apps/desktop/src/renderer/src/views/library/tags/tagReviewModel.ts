@@ -2,7 +2,7 @@ import type { TagProposal } from '@rl/core';
 import type { ReviewFilter } from './tagHealthModel';
 
 export type { ReviewFilter };
-export const REVIEW_FILTERS: readonly ReviewFilter[] = ['merge', 'twins', 'parent', 'name', 'metadata'];
+export const REVIEW_FILTERS: readonly ReviewFilter[] = ['merge', 'twins', 'parent', 'name', 'metadata', 'promote'];
 const CONF = { sure: 0, likely: 1, maybe: 2 } as const;
 
 /** Claude said "different": the row drops to the "maybe" ones, folded (D-495). */
@@ -20,7 +20,7 @@ export function filterProposals(list: readonly TagProposal[], on: ReadonlySet<Re
 }
 
 export function countByKind(list: readonly TagProposal[]): Record<ReviewFilter, number> {
-  const out: Record<ReviewFilter, number> = { merge: 0, twins: 0, parent: 0, name: 0, metadata: 0 };
+  const out: Record<ReviewFilter, number> = { merge: 0, twins: 0, parent: 0, name: 0, metadata: 0, promote: 0 };
   for (const p of list) out[p.kind]++;
   return out;
 }
@@ -47,7 +47,7 @@ export interface ApplyItem {
 export function applyItem(p: TagProposal, choice: RowChoice | undefined): ApplyItem {
   const out: ApplyItem = { id: p.id };
   const keep = choice?.keep ?? p.keep;
-  if (keep && (p.kind === 'merge' || p.kind === 'parent')) out.keep = keep;
+  if (keep && (p.kind === 'merge' || p.kind === 'parent' || p.kind === 'promote')) out.keep = keep;
   const label = choice?.label?.trim() || undefined;
   if (label && label !== p.label) out.label = label;
   const action = choice?.action ?? p.action;
@@ -72,7 +72,7 @@ export function moveIndex(i: number, key: string, n: number): number {
 }
 
 /** Rows that touch a tag ("Similar" in the node editor). */
-export const proposalsFor = (list: readonly TagProposal[], id: string): TagProposal[] => list.filter((p) => p.kind !== 'parent' && p.tags.includes(id));
+export const proposalsFor = (list: readonly TagProposal[], id: string): TagProposal[] => list.filter((p) => p.kind !== 'parent' && p.kind !== 'promote' && p.tags.includes(id));
 
 /** What "Accept all" takes (D-512): the proposals main marked acceptable (sure and likely, past the guardrails), with how many of each. */
 export function acceptAll(list: readonly TagProposal[], acceptable: readonly string[]): { items: TagProposal[]; sure: number; likely: number } {

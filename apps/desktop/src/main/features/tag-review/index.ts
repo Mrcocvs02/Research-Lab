@@ -70,7 +70,8 @@ function itemOps(input: CleanupInput, review: ReviewResult, plans: Map<string, C
         }
         ops.push(op);
       }
-    } else if (p.kind === 'parent') {
+    } else if (p.kind === 'parent' || p.kind === 'promote') {
+      // `promote`: a loose tag used on enough papers goes under the value the proposal names (D-518); the user may pick another tag of the pair.
       ops.push({ op: 'move', id: p.tags[1] as string, parents: [p.tags[0] as string] });
     } else if (row) {
       const v = row.variants['default'];

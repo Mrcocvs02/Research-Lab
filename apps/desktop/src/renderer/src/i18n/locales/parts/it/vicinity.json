@@ -33,7 +33,7 @@
       "showMap": "Mostra nella Mappa",
       "showLibrary": "Mostra nella Libreria",
       "emptyTitle": "Nessun vocabolario da mostrare",
-      "emptyText": "La famiglia non ha ancora valori con lavori. Etichetta qualche lavoro o scegli un'altra famiglia."
+      "familyEmpty": "Nessun tag di questa famiglia è ancora usato."
     },
     "explore": {
       "mode": "Vista",

@@ -50,6 +50,8 @@ export const taxonomyOpSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('merge'), from: itemIdSchema, into: itemIdSchema }),
   /** Makes a root a family (or clears it with `null`); at most one `keywords` family. */
   z.object({ op: z.literal('setFamily'), id: itemIdSchema, family: taxonomyFamilySchema.nullable() }),
+  /** Links the node to a concept of the field vocabulary (`<packId>/<conceptId>`), or unlinks it with `null` (D-516). */
+  z.object({ op: z.literal('setPack'), id: itemIdSchema, pack: z.string().min(3).max(120).nullable() }),
   z.object({ op: z.literal('markDistinct'), a: itemIdSchema, b: itemIdSchema }),
   z.object({ op: z.literal('unmarkDistinct'), a: itemIdSchema, b: itemIdSchema }),
   z.object({ op: z.literal('deprecate'), id: itemIdSchema }),

@@ -58,7 +58,7 @@ export function VocabularyTree({ onShowInMap }: Props) {
     rl.invoke('taxonomy:get', {}).then(
       (r) => {
         if (!live) return;
-        setNodes(r.nodes.filter((n) => n.status !== 'deprecated').map((n) => ({ id: n.id, label: n.label, parents: n.parents, subtree: n.counts.subtree })));
+        setNodes(r.nodes.filter((n) => n.status !== 'deprecated' && n.counts.subtree > 0).map((n) => ({ id: n.id, label: n.label, parents: n.parents, subtree: n.counts.subtree })));
         setKinds(new Map(r.nodes.map((n) => [n.id, n.family])));
       },
       (e: unknown) => live && setError(e),
@@ -131,9 +131,11 @@ export function VocabularyTree({ onShowInMap }: Props) {
       </div>
       {error ? <ErrorNote testId="vocab-error">{errorMessage(error, t)}</ErrorNote> : null}
       {nodes && roots && tree.length === 0 && !error && (
-        <EmptyState icon={<MapIllustration />} title={t('vicinity.vocab.emptyTitle')}>
-          {t('vicinity.vocab.emptyText')}
-        </EmptyState>
+        <div data-testid="vocab-empty">
+          <EmptyState icon={<MapIllustration />} title={t('vicinity.vocab.emptyTitle')}>
+            {t('vicinity.vocab.familyEmpty')}
+          </EmptyState>
+        </div>
       )}
       {tree.length > 0 && (
         <div className="vocab-scroll">

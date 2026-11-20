@@ -119,7 +119,8 @@
         "twins": "Gemelli",
         "parent": "Genitori",
         "name": "Nomi",
-        "metadata": "Metadati"
+        "metadata": "Metadati",
+        "promote": "Promuovi"
       },
       "conf": {
         "sure": "Sicuro",
@@ -141,7 +142,8 @@
         "author": "nome di un autore",
         "underscore": "trattino basso",
         "case": "maiuscole",
-        "long": "troppo lungo"
+        "long": "troppo lungo",
+        "promote": "usato su molti lavori"
       },
       "keep": "Tieni",
       "parentOf": "Metti sotto",
@@ -165,21 +167,24 @@
         "twins": "Applica",
         "parent": "Metti sotto",
         "name": "Rinomina",
-        "metadata": "Sposta nel campo"
+        "metadata": "Sposta nel campo",
+        "promote": "Metti nella famiglia"
       },
       "reject": {
         "merge": "Non sono uguali",
         "twins": "Lascia",
         "parent": "No",
         "name": "No",
-        "metadata": "No"
+        "metadata": "No",
+        "promote": "No"
       },
       "done": {
         "merge": "Uniti {{count}} tag in «{{name}}»",
         "twins": "Gemelli sistemati",
         "parent": "Tag messo al suo posto",
         "name": "Rinominato in «{{name}}»",
-        "metadata": "Spostato nel campo"
+        "metadata": "Spostato nel campo",
+        "promote": "Tag messo nella sua famiglia"
       },
       "doneMany": "Modifiche applicate: {{count}}",
       "rejected_one": "Segnato come non uguale",

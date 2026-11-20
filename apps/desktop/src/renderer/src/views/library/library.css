@@ -804,6 +804,10 @@ button.page-chip {
   border-radius: var(--r-md);
   background: var(--surface);
 }
+.detail-resize {
+  right: calc(var(--detail-eff, 360px) + 4px);
+  left: auto;
+}
 .detail-empty {
   margin: 0;
 }
@@ -816,7 +820,8 @@ button.page-chip {
 /* The card sits beside the list when there is room for the list (420 px) as well; otherwise it is a drawer over it. */
 @container (min-width: 960px) {
   .library-grid.with-detail {
-    grid-template-columns: 240px minmax(0, 1fr) 360px;
+    --detail-eff: clamp(300px, var(--detail-w, 360px), calc(100cqw - 692px));
+    grid-template-columns: 240px minmax(0, 1fr) var(--detail-eff);
   }
 }
 @container (max-width: 959px) {
@@ -826,8 +831,11 @@ button.page-chip {
     right: 0;
     bottom: 0;
     z-index: 6;
-    width: min(360px, 100%);
+    width: min(var(--detail-w, 360px), 100%);
     box-shadow: var(--e-3);
+  }
+  .detail-resize {
+    right: calc(min(var(--detail-w, 360px), 100%) - 4px);
   }
 }
 /* Folders and tags become a drawer opened from the header when the view is narrower than 900 px. */

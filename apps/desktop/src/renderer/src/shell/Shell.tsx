@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Lazy, lazyView } from '../components/Lazy';
 import { NoticeBanner } from '../components/NoticeBanner';
@@ -12,6 +12,8 @@ import type { NavView } from '../lib/nav';
 import { useNotify } from '../lib/notify';
 import { useReader } from '../lib/reader';
 import { useLocalFlag } from '../lib/useLocalFlag';
+import { useResizable } from '../lib/useResizable';
+import { ResizeHandle } from '../components/ResizeHandle';
 import { useApp } from '../state/app-context';
 import { useScanStatus } from '../views/library/useScanStatus';
 import { Sidebar } from './Sidebar';
@@ -45,6 +47,10 @@ interface Props {
   children: ReactNode;
 }
 
+/** Widths of the resizable columns (px): default, smallest and largest. */
+const SIDEBAR_W = { def: 232, min: 200, max: 320 };
+const CHAT_W = { def: 380, min: 300, max: 560 };
+
 /** `true` while the window is narrow enough for the Claude panel to float over the content (below 1180 px, D-335). */
 const floating = () => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 1179px)').matches === true;
 
@@ -62,6 +68,8 @@ export function Shell({ section, onSection, onNewLibrary, reviewDocs = 0, readin
   // `collapsed` stays the user's choice, so the sidebar comes back as they left it.
   const reading = readingProp || (useReader().target !== null && section === 'library');
   const panel = useRef<HTMLElement>(null);
+  const sideW = useResizable('rl.w.sidebar', SIDEBAR_W);
+  const chatW = useResizable('rl.w.chat', CHAT_W);
   // The chat is mounted the first time the panel opens and then kept (hidden when closed), so a running answer goes on.
   const [chatLoaded, setChatLoaded] = useState(chatOpen);
   useEffect(() => {
@@ -95,11 +103,14 @@ export function Shell({ section, onSection, onNewLibrary, reviewDocs = 0, readin
   const aiCount = app.config?.aiEnabledFolders.length ?? 0;
   return (
     <InShellContext.Provider value={true}>
-      <div className="shell" data-testid="shell" data-collapsed={collapsed || reading ? 'true' : undefined} data-reading={reading ? 'true' : undefined} data-chat={chatOpen ? 'open' : 'closed'}>
+      <div className="shell" data-testid="shell" data-collapsed={collapsed || reading ? 'true' : undefined} data-reading={reading ? 'true' : undefined} data-chat={chatOpen ? 'open' : 'closed'} style={{ '--sidebar-user': `${sideW.width}px`, '--chat-w': `${chatW.width}px` } as CSSProperties}>
         <a className="skip-link" href="#main">
           {t('shell.skip')}
         </a>
         <Sidebar view={section} onSection={onSection} onNewLibrary={onNewLibrary} proposals={reviewDocs} documents={scan.status && app.activeProfile ? scan.status.indexed : null} collapsed={collapsed || reading} onToggle={() => !reading && setCollapsed(!collapsed)} chatId={chatId} />
+        <div className="shell-resize">
+          <ResizeHandle r={sideW} edge="end" label={t('common.resizeSidebar')} testId="resize-sidebar" />
+        </div>
         {reading ? (
           <header className="topbar topbar--reader" data-testid="topbar">
             <div id="reader-bar-slot" className="reader-bar-slot" />
@@ -117,6 +128,7 @@ export function Shell({ section, onSection, onNewLibrary, reviewDocs = 0, readin
         </main>
 
         <aside ref={panel} id={chatId} className="claude-panel" aria-label={t('chat.title')} data-testid="chat-panel" hidden={!chatOpen}>
+          <ResizeHandle r={chatW} edge="start" label={t('common.resizeChat')} testId="resize-chat" />
           <div className="chat-head">
             <span className="chat-head__title">
               <Icon name="claude" className="chat-head__ai" />

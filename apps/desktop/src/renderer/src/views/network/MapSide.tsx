@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ResizeHandle } from '../../components/ResizeHandle';
 import { Segmented } from '../../components/Segmented';
+import { useResizable } from '../../lib/useResizable';
 import { safeText } from '../library/safeText';
 import { ChipPop } from './NetChrome';
 import type { EdgeMode, EvFilter } from './edges';
@@ -133,11 +135,13 @@ interface FrameProps {
  */
 export function MapSide({ open, onToggle, minimapRef, ...p }: FrameProps & { open: boolean; onToggle(): void; minimapRef(el: HTMLElement | null): void }) {
   const { t } = useTranslation();
+  const w = useResizable('rl.w.mapSide', { def: 248, min: 220, max: 420 });
   return (
-    <aside className={open ? 'map-side' : 'map-side is-folded'} data-testid="map-side" aria-label={t('network.blocks.side')}>
+    <aside className={open ? 'map-side' : 'map-side is-folded'} style={open ? { width: w.width } : undefined} data-testid="map-side" aria-label={t('network.blocks.side')}>
       <button type="button" className="icon-button map-side-toggle" aria-expanded={open} aria-label={open ? t('network.blocks.sideHide') : t('network.blocks.sideShow')} title={open ? t('network.blocks.sideHide') : t('network.blocks.sideShow')} onClick={onToggle} data-testid="map-side-toggle">
         <span aria-hidden="true">{open ? '›' : '‹'}</span>
       </button>
+      {open && <ResizeHandle r={w} edge="start" label={t('common.resizeMap')} testId="resize-map-side" />}
       {open && (
         <div className="map-side-body">
           {p.blocks.length > 0 ? <BlockList blocks={p.blocks} onLight={p.onLight} onFly={p.onFly} /> : p.legend}

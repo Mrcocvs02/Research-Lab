@@ -8,6 +8,12 @@
     "en": "English"
   },
   "common": {
+    "resizeHint": "Trascina per ridimensionare, doppio clic per ripristinare",
+    "resizeSidebar": "Ridimensiona la barra laterale",
+    "resizeDetails": "Ridimensiona il pannello dei dettagli",
+    "resizeChat": "Ridimensiona il pannello di Claude",
+    "resizeMap": "Ridimensiona il pannello laterale della mappa",
+    "resizeReader": "Ridimensiona il pannello laterale del lettore",
     "loading": "Caricamento…",
     "retry": "Riprova",
     "save": "Salva",

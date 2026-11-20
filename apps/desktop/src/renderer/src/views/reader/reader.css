@@ -174,7 +174,14 @@
   grid-template-columns: minmax(0, 1fr);
 }
 .reader-body.with-side {
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) min(var(--reader-side-w, 340px), 60%);
+}
+.reader-body {
+  position: relative;
+}
+.reader-resize {
+  right: calc(min(var(--reader-side-w, 340px), 60%) - 4px);
+  left: auto;
 }
 .reader-main {
   position: relative;

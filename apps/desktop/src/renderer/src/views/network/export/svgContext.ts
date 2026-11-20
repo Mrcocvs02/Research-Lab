@@ -169,13 +169,6 @@ export class SvgContext {
     this.cx = x + r;
     this.cy = y;
   }
-  rect(x: number, y: number, w: number, h: number): void {
-    this.moveTo(x, y);
-    this.d += `H${num(x + w)}V${num(y + h)}H${num(x)}Z`;
-  }
-  fillRect(x: number, y: number, w: number, h: number): void {
-    this.push(`<rect x="${num(x)}" y="${num(y)}" width="${num(w)}" height="${num(h)}"${this.fillAttrs()}/>`);
-  }
 
   // ---- painting ----
   private fillAttrs(): string {
@@ -208,7 +201,7 @@ export class SvgContext {
   private textEl(text: string, x: number, y: number, maxWidth: number | undefined, paint: string): void {
     if (text === '') return;
     const anchor = this.textAlign === 'center' ? 'middle' : this.textAlign === 'right' || this.textAlign === 'end' ? 'end' : 'start';
-    const dy = this.textBaseline === 'middle' ? ' dy=".35em"' : this.textBaseline === 'top' ? ' dy=".8em"' : this.textBaseline === 'bottom' ? ' dy="-.2em"' : '';
+    const dy = this.textBaseline === 'middle' ? ' dy=".35em"' : '';
     // Canvas shrinks a text wider than `maxWidth`; SVG does so with textLength, only when the text is wider.
     const squeeze = maxWidth !== undefined && this.measure(this.font, text) > maxWidth ? ` textLength="${num(maxWidth)}" lengthAdjust="spacingAndGlyphs"` : '';
     this.push(`<text x="${num(x)}" y="${num(y)}"${dy}${anchor === 'start' ? '' : ` text-anchor="${anchor}"`}${fontAttrs(this.font)}${squeeze}${paint}>${xmlEscape(text)}</text>`);

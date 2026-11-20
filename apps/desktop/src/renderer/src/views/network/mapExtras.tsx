@@ -383,7 +383,7 @@ export function useMapExtras(p: MapExtrasInput): MapExtras {
     () => ({
       capture: () => api.current.captureView(),
       apply: (v: MapViewState) => api.current.applyView(v),
-      defaultName: () => `${familyName} · ${t(onlyUnread ? 'mapViews.filterUnread' : gaps ? 'mapViews.filterGaps' : 'mapViews.filterAll')} · ${new Date().toLocaleDateString(i18n.language)}`,
+      defaultName: () => t('mapViews.defaultName', { family: familyName, filter: t(onlyUnread ? 'mapViews.filterUnread' : gaps ? 'mapViews.filterGaps' : 'mapViews.filterAll'), date: new Date().toLocaleDateString(i18n.language) }),
       selectionTooBig: () => multiIds.length > MAP_EDIT_LIMITS.selection,
       notify: { info, fail, error: reportError },
     }),

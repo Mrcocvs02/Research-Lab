@@ -518,3 +518,27 @@ describe('isolated values: no block of one work is left (D-562)', () => {
     expect(mapShows(applied(input, sel.ops), input.docs).smallest).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe('measureFamily under a Topic family root (D-572)', () => {
+  it('a macro-area that covers most papers stays a block; its sub-areas never become blocks', () => {
+    const nodes = [
+      { id: 'topic', label: 'Topic', parents: [] as string[], family: 'many' },
+      { id: 'ma', label: 'MA', parents: ['topic'] },
+      { id: 'mb', label: 'MB', parents: ['topic'] },
+      { id: 'ma1', label: 'MA1', parents: ['ma'] },
+      { id: 'ma2', label: 'MA2', parents: ['ma'] },
+      { id: 'mb1', label: 'MB1', parents: ['mb'] },
+    ];
+    const tags = (id: string) => [{ id, w: 1 }];
+    const docs = [
+      ...Array.from({ length: 5 }, (_, i) => ({ id: `a${i}`, tags: tags('ma1') })),
+      ...Array.from({ length: 3 }, (_, i) => ({ id: `c${i}`, tags: tags('ma2') })),
+      { id: 'b0', tags: tags('mb1') },
+      { id: 'b1', tags: tags('mb1') },
+    ];
+    const m = measureFamily(nodes, docs, { mode: 'topic' });
+    expect([...m.main.keys()].sort()).toEqual(['ma', 'mb']);
+    expect(m.main.get('ma')).toBe(8);
+    expect(m.blocks).toBe(2);
+  });
+});

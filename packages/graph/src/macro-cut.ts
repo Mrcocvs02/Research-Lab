@@ -343,15 +343,17 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
     return clarity * (m.covered / n) - 0.05 * Math.max(0, m.blocks - kMax) - 0.15 * Math.max(0, kMin - m.blocks) - 0.06 * m.small - 0.08 * m.generic - 2 * Math.max(0, m.largest / n - CUT.big);
   };
   const latentIds = new Set((input.latent ?? []).map((l) => l.id));
+  const topicRooted = input.family !== 'root' && input.root !== undefined && live.get(input.root)?.family === 'many';
   const objective = (a: Agg): number => {
     let small = 0;
     for (const c of a.main.values()) if (c < sMin) small++;
     let generic = 0;
     // A parent made by gathering is as big as the values under it: the size of its block is held by the penalty for the biggest block.
     for (const [v, c] of a.carry) if (c / n > CUT.generic && !(v.startsWith('new:') || latentIds.has(v))) generic++;
-    // The Map gives way to the children of a value that covers four papers in five (`computeAreas`): such a parent would be undone at once.
+    // Without a Topic family root the Map gives way to the children of a value that covers four papers in five (`computeAreas`): such a parent
+    // would be undone at once. Under a Topic family root the level 1 values are never replaced by their children (D-572): no penalty.
     let wide = 0;
-    for (const c of a.carry.values()) if (a.covered > 0 && c / a.covered >= 0.8) wide++;
+    if (!topicRooted) for (const c of a.carry.values()) if (a.covered > 0 && c / a.covered >= 0.8) wide++;
     return objectiveOf({ blocks: a.main.size, clear: a.clear, covered: a.covered, small, generic, largest: Math.max(0, ...a.main.values()) }) - 0.5 * wide;
   };
   const state0 = (): State => ({ cut: new Set(top), v: new Map(), vpar: new Map(), lifts: new Map() });

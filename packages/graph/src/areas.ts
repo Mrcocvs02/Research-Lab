@@ -10,6 +10,8 @@ export interface AreaNode {
   status?: string | undefined;
   /** The colour the user gave to the node (`#rrggbb`): it wins over the tint of the area (§18.3.4). */
   color?: string | undefined;
+  /** Family of a root (`many`, `one`, `keywords`): a root with `many` is the Topic of the Map, whose level-1 children are the areas (D-572). */
+  family?: string | undefined;
 }
 export interface AreaDoc {
   id: string;
@@ -114,24 +116,37 @@ export function computeAreas(nodes: readonly AreaNode[], docs: readonly AreaDoc[
   const withTags = rows.filter((r) => r.w.size > 0);
   const cover = (a: string): number => withTags.reduce((n, r) => n + ([...r.w.keys()].some((t) => anc(t).has(a)) ? 1 : 0), 0);
 
-  // 1. Areas: the roots; a root that covers 80 % of the tagged documents gives way to its children (at most twice).
-  // When the taxonomy has a hierarchy (two roots or more with children), a root without children is a loose tag, not an area:
-  // it colours a document only when none of the document's tags reaches a real area (audit on real data, D-490).
+  // 1. Areas. With a Topic family root (a root with `family: 'many'`, §19.1.1) the areas are exactly its level-1 children that cover at least one
+  // paper, whatever their coverage: a macro-area of the field is never replaced by its sub-areas (D-572); the other roots are loose tags (D-490).
+  // Without one: the roots; a root that covers 80 % of the tagged documents gives way to its children (at most twice). When the taxonomy has a
+  // hierarchy (two roots or more with children), a root without children is a loose tag, not an area: it colours a document only when none of
+  // the document's tags reaches a real area (audit on real data, D-490).
   const roots = [...live.keys()].filter((id) => parentsOf(id).length === 0).sort(cmp);
-  const loose = new Set(roots.filter((id) => kids.has(id)).length >= 2 ? roots.filter((id) => !kids.has(id)) : []);
-  let set = roots.filter((id) => !loose.has(id));
-  for (let round = 0; round < DESCENTS && withTags.length > 0; round++) {
-    const next: string[] = [];
-    let changed = false;
-    for (const a of set) {
-      const sub = (kids.get(a) ?? []).filter((k) => cover(k) > 0);
-      if (sub.length >= 2 && (kids.get(a)?.length ?? 0) >= 2 && cover(a) / withTags.length >= COVER) {
-        next.push(...sub);
-        changed = true;
-      } else next.push(a);
+  const topicRoot = roots
+    .filter((id) => live.get(id)?.family === 'many')
+    .sort((a, b) => (kids.get(b)?.length ?? 0) - (kids.get(a)?.length ?? 0) || cmp(a, b))
+    .find((id) => (kids.get(id) ?? []).some((k) => cover(k) > 0));
+  let loose: Set<string>;
+  let set: string[];
+  if (topicRoot !== undefined) {
+    set = (kids.get(topicRoot) ?? []).filter((k) => cover(k) > 0);
+    loose = new Set(roots.filter((id) => id !== topicRoot));
+  } else {
+    loose = new Set(roots.filter((id) => kids.has(id)).length >= 2 ? roots.filter((id) => !kids.has(id)) : []);
+    set = roots.filter((id) => !loose.has(id));
+    for (let round = 0; round < DESCENTS && withTags.length > 0; round++) {
+      const next: string[] = [];
+      let changed = false;
+      for (const a of set) {
+        const sub = (kids.get(a) ?? []).filter((k) => cover(k) > 0);
+        if (sub.length >= 2 && (kids.get(a)?.length ?? 0) >= 2 && cover(a) / withTags.length >= COVER) {
+          next.push(...sub);
+          changed = true;
+        } else next.push(a);
+      }
+      set = [...new Set(next)];
+      if (!changed) break;
     }
-    set = [...new Set(next)];
-    if (!changed) break;
   }
   const areaSet = new Set([...set, ...loose]);
   const branchOf = (area: string, x: string): string => (x === area ? '' : (kids.get(area) ?? []).find((c) => anc(x).has(c)) ?? '');

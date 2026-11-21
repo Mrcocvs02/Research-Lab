@@ -45,7 +45,7 @@ Configurata in `.claude/settings.local.json` (non versionato) della cartella di 
 
 ## Compact instructions
 Quando compatti il contesto conserva, in quest'ordine:
-- fase e onda correnti (fase 8 completa con tag `phase-8`; versioni 1.0, 1.1.0 (`v1.1.0`) e 1.2.0 (`v1.2.0`) rilasciate; onda 15 fatta e unita su `main`, D-516..D-562; versione 1.3.0 rilasciata (`1c75187`, tag `v1.3.0`); onda 15b unita su `main` (`f30cc5d`, ultimo commit di codice, D-563..D-574, non rilasciata); prossimo: suite completa, tagging AI dei 5 articoli senza tag (≤ $0,10), poi 1.4.0; tag di fase già creati (`phase-0`..`phase-3`, `phase-6`, `phase-7`, `phase-8`; `phase-4`, `phase-5` senza tag);
+- fase e onda correnti (fase 8 completa con tag `phase-8`; versioni 1.0, 1.1.0 (`v1.1.0`) e 1.2.0 (`v1.2.0`) rilasciate; onda 15 fatta e unita su `main`, D-516..D-562; versione 1.3.0 rilasciata (`1c75187`, tag `v1.3.0`); onda 15b e D-575, D-576 rilasciate con la 1.4.0 (`ed375eb`, ultimo commit di codice, tag `v1.4.0`); prossimo: nulla in corso; tag di fase già creati (`phase-0`..`phase-3`, `phase-6`, `phase-7`, `phase-8`; `phase-4`, `phase-5` senza tag);
 - nessun subagent in corso e nessun ramo non unito; funzione 49 fatta (Z1a–Z1c, D-478..D-485);
 - lacune note dopo l'onda 14 (in `docs/HANDOFF.md`, sezione 5);
 - preferenze dell'utente: subagent Sonnet per logica, interfacce, revisioni e sicurezza; Haiku per il lavoro meccanico (worktree, controlli, docs di stato, traduzioni); coppia Opus solo per il design; al massimo 2 subagent insieme; test solo alla fine, quelli pesanti uno alla volta; niente coautore Claude nei commit, identità locale, push a ogni passo; nessuna domanda bloccante; app leggera ma senza togliere funzioni utili;

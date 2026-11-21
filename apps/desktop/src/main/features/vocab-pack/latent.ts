@@ -10,8 +10,8 @@ import { readState } from './state.js';
  * the pack the library uses. Without a pack nothing here runs and the prompt is the one it always was.
  */
 
-/** What a prompt with latent concepts adds per work, at most (15 lines of about 70 characters, the rule): the cost preview counts it. */
-export const LATENT_ESTIMATE_CHARS = 15 * 70 + 120;
+/** What a prompt with latent concepts adds per work, at most (`LATENT_CHARS` of `@rl/ai`: the rule and the lines that fit): the cost preview counts it. */
+export const LATENT_ESTIMATE_CHARS = 1100;
 
 export interface LatentContext {
   /** The concepts a work may be offered: those no tag stands for yet. */

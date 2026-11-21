@@ -1,5 +1,5 @@
 import type { PackFamilyMatch, PackMatch } from '@rl/core';
-import { acroOf, buildIndex, formKey, meaningfulCount, namePairs, type Confidence, type Pair, type ReviewNode } from './tag-review.js';
+import { acroOf, buildIndex, formKey, meaningfulCount, namePairs, splitAcronymName, type Confidence, type Pair, type ReviewNode } from './tag-review.js';
 
 /**
  * Pairing of a field vocabulary pack with the vocabulary of the library (D-517, section 20.1.2): which root of the library each pack family
@@ -187,13 +187,29 @@ export function matchPack(input: PackMatchInput): PackMatchResult {
     return best === undefined ? base : worse(base, best);
   };
 
+  // A match that only an alias of the user's tag makes (its label alone does not meet the concept) is sure only when that alias has at least
+  // as many meaningful words as the label (acronym in brackets apart): a tag that is narrower than the concept ("X Y (S)" carrying the
+  // alias "Y") is not the concept, whatever rule made the alias meet it (D-562).
+  const viaUserAlias = (nodeId: string, c: PackConceptIn | undefined, base: Confidence): Confidence => {
+    const user = userById.get(nodeId);
+    if (base !== 'sure' || !user || !c || user.aliases.length === 0) return base;
+    const names = [c.label, ...(c.labelIt ? [c.labelIt] : []), ...c.aliases];
+    const meets = (form: string): boolean => {
+      const two = [reviewNode(user.id, form, []), reviewNode(CONCEPT, names[0] as string, names.slice(1))];
+      return namePairs(buildIndex({ nodes: two, docs: [] }), two, () => false).length > 0;
+    };
+    if (meets(user.label)) return base;
+    const words = meaningfulCount(splitAcronymName(user.label)?.name ?? user.label);
+    return user.aliases.some((a) => meets(a) && meaningfulCount(splitAcronymName(a)?.name ?? a) >= words) ? base : worse(base, 'likely');
+  };
+
   type Cand = { nodeId: string; conceptId: string; rule: string; confidence: Confidence };
   const cands = new Map<string, Cand>();
   for (const p of pairs) {
     const [nodeId, concept] = isConcept(p.a) ? [p.b, p.a] : [p.a, p.b];
     const conceptId = concept.slice(1);
     if (apart.has(pairKey(nodeId, conceptId))) continue;
-    const confidence = viaAlias(nodeId, concepts.get(conceptId), asked(p));
+    const confidence = viaUserAlias(nodeId, concepts.get(conceptId), viaAlias(nodeId, concepts.get(conceptId), asked(p)));
     const k = pairKey(nodeId, conceptId);
     const old = cands.get(k);
     if (!old || RANK[confidence] < RANK[old.confidence]) cands.set(k, { nodeId, conceptId, rule: p.rule, confidence });

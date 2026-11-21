@@ -1,5 +1,5 @@
 import { ancestorsOf, type GraphNode } from './closure.js';
-import { LATENT_MAX, latentLines, vocabularyOf, type LatentConcept } from '../suggest.js';
+import { LATENT_MAX, latentFit, latentLines, vocabularyOf, type LatentConcept } from '../suggest.js';
 import { clip, norm, oneLine, tokenize } from './text.js';
 
 /** A taxonomy node as the candidate retrieval sees it. */
@@ -97,9 +97,11 @@ export function retrieveCandidates(noteText: string, nodes: readonly CandidateNo
 export function pickLatent(text: string, pool: readonly LatentConcept[], max = LATENT_MAX): LatentConcept[] {
   const nodes: CandidateNode[] = pool.map((c) => ({ id: c.short, label: c.label, aliases: c.aliases, parents: [], implies: [] }));
   const byShort = new Map(pool.map((c) => [c.short, c]));
-  return retrieveCandidates(text, nodes, { top: max, max })
-    .filter((c) => c.via === 'text')
-    .flatMap((c) => byShort.get(c.id) ?? []);
+  return latentFit(
+    retrieveCandidates(text, nodes, { top: max, max })
+      .filter((c) => c.via === 'text')
+      .flatMap((c) => byShort.get(c.id) ?? []),
+  );
 }
 
 /** The candidates as a delimited block, one per line: `- id | label | path | definition | aliases: a, b`. */

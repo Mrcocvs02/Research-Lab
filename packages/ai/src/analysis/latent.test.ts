@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { TaxonomyFile } from '@rl/core';
 import { candidateBlock, pickLatent, type CandidateNode } from './candidates.js';
 import { cleanAnalysis, type AnalysisRaw } from './prompts.js';
-import { cleanSuggestion, LATENT_MAX, LATENT_RULE, latentLines, suggestPrompt, taxonomyBlock, type LatentConcept, type LatentLookup, type TagNodeView } from '../suggest.js';
+import { approxTokens } from '../pricing.js';
+import { cleanSuggestion, LATENT_CHARS, LATENT_MAX, LATENT_RULE, latentFit, latentLines, suggestPrompt, taxonomyBlock, type LatentConcept, type LatentLookup, type TagNodeView } from '../suggest.js';
 
 /** Latent concepts of the field vocabulary in the tagging prompts (D-519): synthetic names only. */
 const node = (id: string, label: string, parents: string[] = [], extra: Partial<CandidateNode> = {}): CandidateNode => ({ id, label, aliases: [], parents, ...extra });
@@ -57,6 +58,22 @@ describe('latent lines', () => {
     expect(picked.length).toBe(15);
     expect(new Set(picked.map((p) => p.short)).size).toBe(15);
     expect(pickLatent(text, pool)).toEqual(picked);
+  });
+
+  it('add at most 300 tokens to a prompt, even with the longest names and paths (D-562)', () => {
+    const long = (n: number): LatentConcept => latent(100 + n, `${'Very long concept name '.repeat(8)}${n}`, `Topic › ${'A long area name '.repeat(6)} › ${'Another long area '.repeat(4)}`);
+    const pool = Array.from({ length: LATENT_MAX }, (_, i) => long(i));
+    const worst = latentLines(pool).join('\n');
+    expect(approxTokens(worst.length + 1)).toBeLessThanOrEqual(300);
+    expect(worst.length).toBeLessThanOrEqual(LATENT_CHARS);
+    // What the prompt offers is what the lines show, best first; typical short lines all fit.
+    const fit = latentFit(pool);
+    expect(fit.length).toBeGreaterThan(0);
+    expect(fit.length).toBeLessThan(LATENT_MAX);
+    expect(latentLines(pool)).toHaveLength(fit.length + 1);
+    expect(pickLatent(pool.map((p) => p.label).join(' '), pool).every((p, i) => p === fit[i] || i >= fit.length)).toBe(true);
+    const short = Array.from({ length: LATENT_MAX }, (_, i) => latent(i, `Theme ${i}`));
+    expect(latentFit(short)).toHaveLength(LATENT_MAX);
   });
 
   it('offer only what the text is about', () => {

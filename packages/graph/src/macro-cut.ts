@@ -121,6 +121,8 @@ interface State {
   v: Map<string, VNode>;
   /** Member -> the virtual node it was gathered under. */
   vpar: Map<string, string>;
+  /** A value too deep to gather (its subtree would pass depth 3) -> the children that rose to level 1 in its place (they are what gets gathered). */
+  lifts: Map<string, string[]>;
 }
 interface DocState {
   main: string | null;
@@ -342,10 +344,11 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
     for (const c of a.carry.values()) if (a.covered > 0 && c / a.covered >= 0.8) wide++;
     return objectiveOf({ blocks: a.main.size, clear: a.clear, covered: a.covered, small, generic, largest: Math.max(0, ...a.main.values()) }) - 0.5 * wide;
   };
-  const state0 = (): State => ({ cut: new Set(top), v: new Map(), vpar: new Map() });
-  const clone = (st: State): State => ({ cut: new Set(st.cut), v: new Map(st.v), vpar: new Map(st.vpar) });
+  const state0 = (): State => ({ cut: new Set(top), v: new Map(), vpar: new Map(), lifts: new Map() });
+  const clone = (st: State): State => ({ cut: new Set(st.cut), v: new Map(st.v), vpar: new Map(st.vpar), lifts: new Map(st.lifts) });
 
   // ---- moves on a state (a move gives the changed state, or null when it does not apply)
+  type Cand = { state: State; touched: string[] };
   const slugs = new Set(input.nodes.map((x) => x.id));
   const splitState = (st: State, g: string): State | null => {
     const rise = (kids.get(g) ?? []).filter((c) => under(c).size > 0);
@@ -355,11 +358,42 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
     for (const c of rise) next.cut.add(c);
     return next;
   };
+  /** A child that rose in place of a deep value -> that value (its name stands for the child in a provisional parent). */
+  const liftOrigin = new Map<string, string>();
+  /** The children lifted in place of a value, at any depth. */
+  const liftedAll = (st: State): Set<string> => new Set([...st.lifts.values()].flat());
+  /**
+   * A value of the cut that is too deep to gather (it would take its subtree below depth 3) and holds no paper by itself: its children rise to level 1
+   * in its place, and they are what a gather takes (the value stays as a tag with no papers). `null` when it does not apply.
+   */
+  const liftState = (st: State, a: string): { state: State; units: string[] } | null => {
+    if (!st.cut.has(a) || st.v.has(a) || 1 + 1 + height(a) <= CUT.maxDepth) return null;
+    const next = clone(st);
+    const units: string[] = [];
+    const rise = (x: string): boolean => {
+      if ((docsOfTag.get(x) ?? []).length > 0) return false;
+      const ks = (kids.get(x) ?? []).filter((c) => under(c).size > 0);
+      if (ks.length === 0) return false;
+      next.cut.delete(x);
+      next.lifts.set(x, ks);
+      for (const c of ks) {
+        liftOrigin.set(c, liftOrigin.get(x) ?? x);
+        next.cut.add(c);
+        if (1 + 1 + height(c) <= CUT.maxDepth) units.push(c);
+        else if (!rise(c)) return false;
+      }
+      return true;
+    };
+    return rise(a) ? { state: next, units: units.sort(cmp) } : null;
+  };
   const latent = [...(input.latent ?? [])].sort((a, b) => a.covers.length - b.covers.length || cmp(a.id, b.id));
   /** The id and the provisional name of a parent over `members`: the biggest three by papers. */
   const provisional = (members: readonly string[]): { id: string; name: string } => {
     const byPapers = [...members].sort((x, y) => under(y).size - under(x).size || cmp(x, y));
-    return { id: `new:${[...members].sort(cmp).join('+')}`, name: byPapers.map((m) => label(m)).slice(0, 3).join(' & ') + (byPapers.length > 3 ? ' & …' : '') };
+    // A child that rose in place of a deep value is named by that value.
+    const origin = (m: string): string => liftOrigin.get(m) ?? m;
+    const names = [...new Set(byPapers.map((m) => label(origin(m))))];
+    return { id: `new:${[...members].sort(cmp).join('+')}`, name: names.slice(0, 3).join(' & ') + (names.length > 3 ? ' & …' : '') };
   };
   /** The ways two values of the cut gather: under each of the two smallest ancestors of the vocabulary above both, under a node already there above both, or else under a parent with a provisional name. */
   const gatherStates = (st: State, a: string, b: string): Array<{ state: State; touched: string[] }> => {
@@ -397,7 +431,20 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
     return out;
   };
   /** A unit (a value of the cut, real or gathered) joins another: two values gather; a value joins a gathered parent; two gathered parents become one. Several values under one parent are what makes a paper with two or three small topics clear. */
-  const joinStates = (st: State, a: string, b: string): Array<{ state: State; touched: string[] }> => {
+  const joinStates = (st: State, a: string, b: string): Cand[] => {
+    // A value too deep to gather: its children rise and go in its place, one after the other.
+    for (const [deep, other] of [[a, b], [b, a]] as const) {
+      const lifted = st.v.has(deep) ? null : liftState(st, deep);
+      if (!lifted || lifted.units.length === 0) continue;
+      let cur: Cand[] = joinStates(lifted.state, lifted.units[0] as string, other).map((c) => ({ state: c.state, touched: [...lifted.units, ...c.touched, deep] }));
+      for (const u of lifted.units.slice(1)) {
+        cur = cur.flatMap((c) => {
+          const parent = [...c.state.v.values()].find((v) => v.members.includes(lifted.units[0] as string));
+          return parent ? joinStates(c.state, u, parent.id).slice(0, 1).map((j) => ({ state: j.state, touched: [...c.touched, ...j.touched] })) : [];
+        });
+      }
+      return cur.slice(0, 2);
+    }
     const va = st.v.get(a);
     const vb = st.v.get(b);
     if (!va && !vb) return gatherStates(st, a, b);
@@ -481,7 +528,6 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
     return out;
   };
 
-  type Cand = { state: State; touched: string[] };
   type Scored = { state: State; agg: Agg; j: number };
   const score = (c: Cand, st: State, agg: Agg): Scored => {
     const affected = new Set<number>();
@@ -546,7 +592,7 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
     for (let round = 0; round < Math.max(CUT.rounds, top.length); round++) {
       const scored: Scored[] = [];
       for (const m of [...st.cut].sort(cmp)) {
-        if (st.v.has(m) || (agg.carry.get(m) ?? 0) / n <= CUT.generic) continue;
+        if (st.v.has(m) || liftedAll(st).has(m) || (agg.carry.get(m) ?? 0) / n <= CUT.generic) continue;
         const sp = splitState(st, m);
         if (!sp) continue;
         let cur = score({ state: sp, touched: [m, ...sp.cut].filter((x) => !st.cut.has(x) || x === m) }, st, agg);
@@ -578,7 +624,7 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
   // ---- the operations a cut leads to, and the numbers the Map shows after them
   const splitsOf = (st: State): string[] => {
     const members = new Set([...st.v.values()].flatMap((v) => v.members));
-    return top.filter((g) => !st.cut.has(g) && !members.has(g));
+    return top.filter((g) => !st.cut.has(g) && !members.has(g) && !st.lifts.has(g));
   };
   const risen = (st: State, g: string): string[] => [...st.cut].filter((c) => !st.v.has(c) && !topSet.has(c) && topOf(c) === g).sort(cmp);
   /** Operations of a cut (provisional parents take their label as it is in `st`), the concepts of the vocabulary it needs, and the id each gathered parent will have. */
@@ -608,6 +654,7 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
       ops.push({ op: 'setFamily', id: g, family: 'many' });
       for (const c of risen(st, g)) ops.push({ op: 'move', id: c, parents: level1 });
     }
+    for (const c of [...liftedAll(st)].sort(cmp)) if (st.cut.has(c) && !st.v.has(c)) ops.push({ op: 'move', id: c, parents: level1 });
     for (const v of [...st.v.values()].sort((a, b) => cmp(a.id, b.id))) for (const m of v.members) ops.push({ op: 'move', id: m, parents: [idOf.get(v.id) as string] });
     return { ops, materialize, idOf, packs };
   };
@@ -666,7 +713,7 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
   const finalSt = result.st;
   const finalAgg = assess(finalSt, null, null);
   const inMember = new Set([...finalSt.v.values()].flatMap((v) => v.members));
-  const splits = top.filter((g) => !finalSt.cut.has(g) && !inMember.has(g));
+  const splits = top.filter((g) => !finalSt.cut.has(g) && !inMember.has(g) && !finalSt.lifts.has(g));
   const childOf = (m: string, st: State, a: Agg): CutChild => ({ id: m, label: label(m, st), papers: a.carry.get(m) ?? under(m).size });
   /** Every node that rose out of `g`: in the cut, or gathered under a parent after rising. */
   const riseAll = (st: State, g: string): string[] => [...new Set([...st.cut, ...[...st.v.values()].flatMap((v) => v.members)])].filter((c) => !st.v.has(c) && !topSet.has(c) && topOf(c) === g).sort(cmp);
@@ -709,6 +756,17 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
       st.cut.delete(v.id);
       st.v.delete(v.id);
       for (const x of v.members) (st.cut.add(x), st.vpar.delete(x));
+    }
+    // A deep value whose children all came back to the cut stands as itself again.
+    for (let again = true; again; ) {
+      again = false;
+      for (const [deep, ks] of [...st.lifts].sort((x, y) => cmp(x[0], y[0]))) {
+        if (!ks.every((c) => st.cut.has(c))) continue;
+        for (const c of ks) st.cut.delete(c);
+        st.cut.add(deep);
+        st.lifts.delete(deep);
+        again = true;
+      }
     }
     for (const m of moves) {
       if (!off.has(m.id) || m.kind !== 'split') continue;

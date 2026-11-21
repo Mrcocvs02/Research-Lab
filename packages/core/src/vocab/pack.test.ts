@@ -76,6 +76,15 @@ describe.each(files)('pack %s', (file) => {
       expect(under(owner as string, broader), term).toBe(true);
     }
   });
+  it('has an own concept for a narrower term, and no alias that is a different concept (D-562)', () => {
+    const concepts = pack.families.flatMap((f) => f.concepts);
+    const byLabel = new Map(concepts.map((c) => [normalizePackTerm(c.label), c]));
+    const narrow = byLabel.get('restricted boltzmann machine');
+    expect(narrow?.parent).toBe('topic.boltzmann-machines');
+    expect(narrow?.aliases).toContain('RBM');
+    expect(concepts.find((c) => c.id === 'topic.boltzmann-machines')?.aliases).toEqual([]);
+    expect(concepts.find((c) => c.id === 'paperType.numerical-study')?.aliases).not.toContain('computational study');
+  });
   it('keeps the topic hierarchy within bounds', () => {
     const topic = pack.families.find((f) => f.id === 'topic')!;
     const roots = topic.concepts.filter((c) => !c.parent);

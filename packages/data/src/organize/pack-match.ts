@@ -1,5 +1,5 @@
 import type { PackFamilyMatch, PackMatch } from '@rl/core';
-import { acroOf, buildIndex, formKey, meaningfulCount, namePairs, splitAcronymName, type Confidence, type Pair, type ReviewNode } from './tag-review.js';
+import { acroOf, buildIndex, formKey, meaningfulCount, namePairs, type Confidence, type Pair, type ReviewNode } from './tag-review.js';
 
 /**
  * Pairing of a field vocabulary pack with the vocabulary of the library (D-517, section 20.1.2): which root of the library each pack family
@@ -187,16 +187,12 @@ export function matchPack(input: PackMatchInput): PackMatchResult {
     return best === undefined ? base : worse(base, best);
   };
 
-  // A match that only an alias of the user's tag makes (its label alone does not meet the concept) is sure only when that alias has at least
-  // as many meaningful words as the label (acronym in brackets apart): a tag that is narrower than the concept ("X Y (S)" carrying the
-  // alias "Y") is not the concept, whatever rule made the alias meet it (D-562).
+  // A match that only an alias of the user's tag makes (the label of the tag, with its acronym in brackets, does not meet the concept) is at
+  // most probable, always: aliases of a user's tag may be junk imported from an old index, so it is never applied automatically and never
+  // makes the tag a duplicate of another tag (D-573, replaces the word-count exception of D-562).
   const viaUserAlias = (user: ReviewNode, c: PackConceptIn, base: Confidence): Confidence => {
     if (base !== 'sure' || user.aliases.length === 0) return base;
-    const whole = conceptNode(c, 'all');
-    const meets = (form: string): boolean => meet(reviewNode(user.id, form, []), whole).length > 0;
-    if (meets(user.label)) return base;
-    const words = meaningfulCount(splitAcronymName(user.label)?.name ?? user.label);
-    return user.aliases.some((a) => meets(a) && meaningfulCount(splitAcronymName(a)?.name ?? a) >= words) ? base : worse(base, 'likely');
+    return meet(reviewNode(user.id, user.label, []), conceptNode(c, 'all')).length > 0 ? base : worse(base, 'likely');
   };
   // A match made only between an alias of the user's tag and an alias of the concept (neither the tag's label nor the concept's label or
   // Italian label takes part) is a chain of two variants, not a name: at most probable (D-563).

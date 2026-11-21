@@ -127,6 +127,17 @@ export async function valuesOf(s: MainServices, view: LibraryView, scope: Scope,
   };
 }
 
+/** Whether a field vocabulary is in use in this library (a failure of the vocabulary counts as none). */
+async function packActive(s: MainServices): Promise<boolean> {
+  try {
+    const rt = await s.runtime.require();
+    const { activeState } = await import('../features/vocab-pack/state.js');
+    return (await activeState(rt.store.dataDir)) !== null;
+  } catch {
+    return false;
+  }
+}
+
 /** The families this library offers, with how many documents each covers (0 when not worth computing: `auto`) and whether each passes the test of the blocks. */
 async function listFamilies(s: MainServices, view: LibraryView, scope: Scope, recs: DocumentRecord[]): Promise<Offer[]> {
   const out: Offer[] = [];
@@ -142,9 +153,12 @@ async function listFamilies(s: MainServices, view: LibraryView, scope: Scope, re
     }
     return undefined;
   };
+  const fieldPack = await packActive(s);
   const check = async (o: { id: string; label: string }, count: number): Promise<void> => {
     const v = await valuesOf(s, view, scope, o.id, recs);
-    const e = familyEligibility(v.docs.values(), recs.length, { one: v.one, keywords: v.keywords });
+    // The Topic (and the families of several values under a root) of a library with a field vocabulary: the macro-areas are the field's (D-570).
+    const topicLike = o.id === 'topic' || o.id.startsWith('root:');
+    const e = familyEligibility(v.docs.values(), recs.length, { one: v.one, keywords: v.keywords, fieldPack: fieldPack && topicLike && !v.one });
     out.push({ ...o, count, eligible: e.eligible, reason: reasonOf(e) });
   };
   await check({ id: 'topic', label: 'Topic' }, topic.tagged);

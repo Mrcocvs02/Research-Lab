@@ -197,9 +197,9 @@ export function mainValue(list: PaperValues, pin: string | null | undefined = li
 
 /**
  * The test: coverage >= 0.6, clarity >= 0.7, 2 to 12 values (more is fine when the 12 biggest hold 80% of the papers: the rest goes to "Other").
- * A family of kind `one` is clear by construction, and so is a paper whose main value the user fixed; the keywords family never passes. `shares` is the weighted values of each paper (the ones with none may be left out).
+ * With `fieldPack` (a field vocabulary in use, Topic): coverage >= 0.6 and 2 values or more, clarity not asked (D-570). A family of kind `one` is clear by construction, and so is a paper whose main value the user fixed; the keywords family never passes. `shares` is the weighted values of each paper (the ones with none may be left out).
  */
-export function familyEligibility(shares: Iterable<PaperValues>, total: number, opts: { one?: boolean; keywords?: boolean } = {}): Eligibility {
+export function familyEligibility(shares: Iterable<PaperValues>, total: number, opts: { one?: boolean; keywords?: boolean; fieldPack?: boolean } = {}): Eligibility {
   const { withValue, clear, main } = valueStats(shares, opts.one);
   const counts = [...main.values()].sort((a, b) => b - a);
   const values = counts.length;
@@ -208,6 +208,9 @@ export function familyEligibility(shares: Iterable<PaperValues>, total: number, 
   const top = counts.slice(0, ELIGIBLE.maxValues).reduce((s, c) => s + c, 0);
   const fits = values <= ELIGIBLE.maxValues || (withValue > 0 && top / withValue >= ELIGIBLE.cover);
   const r = (v: number) => Math.round(v * 1000) / 1000;
+  // With a field vocabulary the macro-areas are the field's and every paper has a main one (D-569, D-570): papers are legitimately mixed, so clarity
+  // does not decide; at least 60 % of the papers with a main macro-area and 2 macro-areas used.
+  if (opts.fieldPack) return { eligible: !opts.keywords && coverage >= ELIGIBLE.coverage && values >= 2, coverage: r(coverage), clarity: r(clarity), values };
   return { eligible: !opts.keywords && coverage >= ELIGIBLE.coverage && clarity >= ELIGIBLE.clarity && values >= 2 && fits, coverage: r(coverage), clarity: r(clarity), values };
 }
 

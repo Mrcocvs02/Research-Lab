@@ -114,6 +114,14 @@ describe('familyEligibility', () => {
     expect(e.coverage).toBeCloseTo(0.833, 3);
     expect(e.clarity).toBe(1);
   });
+  it('with a field vocabulary clarity is not asked: 60 % of the papers with a main macro-area and 2 macro-areas are enough (D-570)', () => {
+    const blurry = Array.from({ length: 10 }, (_, i) => [{ v: `v${i % 2}`, w: 0.55 }, { v: `v${(i + 1) % 2}`, w: 0.45 }]);
+    expect(familyEligibility(blurry, 10).eligible).toBe(false);
+    expect(familyEligibility(blurry, 10, { fieldPack: true })).toMatchObject({ eligible: true, clarity: 0, values: 2 });
+    expect(familyEligibility(docs(5, () => 'v0'), 5, { fieldPack: true }).eligible).toBe(false);
+    expect(familyEligibility(blurry, 20, { fieldPack: true }).eligible).toBe(false);
+    expect(familyEligibility(blurry, 10, { fieldPack: true, keywords: true }).eligible).toBe(false);
+  });
   it('fails on coverage under 0.6 and says so', () => {
     const e = familyEligibility(docs(8, (i) => `v${i % 3}`), 25);
     expect(e.eligible).toBe(false);

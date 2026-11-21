@@ -277,7 +277,6 @@
      "label": "Conformal field theory",
      "aliases": [
       "CFT",
-      "conformal field theory in lattice systems",
       "conformal field theories"
      ],
      "parent": "topic.quantum-phase-transitions"
@@ -448,8 +447,7 @@
      "label": "Open quantum systems",
      "labelIt": "Sistemi quantistici aperti",
      "aliases": [
-      "open quantum system",
-      "quantum dissipation"
+      "open quantum system"
      ],
      "parent": "topic.quantum-many-body-physics"
     },
@@ -1080,8 +1078,7 @@
      "label": "Entropy and thermodynamics",
      "aliases": [
       "entropy (thermodynamics)",
-      "thermodynamic entropy",
-      "thermodynamics"
+      "thermodynamic entropy"
      ],
      "parent": "topic.statistical-physics",
      "distinctFrom": [
@@ -1252,9 +1249,7 @@
     {
      "id": "topic.black-hole-information-and-scrambling",
      "label": "Black hole information and scrambling",
-     "aliases": [
-      "information paradox"
-     ],
+     "aliases": [],
      "parent": "topic.information-theory",
      "arxiv": [
       "hep-th"
@@ -1266,8 +1261,7 @@
      "labelIt": "Simulazione quantistica e hardware quantistico",
      "aliases": [
       "quantum simulation",
-      "quantum simulators",
-      "quantum hardware"
+      "quantum simulators"
      ]
     },
     {
@@ -1358,8 +1352,7 @@
      "label": "Computational physics",
      "labelIt": "Fisica computazionale",
      "aliases": [
-      "numerical physics",
-      "scientific computing"
+      "numerical physics"
      ],
      "arxiv": [
       "physics.comp-ph"
@@ -1379,17 +1372,14 @@
     {
      "id": "topic.method-benchmarking",
      "label": "Method benchmarking",
-     "aliases": [
-      "benchmark of numerical methods"
-     ],
+     "aliases": [],
      "parent": "topic.computational-physics"
     },
     {
      "id": "topic.thermodynamic-limit-extrapolation",
      "label": "Thermodynamic-limit extrapolation",
      "aliases": [
-      "infinite-size extrapolation",
-      "thermodynamic limit"
+      "infinite-size extrapolation"
      ],
      "parent": "topic.computational-physics"
     },
@@ -1469,7 +1459,6 @@
      "id": "topic.machine-learned-interatomic-potentials",
      "label": "Machine-learned interatomic potentials",
      "aliases": [
-      "neural network potentials",
       "machine learning force fields",
       "MLIP",
       "machine learning interatomic potentials"
@@ -1575,8 +1564,7 @@
      "label": "Large language models",
      "aliases": [
       "LLM",
-      "LLMs",
-      "language models"
+      "LLMs"
      ],
      "parent": "topic.deep-learning"
     },
@@ -1592,8 +1580,7 @@
      "id": "topic.learning-theory",
      "label": "Learning theory",
      "aliases": [
-      "statistical learning theory",
-      "generalization theory"
+      "statistical learning theory"
      ],
      "parent": "topic.machine-learning-and-ai"
     },
@@ -1608,9 +1595,7 @@
     {
      "id": "topic.scaling-laws",
      "label": "Scaling laws",
-     "aliases": [
-      "neural scaling laws"
-     ],
+     "aliases": [],
      "parent": "topic.learning-theory"
     },
     {
@@ -1631,7 +1616,16 @@
      "id": "topic.boltzmann-machines",
      "label": "Boltzmann machines",
      "aliases": [],
-     "parent": "topic.statistical-physics-of-learning"
+     "parent": "topic.machine-learning-and-ai"
+    },
+    {
+     "id": "topic.restricted-boltzmann-machines",
+     "label": "Restricted Boltzmann machine",
+     "aliases": [
+      "RBM",
+      "Restricted Boltzmann machines"
+     ],
+     "parent": "topic.boltzmann-machines"
     },
     {
      "id": "topic.optimization-for-learning",
@@ -1731,9 +1725,7 @@
     {
      "id": "topic.fusion-categories",
      "label": "Fusion categories",
-     "aliases": [
-      "tensor categories"
-     ],
+     "aliases": [],
      "parent": "topic.category-theory-in-physics"
     },
     {
@@ -2101,8 +2093,7 @@
      "labelIt": "Diagonalizzazione esatta",
      "aliases": [
       "ED",
-      "exact diagonalisation",
-      "full diagonalization"
+      "exact diagonalisation"
      ]
     },
     {
@@ -2475,8 +2466,7 @@
      "id": "method.renormalization-group-methods",
      "label": "Renormalization group methods",
      "aliases": [
-      "RG analysis",
-      "RG flow"
+      "RG analysis"
      ],
      "parent": "method.analytical-methods"
     },
@@ -2566,9 +2556,7 @@
      "label": "Density functional methods",
      "labelIt": "Metodi del funzionale della densità",
      "aliases": [
-      "DFT calculations",
-      "first-principles calculations",
-      "ab initio calculations"
+      "DFT calculations"
      ]
     },
     {
@@ -2598,9 +2586,7 @@
     {
      "id": "method.supervised-learning",
      "label": "Supervised learning",
-     "aliases": [
-      "supervised classification"
-     ],
+     "aliases": [],
      "parent": "method.machine-learning-methods"
     },
     {
@@ -2612,9 +2598,7 @@
     {
      "id": "method.gaussian-processes",
      "label": "Gaussian processes",
-     "aliases": [
-      "Gaussian process regression"
-     ],
+     "aliases": [],
      "parent": "method.supervised-learning"
     },
     {
@@ -2646,9 +2630,7 @@
     {
      "id": "method.reinforcement-learning-method",
      "label": "Reinforcement learning method",
-     "aliases": [
-      "RL agent"
-     ],
+     "aliases": [],
      "parent": "method.machine-learning-methods"
     },
     {
@@ -2720,9 +2702,7 @@
     {
      "id": "method.neutron-scattering",
      "label": "Neutron scattering",
-     "aliases": [
-      "inelastic neutron scattering"
-     ],
+     "aliases": [],
      "parent": "method.quantum-simulators-and-experiments"
     },
     {
@@ -2762,9 +2742,7 @@
     {
      "id": "method.quantum-circuit-simulation",
      "label": "Quantum circuit simulation",
-     "aliases": [
-      "state-vector simulation"
-     ],
+     "aliases": [],
      "parent": "method.classical-simulation-of-quantum-systems"
     },
     {
@@ -2910,9 +2888,7 @@
     {
      "id": "system.free-fermion-and-topological-band-models",
      "label": "Free-fermion and topological band models",
-     "aliases": [
-      "free fermions"
-     ],
+     "aliases": [],
      "parent": "system.lattice-fermion-models"
     },
     {
@@ -3001,9 +2977,7 @@
     {
      "id": "system.xxz-model",
      "label": "XXZ model",
-     "aliases": [
-      "XXZ chain"
-     ],
+     "aliases": [],
      "parent": "system.heisenberg-model"
     },
     {
@@ -3104,9 +3078,7 @@
     {
      "id": "system.kagome-antiferromagnet",
      "label": "Kagome antiferromagnet",
-     "aliases": [
-      "kagome Heisenberg antiferromagnet"
-     ],
+     "aliases": [],
      "parent": "system.frustrated-lattice-antiferromagnets"
     },
     {
@@ -3260,9 +3232,7 @@
     {
      "id": "system.bose-gas-models",
      "label": "Bose gas models",
-     "aliases": [
-      "dilute Bose gas"
-     ],
+     "aliases": [],
      "parent": "system.bosonic-models"
     },
     {
@@ -3397,7 +3367,6 @@
      "labelIt": "Array di atomi di Rydberg",
      "aliases": [
       "Rydberg arrays",
-      "Rydberg atoms",
       "Rydberg tweezer arrays"
      ],
      "parent": "system.quantum-simulation-platforms"
@@ -3448,9 +3417,7 @@
     {
      "id": "system.ultracold-molecules",
      "label": "Ultracold molecules",
-     "aliases": [
-      "polar molecules"
-     ],
+     "aliases": [],
      "parent": "system.ultracold-atoms"
     },
     {
@@ -3481,10 +3448,7 @@
      "id": "system.quantum-materials",
      "label": "Quantum materials",
      "labelIt": "Materiali quantistici",
-     "aliases": [
-      "correlated materials",
-      "strongly correlated materials"
-     ]
+     "aliases": []
     },
     {
      "id": "system.cuprates",
@@ -3592,7 +3556,6 @@
       "numerical simulation",
       "numerical simulations",
       "numerical investigation",
-      "computational study",
       "simulation study"
      ]
     },
@@ -3625,8 +3588,7 @@
      "aliases": [
       "benchmark paper",
       "benchmarking study",
-      "comparison of methods",
-      "comparative study"
+      "comparison of methods"
      ]
     },
     {

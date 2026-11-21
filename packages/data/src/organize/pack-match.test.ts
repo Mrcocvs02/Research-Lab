@@ -58,6 +58,21 @@ describe('matching the tags of a library with the concepts of a pack (D-517)', (
     expect(alone.conflicts).toBe(0);
   });
 
+  it('a narrower tag is not the broader concept: its own concept (acronym, plural) takes it, the alias that names the broader one does not (D-562)', () => {
+    const own: PackConceptIn[] = [
+      { id: 'topic.omega-machines', family: 'topic', label: 'Omega machines', aliases: [] },
+      { id: 'topic.omega-restricted', family: 'topic', label: 'Restricted omega machine', aliases: ['ROM', 'Restricted omega machines'], parent: 'topic.omega-machines' },
+    ];
+    const r = run([node('a', 'Restricted omega machines (ROM)')], { concepts: own });
+    expect(pairOf(r, 'a')).toMatchObject([{ conceptId: 'topic.omega-restricted', confidence: 'sure' }]);
+    // The alias is a plural of the broader concept, with fewer meaningful words than the label: at most probable (and the tag now fits two concepts).
+    const wide = run([node('b', 'Restricted omega machines (ROM)', { aliases: ['Omega machine'] })], { concepts: own.slice(0, 1) });
+    expect(pairOf(wide, 'b')).toMatchObject([{ conceptId: 'topic.omega-machines', confidence: 'likely' }]);
+    // An alias as long as the label, or a label that is the concept itself, is a true variant: sure.
+    expect(run([node('c', 'AT', { aliases: ['Alpha theory'] })]).matches).toMatchObject([{ conceptId: 'topic.alpha-theory', confidence: 'sure' }]);
+    expect(run([node('d', 'Alpha theory', { aliases: ['Alpha-theory'] })]).matches).toMatchObject([{ conceptId: 'topic.alpha-theory', confidence: 'sure' }]);
+  });
+
   it('a spelling slip is probable, never sure', () => {
     const r = run([node('g', 'Delta chian')]);
     expect(pairOf(r, 'g')).toMatchObject([{ conceptId: 'topic.delta-chains', confidence: 'likely', rule: 'spelling' }]);

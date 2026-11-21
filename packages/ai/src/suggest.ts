@@ -166,12 +166,27 @@ export interface LatentConcept {
   path: string;
 }
 /** Written once, in front of the latent lines, and only when there is at least one. */
-export const LATENT_RULE = '# Ids starting with f are field concepts not yet in the library: use one only if no library node fits';
-/** The latent lines, to go AFTER every line of the library: the rule, then `- f12 | Name | Family › Area` (the path is left out when it is only the family). */
+export const LATENT_RULE = '# f-ids: field concepts not in the library yet; use one only if no library node fits';
+/** The most characters the latent part of a prompt may add (rule and lines): about 275 tokens by `approxTokens`, under the 300 of the criterion (section 20.11). */
+export const LATENT_CHARS = 1100;
+const clipLatent = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t);
+/** One latent line, `- f12 | Name | Family › Area` (the path is left out when it is only the family; name and path are clipped). */
+const latentLine = (c: LatentConcept): string => `- ${c.short} | ${clipLatent(oneLine(c.label), 60)} |${c.path.includes(' › ') ? ` ${clipLatent(oneLine(c.path), 50)}` : ''}`;
+/** The best concepts that fit the character budget, in the order given (what a prompt really offers). */
+export function latentFit(latent: readonly LatentConcept[]): LatentConcept[] {
+  let used = LATENT_RULE.length;
+  const out: LatentConcept[] = [];
+  for (const c of latent) {
+    used += 1 + latentLine(c).length;
+    if (used > LATENT_CHARS) break;
+    out.push(c);
+  }
+  return out;
+}
+/** The latent lines, to go AFTER every line of the library: the rule, then the lines that fit the budget. */
 export function latentLines(latent: readonly LatentConcept[]): string[] {
-  if (latent.length === 0) return [];
-  const path = (p: string): string => (p.includes(' › ') ? ` ${oneLine(p)}` : '');
-  return [LATENT_RULE, ...latent.map((c) => `- ${c.short} | ${oneLine(c.label)} |${path(c.path)}`)];
+  const fit = latentFit(latent);
+  return fit.length === 0 ? [] : [LATENT_RULE, ...fit.map(latentLine)];
 }
 /** What cleaning an answer needs to turn an `f…` id, or a free new tag naming a latent concept, into a proposal "from the field". */
 export interface LatentTag {

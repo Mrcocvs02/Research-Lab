@@ -357,3 +357,54 @@ function bigCorpus(n: number, nv: number): CutInput {
   });
   return { nodes, top: ['g', ...vs], root: 'topic', docs: all, n };
 }
+
+/**
+ * Isolated values (D-562): 11 values on 1 to 4 works each, every work on one value only (no co-occurrence), five works with no value. `depth` = levels
+ * under each value (the works carry the deepest tag): a value with two levels under it cannot go under a new parent without passing depth 3.
+ */
+function isolated(depth: number, sizes = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1, 1]): CutInput {
+  const vals = sizes.map((_, i) => `v${String(i + 1).padStart(2, '0')}`);
+  const nodes: CutNode[] = [node('topic', []), ...vals.map((v) => node(v))];
+  const all: CutDoc[] = [];
+  sizes.forEach((count, i) => {
+    let leaf = vals[i]!;
+    for (let d = 0; d < depth; d++) {
+      nodes.push(node(`${vals[i]}k${d}`, [leaf]));
+      leaf = `${vals[i]}k${d}`;
+    }
+    for (let k = 0; k < count; k++) all.push({ id: `w${i}_${k}`, tags: [{ id: leaf, w: 1 }] });
+  });
+  for (let k = 0; k < 5; k++) all.push({ id: `z${k}`, tags: [] });
+  return { nodes, top: vals, root: 'topic', docs: all, n: all.length };
+}
+
+describe('isolated values: no block of one work is left (D-562)', () => {
+  for (const depth of [0, 1, 2]) {
+    it(`values with ${depth} level(s) under them: all go under a parent, the preview is what the Map shows, depth stays within 3`, () => {
+      const input = isolated(depth);
+      const p = proposeCut(input)!;
+      expect(p.before.smallest).toBe(1);
+      for (const skip of [[], [p.moves[0]!.id], p.moves.map((m) => m.id)]) {
+        const sel = p.select(skip);
+        const map = mapShows(applied(input, sel.ops), input.docs);
+        expect(sel.after).toEqual({ blocks: map.blocks, clearPct: map.clearPct, coverage: map.coverage, largestPct: map.largestPct, smallest: map.smallest });
+        expect(depthAfter(input, sel.ops)).toBeLessThanOrEqual(3);
+      }
+      const sel = p.select();
+      expect(sel.after.smallest).toBeGreaterThanOrEqual(2);
+      expect(sel.after.clearPct).toBe(100);
+      // Values that never meet have no reason to merge once none is small: the block count may stay a little above k_max.
+      expect(sel.after.blocks).toBeLessThanOrEqual(8);
+      expect(p.select(p.moves.map((m) => m.id)).after).toEqual(p.before);
+    });
+  }
+
+  it('one lone isolated value joins the smallest block rather than staying a block of one', () => {
+    const input = isolated(2, [5, 4, 4, 3, 3, 2, 1]);
+    const p = proposeCut(input)!;
+    expect(p.before.smallest).toBe(1);
+    const sel = p.select();
+    expect(sel.after.smallest).toBeGreaterThanOrEqual(2);
+    expect(mapShows(applied(input, sel.ops), input.docs).smallest).toBeGreaterThanOrEqual(2);
+  });
+});

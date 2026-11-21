@@ -18,7 +18,10 @@
     { "id": "topic.delta-chains", "label": "Delta chains", "labelIt": "Catene delta", "aliases": ["delta chain"], "parent": "topic.delta-systems" },
     { "id": "topic.epsilon-maps", "label": "Epsilon maps", "labelIt": "Mappe epsilon", "aliases": ["epsilon mapping", "conditional epsilon maps"] },
     { "id": "topic.eta-model", "label": "Eta model", "labelIt": "Modello eta", "aliases": ["Eta"] },
-    { "id": "topic.eta-mixed", "label": "Mixed eta model", "labelIt": "Modello eta misto", "aliases": ["Mixed eta chain"], "parent": "topic.eta-model" }
+    { "id": "topic.eta-mixed", "label": "Mixed eta model", "labelIt": "Modello eta misto", "aliases": ["Mixed eta chain"], "parent": "topic.eta-model" },
+    { "id": "topic.theta-flow", "label": "Theta flow", "labelIt": "Flusso theta", "aliases": [] },
+    { "id": "topic.theta-flows", "label": "Theta flows", "aliases": [] },
+    { "id": "topic.lambda-and-mu", "label": "Lambda and mu methods", "labelIt": "Metodi lambda e mu", "aliases": ["lambda methods", "mu methods"] }
    ]
   },
   {
@@ -28,7 +31,8 @@
    "concepts": [
     { "id": "method.sampling", "label": "Sampling methods", "labelIt": "Metodi di campionamento", "aliases": ["sampling method", "sampling"] },
     { "id": "method.fast-sampling", "label": "Fast sampling", "labelIt": "Campionamento rapido", "aliases": ["quick sampling"], "parent": "method.sampling" },
-    { "id": "method.zeta-solver", "label": "Zeta solver", "labelIt": "Risolutore zeta", "aliases": ["ZS"] }
+    { "id": "method.zeta-solver", "label": "Zeta solver", "labelIt": "Risolutore zeta", "aliases": ["ZS"] },
+    { "id": "method.sigma-study", "label": "Sigma study", "labelIt": "Studio sigma", "aliases": ["sigma simulation"] }
    ]
   }
  ]

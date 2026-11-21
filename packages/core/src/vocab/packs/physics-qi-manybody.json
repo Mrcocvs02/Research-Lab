@@ -215,6 +215,19 @@
      "parent": "topic.quantum-information-and-computation"
     },
     {
+     "id": "topic.nonstabilizerness",
+     "label": "Nonstabilizerness",
+     "labelIt": "Non-stabilizzatezza",
+     "aliases": [
+      "non-stabilizerness",
+      "nonstabiliserness",
+      "quantum magic",
+      "magic",
+      "magic resource"
+     ],
+     "parent": "topic.quantum-resource-theories"
+    },
+    {
      "id": "topic.quantum-cryptography-and-communication",
      "label": "Quantum cryptography and communication",
      "aliases": [
@@ -229,7 +242,9 @@
      "labelIt": "Fisica quantistica a molti corpi",
      "aliases": [
       "many-body physics",
-      "quantum many-body problem"
+      "quantum many-body problem",
+      "many-body",
+      "quantum many-body"
      ],
      "arxiv": [
       "cond-mat.str-el",
@@ -391,7 +406,31 @@
      "label": "Quantum quenches",
      "aliases": [
       "quantum quench",
-      "quench dynamics"
+      "quench dynamics",
+      "quench"
+     ],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.thermalization",
+     "label": "Thermalization",
+     "labelIt": "Termalizzazione",
+     "aliases": [
+      "thermalisation",
+      "quantum thermalization"
+     ],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.ergodicity-and-its-breaking",
+     "label": "Ergodicity and ergodicity breaking",
+     "labelIt": "Ergodicità e sua rottura",
+     "aliases": [
+      "ergodicity",
+      "ergodic",
+      "non-ergodicity",
+      "nonergodicity",
+      "ergodicity breaking"
      ],
      "parent": "topic.nonequilibrium-quantum-dynamics"
     },
@@ -741,7 +780,8 @@
      "aliases": [
       "strongly correlated electrons",
       "strong correlations",
-      "correlated electron systems"
+      "correlated electron systems",
+      "strongly correlated"
      ],
      "arxiv": [
       "cond-mat.str-el"
@@ -1060,6 +1100,15 @@
      "parent": "topic.phase-transitions-and-critical-phenomena"
     },
     {
+     "id": "topic.multifractality",
+     "label": "Multifractality",
+     "labelIt": "Multifrattalità",
+     "aliases": [
+      "multifractal"
+     ],
+     "parent": "topic.phase-transitions-and-critical-phenomena"
+    },
+    {
      "id": "topic.nonequilibrium-statistical-mechanics",
      "label": "Nonequilibrium statistical mechanics",
      "aliases": [
@@ -1116,6 +1165,25 @@
      "label": "Stochastic processes",
      "aliases": [],
      "parent": "topic.statistical-physics"
+    },
+    {
+     "id": "topic.complex-networks",
+     "label": "Complex networks",
+     "labelIt": "Reti complesse",
+     "aliases": [
+      "complex network",
+      "network science"
+     ],
+     "parent": "topic.statistical-physics"
+    },
+    {
+     "id": "topic.scale-free-networks",
+     "label": "Scale-free networks",
+     "labelIt": "Reti scale-free",
+     "aliases": [
+      "scale-free network"
+     ],
+     "parent": "topic.complex-networks"
     },
     {
      "id": "topic.markov-processes",
@@ -1237,7 +1305,18 @@
     {
      "id": "topic.kolmogorov-complexity",
      "label": "Kolmogorov complexity",
-     "aliases": [],
+     "aliases": [
+      "algorithmic complexity"
+     ],
+     "parent": "topic.complexity-measures"
+    },
+    {
+     "id": "topic.lempel-ziv-complexity",
+     "label": "Lempel-Ziv complexity",
+     "labelIt": "Complessità di Lempel-Ziv",
+     "aliases": [
+      "LZ complexity"
+     ],
      "parent": "topic.complexity-measures"
     },
     {
@@ -1254,6 +1333,15 @@
      "arxiv": [
       "hep-th"
      ]
+    },
+    {
+     "id": "topic.algorithmic-information-theory",
+     "label": "Algorithmic information theory",
+     "labelIt": "Teoria algoritmica dell'informazione",
+     "aliases": [
+      "algorithmic information"
+     ],
+     "parent": "topic.information-theory"
     },
     {
      "id": "topic.quantum-simulation-and-quantum-hardware",
@@ -2603,8 +2691,11 @@
     },
     {
      "id": "method.unsupervised-learning",
-     "label": "Unsupervised learning",
-     "aliases": [],
+     "label": "Unsupervised machine learning",
+     "aliases": [
+      "unsupervised learning",
+      "unsupervised ML"
+     ],
      "parent": "method.machine-learning-methods"
     },
     {
@@ -2665,6 +2756,16 @@
       "quantum gas microscope"
      ],
      "parent": "method.quantum-simulators-and-experiments"
+    },
+    {
+     "id": "method.measurement-snapshots",
+     "label": "Projective measurement snapshots",
+     "labelIt": "Istantanee di misura",
+     "aliases": [
+      "measurement snapshots",
+      "projective measurements snapshots"
+     ],
+     "parent": "method.quantum-gas-microscopes"
     },
     {
      "id": "method.trapped-ion-experiments",
@@ -2767,6 +2868,16 @@
      "aliases": [
       "bootstrap",
       "jackknife"
+     ],
+     "parent": "method.statistical-and-data-analysis-methods"
+    },
+    {
+     "id": "method.intrinsic-dimension-estimation",
+     "label": "Intrinsic dimension estimation",
+     "labelIt": "Stima della dimensione intrinseca",
+     "aliases": [
+      "intrinsic dimension",
+      "intrinsic dimensionality"
      ],
      "parent": "method.statistical-and-data-analysis-methods"
     }

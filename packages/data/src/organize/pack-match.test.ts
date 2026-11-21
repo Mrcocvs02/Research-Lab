@@ -45,10 +45,12 @@ describe('matching the tags of a library with the concepts of a pack (D-517)', (
     expect(one('Models of alpha-theory')).toMatchObject([{ conceptId: 'topic.alpha-theory', confidence: 'likely' }]);
   });
 
-  it('a narrower term that has its own concept is matched to it, apart from its parent: no claim on the same concept', () => {
+  it('a narrower term that has its own concept is matched to it, apart from its parent: the tag named like the concept is sure, the alias tag is not', () => {
     const r = run([node('p', 'Eta model'), node('c', 'Mixed eta model'), node('a', 'Eta')]);
-    expect(pairOf(r, 'p')).toMatchObject([{ conceptId: 'topic.eta-model', confidence: 'maybe' }]);
-    // "Eta" and "Eta model" are two tags of the one concept: claimed twice, the user chooses; the narrower tag is not drawn into it.
+    // "Eta" and "Eta model" are two tags of the one concept: the tag that carries the concept's label stays sure, the alias one is probable.
+    expect(pairOf(r, 'p')).toMatchObject([{ conceptId: 'topic.eta-model', confidence: 'sure' }]);
+    expect(pairOf(r, 'a')).toMatchObject([{ conceptId: 'topic.eta-model', confidence: 'likely' }]);
+    // The narrower tag is not drawn into it.
     expect(pairOf(r, 'c')).toMatchObject([{ conceptId: 'topic.eta-mixed', confidence: 'sure' }]);
     const alone = run([node('p', 'Eta model'), node('c', 'Mixed eta chain')]);
     expect(alone.matches.map((m) => [m.nodeId, m.conceptId, m.confidence])).toEqual([
@@ -78,16 +80,64 @@ describe('matching the tags of a library with the concepts of a pack (D-517)', (
     expect(pairOf(r, 'g')).toMatchObject([{ conceptId: 'topic.delta-chains', confidence: 'likely', rule: 'spelling' }]);
   });
 
-  it('a tag that fits two concepts, or a concept two tags claim, is a "maybe" and counted as a conflict', () => {
-    const two = run([node('x', 'Beta states', { aliases: ['Delta chain'] })]);
-    expect(pairOf(two, 'x').map((m) => [m.conceptId, m.confidence]).sort()).toEqual([
-      ['topic.beta-states', 'maybe'],
-      ['topic.delta-chains', 'maybe'],
+  it('a tag whose own label reaches one concept stays sure; the concept its alias reaches is not a conflict (D-563)', () => {
+    const r = run([node('x', 'Beta states', { aliases: ['Delta chain'] })]);
+    expect(pairOf(r, 'x').map((m) => [m.conceptId, m.confidence])).toEqual([['topic.beta-states', 'sure']]);
+    expect(r.conflicts).toBe(0);
+    // Also when the alias is a sure match of another concept and the label is a plural of its own.
+    expect(pairOf(run([node('y', 'Beta state', { aliases: ['Delta systems'] })]), 'y').map((m) => [m.conceptId, m.confidence])).toEqual([['topic.beta-states', 'sure']]);
+  });
+
+  it('a tag whose label sure-meets two concepts stays a "maybe" for both, and is counted as a conflict', () => {
+    const r = run([node('t', 'Theta flow')]);
+    expect(pairOf(r, 't').map((m) => [m.conceptId, m.confidence]).sort()).toEqual([
+      ['topic.theta-flow', 'maybe'],
+      ['topic.theta-flows', 'maybe'],
     ]);
-    expect(two.conflicts).toBe(1);
+    expect(r.conflicts).toBe(1);
+  });
+
+  it('a tag with no label match and two candidates stays a "maybe" for both', () => {
+    const r = run([node('x', 'Unrelated name', { aliases: ['Beta state', 'Delta chain'] })]);
+    expect(pairOf(r, 'x').map((m) => m.confidence)).toEqual(['maybe', 'maybe']);
+    expect(r.conflicts).toBe(1);
+  });
+
+  it('a concept two different tags claim: only the tag that matches its label is sure, the other is probable', () => {
     const claimed = run([node('p', 'Zeta solver'), node('q', 'ZS')]);
-    expect(claimed.matches.map((m) => m.confidence)).toEqual(['maybe', 'maybe']);
+    expect(claimed.matches.map((m) => [m.nodeId, m.confidence])).toEqual([
+      ['p', 'sure'],
+      ['q', 'likely'],
+    ]);
     expect(claimed.conflicts).toBe(1);
+  });
+
+  it('a concept claimed by tags that are sure duplicates of each other keeps them all sure', () => {
+    const r = run([node('p', 'Alpha theory'), node('q', 'Alpha theory (AT)'), node('s', 'Alpha-theories')]);
+    expect(r.matches.map((m) => [m.nodeId, m.confidence])).toEqual([
+      ['p', 'sure'],
+      ['q', 'sure'],
+      ['s', 'sure'],
+    ]);
+    expect(r.conflicts).toBe(0);
+  });
+
+  it('two different tags on a combined concept, each through an alias, are not sure: they are different concepts', () => {
+    const r = run([node('l', 'Lambda methods'), node('m', 'Mu methods')]);
+    expect(r.matches.map((m) => [m.nodeId, m.conceptId, m.confidence])).toEqual([
+      ['l', 'topic.lambda-and-mu', 'likely'],
+      ['m', 'topic.lambda-and-mu', 'likely'],
+    ]);
+    // Neither counts as sure.
+    expect(r.matches.filter((m) => m.confidence === 'sure')).toEqual([]);
+  });
+
+  it('a match made only between an alias of the tag and an alias of the concept is probable at most (D-563)', () => {
+    const chain = run([node('c', 'Rho methods', { aliases: ['sigma simulation'] })]);
+    expect(pairOf(chain, 'c')).toMatchObject([{ conceptId: 'method.sigma-study', confidence: 'likely' }]);
+    // The tag's label meeting an alias of the concept, or the concept's label meeting an alias of the tag, is still sure.
+    expect(run([node('d', 'Sigma simulation')]).matches).toMatchObject([{ conceptId: 'method.sigma-study', confidence: 'sure' }]);
+    expect(run([node('e', 'Rho methods', { aliases: ['Sigma study'] })]).matches).toMatchObject([{ conceptId: 'method.sigma-study', confidence: 'sure' }]);
   });
 
   it('never merges what the field tells apart: the tag is listed, not matched', () => {
@@ -105,6 +155,57 @@ describe('matching the tags of a library with the concepts of a pack (D-517)', (
   it('counts what it recognises and the papers that have a topic of the field', () => {
     const r = run([node('a', 'Alpha theory'), node('m', 'Sampling methods'), node('z', 'Unrelated')], { docs: [{ id: 'd1', tags: ['a'] }, { id: 'd2', tags: ['m'] }, { id: 'd3', tags: ['z'] }] });
     expect(r).toMatchObject({ recognized: 2, tags: 3, papers: 3, papersWithTopic: 1 });
+  });
+});
+
+describe('a library shaped like a real one (acceptance 20.11 A, D-563)', () => {
+  const A = ['amber', 'basalt', 'cobalt', 'dune', 'fjord', 'garnet', 'harbor', 'indigo', 'jasper'];
+  const B = ['lattice', 'orbit', 'phase', 'ridge', 'spiral'];
+  const syn = (i: number): string => `${A[i % A.length]} ${B[Math.floor(i / A.length) % B.length]}`;
+  const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+  const mk = (id: string, label: string, aliases: string[] = []): PackConceptIn => ({ id, family: 'topic', label, aliases });
+  const own: PackConceptIn[] = [];
+  const nodes: PackNodeIn[] = [];
+  const wrong: Array<[string, string]> = [];
+  // 36 plain tags named like a concept; 4 tags whose own label meets a concept and whose alias meets another one.
+  for (let i = 0; i < 36; i++) {
+    own.push(mk(`c${i}`, cap(syn(i)), i % 3 === 0 ? [`${syn(i)} variant`] : []));
+    nodes.push(node(`n${i}`, cap(syn(i))));
+  }
+  for (let i = 36; i < 40; i++) {
+    own.push(mk(`c${i}`, cap(syn(i)), []), mk(`x${i}`, cap(syn(i + 4)), []));
+    nodes.push(node(`n${i}`, cap(syn(i)), { aliases: [cap(syn(i + 4))] }));
+    wrong.push([`n${i}`, `x${i}`]);
+  }
+  // A concept claimed twice by sure duplicates (the name and the name with its sigla): both sure.
+  own.push(mk('d', 'Quartz field', ['QF']));
+  nodes.push(node('d1', 'Quartz field'), node('d2', 'Quartz field (QF)'));
+  // A concept claimed by a tag that carries its label and a tag that only reaches it through an alias: the second is not sure.
+  own.push(mk('e', 'Ruby solver', ['RS']));
+  nodes.push(node('e1', 'Ruby solver'), node('e2', 'RS'));
+  wrong.push(['e2', 'e']);
+  // A combined concept claimed by two different tags through its aliases.
+  own.push(mk('f', 'Topaz and onyx methods', ['topaz methods', 'onyx methods']));
+  nodes.push(node('f1', 'Topaz methods'), node('f2', 'Onyx methods'));
+  wrong.push(['f1', 'f'], ['f2', 'f']);
+  // A tag whose label meets nothing and whose alias is an alias of a concept.
+  own.push(mk('g', 'Pearl study', ['pearl simulation']));
+  nodes.push(node('g1', 'Opal methods', { aliases: ['pearl simulation'] }));
+  wrong.push(['g1', 'g']);
+  const r = run(nodes, { concepts: own });
+  const sure = new Set(r.matches.filter((m) => m.confidence === 'sure').map((m) => `${m.nodeId}/${m.conceptId}`));
+
+  it('recognises 43 tags for sure, with no wrong pairing among them (at least 40 are expected on a real library)', () => {
+    expect(sure.size).toBe(43);
+    expect(sure.size).toBeGreaterThanOrEqual(40);
+    expect(r.recognized).toBe(r.matches.filter((m) => m.confidence !== 'maybe').length);
+    for (let i = 0; i < 40; i++) expect(sure.has(`n${i}/c${i}`), `n${i}`).toBe(true);
+    for (const k of ['d1/d', 'd2/d', 'e1/e']) expect(sure.has(k), k).toBe(true);
+  });
+
+  it('every wrong pairing is not sure', () => {
+    for (const [n, c] of wrong) expect(sure.has(`${n}/${c}`), `${n}/${c}`).toBe(false);
+    expect([...sure].filter((k) => k.startsWith('f') || k.startsWith('g'))).toEqual([]);
   });
 });
 

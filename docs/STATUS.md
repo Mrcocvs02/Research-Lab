@@ -3,8 +3,8 @@
 > Passaggio di consegne: vedi `docs/HANDOFF.md`.
 
 - **Fase:** 8 completa, tag `phase-8` creato. Tag pubblicati: `phase-0`..`phase-3`, `phase-6`, `phase-7`, `phase-8`; `phase-4` e `phase-5` senza tag. Versioni 1.0, 1.1.0 (tag `v1.1.0`) e 1.2.0 (tag `v1.2.0`) rilasciate; versione 1.3.0 impostata (commit `1c75187`), tag `v1.3.0` pubblicato.
-- **Onda:** onda 15 (2026-11-20/21, D-516..D-562, design §20 di `docs/design/ARCHITETTURA-UI.md`) fatta e unita su `main`. Onda 14 (D-492..D-510) e lavoro dopo la 1.1.0 (D-511..D-514) sotto. Nessun lavoro di ondata in corso.
-- **HEAD:** vedi `git log`. Ultimo commit di codice: `1c75187` (Set version 1.3.0). La documentazione dell'onda 15 è sul ramo `docs16`, non ancora unita.
+- **Onda:** onda 15 (2026-11-20/21, D-516..D-562, design §20 di `docs/design/ARCHITETTURA-UI.md`) fatta e unita su `main`; onda 15b (2026-11-21, D-563..D-574, dopo la 1.3.0) unita su `main`, non rilasciata. Onda 14 (D-492..D-510) e lavoro dopo la 1.1.0 (D-511..D-514) sotto. Nessun lavoro di ondata in corso.
+- **HEAD:** vedi `git log`. Ultimo commit di codice: `f30cc5d` (merge `mo10`, onda 15b). Ultima versione rilasciata: 1.3.0 (commit di versione `1c75187`, tag `v1.3.0`). La documentazione dell'onda 15b è sul ramo `docs17`, non ancora unita.
 
 - **Fatto** (onda 14):
   - Sorprendimi salta i collegamenti già noti; Discover riduce i classici, visibili con "Includi classici" (D-492).
@@ -35,9 +35,21 @@
   - Verifica Opus su copia temporanea della libreria reale (headless, solo aggregati, copia cancellata): pacchetto 30 riconoscimenti sicuri (obiettivo ≥ 40, non raggiunto); 1 fusione sicura errata ("computational methods" vs "numerical study", probabilmente da un alias dell'utente); token del prompt con pacchetto max 272, mediana 257 (≤ 300 ok); macro-aree con pacchetto: 5 blocchi, 86 % chiari, il più grande 31 %, ma un blocco di 1 opera (obiettivo ≥ 2); senza pacchetto 29 % chiari (non garantito, D-562); Applica→Annulla identico. Verifiche visive nell'app NON fatte (la run del verificatore si è bloccata 4 h sulla scansione ed è stata fermata; memoria bassa).
 - **Installer 1.3.0:** `apps/desktop/release/ResearchLab-Setup-1.3.0.exe` costruito (125 MB, non provato con installazione) (senza eseguibile di Claude Code, D-474).
 - **Fatto dopo la 1.2.0:** 1.2.0 rilasciata (`7a3246a`, tag `v1.2.0`, installer di 125 MB senza Claude Code); `hk1` (`a5d1ea1`) e `vpack` (`9a57b84`) uniti su `main` (D-515).
+- **Fatto dopo la 1.3.0** (onda 15b, su `main`, non rilasciato; D-563..D-574):
+  - Feedback dell'utente: le macro-aree erano gruppi nati dalla co-occorrenza (Machine learning finiva sotto molti corpi; "Many-body" e "Many-body physics" non erano unite). Decisioni: macro-aree = struttura fissa del campo, basata su riviste e arXiv, estendibile (un libro di geometria/topologia va sotto Matematica); vocabolario del campo applicato in automatico con un solo annullamento; obiettivo: una macro-area principale per articolo.
+  - `pm4` (D-563): la corrispondenza con l'etichetta propria resta sicura; si aggiungono i concetti del campo.
+  - `ma7` (D-568..D-570): macro-aree fisse, senza raggruppamento per co-occorrenza con un pacchetto; macro-area principale per articolo (fissata, peso, mezzo peso per i generici, concetto più profondo); nuovo obiettivo e Topic ammessi con copertura ≥ 60 % con un pacchetto.
+  - `va6` (D-565..D-567, D-571): vocabolario applicato in automatico come un'unica modifica annullabile; nuove macro-aree Matematica e "Scienza, società e pratica della ricerca", con i tag non di ricerca sotto quest'ultima; concetti combinati divisi in concetti figli, duplicati veri uniti.
+  - `tp8` (D-572): con una famiglia Topic le macro-aree sono esattamente i suoi figli di primo livello, senza discesa.
+  - `ua9` (D-573): una corrispondenza solo tramite alias dell'utente è al massimo "probabile".
+  - `mo10` (D-574): la Mappa si apre su Topic con un pacchetto; niente pillola di chiarezza. D-564 non usata (ricerca per co-occorrenza abbandonata).
+  - Misure su una copia temporanea della libreria reale (headless e nell'app): 61–64 riconoscimenti sicuri (obiettivo ≥ 40), 0 fusioni sicure errate; Many-body = Many-body physics = Quantum many-body uniti; blocchi = macro-aree (Machine learning and AI 10, Many-body physics 6, Scienza/società 4, Altro 1, Nessun valore 5); ogni articolo taggato ha una macro-area principale; Annulla identico (tassonomia e documenti).
+  - Nell'app PASS: trascinamento tra blocchi con annulla, rinomina con annulla, selezione a rettangolo, segni di lettura, vista salvata, export PNG/SVG.
+  - Incidente di costo: il primo tentativo di tagging AI sulla copia ha eseguito la pipeline completa su 5 articoli lunghi senza tetto: spesa circa $0,39 (stima $1,06; approvati "pochi centesimi"); fermato. Regola: `pipeline: 'direct'`, `fields: ['tags']`, Haiku, prima `jobs:estimate`, stop sopra $0,10 (massimo approvato).
+  - Test: unitari 3245/3245 su `864cc69`; i merge successivi hanno eseguito i test dei file toccati e i quattro controlli. Suite unitaria completa su `f30cc5d` NON ancora fatta.
 - **In corso:** nulla.
 - **Bloccato:** nulla di bloccante. Le domande aperte all'utente non bloccano (`docs/HANDOFF.md`, sezione 7).
-- **Lacune note dopo l'onda 15:** pacchetto con 30 riconoscimenti sicuri su obiettivo ≥ 40; macro-aree con un blocco di 1 opera sui dati reali; senza pacchetto solo 29 % chiari (non garantito); verifica visiva di §20 da fare.
+- **Lacune note dopo l'onda 15b:** copertura Topic 81 % (i 5 articoli senza tag; obiettivo ≥ 90 %); libro di geometria/topologia non ancora verificato sotto Matematica; blocco "Altro" con 1 solo articolo; suite completa ed e2e pesanti da fare (RAM libera 0,4–0,5 GB).
 - **Lacune note dopo l'onda 14:** concetti duplicati risolti ~12 su 18 sulla libreria reale (obiettivo 90%); Topic chiarisce il 52% dei blocchi per le macro-aree generiche e piccole dell'utente (si possono unire; Automatica è il default); selettore delle famiglie di tag un tag alla volta; "Suggerisci famiglie"; Rinomina sulla scheda del tema; Cronologia per annullare i collegamenti; dimensioni schede S/M/L; stato di studio in batch.
 - **Prossimo:** vedi "Ripresa" qui sotto.
 - **Budget:** tetti in `CLAUDE.md`, non più rigidi (D-487), alzati per D-501..D-503; ogni nuovo chunk del renderer ha un tetto di 16 KiB (`renderer.chunkCapsKB`, D-465).
@@ -45,6 +57,7 @@
 
 ## Ripresa (2026-11-21) — leggere per primo
 
+- **Onda 15b unita su `main`** (`f30cc5d`, D-563..D-574, dopo la 1.3.0, non rilasciata): vedi "Fatto dopo la 1.3.0" sopra.
 - Onda 15 **unita su `main`** (design §20 di `docs/design/ARCHITETTURA-UI.md`, D-516..D-562). Ultimo commit di codice `1c75187` (Set version 1.3.0). Versione **1.3.0 impostata**; installer `apps/desktop/release/ResearchLab-Setup-1.3.0.exe` (125 MB) costruito; tag `v1.3.0` (senza Claude Code, D-474); tag `v1.3.0` pubblicato.
 - Contenuti: design §20 con 2 round Opus (architetto e revisore avversario); scelta dell'utente: lo spostamento di macro-area parte selezionato (D-533). Extra approvati per rete/Mappa: stato di lettura, multi-selezione, opere isolate e blocchi senza collegamenti, viste salvate con export PNG/SVG.
 - Merge: `vp1` pacchetto di vocabolario fisica/QI/molti corpi (D-536); `me2` Mappa lato principale (D-546); `be3` blocchi modificabili (D-548); `mx4` segni di lettura, isolate, viste salvate, export, riga di progetto (D-558). Tetti alzati D-547, D-548, D-558, D-561.
@@ -52,10 +65,9 @@
 - Test su `main` prima della 1.3.0: unitari 3212/3212 (24 saltati); pesanti unitari 65/65; e2e tutti verdi da soli tranne `qa-budget` `firstContentMs` 595 contro 530 (instabile noto); `packaged-app` verde sulla build 1.3.0 (build di prova e controllo di rilascio). E2e pesanti NON eseguiti (2,3 GiB liberi, ne servono 2,5).
 - Verifica Opus su copia temporanea della libreria reale (headless, solo aggregati, copia cancellata): pacchetto 30 riconoscimenti sicuri (obiettivo ≥ 40, non raggiunto); 1 fusione sicura errata ("computational methods" vs "numerical study", probabilmente da un alias dell'utente); token del prompt con pacchetto max 272, mediana 257 (≤ 300 ok); macro-aree con pacchetto: 5 blocchi, 86 % chiari, il più grande 31 %, ma un blocco di 1 opera (obiettivo ≥ 2); senza pacchetto 29 % chiari (non garantito, D-562); Applica→Annulla identico. Verifiche visive nell'app NON fatte (run bloccata 4 h sulla scansione, fermata; memoria bassa).
 - **Prossimi passi:**
-  1. ~~Installer 1.3.0 e tag `v1.3.0`~~ fatto.
-  2. Verifica visiva di §20 nell'app con RAM libera: trascinamento, rinomina, unione, annulla, barra di selezione, segni di lettura contro etichette, viste salvate, export.
+  1. Suite unitaria completa su `f30cc5d` (con RAM libera).
+  2. Tagging AI dei 5 articoli senza tag: solo tag, Haiku, `pipeline: 'direct'`, `fields: ['tags']`, `jobs:estimate` prima, stop sopra $0,10. Obiettivo: copertura Topic ≥ 90 % (ora 81 %) e libro di geometria/topologia sotto Matematica.
   3. E2e pesanti uno alla volta.
-  4. Portare i riconoscimenti sicuri del pacchetto verso ≥ 40.
-  5. Nessun blocco macro di una sola opera sui dati reali.
-  6. Rimuovere i vecchi worktree in `C:\dev\rl-wt` (mai una junction `node_modules`).
-- Regole operative ricordate dall'utente: costo in token prima del tempo; agenti al massimo 2; test bomba vietati (D-476); tetti in KiB non vincolanti ma app leggera (D-487); niente Co-Authored-By.
+  4. Versione 1.4.0, installer e tag `v1.4.0`.
+  5. Rimuovere i vecchi worktree in `C:\dev\rl-wt` (mai una junction `node_modules`).
+- Regole operative ricordate dall'utente: costo in token prima del tempo; agenti al massimo 2; test bomba vietati (D-476); tetti in KiB non vincolanti ma app leggera (D-487); AI di test con tetto $0,10 (approvato); niente Co-Authored-By.

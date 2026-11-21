@@ -559,5 +559,13 @@
   },
   "tagPicker": {
     "pack": "Dal vocabolario del campo"
+  },
+  "packAuto": {
+    "text_one": "Vocabolario del campo applicato: {{count}} tag riconosciuto",
+    "text_other": "Vocabolario del campo applicato: {{count}} tag riconosciuti",
+    "undo": "Annulla",
+    "review": "Rivedi",
+    "undone": "Vocabolario del campo annullato. Non si applicherà più da solo; puoi sempre attivarlo a mano.",
+    "stopped": "Non si è potuto annullare: {{reason}}"
   }
 }

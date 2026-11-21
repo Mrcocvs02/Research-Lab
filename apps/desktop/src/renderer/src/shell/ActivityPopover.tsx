@@ -62,6 +62,7 @@ export function ActivityPopover({ anchor, onClose, scan, startScan, cancelScan, 
         testId="activity-row"
         actions={
           <>
+            {g.alt && <Button size="sm" variant="ghost" onClick={g.alt.run}>{g.alt.label}</Button>}
             {g.action && <Button size="sm" onClick={g.action.run}>{g.action.label}</Button>}
             {g.dismiss && <Button size="sm" variant="ghost" onClick={g.dismiss}>{t('jobs.dismiss')}</Button>}
           </>

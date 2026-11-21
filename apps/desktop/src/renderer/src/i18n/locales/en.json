@@ -559,5 +559,13 @@
   },
   "tagPicker": {
     "pack": "From the field vocabulary"
+  },
+  "packAuto": {
+    "text_one": "Field vocabulary applied: {{count}} tag recognised",
+    "text_other": "Field vocabulary applied: {{count}} tags recognised",
+    "undo": "Undo",
+    "review": "Review",
+    "undone": "Field vocabulary undone. It will not apply itself again; you can still turn it on by hand.",
+    "stopped": "It could not be undone: {{reason}}"
   }
 }

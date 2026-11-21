@@ -43,6 +43,7 @@ import { PDF_WRITE_ENABLED } from '@rl/core';
 import { flushPdfWrites } from './study/pdf-sync.js';
 import { FileSecretStore } from './secret-store.js';
 import { bindAutoAccept, noteLibraryChange } from './features/tag-review/auto-hook.js';
+import { bindPackAuto, notePackAuto } from './features/vocab-pack/auto-hook.js';
 import { installGlobalSecurity, isTrustedUrl, registerPrivilegedSchemes, rendererOrigin, serveDocuments, serveRenderer, serveThumbnails } from './security.js';
 import { SettingsStore } from './settings-store.js';
 import { createMainWindow } from './window.js';
@@ -69,7 +70,10 @@ const log = createFileLogger({ dir: path.join(dirs.localData, 'logs'), name: 'ma
 for (const warning of runtime.warnings) log.warn(warning);
 
 function emit<K extends EventName>(event: K, payload: unknown): void {
-  if (event === 'library:changed') noteLibraryChange((payload as { kind?: string }).kind ?? '');
+  if (event === 'library:changed') {
+    noteLibraryChange((payload as { kind?: string }).kind ?? '');
+    notePackAuto((payload as { kind?: string }).kind ?? '');
+  } else if (event === 'scan:progress' && (payload as { state?: string }).state === 'done') notePackAuto('scan');
   const parsed = events[event].safeParse(payload);
   if (!parsed.success) {
     log.error('invalid event payload', { event });
@@ -198,6 +202,7 @@ async function main(): Promise<void> {
 
   // The reader loads PDFs through rl-doc://; every request looks the document up in the active library again.
   bindAutoAccept(services);
+  bindPackAuto(services);
   serveDocuments(session.defaultSession, createDocHandler({ resolve: (id) => presentPdf(services, id as DocumentId), allowedOrigin: rendererOrigin }));
 
   // Grid thumbnails through rl-thumb://: only files of the cache folder of the active library (D-196).
@@ -235,6 +240,8 @@ async function main(): Promise<void> {
     .then(() => reconcileMcp(services))
     // The automatic backup waits for the first scan to end: both read the same folder, and one heavy job at a time.
     .then(() => runtimeManager.require().then((rt) => rt.whenIdle()).catch(() => undefined))
+    // The field vocabulary that fits the library applies itself once the library is open and quiet (D-565).
+    .then(() => notePackAuto('open'))
     .then(async () => {
       // The backup code is loaded only when the automatic backup is on.
       const app = await settings.get();

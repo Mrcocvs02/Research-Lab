@@ -45,11 +45,11 @@ describe('matching the tags of a library with the concepts of a pack (D-517)', (
     expect(one('Models of alpha-theory')).toMatchObject([{ conceptId: 'topic.alpha-theory', confidence: 'likely' }]);
   });
 
-  it('a narrower term that has its own concept is matched to it, apart from its parent: the tag named like the concept is sure, the alias tag is not', () => {
+  it('a narrower term that has its own concept is matched to it, apart from its parent: the tag named like the concept and the one that is its short name are both sure (D-571), the narrower tag is not drawn into it', () => {
     const r = run([node('p', 'Eta model'), node('c', 'Mixed eta model'), node('a', 'Eta')]);
-    // "Eta" and "Eta model" are two tags of the one concept: the tag that carries the concept's label stays sure, the alias one is probable.
+    // "Eta" and "Eta model" are two tags of the one concept: the label and its true variant, both sure (they merge together).
     expect(pairOf(r, 'p')).toMatchObject([{ conceptId: 'topic.eta-model', confidence: 'sure' }]);
-    expect(pairOf(r, 'a')).toMatchObject([{ conceptId: 'topic.eta-model', confidence: 'likely' }]);
+    expect(pairOf(r, 'a')).toMatchObject([{ conceptId: 'topic.eta-model', confidence: 'sure' }]);
     // The narrower tag is not drawn into it.
     expect(pairOf(r, 'c')).toMatchObject([{ conceptId: 'topic.eta-mixed', confidence: 'sure' }]);
     const alone = run([node('p', 'Eta model'), node('c', 'Mixed eta chain')]);
@@ -103,13 +103,19 @@ describe('matching the tags of a library with the concepts of a pack (D-517)', (
     expect(r.conflicts).toBe(1);
   });
 
-  it('a concept two different tags claim: only the tag that matches its label is sure, the other is probable', () => {
+  it('a concept two tags claim, each through a sure match (its label or a true variant alias), keeps them all sure: they are duplicates (D-571)', () => {
     const claimed = run([node('p', 'Zeta solver'), node('q', 'ZS')]);
     expect(claimed.matches.map((m) => [m.nodeId, m.confidence])).toEqual([
       ['p', 'sure'],
-      ['q', 'likely'],
+      ['q', 'sure'],
     ]);
-    expect(claimed.conflicts).toBe(1);
+    expect(claimed.conflicts).toBe(0);
+    // The short and the long name of a model: both reach the concept, both sure.
+    const eta = run([node('e1', 'Eta'), node('e2', 'Eta model')]);
+    expect(eta.matches.map((m) => [m.nodeId, m.conceptId, m.confidence])).toEqual([
+      ['e1', 'topic.eta-model', 'sure'],
+      ['e2', 'topic.eta-model', 'sure'],
+    ]);
   });
 
   it('a concept claimed by tags that are sure duplicates of each other keeps them all sure', () => {
@@ -122,14 +128,12 @@ describe('matching the tags of a library with the concepts of a pack (D-517)', (
     expect(r.conflicts).toBe(0);
   });
 
-  it('two different tags on a combined concept, each through an alias, are not sure: they are different concepts', () => {
+  it('the parts of a combined concept are children with their own aliases: two tags on two parts are two different concepts, never duplicates (D-571)', () => {
     const r = run([node('l', 'Lambda methods'), node('m', 'Mu methods')]);
     expect(r.matches.map((m) => [m.nodeId, m.conceptId, m.confidence])).toEqual([
-      ['l', 'topic.lambda-and-mu', 'likely'],
-      ['m', 'topic.lambda-and-mu', 'likely'],
+      ['l', 'topic.lambda-methods', 'sure'],
+      ['m', 'topic.mu-methods', 'sure'],
     ]);
-    // Neither counts as sure.
-    expect(r.matches.filter((m) => m.confidence === 'sure')).toEqual([]);
   });
 
   it('a match made only between an alias of the tag and an alias of the concept is probable at most (D-563)', () => {
@@ -180,14 +184,12 @@ describe('a library shaped like a real one (acceptance 20.11 A, D-563)', () => {
   // A concept claimed twice by sure duplicates (the name and the name with its sigla): both sure.
   own.push(mk('d', 'Quartz field', ['QF']));
   nodes.push(node('d1', 'Quartz field'), node('d2', 'Quartz field (QF)'));
-  // A concept claimed by a tag that carries its label and a tag that only reaches it through an alias: the second is not sure.
+  // A concept claimed by a tag that carries its label and a tag that reaches it through a true variant (its sigla): both sure (D-571).
   own.push(mk('e', 'Ruby solver', ['RS']));
   nodes.push(node('e1', 'Ruby solver'), node('e2', 'RS'));
-  wrong.push(['e2', 'e']);
-  // A combined concept claimed by two different tags through its aliases.
-  own.push(mk('f', 'Topaz and onyx methods', ['topaz methods', 'onyx methods']));
+  // A combined concept has its parts as children: each tag takes its own part, sure, never the combined concept.
+  own.push(mk('f', 'Topaz and onyx methods'), { ...mk('f1c', 'Topaz methods'), parent: 'f' }, { ...mk('f2c', 'Onyx methods'), parent: 'f' });
   nodes.push(node('f1', 'Topaz methods'), node('f2', 'Onyx methods'));
-  wrong.push(['f1', 'f'], ['f2', 'f']);
   // A tag whose label meets nothing and whose alias is an alias of a concept.
   own.push(mk('g', 'Pearl study', ['pearl simulation']));
   nodes.push(node('g1', 'Opal methods', { aliases: ['pearl simulation'] }));
@@ -195,17 +197,17 @@ describe('a library shaped like a real one (acceptance 20.11 A, D-563)', () => {
   const r = run(nodes, { concepts: own });
   const sure = new Set(r.matches.filter((m) => m.confidence === 'sure').map((m) => `${m.nodeId}/${m.conceptId}`));
 
-  it('recognises 43 tags for sure, with no wrong pairing among them (at least 40 are expected on a real library)', () => {
-    expect(sure.size).toBe(43);
+  it('recognises 46 tags for sure, with no wrong pairing among them (at least 40 are expected on a real library)', () => {
+    expect(sure.size).toBe(46);
     expect(sure.size).toBeGreaterThanOrEqual(40);
     expect(r.recognized).toBe(r.matches.filter((m) => m.confidence !== 'maybe').length);
     for (let i = 0; i < 40; i++) expect(sure.has(`n${i}/c${i}`), `n${i}`).toBe(true);
-    for (const k of ['d1/d', 'd2/d', 'e1/e']) expect(sure.has(k), k).toBe(true);
+    for (const k of ['d1/d', 'd2/d', 'e1/e', 'e2/e', 'f1/f1c', 'f2/f2c']) expect(sure.has(k), k).toBe(true);
   });
 
   it('every wrong pairing is not sure', () => {
     for (const [n, c] of wrong) expect(sure.has(`${n}/${c}`), `${n}/${c}`).toBe(false);
-    expect([...sure].filter((k) => k.startsWith('f') || k.startsWith('g'))).toEqual([]);
+    expect([...sure].filter((k) => k.endsWith('/f') || k.startsWith('g'))).toEqual([]);
   });
 });
 

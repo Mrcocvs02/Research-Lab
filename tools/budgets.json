@@ -41,7 +41,7 @@
   },
   "main": {
     "entryJsKB": 1150,
-    "lazyJsKB": 690,
+    "lazyJsKB": 700,
     "lazyChunkKB": 30,
     "lazyChunkOverrides": {
       "writer": 48,

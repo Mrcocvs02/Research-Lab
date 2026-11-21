@@ -315,6 +315,7 @@ export const EVENT_NAMES: readonly string[] = [
   'mcp:changed',
   'scan:progress',
   'tagReview:aiProgress',
+  'vocabPack:autoApplied',
   'watch:changed',
   'watch:progress',
 ];

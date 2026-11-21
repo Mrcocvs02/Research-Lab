@@ -57,6 +57,11 @@
       "open": "Disattiva…",
       "keep": "Smetti di usarlo",
       "undo": "Disattiva e annulla i collegamenti"
+    },
+    "review": {
+      "left_one": "{{count}} altro tag potrebbe essere nel vocabolario: rivedilo.",
+      "left_other": "{{count}} altri tag potrebbero essere nel vocabolario: rivedili.",
+      "open": "Rivedi"
     }
   },
   "macro": {

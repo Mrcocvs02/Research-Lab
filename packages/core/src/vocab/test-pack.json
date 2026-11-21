@@ -21,7 +21,9 @@
     { "id": "topic.eta-mixed", "label": "Mixed eta model", "labelIt": "Modello eta misto", "aliases": ["Mixed eta chain"], "parent": "topic.eta-model" },
     { "id": "topic.theta-flow", "label": "Theta flow", "labelIt": "Flusso theta", "aliases": [] },
     { "id": "topic.theta-flows", "label": "Theta flows", "aliases": [] },
-    { "id": "topic.lambda-and-mu", "label": "Lambda and mu methods", "labelIt": "Metodi lambda e mu", "aliases": ["lambda methods", "mu methods"] }
+    { "id": "topic.lambda-and-mu", "label": "Lambda and mu methods", "labelIt": "Metodi lambda e mu", "aliases": [] },
+    { "id": "topic.lambda-methods", "label": "Lambda methods", "labelIt": "Metodi lambda", "aliases": ["lambda method"], "parent": "topic.lambda-and-mu" },
+    { "id": "topic.mu-methods", "label": "Mu methods", "labelIt": "Metodi mu", "aliases": ["mu method"], "parent": "topic.lambda-and-mu" }
    ]
   },
   {

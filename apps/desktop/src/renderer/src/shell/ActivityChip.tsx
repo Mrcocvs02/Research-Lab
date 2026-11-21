@@ -9,6 +9,7 @@ import { scanText } from '../views/library/ScanStatusText';
 import type { useScanStatus } from '../views/library/useScanStatus';
 import { jobGroup, scanGroup, summarize, useGenericActivity } from './activityModel';
 import { useHaikuActivity } from './useHaikuActivity';
+import { useVocabPackNotice } from './useVocabPackNotice';
 
 // The list of activities is only needed when the chip is clicked.
 const ScanReport = lazyView(() => import('../views/library/ScanReport').then((m) => ({ default: m.ScanReport })), ['library']);
@@ -51,6 +52,7 @@ export function ActivityChip({ scan: scanApi }: { scan: ReturnType<typeof useSca
   const { job } = useJobs();
   const { job: citations } = useCitationJob();
   useHaikuActivity();
+  useVocabPackNotice();
   const generic = useGenericActivity();
   const anchor = useRef<HTMLButtonElement>(null);
   const [unseen, setUnseen] = useState(false);

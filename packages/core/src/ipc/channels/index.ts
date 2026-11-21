@@ -38,7 +38,7 @@ import { citectxChannels, compareChannels, groupsChannels } from './synthesis.js
 import { taxonomyChannels } from './taxonomy.js';
 import { tagReviewChannels, tagReviewEvents } from './tag-review.js';
 import { thumbsChannels } from './thumbs.js';
-import { vocabPackChannels } from './vocab-pack.js';
+import { vocabPackChannels, vocabPackEvents } from './vocab-pack.js';
 import { watchChannels, watchEvents } from './watch.js';
 import { scanChannels, scanEvents } from './scan.js';
 import { indexChannels, searchChannels } from './search.js';
@@ -59,7 +59,7 @@ export const channels = mergeRegistries(appChannels, settingsChannels, libraryCh
   vocabPackChannels,
 );
 
-export const events = mergeRegistries(aiEvents, annotationsEvents, appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, tagReviewEvents, watchEvents, graphEvents, exportEvents, mcpEvents, backupEvents);
+export const events = mergeRegistries(aiEvents, annotationsEvents, appEvents, importEvents, scanEvents, libraryEvents, chatEvents, jobsEvents, inboxEvents, citationsEvents, tagReviewEvents, watchEvents, graphEvents, exportEvents, mcpEvents, backupEvents, vocabPackEvents);
 
 export type Channels = typeof channels;
 export type Events = typeof events;

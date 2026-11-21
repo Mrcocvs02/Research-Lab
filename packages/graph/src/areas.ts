@@ -23,6 +23,11 @@ export interface AreaShare {
   ar: AreaTriple[];
   /** Centrality x 100. */
   az: number;
+  /**
+   * What the choice of the main area of the paper reads (D-569), for every area the paper reaches: `[area index, tag weight, depth of the deepest
+   * tag, number of tags]`. The tag weight counts a tag that is the area itself (a generic tag) at half. Documents only: not shipped to the renderer.
+   */
+  rk?: Array<[number, number, number, number]>;
 }
 export interface AreaSummary {
   id: string;
@@ -89,6 +94,17 @@ export function computeAreas(nodes: readonly AreaNode[], docs: readonly AreaDoc[
     return s;
   };
 
+  /** Depth of a node in the tree: 0 for a root, else 1 + the deepest parent (a cycle ends where it repeats). */
+  const depthMemo = new Map<string, number>();
+  const depth = (id: string, guard = 0): number => {
+    const known = depthMemo.get(id);
+    if (known !== undefined) return known;
+    depthMemo.set(id, 0);
+    const d = guard > 30 ? 0 : Math.max(-1, ...parentsOf(id).map((p) => depth(p, guard + 1))) + 1;
+    depthMemo.set(id, d);
+    return d;
+  };
+
   // Documents with their known tags.
   const rows = docs.map((d) => {
     const w = new Map<string, number>();
@@ -125,6 +141,10 @@ export function computeAreas(nodes: readonly AreaNode[], docs: readonly AreaDoc[
     id: string;
     m: Map<string, number>;
     br: Map<string, Map<string, number>>;
+    /** Tag weight with a generic tag (the area itself) at half, depth of the deepest tag and number of tags, per area (D-569). */
+    mw: Map<string, number>;
+    dp: Map<string, number>;
+    nt: Map<string, number>;
   }
   const per: Row[] = [];
   const areaDocs = new Map<string, number>();
@@ -133,7 +153,7 @@ export function computeAreas(nodes: readonly AreaNode[], docs: readonly AreaDoc[
     const ids = [...r.w.keys()];
     const ancestorOfOther = new Set<string>();
     for (const t of ids) for (const a of anc(t)) if (a !== t) ancestorOfOther.add(a);
-    const row: Row = { id: r.id, m: new Map(), br: new Map() };
+    const row: Row = { id: r.id, m: new Map(), br: new Map(), mw: new Map(), dp: new Map(), nt: new Map() };
     // First the real areas; the loose roots only for a document that reaches none.
     for (const fallback of [false, true]) {
       if (fallback && (row.m.size > 0 || loose.size === 0)) break;
@@ -144,6 +164,9 @@ export function computeAreas(nodes: readonly AreaNode[], docs: readonly AreaDoc[
         const c = r.w.get(x)! / mine.length;
         for (const a of mine) {
           row.m.set(a, (row.m.get(a) ?? 0) + c);
+          row.mw.set(a, (row.mw.get(a) ?? 0) + (x === a ? c / 2 : c));
+          row.dp.set(a, Math.max(row.dp.get(a) ?? 0, depth(x)));
+          row.nt.set(a, (row.nt.get(a) ?? 0) + 1);
           const b = branchOf(a, x);
           const bm = row.br.get(a) ?? row.br.set(a, new Map()).get(a)!;
           bm.set(b, (bm.get(b) ?? 0) + c);
@@ -178,7 +201,8 @@ export function computeAreas(nodes: readonly AreaNode[], docs: readonly AreaDoc[
       for (const [b, v] of row.br.get(a)!) if (v > bv || (v === bv && cmp(b, best) < 0)) (best = b, (bv = v));
       return { a: areaIndex.get(a)!, b: best === '' ? -1 : (branchIndex.get(a)!.get(best) ?? -1), p: m / M };
     });
-    out.set(row.id, { ar: pack(entries), az: Math.round(Math.min(1, Math.max(...row.m.values()) / Z_FULL) * 100) });
+    const rk = [...row.m.keys()].sort(cmp).map((a): [number, number, number, number] => [areaIndex.get(a)!, row.mw.get(a)!, row.dp.get(a)!, row.nt.get(a)!]);
+    out.set(row.id, { ar: pack(entries), az: Math.round(Math.min(1, Math.max(...row.m.values()) / Z_FULL) * 100), rk });
   }
 
   const mean = (ids: Iterable<string>): AreaShare | null => {
@@ -264,4 +288,18 @@ export function topicNodes<T extends { id: string; parents: readonly string[]; f
   if (!topic) return kept;
   const others = new Set(roots.filter((r) => r.id !== topic.id).map((r) => r.id));
   return kept.filter((n) => !others.has(rootOf(n.id) ?? ''));
+}
+
+/**
+ * The values of a paper in the Topic as the blocks, the test and the preview read them: its areas with their share (`w`) and what the choice of the
+ * main one reads (D-569: `mw`, `d`, `n`). `null` for a paper with no area. One definition for the Map and for `measureFamily`.
+ */
+export function areaValues(m: AreaModel, docId: string): Array<{ v: string; w: number; mw?: number; d?: number; n?: number }> | null {
+  const sh = m.docs.get(docId);
+  if (!sh || sh.ar.length === 0) return null;
+  const rk = new Map((sh.rk ?? []).map((e) => [e[0], e]));
+  return sh.ar.map(([a, , q]) => {
+    const r = rk.get(a);
+    return { v: m.areas[a]!.id, w: q, ...(r ? { mw: r[1], d: r[2], n: r[3] } : {}) };
+  });
 }

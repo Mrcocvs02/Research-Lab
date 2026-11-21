@@ -25,7 +25,7 @@ export interface MacroChild {
   papers: number;
 }
 /**
- * One move of a proposal, the unit the user ticks. `split`: the value `id` is too generic, its `children` rise to level 1 and it becomes a family
+ * One move of a proposal, the unit the user ticks (all but the `cooc` ones start ticked). `split`: the value `id` is too generic, its `children` rise to level 1 and it becomes a family
  * of its own. `gather`: the `children` (siblings that go together or are small) go under `parent`, which becomes the level 1 value.
  * A `gather` over children that a `split` raised has `requires` = those moves (unticking a move unticks the ones that require it).
  */
@@ -44,6 +44,8 @@ export interface MacroMove {
   requires: string[];
   /** Papers whose hand-fixed main value returns automatic if the move is applied. */
   pinsLost: number;
+  /** A group made because the papers meet, not because of the structure of the field (offered without a field vocabulary): it starts unticked and the dialog says so (D-568). */
+  cooc?: boolean;
 }
 export interface MacroCutItem {
   id: string;
@@ -63,7 +65,7 @@ export interface MacroProposal {
   materialize: string[];
   /** Without moves: `fine` = the blocks are already clear, `no-cut` = no cut of the tree improves them. */
   reason?: 'fine' | 'no-cut';
-  /** The moves left out (`skip` and the ones that need them): `after`, `cut` and `ops` are for the others. */
+  /** The moves left out (`skip`, or without it the groups by co-occurrence, D-568, and the ones that need them): `after`, `cut` and `ops` are for the others. */
   skipped: string[];
   /** Papers whose main value is not clear today (at most 5000), for "Select the unclear ones". */
   unclear: string[];
@@ -109,7 +111,7 @@ export const mapEditChannels = defineChannels('mapEdit', {
     /** `removed`: labels of the tags taken off (at most 20); `already`: papers that already carried `to`. */
     response: reply<{ changeId: string | null; changed: number; removed: string[]; already: number }>(),
   },
-  /** The cut of the tree proposed for a family (D-520); `skip` = ids of moves the user unticked: the answer is the proposal without them. Nothing is written. */
+  /** The cut of the tree proposed for a family (D-520, D-568); `skip` = ids of moves the user unticked: the answer is the proposal without them (no `skip`: without the groups by co-occurrence). Nothing is written. */
   macroPropose: { request: z.object({ family, scope, skip: z.array(z.string().max(300)).max(MAP_EDIT_LIMITS.moves).optional() }), response: reply<MacroProposal>() },
   /** Applies the ticked moves (their ids) as ONE change of the taxonomy; `names` holds the names written for provisional parents. CONFLICT `details.reason` = `stale` if the library changed since the proposal. */
   macroApply: {

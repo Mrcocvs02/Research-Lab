@@ -29,7 +29,7 @@ const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 /** Cluster ids with their labels and the weighted membership of each document (documents with none are absent). */
 export interface Memberships {
   labels: Map<string, string>;
-  docs: Map<string, Array<{ cluster: string; w: number }>>;
+  docs: Map<string, Array<{ cluster: string; w: number; mw?: number; d?: number; n?: number }>>;
 }
 export type FamilyNode = AreaNode & { level?: string | undefined; group?: string | undefined };
 
@@ -66,18 +66,35 @@ export function tagMemberships(ref: FamilyRef, nodes: readonly FamilyNode[], doc
     }
     return r;
   };
+  /** Depth of a tag in the tree (a root is 0): the deepest tag is the most specific (D-569). */
+  const depthMemo = new Map<string, number>();
+  const depth = (id: string, guard = 0): number => {
+    const known = depthMemo.get(id);
+    if (known !== undefined) return known;
+    depthMemo.set(id, 0);
+    const d = guard > 30 ? 0 : Math.max(-1, ...parentsOf(id).map((p) => depth(p, guard + 1))) + 1;
+    depthMemo.set(id, d);
+    return d;
+  };
   const labels = new Map<string, string>();
-  const out = new Map<string, Array<{ cluster: string; w: number }>>();
+  const out = new Map<string, Array<{ cluster: string; w: number; mw: number; d: number; n: number }>>();
   for (const d of docs) {
-    const acc = new Map<string, number>();
+    const acc = new Map<string, { w: number; mw: number; d: number; n: number }>();
     for (const t of d.tags) {
       if (!prefix && !live.has(t.id)) continue;
       const own = topsOf(t.id);
-      for (const c of own) acc.set(c, Math.min(1, (acc.get(c) ?? 0) + t.w / own.length));
+      for (const c of own) {
+        const e = acc.get(c) ?? acc.set(c, { w: 0, mw: 0, d: 0, n: 0 }).get(c)!;
+        e.w = Math.min(1, e.w + t.w / own.length);
+        // A tag that is the value itself is generic: it counts at half, so the specific tags decide (D-569).
+        e.mw += (c === t.id ? t.w / 2 : t.w) / own.length;
+        e.d = Math.max(e.d, depth(t.id));
+        e.n++;
+      }
     }
     if (acc.size === 0) continue;
     for (const c of acc.keys()) if (!labels.has(c)) labels.set(c, prefix ? c.slice(ref.value.length) : (live.get(c)?.label ?? c));
-    out.set(d.id, [...acc].map(([cluster, w]) => ({ cluster, w })));
+    out.set(d.id, [...acc].map(([cluster, e]) => ({ cluster, w: e.w, mw: e.mw, d: e.d, n: e.n })));
   }
   return { labels, docs: out };
 }
@@ -144,42 +161,45 @@ export interface Eligibility {
   values: number;
 }
 
-/** How specific each value is: log(N / papers with the value), N the papers with any value; at least 0.15 so a value on every paper still counts. */
-export function valueSpecificity(shares: Iterable<ReadonlyArray<{ v: string; w: number }>>): Map<string, number> {
-  const count = new Map<string, number>();
-  let n = 0;
-  for (const list of shares) {
-    let any = false;
-    for (const v of new Set(list.filter((e) => e.w > 0).map((e) => e.v))) {
-      count.set(v, (count.get(v) ?? 0) + 1);
-      any = true;
-    }
-    if (any) n++;
-  }
-  return new Map([...count].map(([v, c]) => [v, Math.max(0.15, Math.log(n / c))]));
+/** One value of a paper: its share `w`, and what the choice of the main value reads (D-569): `mw` the total weight of the paper's tags in the value (a generic tag, the value itself, at half), `d` the depth of the deepest tag, `n` the number of tags. */
+export interface PaperValue {
+  v: string;
+  w: number;
+  mw?: number | undefined;
+  d?: number | undefined;
+  n?: number | undefined;
 }
-
 /** The weighted values of one paper. `pin` is the value the user fixed by hand as its main one (D-521, `mainTags`), already resolved to a level 1 value. */
-export type PaperValues = ReadonlyArray<{ v: string; w: number }> & { pin?: string | null | undefined };
+export type PaperValues = ReadonlyArray<PaperValue> & { pin?: string | null | undefined };
 
+const EPS = 1e-9;
 /**
- * The main value of a paper: the one the user fixed by hand (`pin`, or `list.pin`) while it is still one of the paper's values; else the biggest weight, or
- * with `spec` (D-508) the biggest weight x specificity, so a value on most papers (a generic macro-area) does not win over a narrower one it ties with.
- * A pin that is no longer among the values (its tag was taken off) is ignored. Ties: the smaller id.
+ * The main value of a paper (D-569, section 19.2.2), the same rule for the blocks, the test, the preview and the proposal of macro-areas:
+ * 1) the value the user fixed by hand (`pin`, or `list.pin`) while it is still one of the paper's values; 2) the biggest total tag weight
+ * (`mw`; a generic tag, the value itself, counts at half; `w` when a list has no `mw`); 3) ties: the value reached by the deepest tag; 4) the value with
+ * more of the paper's tags; 5) the smaller id. A pin that is no longer among the values (its tag was taken off) is ignored.
  */
-export function mainValue(list: PaperValues, spec?: ReadonlyMap<string, number>, pin: string | null | undefined = list.pin): string | null {
+export function mainValue(list: PaperValues, pin: string | null | undefined = list.pin): string | null {
   if (pin && list.some((e) => e.v === pin && e.w > 0)) return pin;
-  let best: { v: string; w: number } | null = null;
-  const score = (e: { v: string; w: number }): number => e.w * (spec?.get(e.v) ?? 1);
-  for (const e of list) if (e.w > 0 && (!best || score(e) > score(best) || (score(e) === score(best) && e.v < best.v))) best = e;
+  let best: PaperValue | null = null;
+  for (const e of list) {
+    if (!(e.w > 0)) continue;
+    if (!best) {
+      best = e;
+      continue;
+    }
+    const d = (e.mw ?? e.w) - (best.mw ?? best.w);
+    const better = Math.abs(d) > EPS ? d > 0 : (e.d ?? 0) !== (best.d ?? 0) ? (e.d ?? 0) > (best.d ?? 0) : (e.n ?? 0) !== (best.n ?? 0) ? (e.n ?? 0) > (best.n ?? 0) : e.v < best.v;
+    if (better) best = e;
+  }
   return best?.v ?? null;
 }
 
 /**
  * The test: coverage >= 0.6, clarity >= 0.7, 2 to 12 values (more is fine when the 12 biggest hold 80% of the papers: the rest goes to "Other").
- * A family of kind `one` is clear by construction, and so is a paper whose main value the user fixed; the keywords family never passes. `shares` is the weighted values of each paper (the ones with none may be left out).
+ * With `fieldPack` (a field vocabulary in use, Topic): coverage >= 0.6 and 2 values or more, clarity not asked (D-570). A family of kind `one` is clear by construction, and so is a paper whose main value the user fixed; the keywords family never passes. `shares` is the weighted values of each paper (the ones with none may be left out).
  */
-export function familyEligibility(shares: Iterable<PaperValues>, total: number, opts: { one?: boolean; keywords?: boolean } = {}): Eligibility {
+export function familyEligibility(shares: Iterable<PaperValues>, total: number, opts: { one?: boolean; keywords?: boolean; fieldPack?: boolean } = {}): Eligibility {
   const { withValue, clear, main } = valueStats(shares, opts.one);
   const counts = [...main.values()].sort((a, b) => b - a);
   const values = counts.length;
@@ -188,6 +208,9 @@ export function familyEligibility(shares: Iterable<PaperValues>, total: number, 
   const top = counts.slice(0, ELIGIBLE.maxValues).reduce((s, c) => s + c, 0);
   const fits = values <= ELIGIBLE.maxValues || (withValue > 0 && top / withValue >= ELIGIBLE.cover);
   const r = (v: number) => Math.round(v * 1000) / 1000;
+  // With a field vocabulary the macro-areas are the field's and every paper has a main one (D-569, D-570): papers are legitimately mixed, so clarity
+  // does not decide; at least 60 % of the papers with a main macro-area and 2 macro-areas used.
+  if (opts.fieldPack) return { eligible: !opts.keywords && coverage >= ELIGIBLE.coverage && values >= 2, coverage: r(coverage), clarity: r(clarity), values };
   return { eligible: !opts.keywords && coverage >= ELIGIBLE.coverage && clarity >= ELIGIBLE.clarity && values >= 2 && fits, coverage: r(coverage), clarity: r(clarity), values };
 }
 
@@ -198,16 +221,15 @@ export interface ValueStats {
   main: Map<string, number>;
   unclear: number[];
 }
-/** The one definition of "clear" (section 19.2.2): the main value (`mainValue` with the specificity of the values) is fixed by hand or holds at least `ELIGIBLE.share` of the weight of the paper. `unclear`: indexes in `shares` of papers with a value that is not clear. */
+/** The one definition of "clear" (section 19.2.2): the main value (`mainValue`) is fixed by hand or holds at least `ELIGIBLE.share` of the weight of the paper. `unclear`: indexes in `shares` of papers with a value that is not clear. */
 export function valueStats(shares: Iterable<PaperValues>, one = false): ValueStats {
   const all = [...shares];
-  const spec = valueSpecificity(all);
   const main = new Map<string, number>();
   const unclear: number[] = [];
   let withValue = 0;
   let clear = 0;
   all.forEach((list, i) => {
-    const m = mainValue(list, spec);
+    const m = mainValue(list);
     if (m === null) return;
     withValue++;
     main.set(m, (main.get(m) ?? 0) + 1);

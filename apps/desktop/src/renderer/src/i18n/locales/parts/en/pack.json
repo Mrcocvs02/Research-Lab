@@ -88,6 +88,7 @@
     "treeGatherExisting": "\"{{name}}\" (already in the tree) above {{kids}}",
     "nameLabel": "Name of the new parent",
     "nameNeeded": "Write a name for the new parent",
+    "cooc": "Grouped by co-occurrence: the papers appear together, but the topics may differ · unticked to begin with",
     "provisional": "{{a}} and {{b}}",
     "pins_one": "{{count}} paper fixed on \"{{name}}\" returns automatic",
     "pins_other": "{{count}} papers fixed on \"{{name}}\" return automatic",

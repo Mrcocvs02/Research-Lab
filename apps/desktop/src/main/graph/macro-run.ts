@@ -7,13 +7,16 @@ import type { Scope } from './family-run.js';
 import { loadView, scopeIds } from './view.js';
 
 /**
- * Macro-areas (D-520, D-533, loaded on first use): a cut of the tree of Topic (or of a family of several values) that makes the blocks of the
- * Map clearer, proposed by `macro-cut` and applied as ONE change of the taxonomy. The tags of the papers do not change, only where the values
+ * Macro-areas (D-520, D-533, D-568, loaded on first use): the structure of the tree of Topic (or of a family of several values) made the field's:
+ * with a field vocabulary the values are placed under its macro-areas (nothing grouped by co-occurrence), without one groups by co-occurrence are
+ * only offered, unticked. Proposed by `macro-cut` and applied as ONE change of the taxonomy. The tags of the papers do not change, only where the values
  * stand in the tree. Nothing here calls Claude.
  */
 export interface MacroHooks {
-  /** Concepts of the field vocabulary above the family's nodes, when a vocabulary is on: they become the parents of the gathered values. */
-  latent?: (family: string) => Promise<readonly LatentAncestor[]>;
+  /** Concepts of the field vocabulary above the family's nodes: the macro-areas the values are placed under. `null` when no vocabulary is in use (the proposal may then offer groups by co-occurrence, unticked: D-568). */
+  latent?: (family: string) => Promise<readonly LatentAncestor[] | null>;
+  /** Nodes of the library that are level 1 concepts of the vocabulary themselves (macro-areas already, never split). */
+  fixed?: (family: string) => Promise<readonly string[]>;
   /** Creates the nodes of those concepts (before the operations, in the same group); returns the operations that put them in place. `root`: the family root the level 1 values hang under: each concept is made alone under it, a value of level 1 as the cut reads it. */
   materialize?: (concepts: readonly string[], ops: TaxonomyOp[], root?: string) => Promise<TaxonomyOp[]>;
 }
@@ -34,10 +37,20 @@ export function packHooks(s: MainServices): MacroHooks {
     return { rt, state, loaded: await loadPack(state.packId) };
   };
   return {
-    latent: async () => {
+    fixed: async () => {
       try {
         const a = await active();
         if (!a) return [];
+        const { linkedConcepts } = await import('../features/vocab-pack/materialize.js');
+        return [...linkedConcepts(await a.rt.store.readTaxonomy(), a.state.packId)].filter(([cid]) => !a.loaded.byId.get(cid)?.parent).map(([, node]) => node);
+      } catch {
+        return [];
+      }
+    },
+    latent: async () => {
+      try {
+        const a = await active();
+        if (!a) return null;
         const { linkedConcepts, conceptLabel } = await import('../features/vocab-pack/materialize.js');
         const tax = await a.rt.store.readTaxonomy();
         const linked = linkedConcepts(tax, a.state.packId);
@@ -58,7 +71,7 @@ export function packHooks(s: MainServices): MacroHooks {
           return c ? [{ id, label: conceptLabel(c, l), covers: nodes, top: !c.parent }] : [];
         });
       } catch {
-        return [];
+        return null;
       }
     },
     materialize: async (concepts, ops, root) => {
@@ -123,20 +136,22 @@ async function cutInput(s: MainServices, family: string, scope: Scope): Promise<
   };
 }
 
-async function build(s: MainServices, family: string, scope: Scope, hooks?: MacroHooks): Promise<{ prop: CutProposal | null; label: string; root: string | undefined }> {
+async function build(s: MainServices, family: string, scope: Scope, hooks?: MacroHooks): Promise<{ prop: CutProposal | null; label: string; root: string | undefined; pack: boolean }> {
   const { input, label } = await cutInput(s, family, scope);
-  const latent = hooks?.latent ? await hooks.latent(family) : undefined;
-  return { prop: proposeCut({ ...input, ...(latent && latent.length > 0 ? { latent } : {}) }), label, root: input.root };
+  const latent = hooks?.latent ? await hooks.latent(family) : null;
+  const fixed = latent && hooks?.fixed ? await hooks.fixed(family) : [];
+  return { prop: proposeCut({ ...input, pack: latent !== null, fixed, ...(latent && latent.length > 0 ? { latent } : {}) }), label, root: input.root, pack: latent !== null };
 }
 
 /** `mapEdit:macroPropose`: the moves, and the cut that follows from the ones not in `skip`. */
 export async function macroPropose(s: MainServices, req: { family: string; scope?: Scope; skip?: string[] | undefined }, hooks: MacroHooks = packHooks(s)): Promise<MacroProposal> {
-  const { prop } = await build(s, req.family, req.scope, hooks);
+  const { prop, pack } = await build(s, req.family, req.scope, hooks);
   if (!prop) {
     const zero = { blocks: 0, clearPct: 0, coverage: 0, largestPct: 0, smallest: 0 };
     return { family: req.family, before: zero, after: zero, cut: [], moves: [], ops: [], materialize: [], reason: 'no-cut', skipped: [], unclear: [] };
   }
-  const sel = prop.select(req.skip ?? []);
+  // Without `skip`: every move but the groups by co-occurrence, which start unticked (D-568).
+  const sel = prop.select(req.skip ?? prop.defaultSkip);
   return {
     family: req.family,
     before: prop.before,
@@ -145,7 +160,7 @@ export async function macroPropose(s: MainServices, req: { family: string; scope
     moves: prop.moves,
     ops: sel.ops,
     materialize: sel.materialize,
-    ...(prop.moves.length === 0 ? { reason: prop.before.clearPct >= 70 ? ('fine' as const) : ('no-cut' as const) } : {}),
+    ...(prop.moves.length === 0 ? { reason: pack || prop.before.clearPct >= 70 ? ('fine' as const) : ('no-cut' as const) } : {}),
     skipped: sel.skipped,
     unclear: prop.unclear,
   };

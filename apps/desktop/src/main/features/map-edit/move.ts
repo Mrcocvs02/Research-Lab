@@ -1,5 +1,5 @@
 import { AppError } from '@rl/core';
-import { mainValue, parseFamily, valueSpecificity } from '@rl/graph';
+import { mainValue, parseFamily } from '@rl/graph';
 import { areaModel } from '../../graph/areas-run.js';
 import { valuesOf, type Scope } from '../../graph/family-run.js';
 import { loadView, type LibraryView } from '../../graph/view.js';
@@ -71,8 +71,7 @@ export async function move(
   let mains: Map<string, string | null> | null = null;
   if (many && req.removeFrom && req.to !== null) {
     const v = await valuesOf(s, view, req.scope, req.family, view.records);
-    const spec = valueSpecificity(v.docs.values());
-    mains = new Map([...v.docs].map(([id, list]) => [id, mainValue(list, spec)]));
+    mains = new Map([...v.docs].map(([id, list]) => [id, mainValue(list)]));
   }
   const items = req.docIds.map((docId) => {
     const have = view.byId.get(docId)?.tags ?? [];

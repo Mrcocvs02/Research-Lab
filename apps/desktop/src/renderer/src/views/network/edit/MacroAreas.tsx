@@ -39,8 +39,8 @@ function statsLine(b: MacroStats, a: MacroStats): Array<[string, string, string]
 }
 
 /**
- * The macro-areas dialog (D-520, D-533, section 20.2.3): a cut of the tree that makes the blocks clearer, as moves the user ticks (all ticked to
- * begin with), with the preview "before -> after" and, under each move, what changes in the tree. Nothing is written until Apply; Apply is ONE
+ * The macro-areas dialog (D-520, D-533, D-568, section 20.2.3): the values placed under the macro-areas of the field, as moves the user ticks (all ticked to
+ * begin with, but the groups by co-occurrence, which say so and start unticked), with the preview "before -> after" and, under each move, what changes in the tree. Nothing is written until Apply; Apply is ONE
  * change of the taxonomy and one Undo puts everything back. The papers' tags never change.
  */
 export default function MacroAreas({ family, scope, onClose, onApplied, onSelectUnclear }: Props) {
@@ -48,7 +48,8 @@ export default function MacroAreas({ family, scope, onClose, onApplied, onSelect
   const [prop, setProp] = useState<MacroProposal | null>(null);
   const [today, setToday] = useState<Today[]>([]);
   const [error, setError] = useState<unknown>(null);
-  const [skip, setSkip] = useState<string[]>([]);
+  // `null` = the main process's own start (every move ticked but the groups by co-occurrence, D-568); a list once the user has ticked or unticked a move.
+  const [skip, setSkip] = useState<string[] | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [stale, setStale] = useState(false);
@@ -58,7 +59,7 @@ export default function MacroAreas({ family, scope, onClose, onApplied, onSelect
   // The proposal; each unticked move asks again (the main process computes the cut without it, a few milliseconds).
   useEffect(() => {
     let live = true;
-    rl.invoke('mapEdit:macroPropose', { family, ...(scope ? { scope } : {}), ...(skip.length > 0 ? { skip } : {}) }).then(
+    rl.invoke('mapEdit:macroPropose', { family, ...(scope ? { scope } : {}), ...(skip !== null ? { skip } : {}) }).then(
       (r) => {
         if (!live) return;
         if (moves.current.length === 0) moves.current = r.moves;
@@ -90,7 +91,8 @@ export default function MacroAreas({ family, scope, onClose, onApplied, onSelect
   const lacking = ticked.some((m) => m.parent?.kind === 'provisional' && nameOf(m).trim() === '');
   const toggle = (m: MacroMove) => {
     // Unticking a move unticks the ones that need it; ticking again asks without it.
-    setSkip((cur) => (skipped.has(m.id) ? cur.filter((id) => id !== m.id && !list.find((x) => x.id === id)?.requires.includes(m.id)) : [...cur, m.id]));
+    const cur = [...skipped];
+    setSkip(skipped.has(m.id) ? cur.filter((id) => id !== m.id && !list.find((x) => x.id === id)?.requires.includes(m.id)) : [...cur, m.id]);
   };
   const apply = async () => {
     if (busy || ticked.length === 0 || lacking) return;
@@ -197,6 +199,11 @@ export default function MacroAreas({ family, scope, onClose, onApplied, onSelect
                             ? t('macro.treeGatherExisting', { name: safeText(m.label), kids })
                             : t('macro.treeGather', { name: safeText(nameOf(m)), kids })}
                     </p>
+                    {m.cooc && (
+                      <p className="hint" data-testid="macro-cooc">
+                        {t('macro.cooc')}
+                      </p>
+                    )}
                     {on && m.parent?.kind === 'provisional' && (
                       <label className="macro-name">
                         <span>{t('macro.nameLabel')}</span>

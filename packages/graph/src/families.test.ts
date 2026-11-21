@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FAMILY_TOP, OTHER_CLUSTER, autoMemberships, familyEligibility, familyModel, mainValue, parseFamily, tagMemberships, valueSpecificity, vocabLinks } from './families.js';
+import { FAMILY_TOP, OTHER_CLUSTER, autoMemberships, familyEligibility, familyModel, mainValue, parseFamily, tagMemberships, vocabLinks } from './families.js';
 
 const node = (id: string, extra: { level?: string; parents?: string[]; group?: string } = {}) => ({ id, label: id.toUpperCase(), parents: extra.parents ?? [], level: extra.level, group: extra.group });
 
@@ -24,7 +24,7 @@ describe('tagMemberships', () => {
       { id: 'c', tags: [{ id: 't1', w: 1 }] },
     ]);
     expect([...m.docs.keys()].sort()).toEqual(['a', 'b']);
-    expect(m.docs.get('a')).toEqual([{ cluster: 'rct', w: 1 }]);
+    expect(m.docs.get('a')).toMatchObject([{ cluster: 'rct', w: 1 }]);
     expect(m.labels.get('rct')).toBe('RCT');
   });
   it('splits the weight of a tag under several top-level members and keeps prefix tags as their own clusters', () => {
@@ -35,7 +35,7 @@ describe('tagMemberships', () => {
       ['y', 0.5],
     ]);
     const g = tagMemberships(parseFamily('prefix:grp:'), [], [{ id: 'a', tags: [{ id: 'grp:Lab One', w: 1 }, { id: 't1', w: 1 }] }]);
-    expect(g.docs.get('a')).toEqual([{ cluster: 'grp:Lab One', w: 1 }]);
+    expect(g.docs.get('a')).toMatchObject([{ cluster: 'grp:Lab One', w: 1 }]);
     expect(g.labels.get('grp:Lab One')).toBe('Lab One');
   });
   it('root:<id> uses the values of level 1 under a family root of the controlled vocabulary (D-505)', () => {
@@ -46,8 +46,8 @@ describe('tagMemberships', () => {
       { id: 'b', tags: [{ id: 'm2', w: 1 }, { id: 'other', w: 1 }] },
       { id: 'c', tags: [{ id: 'other', w: 1 }] },
     ]);
-    expect(m.docs.get('a')).toEqual([{ cluster: 'm1', w: 1 }]);
-    expect(m.docs.get('b')).toEqual([{ cluster: 'm2', w: 1 }]);
+    expect(m.docs.get('a')).toEqual([{ cluster: 'm1', w: 1, mw: 1, d: 2, n: 1 }]);
+    expect(m.docs.get('b')).toEqual([{ cluster: 'm2', w: 1, mw: 0.5, d: 1, n: 1 }]);
     expect(m.docs.has('c')).toBe(false);
   });
 });
@@ -114,6 +114,14 @@ describe('familyEligibility', () => {
     expect(e.coverage).toBeCloseTo(0.833, 3);
     expect(e.clarity).toBe(1);
   });
+  it('with a field vocabulary clarity is not asked: 60 % of the papers with a main macro-area and 2 macro-areas are enough (D-570)', () => {
+    const blurry = Array.from({ length: 10 }, (_, i) => [{ v: `v${i % 2}`, w: 0.55 }, { v: `v${(i + 1) % 2}`, w: 0.45 }]);
+    expect(familyEligibility(blurry, 10).eligible).toBe(false);
+    expect(familyEligibility(blurry, 10, { fieldPack: true })).toMatchObject({ eligible: true, clarity: 0, values: 2 });
+    expect(familyEligibility(docs(5, () => 'v0'), 5, { fieldPack: true }).eligible).toBe(false);
+    expect(familyEligibility(blurry, 20, { fieldPack: true }).eligible).toBe(false);
+    expect(familyEligibility(blurry, 10, { fieldPack: true, keywords: true }).eligible).toBe(false);
+  });
   it('fails on coverage under 0.6 and says so', () => {
     const e = familyEligibility(docs(8, (i) => `v${i % 3}`), 25);
     expect(e.eligible).toBe(false);
@@ -143,19 +151,19 @@ describe('familyEligibility', () => {
     expect(mainValue([{ v: 'b', w: 1 }, { v: 'a', w: 1 }])).toBe('a');
     expect(mainValue([])).toBeNull();
   });
-  it('the main value is the most specific one when weights tie (a generic value does not win)', () => {
-    // 10 papers: "wide" on all, "narrow" on 3, "mid" on 6; the tie on weight goes to the rarer value.
-    const papers = Array.from({ length: 10 }, (_, i) => [{ v: 'wide', w: 1 }, ...(i < 3 ? [{ v: 'narrow', w: 1 }] : []), ...(i >= 3 && i < 9 ? [{ v: 'mid', w: 1 }] : [])]);
-    const spec = valueSpecificity(papers);
-    expect(spec.get('narrow')!).toBeGreaterThan(spec.get('mid')!);
-    expect(spec.get('wide')).toBe(0.15);
-    expect(mainValue(papers[0]!)).toBe('narrow'.localeCompare('wide') < 0 ? 'narrow' : 'wide');
-    expect(mainValue(papers[0]!, spec)).toBe('narrow');
-    expect(mainValue(papers[5]!, spec)).toBe('mid');
-    expect(mainValue(papers[9]!, spec)).toBe('wide'); // only one value: still chosen
-    // a clearly heavier weight still wins
-    expect(mainValue([{ v: 'wide', w: 1 }, { v: 'narrow', w: 0.2 }], spec)).toBe('narrow');
-    expect(mainValue([{ v: 'wide', w: 1 }, { v: 'mid', w: 0.1 }], spec)).toBe('wide');
+  it('main value (D-569): the biggest tag weight; a generic tag (the value itself) counts at half; then the deepest, the more tags, the id', () => {
+    const v = (id: string, mw: number, d = 0, n = 1) => ({ v: id, w: 1, mw, d, n });
+    expect(mainValue([v('a', 1), v('b', 1.4)])).toBe('b');
+    // The generic tag alone is half: a specific tag of the same weight wins even with the later id.
+    expect(mainValue([v('a', 0.5, 1), v('z', 1, 2)])).toBe('z');
+    // Weights tie: the value reached by the deepest tag, then the one with more tags, then the smaller id.
+    expect(mainValue([v('a', 1, 2), v('b', 1, 3)])).toBe('b');
+    expect(mainValue([v('a', 1, 3, 1), v('b', 1, 3, 2)])).toBe('b');
+    expect(mainValue([v('b', 1, 3, 2), v('a', 1, 3, 2)])).toBe('a');
+    // A list with no detail reads the share.
+    expect(mainValue([{ v: 'wide', w: 1 }, { v: 'narrow', w: 0.2 }])).toBe('wide');
+    // The order of the list never matters.
+    expect(mainValue([v('b', 1, 3, 2), v('c', 0.4), v('a', 1, 3, 2)])).toBe(mainValue([v('a', 1, 3, 2), v('c', 0.4), v('b', 1, 3, 2)]));
   });
   it('eligibility counts the specific main values: a 80 % macro and a 60 % one no longer swallow the papers', () => {
     const papers = Array.from({ length: 20 }, (_, i) => [{ v: 'wide', w: 1 }, ...(i % 5 < 3 ? [{ v: 'mid', w: 1 }] : []), { v: `s${i % 4}`, w: 1 }]);
@@ -189,14 +197,12 @@ describe('vocabLinks', () => {
 
 describe('the main value fixed by hand (D-521)', () => {
   const both = (pin?: string | null) => Object.assign([{ v: 'a', w: 1 }, { v: 'b', w: 0.4 }], { pin });
-  it('wins over the weight and over the specificity while it is one of the values of the paper', () => {
+  it('wins over the weight and over the depth while it is one of the values of the paper', () => {
     expect(mainValue(both())).toBe('a');
     expect(mainValue(both('b'))).toBe('b');
     // The explicit argument works too, and beats the property.
-    expect(mainValue([{ v: 'a', w: 1 }, { v: 'b', w: 0.4 }], undefined, 'b')).toBe('b');
-    expect(mainValue(both('b'), undefined, 'a')).toBe('a');
-    const spec = new Map([['a', 0.15], ['b', 2]]);
-    expect(mainValue(both('a'), spec)).toBe('a');
+    expect(mainValue([{ v: 'a', w: 1 }, { v: 'b', w: 0.4 }], 'b')).toBe('b');
+    expect(mainValue(both('b'), 'a')).toBe('a');
   });
   it('an expired fixed value (its tag was taken off, so the value is not among the paper values) is ignored', () => {
     expect(mainValue(both('gone'))).toBe('a');

@@ -8,6 +8,8 @@ export const BLOCK_GAP = 60;
 export const BLOCK_HEAD = 34;
 export const SUB_HEAD = 20;
 export const MAX_VALUES = 12;
+/** A value gets a block of its own from this many papers; fewer go to "Other" with the values beyond the 12th (D-568, display only: the taxonomy is not touched). */
+export const MIN_BLOCK = 2;
 export const OTHER_BLOCK = '__other';
 export const NO_VALUE_BLOCK = '__none';
 const SUB_MIN_DOCS = 8;
@@ -53,6 +55,11 @@ export interface BlockLayout {
 
 const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
+/** The values that get a block of their own, biggest first: at most `MAX_VALUES`, each with at least `MIN_BLOCK` papers (`count` = papers per main value). The one definition for the Map and for the preview of the macro-areas. */
+export function blockValues(count: ReadonlyMap<string, number>): string[] {
+  return [...count.keys()].filter((v) => count.get(v)! >= MIN_BLOCK).sort((a, b) => count.get(b)! - count.get(a)! || cmp(a, b)).slice(0, MAX_VALUES);
+}
+
 /** Papers ordered along the main axis of their positions (2D PCA, the sign fixed so that the axis points right, or up when vertical). */
 function alongAxis(docs: readonly BlockDoc[]): BlockDoc[] {
   const n = docs.length;
@@ -91,14 +98,14 @@ interface Group {
   docs: BlockDoc[];
 }
 
-/** Blocks, cells and the block of each paper. The values beyond the 12th biggest go to "Other"; papers with no value to the last block. */
+/** Blocks, cells and the block of each paper. The values beyond the 12th biggest, and those with under 2 papers, go to "Other"; papers with no value to the last block. */
 const COLUMN_FACTORS = [1, 1.5, 2, 3] as const;
 
 export function layoutBlocks(input: BlockInput): BlockLayout {
   const count = new Map<string, number>();
   for (const d of input.docs) if (d.value !== null) count.set(d.value, (count.get(d.value) ?? 0) + 1);
-  const ranked = [...count.keys()].sort((a, b) => count.get(b)! - count.get(a)! || cmp(a, b));
-  const keep = new Set(ranked.slice(0, MAX_VALUES));
+  const ranked = blockValues(count);
+  const keep = new Set(ranked);
   const members = new Map<string, BlockDoc[]>();
   const blockOf = new Map<string, { block: string; others: string[] }>();
   for (const d of input.docs) {
@@ -107,7 +114,7 @@ export function layoutBlocks(input: BlockInput): BlockLayout {
     const others = [...new Set((d.others ?? []).map((o) => (keep.has(o) ? o : OTHER_BLOCK)).filter((o) => o !== id))].sort(cmp).slice(0, 2);
     blockOf.set(d.id, { block: id, others });
   }
-  const order = [...ranked.slice(0, MAX_VALUES), OTHER_BLOCK, NO_VALUE_BLOCK].filter((id) => members.has(id));
+  const order = [...ranked, OTHER_BLOCK, NO_VALUE_BLOCK].filter((id) => members.has(id));
 
   const aspect = input.aspect > 0 && Number.isFinite(input.aspect) ? input.aspect : 1.6;
   // The blocks are near-square; on a wide canvas they may take more columns (factor 1, 1.5, 2, 3) when the whole layout then fills

@@ -1,5 +1,5 @@
 import { visibleGroupTags, type DocumentRecord } from '@rl/core';
-import { autoMemberships, familyEligibility, familyModel, layoutBlocks, mainValue, neighborsOf, parseFamily, tagMemberships, valueSpecificity, vocabLinks, type AreaModel, type AreaSummary, type Block, type Eligibility, type FamilyNode, type Memberships, type PaperValues, type VocabLink } from '@rl/graph';
+import { areaValues, autoMemberships, familyEligibility, familyModel, layoutBlocks, mainValue, neighborsOf, parseFamily, tagMemberships, vocabLinks, type AreaModel, type AreaSummary, type Block, type Eligibility, type FamilyNode, type Memberships, type PaperValue, type PaperValues, type VocabLink } from '@rl/graph';
 import type { MainServices } from '../ipc/handlers/services.js';
 import { areaModel, weightsOf, withoutKeywords } from './areas-run.js';
 import { isSourceFamily } from './family-offer.js';
@@ -32,7 +32,7 @@ const docTags = (rec: DocumentRecord, withGroups: boolean): Array<{ id: string; 
 
 export interface Values {
   /** Weighted values of level 1 of each paper that has any; `pin` is the value the user fixed as the paper's main one (D-521). */
-  docs: Map<string, Array<{ v: string; w: number }> & PaperValues>;
+  docs: Map<string, PaperValue[] & PaperValues>;
   labels: Map<string, string>;
   /** Level 2 value of a paper inside its main value. */
   sub: (docId: string, value: string) => string | null;
@@ -68,11 +68,12 @@ export async function valuesOf(s: MainServices, view: LibraryView, scope: Scope,
   const byId = new Map(nodes.map((n) => [n.id, n]));
   if (ref.kind === 'topic') {
     const m = await areaModel(await s.runtime.require(), view, scope);
-    const docs = new Map<string, Array<{ v: string; w: number }>>();
+    const docs: Values['docs'] = new Map();
     const branch = new Map<string, string>();
     for (const [id, sh] of m.docs) {
-      if (sh.ar.length === 0) continue;
-      docs.set(id, sh.ar.map(([a, , q]) => ({ v: m.areas[a]!.id, w: q })));
+      const list = areaValues(m, id);
+      if (!list) continue;
+      docs.set(id, list);
       const [a, b] = sh.ar[0]!;
       if (b >= 0) branch.set(id, m.areas[a]!.branches[b]!.id);
     }
@@ -93,7 +94,7 @@ export async function valuesOf(s: MainServices, view: LibraryView, scope: Scope,
   if (!prefix) for (const n of nodes) for (const p of n.parents) if (mem.labels.has(p)) (kids.get(p) ?? kids.set(p, []).get(p)!).push(n.id);
   const tagsById = new Map(tagged.map((d) => [d.id, d.tags]));
   const tops = [...mem.labels.keys()];
-  const docs: Values['docs'] = new Map([...mem.docs].map(([id, l]) => [id, l.map((e) => ({ v: e.cluster, w: e.w }))]));
+  const docs: Values['docs'] = new Map([...mem.docs].map(([id, l]) => [id, l.map((e) => ({ v: e.cluster, w: e.w, mw: e.mw, d: e.d, n: e.n }))]));
   if (ref.kind === 'root') {
     // The level 1 value above a tag: the first ancestor (itself included) that hangs directly under the family root.
     const above = (t: string): string[] => {
@@ -126,6 +127,17 @@ export async function valuesOf(s: MainServices, view: LibraryView, scope: Scope,
   };
 }
 
+/** Whether a field vocabulary is in use in this library (a failure of the vocabulary counts as none). */
+async function packActive(s: MainServices): Promise<boolean> {
+  try {
+    const rt = await s.runtime.require();
+    const { activeState } = await import('../features/vocab-pack/state.js');
+    return (await activeState(rt.store.dataDir)) !== null;
+  } catch {
+    return false;
+  }
+}
+
 /** The families this library offers, with how many documents each covers (0 when not worth computing: `auto`) and whether each passes the test of the blocks. */
 async function listFamilies(s: MainServices, view: LibraryView, scope: Scope, recs: DocumentRecord[]): Promise<Offer[]> {
   const out: Offer[] = [];
@@ -141,9 +153,12 @@ async function listFamilies(s: MainServices, view: LibraryView, scope: Scope, re
     }
     return undefined;
   };
+  const fieldPack = await packActive(s);
   const check = async (o: { id: string; label: string }, count: number): Promise<void> => {
     const v = await valuesOf(s, view, scope, o.id, recs);
-    const e = familyEligibility(v.docs.values(), recs.length, { one: v.one, keywords: v.keywords });
+    // The Topic (and the families of several values under a root) of a library with a field vocabulary: the macro-areas are the field's (D-570).
+    const topicLike = o.id === 'topic' || o.id.startsWith('root:');
+    const e = familyEligibility(v.docs.values(), recs.length, { one: v.one, keywords: v.keywords, fieldPack: fieldPack && topicLike && !v.one });
     out.push({ ...o, count, eligible: e.eligible, reason: reasonOf(e) });
   };
   await check({ id: 'topic', label: 'Topic' }, topic.tagged);
@@ -226,11 +241,10 @@ async function blocksOf(s: MainServices, v: Values, recs: DocumentRecord[], aspe
     const i = lm?.index.get(id);
     return i === undefined || !lm ? {} : { x: lm.model.x[i] as number, y: lm.model.y[i] as number };
   };
-  const spec = valueSpecificity(v.docs.values());
   const docs = recs
     .map((r) => {
       const list = v.docs.get(r.id) ?? [];
-      const main = mainValue(list, spec);
+      const main = mainValue(list);
       return { id: r.id, value: main, sub: main === null ? null : v.sub(r.id, main), others: list.filter((e) => e.v !== main).sort((a, b) => b.w - a.w || (a.v < b.v ? -1 : 1)).map((e) => e.v), ...pos(r.id) };
     })
     .sort((a, b) => (a.id < b.id ? -1 : 1));

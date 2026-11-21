@@ -45,7 +45,7 @@
     "lazyChunkKB": 30,
     "lazyChunkOverrides": {
       "writer": 48,
-      "macro": 36
+      "macro": 38
     }
   },
   "preload": {

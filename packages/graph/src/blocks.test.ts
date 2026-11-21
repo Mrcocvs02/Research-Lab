@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CELL_H, CELL_W, NO_VALUE_BLOCK, OTHER_BLOCK, layoutBlocks, type BlockDoc } from './blocks.js';
+import { CELL_H, CELL_W, NO_VALUE_BLOCK, OTHER_BLOCK, blockValues, layoutBlocks, type BlockDoc } from './blocks.js';
 
 const mk = (n: number, value: (i: number) => string | null, extra: (i: number) => Partial<BlockDoc> = () => ({})): BlockDoc[] =>
   Array.from({ length: n }, (_, i) => ({ id: `d${String(i).padStart(3, '0')}`, value: value(i), x: Math.sin(i) * 100, y: Math.cos(i * 3) * 100, ...extra(i) }));
@@ -104,5 +104,14 @@ describe('blocks on a wide canvas (D-509)', () => {
   it('is deterministic', () => {
     const docs = mk(40, (i) => `v${i % 4}`);
     expect(JSON.stringify(layoutBlocks({ docs, labels: new Map(), aspect: 2.4 }).blocks)).toBe(JSON.stringify(layoutBlocks({ docs, labels: new Map(), aspect: 2.4 }).blocks));
+  });
+
+  it('a value with fewer than 2 papers has no block of its own: it is shown inside "Other" and nothing else changes (D-568)', () => {
+    const docs = mk(30, (i) => (i < 14 ? 'a' : i < 26 ? 'b' : i === 26 ? 'c' : i === 27 ? 'd' : i === 28 ? 'd' : 'e'));
+    const out = layoutBlocks({ docs, labels: labels(['a', 'b', 'c', 'd', 'e']), aspect: 1.6 });
+    expect(out.blocks.map((b) => [b.id, b.count])).toEqual([['a', 14], ['b', 12], ['d', 2], [OTHER_BLOCK, 2]]);
+    expect(out.blockOf.get(docs[26]!.id)!.block).toBe(OTHER_BLOCK);
+    expect(out.blockOf.get(docs[29]!.id)!.block).toBe(OTHER_BLOCK);
+    expect(blockValues(new Map([['a', 5], ['b', 1], ['c', 2]]))).toEqual(['a', 'c']);
   });
 });

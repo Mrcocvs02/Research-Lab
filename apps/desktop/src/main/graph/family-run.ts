@@ -47,6 +47,8 @@ interface Offer {
   count: number;
   eligible?: boolean;
   reason?: Reason;
+  /** The family was judged with the field vocabulary (D-570): the clarity is not its measure (D-574). */
+  pack?: boolean;
 }
 const reasonOf = (e: Eligibility): Reason => ({ coverage: e.coverage, clarity: e.clarity, values: e.values });
 
@@ -158,8 +160,9 @@ async function listFamilies(s: MainServices, view: LibraryView, scope: Scope, re
     const v = await valuesOf(s, view, scope, o.id, recs);
     // The Topic (and the families of several values under a root) of a library with a field vocabulary: the macro-areas are the field's (D-570).
     const topicLike = o.id === 'topic' || o.id.startsWith('root:');
-    const e = familyEligibility(v.docs.values(), recs.length, { one: v.one, keywords: v.keywords, fieldPack: fieldPack && topicLike && !v.one });
-    out.push({ ...o, count, eligible: e.eligible, reason: reasonOf(e) });
+    const packed = fieldPack && topicLike && !v.one;
+    const e = familyEligibility(v.docs.values(), recs.length, { one: v.one, keywords: v.keywords, fieldPack: packed });
+    out.push({ ...o, count, eligible: e.eligible, reason: reasonOf(e), ...(packed ? { pack: true } : {}) });
   };
   await check({ id: 'topic', label: 'Topic' }, topic.tagged);
   const docs = view.records.map((r) => ({ id: r.id, tags: docTags(r, true) }));

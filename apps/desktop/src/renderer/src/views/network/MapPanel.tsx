@@ -26,7 +26,7 @@ import { GroupBy, NameFamilyButton, NameFamilyDialog } from './GroupBy';
 import { buildBlockView, type FamilyResponse } from './blocksDraw';
 import { filterKinds, type EdgeMode, type EvEdge, type EvFilter } from './edges';
 import { MapSide, MapStrip, useWide, type EvidenceControls, type SideBlock, type Strictness } from './MapSide';
-import { bumpFamilyNames, clearShare, familyLabel, NONE_FAMILY, useFamilies, useFamily, useFamilyRev } from './grouping';
+import { bumpFamilyNames, clearShare, familyLabel, macroPillKind, NONE_FAMILY, useFamilies, useFamily, useFamilyRev } from './grouping';
 import { areaFallback, assignAreaSlots, loadAreaMemo, saveAreaMemo } from './areaColors';
 import { adjacencyOf, assignTints, type TintMemo } from './colors';
 import { rng } from './playful';
@@ -99,7 +99,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const [level, setLevel] = useState(0);
   const [rawMap, setMap] = useState<PreparedMap | null>(null);
   // Group by (D-498): the papers sit in blocks, one per value of the family; "None" is the free layout of the map.
-  const [family] = useFamily();
+  const [family, , familySettled] = useFamily();
   const freeMode = family === NONE_FAMILY;
   const map = rawMap;
   const [mapKey, setMapKey] = useState('');
@@ -205,7 +205,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const effective = freeMode ? null : family;
   const [fam, setFam] = useState<FamilyResponse | null>(null);
   useEffect(() => {
-    if (!usable || !effective || aspect === null || !rawMap) return;
+    if (!usable || !effective || !familySettled || aspect === null || !rawMap) return;
     let live = true;
     rl.invoke('graph:family', { family: effective, ...(scope ? { scope } : {}), aspect }).then(
       (r) => {
@@ -219,7 +219,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     return () => {
       live = false;
     };
-  }, [usable, effective, scope, aspect, !!rawMap, famRev, mapVersion, status.documents, status.pending, status.builtAt, docVersion, taxVersion]);
+  }, [usable, effective, familySettled, scope, aspect, !!rawMap, famRev, mapVersion, status.documents, status.pending, status.builtAt, docVersion, taxVersion]);
   const blocksView = useMemo(() => (fam?.blocks && !freeMode ? buildBlockView(fam.items, fam.blocks) : null), [fam, freeMode]);
   const blocks = blocksView && blocksView.ids.length > 0 ? { view: blocksView, keep } : null;
   const editable = !!effective && editableFamily(effective) && !!blocksView;
@@ -489,7 +489,23 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
   const macroTarget = editableFamily(family) ? family : family === 'auto' ? 'topic' : null;
   const macroInfo = macroTarget ? families.find((f) => f.id === macroTarget) : undefined;
   const offKey = `${app.activeProfile?.id ?? ''}|${macroTarget ?? ''}`;
-  const macroPill = !freeMode && macroInfo?.reason && macroInfo.reason.values >= 2 && clearShare(macroInfo) < 70 && !macroOff.includes(offKey) ? { family: familyLabel(t, macroInfo), pct: clearShare(macroInfo) } : null;
+  // With a field vocabulary the pill shows only when the proposal has moves (D-574): asked once per tax change, a few milliseconds.
+  const packFamily = !freeMode && macroInfo?.pack && !macroOff.includes(offKey) ? macroTarget : null;
+  const [packMoves, setPackMoves] = useState<number | null>(null);
+  useEffect(() => {
+    setPackMoves(null);
+    if (!usable || !packFamily) return;
+    let live = true;
+    rl.invoke('mapEdit:macroPropose', { family: packFamily, ...(scope ? { scope } : {}) }).then(
+      (r) => live && setPackMoves(r.moves.length),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [usable, packFamily, scope, taxVersion, mapVersion, status.documents]);
+  const pillKind = freeMode || !macroInfo || macroOff.includes(offKey) ? null : macroPillKind(macroInfo, packMoves);
+  const macroPill = pillKind ? { kind: pillKind, family: familyLabel(t, macroInfo!), pct: clearShare(macroInfo!) } : null;
   const hideMacro = () => {
     const next = [...macroOff, offKey];
     setMacroOff(next);
@@ -549,7 +565,7 @@ export function MapPanel({ active, status, mapVersion, scopes, selected, onSelec
     } else if (macroPill) {
       pill = (
         <Pill testId="map-macro-pill" onClose={hideMacro}>
-          {t('mapEdit.macroPill', macroPill)}{' '}
+          {macroPill.kind === 'pack' ? t('mapEdit.macroPillPack') : t('mapEdit.macroPill', macroPill)}{' '}
           <button type="button" className="link" onClick={() => setMacroOpen(true)} data-testid="map-macro-propose">
             {t('mapEdit.macroPropose')}
           </button>

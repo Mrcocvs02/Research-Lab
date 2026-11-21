@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AREA_TINTS } from './colors';
 import { OTHER, OTHER_CLUSTER_ID, assignAreaSlots } from './areaColors';
 import { CROSS_CLUSTER, Network, SAME_CLUSTER, clusterAffinity, clusterMultiplier, clustersOf, type RawNode } from './forceSim';
-import { applyShares, clearShare, isPartial, offerFamilies, type FamilyInfo } from './grouping';
+import { applyShares, clearShare, defaultFamily, isPartial, macroPillKind, offerFamilies, type FamilyInfo } from './grouping';
 
 const def = (id: string) => ({ id, label: id, count: 1, branches: [] });
 
@@ -151,5 +151,28 @@ describe('family offer list', () => {
     expect(isPartial(list[0])).toBe(true);
     expect(isPartial(list[1])).toBe(false);
     expect(isPartial(undefined)).toBe(false);
+  });
+});
+
+describe('default family and macro-areas pill (D-574)', () => {
+  const topic = (o: Partial<FamilyInfo>): FamilyInfo => ({ id: 'topic', label: 'Topic', count: 30, eligible: true, reason: { coverage: 0.81, clarity: 0.42, values: 5 }, ...o });
+  const auto: FamilyInfo = { id: 'auto', label: 'Automatic', count: 0, eligible: true };
+  it('opens by Topic with a field vocabulary and Topic eligible, else by Automatic (D-510)', () => {
+    expect(defaultFamily([topic({ pack: true }), auto])).toBe('topic');
+    expect(defaultFamily([topic({ pack: true, eligible: false }), auto])).toBe('auto');
+    expect(defaultFamily([topic({}), auto])).toBe('auto');
+    expect(defaultFamily([auto])).toBe('auto');
+  });
+  it('without a vocabulary the pill is the clarity one below 70 %, as before', () => {
+    expect(macroPillKind(topic({}), null)).toBe('clarity');
+    expect(macroPillKind(topic({ reason: { coverage: 0.9, clarity: 0.9, values: 5 } }), null)).toBeNull();
+    expect(macroPillKind(topic({ reason: { coverage: 0.9, clarity: 0.4, values: 1 } }), null)).toBeNull();
+    expect(macroPillKind(undefined, null)).toBeNull();
+  });
+  it('with a vocabulary the percentage is not the measure: the pill shows only when the proposal has moves', () => {
+    expect(macroPillKind(topic({ pack: true }), null)).toBeNull();
+    expect(macroPillKind(topic({ pack: true }), 0)).toBeNull();
+    expect(macroPillKind(topic({ pack: true }), 2)).toBe('pack');
+    expect(macroPillKind(topic({ pack: true, reason: { coverage: 0.9, clarity: 0.95, values: 5 } }), 1)).toBe('pack');
   });
 });

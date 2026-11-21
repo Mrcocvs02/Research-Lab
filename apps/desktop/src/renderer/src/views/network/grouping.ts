@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useReducer, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { rl } from '../../lib/rl';
 import { OTHER_CLUSTER_ID, mainArea, type AreaDef, type AreaTriples } from './areaColors';
@@ -9,7 +9,7 @@ import type { PreparedMap } from './mapModel';
  * used today; every other family comes from `graph:family` (a tag kind, research groups, or communities found in the network).
  */
 export const TOPIC_FAMILY = 'topic';
-/** The family the Map opens with when the viewer has not chosen one: the communities found in the network (user choice, D-510). */
+/** The family the Map opens with when the viewer has not chosen one and no field vocabulary is active: the communities found in the network (user choice, D-510). */
 export const DEFAULT_FAMILY = 'auto';
 /** "None": the free layout of the map, with no blocks (D-498). */
 export const NONE_FAMILY = 'none';
@@ -24,7 +24,15 @@ export interface FamilyInfo {
   /** Whether the family passes the test of the blocks, and the numbers behind it (section 19.2.2). */
   eligible?: boolean | undefined;
   reason?: { coverage: number; clarity: number; values: number } | undefined;
+  /** The macro-areas are the ones of a field vocabulary (D-569, D-570): the share of clear papers is not the measure. */
+  pack?: boolean | undefined;
 }
+
+/** The family the Map opens with when the viewer never chose one (D-574): Topic with a field vocabulary and Topic eligible, else Automatic (D-510). */
+export const defaultFamily = (list: readonly FamilyInfo[]): string => {
+  const topic = list.find((f) => f.id === TOPIC_FAMILY);
+  return topic?.pack && topic.eligible ? TOPIC_FAMILY : DEFAULT_FAMILY;
+};
 /** Share of the papers that sit in a clear value of a family, in percent (section 19.2.2): coverage x clarity, the papers a block shows with certainty. */
 export const clearShare = (f: Pick<FamilyInfo, 'reason'>): number => (f.reason ? Math.round(100 * f.reason.coverage * f.reason.clarity) : 0);
 
@@ -36,6 +44,16 @@ export function offerFamilies(list: readonly FamilyInfo[], current: string): Fam
   return list.filter((f) => f.id === current || f.id === 'auto' || f.eligible !== false || clearShare(f) > 0);
 }
 
+/**
+ * Which pill the macro-areas offer (D-520, D-574): without a field vocabulary, "groups N % of the papers clearly" below 70 %; with one the percentage is
+ * not the measure (D-569, D-570), so the pill is neutral and shows only when the proposal has moves (`packMoves`, null while unknown).
+ */
+export function macroPillKind(info: FamilyInfo | undefined, packMoves: number | null): 'clarity' | 'pack' | null {
+  if (!info?.reason || info.reason.values < 2) return null;
+  if (info.pack) return packMoves !== null && packMoves > 0 ? 'pack' : null;
+  return clearShare(info) < 70 ? 'clarity' : null;
+}
+
 /** Whether the family is on but groups clearly only part of the papers (the strip says so). */
 export const isPartial = (f: FamilyInfo | undefined): f is FamilyInfo => !!f && f.eligible === false && f.id !== 'none';
 
@@ -44,19 +62,30 @@ export interface FamilyShares {
   items: Array<{ id: string; ar?: AreaTriples | undefined; az?: number | undefined }>;
 }
 
-function readFamily(): string {
+/** What the library says its default is (set by `useFamilies`); `null` until the families are known. Never written to storage: only an explicit choice is. */
+let known: string | null = null;
+
+function readStored(): string | null {
   try {
-    return window.localStorage.getItem(KEY) || DEFAULT_FAMILY;
+    return window.localStorage.getItem(KEY) || null;
   } catch {
-    return DEFAULT_FAMILY;
+    return null;
   }
 }
+const readFamily = (): string => readStored() ?? known ?? DEFAULT_FAMILY;
 
-/** The chosen family, shared by the Panorama and the network (a per-viewer convenience, kept in localStorage when it works). */
-export function useFamily(): [string, (id: string) => void] {
+/**
+ * The chosen family, shared by the Panorama and the network (a per-viewer convenience, kept in localStorage when it works). The third value
+ * says whether it is settled: an explicit choice is, the default waits for the families of the library (so the Map does not compute Automatic first).
+ */
+export function useFamily(): [string, (id: string) => void, boolean] {
   const [family, setFamily] = useState(readFamily);
+  const [, refresh] = useReducer((n: number) => n + 1, 0);
   useEffect(() => {
-    const on = () => setFamily(readFamily());
+    const on = () => {
+      setFamily(readFamily());
+      refresh();
+    };
     window.addEventListener(EVENT, on);
     return () => window.removeEventListener(EVENT, on);
   }, []);
@@ -69,7 +98,7 @@ export function useFamily(): [string, (id: string) => void] {
     setFamily(id);
     window.dispatchEvent(new Event(EVENT));
   }, []);
-  return [family, set];
+  return [family, set, readStored() !== null || known !== null];
 }
 
 /** Tells the views that the names of the automatic clusters changed (they ask `graph:family` again). */
@@ -96,8 +125,21 @@ export function useFamilies(scope?: Record<string, string> | undefined, enabled 
     if (!enabled) return;
     let live = true;
     rl.invoke('graph:family', scope ? { scope } : {}).then(
-      (r) => live && setList(r.families),
-      () => undefined,
+      (r) => {
+        if (!live) return;
+        setList(r.families);
+        const d = defaultFamily(r.families);
+        if (known !== d) {
+          known = d;
+          window.dispatchEvent(new Event(EVENT));
+        }
+      },
+      () => {
+        if (live && known === null) {
+          known = DEFAULT_FAMILY;
+          window.dispatchEvent(new Event(EVENT));
+        }
+      },
     );
     return () => {
       live = false;

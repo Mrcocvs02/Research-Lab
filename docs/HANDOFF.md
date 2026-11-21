@@ -3,17 +3,21 @@
 Questo file serve a riprendere il lavoro su Research Lab da una chat nuova di Claude Code, che non conosce la sessione precedente.
 
 
-## Ripresa (2026-11-20, sera) — leggere per primo
+## Ripresa (2026-11-21) — leggere per primo
 
-- Rilasciata **v1.2.0** (`7a3246a`, tag `v1.2.0`), installer `apps/desktop/release/ResearchLab-Setup-1.2.0.exe` (125 MB, senza Claude Code, non provato con installazione). Test: unitari 3044/3044, pesanti verdi, e2e verdi tranne `qa-budget` (instabile noto).
-- **Uniti su `main` dopo la 1.2.0** (spinti; nessun ramo in corso):
-  - `hk1` **unito** (`a5d1ea1`): "Lascia decidere a Haiku" con avanzamento visibile ("120/600", chip Attività, Annulla che tiene il parziale, riepilogo), tutte le domande in una corsa (anteprima con costo totale e tetto), prompt condiviso inviato una volta con cache e domande a centinaia per chiamata (riportare i token prima/dopo), "Vai al documento"/"Inizia da qui" spostati a destra nel vicinato. D-515.
-  - `vpack` **unito** (`9a57b84`): vocabolario di base (topic 161 con 12 macro-aree, method 79, system 42, paperType 12; termini scritti da zero, solo categorie arXiv come indizi; PhySH non usato: licenza non dichiarata) del campo dell'utente (fisica, informazione quantistica, molti corpi, materia condensata, metodi numerici, AI, fisica matematica) in `packages/core/src/vocab/packs/physics-qi-manybody.json` + schema zod + test + `docs/design/vocab-packs.md`; licenze da verificare (PhySH CC0?).
+- Onda 15 **unita su `main`** (design §20 di `docs/design/ARCHITETTURA-UI.md`, D-516..D-562). Ultimo commit di codice `1c75187` (Set version 1.3.0). Versione **1.3.0 impostata**; installer `apps/desktop/release/ResearchLab-Setup-1.3.0.exe` (125 MB) costruito; tag `v1.3.0` (senza Claude Code, D-474); tag `v1.3.0` pubblicato.
+- Contenuti: design §20 con 2 round Opus (architetto e revisore avversario); scelta dell'utente: lo spostamento di macro-area parte selezionato (D-533). Extra approvati per rete/Mappa: stato di lettura, multi-selezione, opere isolate e blocchi senza collegamenti, viste salvate con export PNG/SVG.
+- Merge: `vp1` pacchetto di vocabolario fisica/QI/molti corpi (D-536); `me2` Mappa lato principale (D-546); `be3` blocchi modificabili (D-548); `mx4` segni di lettura, isolate, viste salvate, export, riga di progetto (D-558). Tetti alzati D-547, D-548, D-558, D-561.
+- Correzioni dopo la verifica finale: `uf13` (D-559), `pf1` (D-560), `mc2` (D-561), `lf3` (D-562); dettagli in `docs/HISTORY.md`.
+- Test su `main` prima della 1.3.0: unitari 3212/3212 (24 saltati); pesanti unitari 65/65; e2e tutti verdi da soli tranne `qa-budget` `firstContentMs` 595 contro 530 (instabile noto); `packaged-app` verde sulla build 1.3.0 (build di prova e controllo di rilascio). E2e pesanti NON eseguiti (2,3 GiB liberi, ne servono 2,5).
+- Verifica Opus su copia temporanea della libreria reale (headless, solo aggregati, copia cancellata): pacchetto 30 riconoscimenti sicuri (obiettivo ≥ 40, non raggiunto); 1 fusione sicura errata ("computational methods" vs "numerical study", probabilmente da un alias dell'utente); token del prompt con pacchetto max 272, mediana 257 (≤ 300 ok); macro-aree con pacchetto: 5 blocchi, 86 % chiari, il più grande 31 %, ma un blocco di 1 opera (obiettivo ≥ 2); senza pacchetto 29 % chiari (non garantito, D-562); Applica→Annulla identico. Verifiche visive nell'app NON fatte (run bloccata 4 h sulla scansione, fermata; memoria bassa).
 - **Prossimi passi:**
-  1. ~~Unire `hk1` e `vpack`~~ fatto (`a5d1ea1`, `9a57b84`).
-  2. Progetto Opus: il vocabolario di base guida tagging, macro-aree e blocchi (il Vocabolario mostra solo i concetti usati in libreria; il vocabolario evolve con i paper); correzioni a mano nella panoramica a blocchi (trascinare un paper in un altro blocco = cambia il valore della famiglia, rinominare/unire blocchi); migliorare la scelta delle macro-aree. **La panoramica a blocchi va tenuta** (piace all'utente).
-  3. Sonnet implementa; Opus verifica su una copia della cartella UL (sola lettura, copia temporanea, niente percorso nei file).
-  4. Giro completo dei test (unitari; e2e due alla volta, ognuno con `--output` suo; pesanti), documenti, versione 1.3.0.
+  1. ~~Installer 1.3.0 e tag `v1.3.0`~~ fatto.
+  2. Verifica visiva di §20 nell'app con RAM libera: trascinamento, rinomina, unione, annulla, barra di selezione, segni di lettura contro etichette, viste salvate, export.
+  3. E2e pesanti uno alla volta.
+  4. Portare i riconoscimenti sicuri del pacchetto verso ≥ 40.
+  5. Nessun blocco macro di una sola opera sui dati reali.
+  6. Rimuovere i vecchi worktree in `C:\dev\rl-wt` (mai una junction `node_modules`).
 - Regole operative ricordate dall'utente: costo in token prima del tempo; agenti al massimo 2; test bomba vietati (D-476); tetti in KiB non vincolanti ma app leggera (D-487); niente Co-Authored-By.
 
 ## 1. Scopo del file
@@ -23,7 +27,7 @@ Stato di passaggio per riprendere il lavoro. Prima di fare qualunque cosa, legge
 1. `CLAUDE.md` (regole di lavoro, modelli per compito, commit, comandi);
 2. `docs/STATUS.md` (fase, onda, fatto, in corso, bloccato, prossimo);
 3. `docs/HANDOFF.md` (questo file);
-4. `docs/DECISIONS.md` (le ultime voci: D-492..D-514);
+4. `docs/DECISIONS.md` (le ultime voci: D-516..D-562);
 5. `docs/design/ARCHITETTURA-UI.md` §14 e §14.1 (ondate di implementazione e funzioni nuove);
 6. `docs/HISTORY.md` (facoltativo: cronologia).
 
@@ -31,12 +35,12 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 
 ## 2. Aggiornato
 
-- Data: 2026-11-20.
-- HEAD: vedi `git log`. Ondate 1–13 unite su `main`; onda 14 unita. Documentazione del lavoro dopo la 1.1.0 sul ramo `docs15`, non ancora unita.
+- Data: 2026-11-21.
+- HEAD: vedi `git log`; ultimo codice `1c75187` (versione 1.3.0). Ondate 1–15 unite su `main`. Documentazione dell'onda 15 sul ramo `docs16`, non ancora unita.
 - Onda 14 (dopo la 1.0) fatta; versione 1.1.0 rilasciata (tag `v1.1.0`); dopo la 1.1.0 altri lavori su `main` non rilasciati (sezione 3). Nessun lavoro di ondata in corso. Fase 8 completa con tag `phase-8`.
 - Worktree vecchi ancora su disco: rimuovibili. Non cancellare mai una junction `node_modules`.
 - Tag: `phase-0`..`phase-3`, `phase-6`, `phase-7`, `phase-8` pubblicati; `phase-4`, `phase-5` senza tag.
-- Installer: non rifatto per il lavoro dopo la 1.1.0 (si farà con la versione 1.2.0).
+- Installer 1.3.0 costruito (senza eseguibile di Claude Code); tag `v1.3.0` pubblicato.
 
 ## 3. Cosa è successo in questa sessione
 
@@ -76,11 +80,13 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
   - Mappa su carta con archi di evidenza, vicinato, percorso, Indietro/Avanti, vista Vocabolario, apertura per Automatica (D-510); schede in verticale; multi-selezione solo sui condivisi.
   - Verifiche dell'auditor Opus su dati reali (D-505..D-509): 0 fusioni errate, 25/25 titoli a 1280 e 1920.
   - Tetti di budget alzati (D-501..D-503); valori in `CLAUDE.md`.
+- Onda 15, dopo la 1.2.0 (D-516..D-562, design §20 di `docs/design/ARCHITETTURA-UI.md`): `vp1` pacchetto di vocabolario fisica/QI/molti corpi (D-536); `me2` Mappa lato principale (D-546); `be3` blocchi modificabili, multi-selezione con Ctrl+trascinamento, proposte di macro-area (D-548); `mx4` segni di lettura, isolate, viste salvate, export PNG/SVG (D-558). Correzioni dopo la verifica finale: `uf13` (D-559), `pf1` (D-560), `mc2` (D-561), `lf3` (D-562). Dettagli in `docs/STATUS.md`.
 - Revisioni e test rimandati alla verifica finale (D-443).
 
 ## 4. Test: eseguiti
 
 - **Verifica finale (D-443), su `main` a `6d2018e`:** unitari 2708 passati, 1 instabile (`export.test.ts` "cancelled or failed", passa da solo); e2e uno alla volta 40 su 42 verdi, con `qa-budget` `firstContentMs` instabile (534, 604 contro 530, non alzato); heavy tutti verdi (6 file unitari, `qa-search-perf`, `security-hostile-scan`). Le sezioni seguenti descrivono lo stato prima di questa verifica e restano come storia dei punti di revisione.
+- Onda 15 (D-516..D-562), su `main` prima della 1.3.0: unitari 3212/3212 (24 saltati); pesanti unitari 65/65; e2e verdi da soli tranne `qa-budget` `firstContentMs` (noto); `packaged-app` verde sulla 1.3.0; e2e pesanti non eseguiti (RAM libera insufficiente).
 - Dopo la 1.1.0 (D-511..D-514): la suite completa non è stata rifatta dopo questi merge; ogni agente ha eseguito i test unitari e gli e2e dei file che ha toccato. Da fare nella verifica finale.
 - Onda 14: unitari 3005/3005; heavy verdi; e2e verdi tranne `qa-budget` `firstContentMs` (instabile, noto).
 - Ondata 13: unitari ed e2e verdi tranne `qa-budget` `firstContentMs` (instabile, noto); heavy verdi.
@@ -112,13 +118,17 @@ Se questo file e `docs/STATUS.md` non coincidono, vale `docs/STATUS.md`; questo 
 
 ## 5. Stato e prossimi passi
 
-Ondate 1–13 unite su `main`; onda 14 (dopo la 1.0) fatta; versione 1.1.0 rilasciata (tag `v1.1.0`). Fase 8 completa con tag `phase-8`. `PDF_WRITE_ENABLED` è acceso (D-473); nei test e2e di sviluppo resta spento salvo `RL_E2E_PDF_WRITE=1`.
+Ondate 1–15 unite su `main`; versioni 1.1.0 (`v1.1.0`) e 1.2.0 (`v1.2.0`) rilasciate; versione 1.3.0 impostata (`1c75187`). Fase 8 completa con tag `phase-8`. `PDF_WRITE_ENABLED` è acceso (D-473); nei test e2e di sviluppo resta spento salvo `RL_E2E_PDF_WRITE=1`.
 
-Lavoro dopo la 1.1.0 (sezione 3): su `main`, non rilasciato.
+Lavoro dopo la 1.2.0 (sezione 3): onda 15 unita su `main`; tag `v1.3.0` pubblicato.
 
 Passi, in ordine:
-1. Verifica finale completa (D-443) su `main`, pesanti uno alla volta.
-2. Versione 1.2.0, quando l'utente è pronto; installer senza eseguibile di Claude Code (D-474).
+1. ~~Installer 1.3.0 e tag `v1.3.0`~~ fatto.
+2. Verifica visiva di §20 nell'app con RAM libera (trascinamento, rinomina, unione, annulla, barra di selezione, segni di lettura contro etichette, viste salvate, export).
+3. E2e pesanti uno alla volta.
+4. Portare i riconoscimenti sicuri del pacchetto verso ≥ 40 (ora 30).
+5. Nessun blocco macro di una sola opera sui dati reali.
+6. Rimuovere i vecchi worktree in `C:\dev\rl-wt` (mai una junction `node_modules`).
 
 Lacune note dopo l'onda 14 (da chiudere con il feedback, non bloccano la 1.1.0):
 - Duplicati: concetti duplicati risolti ~12 su 18 sulla libreria reale (obiettivo 90%).

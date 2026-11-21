@@ -238,9 +238,11 @@ test('edit the Map by hand: drag into a block, keyboard, rename, merge, rectangl
     await window.getByTestId('path-close').click();
     await window.getByTestId('net-tab-map').click();
 
-    // 10. Macro-areas with the synthetic test pack, always with a proposal: Alpha sits on 16 of 30 papers (generic) and gets four sub-values of four
-    // papers each, so the cut splits it. The dialog opens from the menu of a block, says that the tags do not change, and applying then undoing
-    // gives the taxonomy back (what changes is only where the values stand in the tree).
+    // 10. Macro-areas with the synthetic test pack (D-568), always with a proposal: "Delta chains" is a concept of the pack (below the level 1 concept
+    // "Delta systems"), so it is placed under that macro-area, which is materialized; and Alpha sits on 16 of 30 papers (generic) and gets four
+    // sub-values of four papers each, so the cut splits it. Nothing is grouped by co-occurrence. The dialog opens from the menu of a block, says that
+    // the tags do not change, and applying then undoing gives the taxonomy back (what changes is only where the values stand in the tree).
+    await make('Delta chains', [topic], range(16, 21));
     const pv = await ipcData<{ families: Array<{ packFamily: string; root: string }>; matches: Array<{ nodeId: string; conceptId: string; confidence: string }>; place: Array<{ nodeId: string; parentId: string | null }> }>(window, 'vocabPack:preview', { packId: 'test-pack' });
     await ipcData(window, 'vocabPack:enable', {
       packId: 'test-pack',

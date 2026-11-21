@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computeAreas, type AreaNode } from './areas.js';
+import { areaValues, computeAreas, type AreaNode } from './areas.js';
+import { mainValue } from './families.js';
 
 const n = (id: string, parents: string[] = [], status?: string): AreaNode => ({ id, label: id.toUpperCase(), parents, status });
 const tax: AreaNode[] = [n('phys'), n('cs'), n('optics', ['phys']), n('quantum', ['phys']), n('ml', ['cs']), n('old', ['phys'], 'deprecated')];
@@ -73,5 +74,58 @@ describe('computeAreas (§18.3.4)', () => {
     // A flat taxonomy (fewer than two roots with children) keeps every root as an area.
     const flat = computeAreas(kw, [d('a', ['kw1', 1]), d('b', ['kw2', 1])]);
     expect(flat.areas).toHaveLength(2);
+  });
+});
+
+describe('the main area of a paper (D-569)', () => {
+  // `z` and `a` are the areas (roots with children): the ids are chosen so that the last tie-break (the smaller id) would pick the other one.
+  const t = [n('z'), n('a'), n('zk', ['z']), n('zk2', ['z']), n('zk3', ['zk']), n('ak', ['a']), n('ak2', ['a'])];
+  const main = (...tags: Array<[string, number]>) => {
+    const docs = [d('p', ...tags), d('q', ['zk', 1]), d('r', ['ak', 1])];
+    const m = computeAreas(t, docs);
+    const list = areaValues(m, 'p')!;
+    return mainValue(list);
+  };
+
+  it('the area with the biggest total tag weight', () => {
+    expect(main(['ak', 0.9], ['zk', 0.6])).toBe('a');
+    expect(main(['ak', 0.5], ['zk', 0.6])).toBe('z');
+    // Two tags in one area add up.
+    expect(main(['ak', 0.4], ['ak2', 0.4], ['zk', 0.7])).toBe('a');
+  });
+
+  it('a tag that is the area itself is generic and counts at half, so the specific tags decide', () => {
+    expect(main(['a', 1], ['zk', 0.6])).toBe('z');
+    // A generic tag alone still gives its area.
+    expect(main(['a', 1])).toBe('a');
+    // Not generic when it is the only way in with the same weight: 1 against 0.5 + 0.5.
+    expect(main(['a', 1], ['zk', 0.5], ['zk2', 0.5])).toBe('z');
+  });
+
+  it('ties go to the area reached by the deepest tag, then to the one with more of the tags, then to the id', () => {
+    // 1 against 1: `zk3` sits at depth 2, `ak` at depth 1.
+    expect(main(['zk3', 1], ['ak', 1])).toBe('z');
+    // The same depth, 0.5 + 0.5 against 1: more tags.
+    expect(main(['zk', 0.5], ['zk2', 0.5], ['ak', 1])).toBe('z');
+    // Nothing separates them: the smaller id.
+    expect(main(['zk', 1], ['ak', 1])).toBe('a');
+  });
+
+  it('is deterministic: the order of the tags and of the papers does not matter', () => {
+    const tags: Array<[string, number]> = [['zk', 0.5], ['zk2', 0.5], ['ak', 1], ['ak2', 0.3]];
+    const reference = main(...tags);
+    for (const order of [[3, 2, 1, 0], [1, 3, 0, 2], [2, 0, 3, 1]]) expect(main(...order.map((i) => tags[i]!))).toBe(reference);
+    const docs = [d('p', ...tags), d('q', ['zk', 1]), d('r', ['ak', 1])];
+    expect(mainValue(areaValues(computeAreas(t, [...docs].reverse()), 'p')!)).toBe(reference);
+  });
+
+  it('every paper with a tag in an area has a main area; a pinned value wins while it is one of its values', () => {
+    const m = computeAreas(t, [d('p', ['zk', 1], ['ak', 0.2]), d('q', ['ak', 1])]);
+    for (const id of ['p', 'q']) expect(mainValue(areaValues(m, id)!)).not.toBeNull();
+    expect(areaValues(m, 'nobody')).toBeNull();
+    const list = areaValues(m, 'p')!;
+    expect(mainValue(list)).toBe('z');
+    expect(mainValue(list, 'a')).toBe('a');
+    expect(mainValue(list, 'gone')).toBe('z');
   });
 });

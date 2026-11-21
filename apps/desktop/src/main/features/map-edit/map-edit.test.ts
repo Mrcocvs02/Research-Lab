@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { documentRecordSchema, taxonomyFileSchema, type DocumentRecord } from '@rl/core';
 import { createLibraryStore, createOrganizer, type FileLibraryStore, type Organizer } from '@rl/data';
-import { NO_VALUE_BLOCK, layoutBlocks, mainValue, valueSpecificity, valueStats } from '@rl/graph';
+import { NO_VALUE_BLOCK, OTHER_BLOCK, layoutBlocks, mainValue, valueStats } from '@rl/graph';
 import { valuesOf } from '../../graph/family-run.js';
 import { macroApply, macroPropose } from '../../graph/macro-run.js';
 import { loadView } from '../../graph/view.js';
@@ -92,8 +92,12 @@ describe('macro-areas', () => {
     await setup(nodes, all);
     const taxBefore = await taxonomyText();
     const docsBefore = await Promise.all(all.map((_, i) => read(i + 1)));
-    const p = await macroPropose(s, { family: 'root:field' });
+    // With no vocabulary the group by co-occurrence is only offered: it starts unticked (D-568); asking with `skip: []` is the whole cut.
+    const start = await macroPropose(s, { family: 'root:field' });
+    expect(start.skipped).toEqual(['gather:new:a+b']);
+    const p = await macroPropose(s, { family: 'root:field', skip: [] });
     expect(p.moves.map((m) => m.id)).toEqual(['split:g', 'gather:new:a+b']);
+    expect(p.moves[1]).toMatchObject({ cooc: true });
     expect(p.after.clearPct).toBeGreaterThan(p.before.clearPct);
     expect(p.unclear).toHaveLength(25);
     expect((await macroPropose(s, { family: 'root:field', skip: ['split:g'] })).skipped).toEqual(['split:g']);
@@ -125,6 +129,58 @@ describe('macro-areas', () => {
     await expect(macroPropose(s, { family: 'auto' })).rejects.toMatchObject({ details: { reason: 'family' } });
   });
 
+  describe('with a field vocabulary (D-568)', () => {
+    // `amber` and `cobalt` meet on most works; `copper` matches nothing; `tiny` is on one work.
+    const fieldNodes = [node('topic', { family: 'many' }), ...['amber', 'cobalt', 'copper', 'tiny'].map((id) => node(id, { parents: ['topic'] }))];
+    const fieldDocs = () => {
+      let n = 0;
+      const mk = (count: number, tags: string[]) => Array.from({ length: count }, () => doc(++n, tags));
+      return [...mk(30, ['amber', 'cobalt']), ...mk(5, ['amber']), ...mk(5, ['cobalt']), ...mk(7, ['copper']), ...mk(1, ['tiny'])];
+    };
+    const hooks = {
+      latent: async () => [
+        { id: 'f-amber', label: 'Amber field', covers: ['amber'], top: true },
+        { id: 'f-cobalt', label: 'Cobalt field', covers: ['cobalt'], top: true },
+      ],
+      fixed: async () => [],
+      // The seam of the vocabulary, as the pack's `materialization` does it: a node alone under the family root.
+      materialize: async (concepts: readonly string[], ops: unknown[], root?: string) => [...concepts.map((c) => ({ op: 'create', id: c, label: c, parents: root ? [root] : [] })), ...ops] as never,
+    };
+    const shows = async () => {
+      const view = await loadView(await s.runtime.require());
+      const v = await valuesOf(s, view, undefined, 'topic', view.records);
+      const placed = view.records.map((r) => ({ id: r.id, value: mainValue(v.docs.get(r.id) ?? []) }));
+      return { v, placed, layout: layoutBlocks({ docs: placed, labels: v.labels, aspect: 1.6 }) };
+    };
+
+    it('the two areas that meet stay two macro-areas; the preview is the Map after Apply; the one-work area is in "Other"; Undo gives the taxonomy back', async () => {
+      await setup(fieldNodes, fieldDocs());
+      const taxBefore = await taxonomyText();
+      const p = await macroPropose(s, { family: 'topic' }, hooks);
+      expect(p.moves.map((m) => m.id)).toEqual(['gather:f-amber', 'gather:f-cobalt']);
+      expect(p.moves.every((m) => !m.cooc && m.children.length === 1)).toBe(true);
+      expect(p.skipped).toEqual([]);
+      const r = await macroApply(s, { family: 'topic', moves: p.moves.map((m) => m.id), names: {} }, hooks);
+      expect(r.applied).toBe(2);
+      const tax = (await org.taxonomy()).nodes;
+      expect(tax.find((n) => n.id === 'amber')?.parents).toEqual(['f-amber']);
+      expect(tax.find((n) => n.id === 'cobalt')?.parents).toEqual(['f-cobalt']);
+      expect(tax.find((n) => n.id === 'f-amber')?.parents).toEqual(['topic']);
+      expect(tax.find((n) => n.id === 'copper')?.parents).toEqual(['topic']);
+      const after = await shows();
+      // Every paper has a main macro-area; the blocks are the areas used, `tiny` only inside "Other".
+      expect(after.placed.every((d) => d.value !== null)).toBe(true);
+      expect(after.layout.blocks.map((b) => b.id).sort()).toEqual([OTHER_BLOCK, 'copper', 'f-amber', 'f-cobalt'].sort());
+      expect(after.layout.blocks.find((b) => b.id === OTHER_BLOCK)?.count).toBe(1);
+      expect(p.after.blocks).toBe(after.layout.blocks.length);
+      expect(p.cut.map((c) => c.papers).sort((a, b) => b - a)).toEqual(after.layout.blocks.map((b) => b.count).sort((a, b) => b - a));
+      // The main area of a paper is the same every time it is asked (ties: id).
+      expect((await shows()).placed).toEqual(after.placed);
+      await org.undo();
+      expect(await taxonomyText()).toBe(taxBefore);
+    });
+  });
+
   describe('Topic with 14 small values on 26 works (D-561)', () => {
     const values = Array.from({ length: 14 }, (_, i) => `v${String(i + 1).padStart(2, '0')}`);
     const works = [
@@ -141,24 +197,28 @@ describe('macro-areas', () => {
       const v = await valuesOf(s, view, undefined, 'topic', view.records);
       const lists = [...v.docs.values()];
       const st = valueStats(lists);
-      const spec = valueSpecificity(lists);
-      const placed = view.records.map((r) => ({ id: r.id, value: mainValue(v.docs.get(r.id) ?? [], spec) }));
-      const counts = layoutBlocks({ docs: placed, labels: v.labels, aspect: 1.6 }).blocks.filter((b) => b.id !== NO_VALUE_BLOCK).map((b) => b.count);
+      const placed = view.records.map((r) => ({ id: r.id, value: mainValue(v.docs.get(r.id) ?? []) }));
+      const blocks = layoutBlocks({ docs: placed, labels: v.labels, aspect: 1.6 }).blocks.filter((b) => b.id !== NO_VALUE_BLOCK);
+      // The values under 2 works are inside "Other" (D-568); the smallest block is one of a value of its own.
+      const counts = blocks.map((b) => b.count);
+      const own = blocks.filter((b) => b.id !== OTHER_BLOCK).map((b) => b.count);
       const n = view.records.length;
-      return { blocks: counts.length, clearPct: Math.round((st.clear / st.withValue) * 100), coverage: Math.round((st.withValue / n) * 100), largestPct: Math.round((Math.max(...counts) / n) * 100), smallest: Math.min(...counts) };
+      return { blocks: counts.length, clearPct: Math.round((st.clear / st.withValue) * 100), coverage: Math.round((st.withValue / n) * 100), largestPct: Math.round((Math.max(...counts) / n) * 100), smallest: own.length > 0 ? Math.min(...own) : counts[0]! };
     };
 
     it('the preview is what the Map shows after Apply, and Undo brings the taxonomy back byte for byte', async () => {
       await setup([node('topic', { family: 'many' }), ...values.map((id) => node(id, { parents: ['topic'] }))], works.map((tags, i) => doc(i + 1, tags)));
       const taxBefore = await taxonomyText();
-      const p = await macroPropose(s, { family: 'topic' });
+      // The whole offer (`skip: []`): without a vocabulary the groups by co-occurrence start unticked, here the user ticks them all.
+      const p = await macroPropose(s, { family: 'topic', skip: [] });
       expect(p.before).toEqual(await mapShows());
-      expect(p.before).toMatchObject({ blocks: 12, clearPct: 12, smallest: 1 });
+      expect(p.before).toMatchObject({ clearPct: 12, smallest: 2 });
+      expect(p.moves.every((m) => m.cooc)).toBe(true);
+      expect((await macroPropose(s, { family: 'topic' })).skipped).toHaveLength(p.moves.length);
       expect(p.after.blocks).toBeGreaterThanOrEqual(4);
       expect(p.after.blocks).toBeLessThanOrEqual(7);
-      expect(p.after.smallest).toBeGreaterThanOrEqual(2);
       expect(p.after.largestPct).toBeLessThanOrEqual(50);
-      expect(p.after.clearPct).toBeGreaterThanOrEqual(80);
+      expect(p.after.clearPct).toBeGreaterThan(p.before.clearPct);
 
       const r = await macroApply(s, { family: 'topic', moves: p.moves.map((m) => m.id), names: {} });
       expect(r.applied).toBe(p.moves.length);

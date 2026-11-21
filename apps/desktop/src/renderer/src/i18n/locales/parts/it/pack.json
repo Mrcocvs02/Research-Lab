@@ -88,6 +88,7 @@
     "treeGatherExisting": "«{{name}}» (già nell'albero) sopra {{kids}}",
     "nameLabel": "Nome del nuovo genitore",
     "nameNeeded": "Scrivi un nome per il nuovo genitore",
+    "cooc": "Raggruppa per co-occorrenza: i lavori compaiono insieme, ma gli argomenti possono essere diversi · non spuntato di serie",
     "provisional": "{{a}} e {{b}}",
     "pins_one": "{{count}} lavoro fissato su «{{name}}» torna automatico",
     "pins_other": "{{count}} lavori fissati su «{{name}}» tornano automatici",

@@ -1,17 +1,20 @@
 /**
- * Macro-areas proposed as a cut of the tree (D-520, section 20.2). The blocks of the Map are the values of level 1 of a family; values on
- * half of the papers (generic) or on one or two (small) make them unclear. A CUT is a set of nodes, none an ancestor of another, taken as the
- * level 1 values. Two moves lead from today's values to a better cut: SPLIT a generic value (its children rise to level 1, the value becomes a
- * family of its own) and GATHER siblings that go together or are small under a common parent (which becomes a level 1 value, the siblings its
- * sub-areas). The parent is, in order, a latent ancestor of the field vocabulary (when given), a node already there, or a provisional name.
- * A gather may hold more than two values (a value joins a gathered parent, two gathered parents become one): that is what makes a paper with
- * values on two or three small topics clear, and takes small blocks in. A greedy climb on an objective of clarity x coverage with penalties for
- * too many or too few blocks (4 to 7), small, generic and too big values; two starts (today's values, and the projection on the level 1 of the
- * field vocabulary); a proposal only if the objective gains 0.05. The search reads the papers like the Map does (a tag above another tag of the
- * paper does not count, `mainValue`), but the numbers it reports, before and after, come from `measureFamily` over the taxonomy the operations
- * lead to, and the finalists are chosen by them: the preview is what the Map shows after Apply (D-561). Pure, deterministic (ties by id), no
- * files. The caller turns the answer into `taxonomy:apply` operations (`select(...).ops`).
+ * Macro-areas proposed as a cut of the tree (D-520, D-561, D-568, section 20.2). The blocks of the Map are the values of level 1 of a family.
+ * A CUT is a set of nodes, none an ancestor of another, taken as the level 1 values. The macro-areas are the field's fixed structure, not groups
+ * of papers that happen to meet (D-568): WITH a field vocabulary (`pack`) the proposal never groups two values because they co-occur. Its moves are
+ * PLACE each value that matches a concept of the vocabulary under that concept's macro-area (a latent ancestor of level 1, materialized on apply;
+ * a value that IS a macro-area is the level 1 value itself, a value that matches nothing stays a level 1 value of its own) and, for a value that
+ * sits on half of the papers (generic) and is no macro-area of the vocabulary, SPLIT it (its children rise to level 1, the value becomes a family
+ * of its own). Values with fewer than 2 papers are not merged anywhere: the Map shows them inside "Other" (`blockValues`, display only).
+ * WITHOUT a vocabulary the old search by co-occurrence may still be OFFERED: a greedy climb on an objective of clarity x coverage with penalties for
+ * too many or too few blocks (4 to 7), small, generic and too big values, over the moves SPLIT and GATHER (siblings that go together under a common
+ * parent: a latent ancestor, a node already there, or a provisional name); its gathers are flagged `cooc` and start UNTICKED (`defaultSkip`), a
+ * proposal only if the objective gains 0.05. The search reads the papers like the Map does (a tag above another tag of the paper does not count),
+ * but the numbers it reports, before and after, come from `measureFamily` over the taxonomy the operations lead to, and the finalists are chosen
+ * by them: the preview is what the Map shows after Apply (D-561). Pure, deterministic (ties by id), no files. The caller turns the answer into
+ * `taxonomy:apply` operations (`select(...).ops`).
  */
+import { blockValues, OTHER_BLOCK } from './blocks.js';
 import { mainValue, type PaperValues } from './families.js';
 import { measureFamily, type Measured, type MeasureNode } from './macro-measure.js';
 
@@ -48,6 +51,10 @@ export interface CutInput {
   latent?: readonly LatentAncestor[] | undefined;
   /** What the Map reads after the cut: the macro-areas of the Topic (default) or the values of level 1 under `root` (a `root:` family). */
   family?: 'topic' | 'root' | undefined;
+  /** A field vocabulary is in use (default: `latent` has concepts): the macro-areas are its level 1 concepts and nothing is grouped by co-occurrence (D-568). */
+  pack?: boolean | undefined;
+  /** Nodes of the library that are level 1 concepts of the vocabulary themselves: they are macro-areas already, never split. */
+  fixed?: readonly string[] | undefined;
 }
 
 export interface CutStats {
@@ -74,6 +81,8 @@ export interface CutMove {
   parent?: { kind: 'pack' | 'existing' | 'provisional'; id?: string; label: string };
   requires: string[];
   pinsLost: number;
+  /** A gather that comes from papers that meet, not from the structure of the field: offered without a vocabulary, unticked to begin with (D-568). */
+  cooc?: boolean;
 }
 export interface CutItem {
   id: string;
@@ -101,6 +110,8 @@ export interface CutProposal {
   moves: CutMove[];
   /** Papers whose main value is not clear today. */
   unclear: string[];
+  /** The moves unticked to begin with (the gathers by co-occurrence, D-568): `select()` with no argument leaves them out too. */
+  defaultSkip: string[];
   /** The cut with every move except `skip` (move ids); `names` = names for provisional parents by move id. */
   select(skip?: Iterable<string>, names?: Readonly<Record<string, string>>): CutSelection;
 }
@@ -139,7 +150,8 @@ interface Agg {
 
 /** Proposes the cut; with no move when no cut gains enough (`moves` empty), `null` when there are fewer than two values to cut. */
 export function proposeCut(input: CutInput): CutProposal | null {
-  if (input.docs.length <= CUT.sample) return cutCore(input).prop;
+  // With a vocabulary nothing is searched: the moves come from the structure of the field, on every paper.
+  if (input.docs.length <= CUT.sample || (input.pack ?? (input.latent?.length ?? 0) > 0)) return cutCore(input).prop;
   // A big library: the search reads an even sample of the papers (every k-th by id); the cut it finds is then measured and described on all of them.
   const sorted = [...input.docs].sort((a, b) => cmp(a.id, b.id));
   const step = Math.ceil(sorted.length / CUT.sample);
@@ -156,7 +168,8 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
   // The tree under today's values.
   const live = new Map(input.nodes.filter((x) => x.status !== 'deprecated').map((x) => [x.id, x]));
   const top = [...new Set(input.top)].filter((t) => live.has(t));
-  if (top.length < 2) return { prop: null, state: null };
+  const packMode = input.pack ?? (input.latent?.length ?? 0) > 0;
+  if (top.length < (packMode ? 1 : 2)) return { prop: null, state: null };
   const childrenOf = new Map<string, string[]>();
   for (const x of [...live.values()].sort((a, b) => cmp(a.id, b.id))) for (const p of x.parents) (childrenOf.get(p) ?? childrenOf.set(p, []).get(p)!).push(x.id);
   const kids = new Map<string, string[]>();
@@ -273,13 +286,12 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
     return out.sort(cmp);
   };
 
-  const specOf = (agg: Pick<Agg, 'covered' | 'carry'>): Map<string, number> => new Map([...agg.carry].map(([v, c]) => [v, Math.max(0.15, Math.log(agg.covered / c))]));
-  const judge = (d: (typeof docs)[number], vals: Map<string, number>, owners: (t: string) => string[], spec: ReadonlyMap<string, number>): { main: string | null; clear: boolean } => {
+  const judge = (d: (typeof docs)[number], vals: Map<string, number>, owners: (t: string) => string[]): { main: string | null; clear: boolean } => {
     if (vals.size === 0) return { main: null, clear: false };
     const list: PaperValues = [...vals].map(([v, w]) => ({ v, w }));
-    // The paper's fixed value, when it sits under one of its values; else the choice of the Map (`mainValue`, weight x specificity).
+    // The paper's fixed value, when it sits under one of its values; else the choice of the Map (`mainValue`, by weight; the search does not read the depth).
     const pin = d.pin !== null ? (owners(d.pin).find((o) => vals.has(o)) ?? null) : null;
-    const main = mainValue(list, spec, pin);
+    const main = mainValue(list, pin);
     if (main === null) return { main: null, clear: false };
     if (pin !== null && main === pin) return { main, clear: true };
     let sum = 0;
@@ -314,11 +326,9 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
       for (const v of vals.keys()) bump(agg.carry, v, 1);
       agg.docs.set(i, { main: null, clear: false, vals });
     }
-    // The specificity of a value (D-508) follows the papers that carry it now; the others keep the choice they had.
-    const spec = specOf(agg);
     for (const i of list) {
       const s = agg.docs.get(i) as DocState;
-      const j = judge(docs[i]!, s.vals, owners, spec);
+      const j = judge(docs[i]!, s.vals, owners);
       s.main = j.main;
       s.clear = j.clear;
       if (j.main !== null) bump(agg.main, j.main, 1);
@@ -682,32 +692,62 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
   const s0 = state0();
   const before = simulate([], []);
   const jBefore = objectiveOf(before);
-  const starts: Array<{ st: State }> = preset ? [{ st: preset }] : [climb(s0)];
-  // On a small library there is time to start the climb again from the second and third best first step.
-  if (!preset && docs.length * top.length <= CUT.detours) for (const d of [1, 2]) starts.push(climb(s0, d));
-  // Second start: the values of today gathered under the level 1 concepts of the field vocabulary.
-  const tops = latent.filter((l) => l.top);
-  if (!preset && tops.length > 0) {
-    const s1 = state0();
-    for (const l of tops) {
-      const members = top.filter((t) => s1.cut.has(t) && !s1.v.has(t) && l.covers.includes(t) && 2 + height(t) <= CUT.maxDepth);
-      if (members.length < 2) continue;
-      for (const m of members) {
-        s1.cut.delete(m);
-        s1.vpar.set(m, l.id);
-      }
-      s1.cut.add(l.id);
-      s1.v.set(l.id, { id: l.id, label: l.label, members: [...members].sort(cmp), kind: 'pack' });
+  /**
+   * With a field vocabulary (D-568): the structure is the field's, so nothing is searched. Values on half of the papers that are no macro-area of the
+   * vocabulary are split; then every value that matches a concept below a level 1 concept of the vocabulary goes under that concept (one value is
+   * enough), a value that matches nothing stays a level 1 value. Never a group made of values that co-occur.
+   */
+  const packCut = (): State => {
+    let st = state0();
+    const fixed = new Set(input.fixed ?? []);
+    const carry = assess(st, null, null).carry;
+    for (const g of top) {
+      if (fixed.has(g) || (carry.get(g) ?? 0) / n <= CUT.generic) continue;
+      st = splitState(st, g) ?? st;
     }
-    if (s1.v.size > 0) starts.push(climb(s1));
-  }
-  // The finalists are judged by what the Map will show; too small a gain: no move, the cut stays today's values.
+    for (const l of latent.filter((x) => x.top)) {
+      const members = [...st.cut].filter((m) => !st.v.has(m) && l.covers.includes(m) && 1 + 1 + height(m) <= CUT.maxDepth).sort(cmp);
+      if (members.length === 0) continue;
+      const next = clone(st);
+      for (const m of members) {
+        next.cut.delete(m);
+        next.vpar.set(m, l.id);
+      }
+      next.cut.add(l.id);
+      next.v.set(l.id, { id: l.id, label: l.label, members, kind: 'pack' });
+      st = next;
+    }
+    return st;
+  };
   let result: { st: State; j: number } | null = null;
-  for (const r of starts) {
-    const j = objectiveOf(truth(r.st));
-    if (!result || j > result.j + 1e-9) result = { st: r.st, j };
+  if (packMode) result = { st: packCut(), j: 0 };
+  else {
+    const starts: Array<{ st: State }> = preset ? [{ st: preset }] : [climb(s0)];
+    // On a small library there is time to start the climb again from the second and third best first step.
+    if (!preset && docs.length * top.length <= CUT.detours) for (const d of [1, 2]) starts.push(climb(s0, d));
+    // Second start: the values of today gathered under the level 1 concepts of the field vocabulary.
+    const tops = latent.filter((l) => l.top);
+    if (!preset && tops.length > 0) {
+      const s1 = state0();
+      for (const l of tops) {
+        const members = top.filter((t) => s1.cut.has(t) && !s1.v.has(t) && l.covers.includes(t) && 2 + height(t) <= CUT.maxDepth);
+        if (members.length < 2) continue;
+        for (const m of members) {
+          s1.cut.delete(m);
+          s1.vpar.set(m, l.id);
+        }
+        s1.cut.add(l.id);
+        s1.v.set(l.id, { id: l.id, label: l.label, members: [...members].sort(cmp), kind: 'pack' });
+      }
+      if (s1.v.size > 0) starts.push(climb(s1));
+    }
+    // The finalists are judged by what the Map will show; too small a gain: no move, the cut stays today's values.
+    for (const r of starts) {
+      const j = objectiveOf(truth(r.st));
+      if (!result || j > result.j + 1e-9) result = { st: r.st, j };
+    }
+    if (!result || (!preset && result.j < jBefore + CUT.gain)) result = { st: s0, j: jBefore };
   }
-  if (!result || (!preset && result.j < jBefore + CUT.gain)) result = { st: s0, j: jBefore };
 
   // ---- the moves of the final cut, and the cut with some of them left out
   const finalSt = result.st;
@@ -739,10 +779,12 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
       parent: v.kind === 'pack' ? { kind: 'pack', id: v.id, label: v.label } : { kind: 'provisional', label: v.label },
       requires,
       pinsLost: 0,
+      ...(packMode ? {} : { cooc: true }),
     });
   }
 
-  const select: CutProposal['select'] = (skipIds = [], names = {}) => {
+  const defaultOff = moves.filter((m) => m.cooc).map((m) => m.id);
+  const select: CutProposal['select'] = (skipIds = defaultOff, names = {}) => {
     const off = new Set(skipIds);
     // A move that needs a move left out goes too.
     for (let again = true; again; ) {
@@ -780,14 +822,18 @@ function cutCore(input: CutInput, preset?: State): { prop: CutProposal | null; s
     const after = simulate(plan.ops, plan.packs, new Set(plan.idOf.values()));
     // The blocks of the Map: a value of the Map is the id the node will have; the papers of a block are the ones whose main value it is.
     const backTo = new Map([...plan.idOf].map(([virt, real]) => [real, virt]));
-    const items: CutItem[] = [...after.main].map(([value, papers]) => {
+    // The blocks of the Map (`blockValues`): the values under 2 papers, and the ones beyond the 12th, are only shown inside "Other" (D-568), never merged.
+    const shown = new Set(blockValues(after.main));
+    const items: CutItem[] = [...after.main].filter(([value]) => shown.has(value)).map(([value, papers]) => {
       const id = backTo.get(value) ?? value;
       const virt = st.v.get(id);
       return { id, label: label(id, st), papers, kind: virt ? ('gather' as const) : topSet.has(id) ? ('keep' as const) : ('split-child' as const), ...(virt ? { children: virt.members.map((m) => childOf(m, st, finalAgg)) } : {}) };
     });
+    const rest = [...after.main].filter(([value]) => !shown.has(value)).reduce((sum, [, papers]) => sum + papers, 0);
+    if (rest > 0) items.push({ id: OTHER_BLOCK, label: 'Other', papers: rest, kind: 'keep' });
     items.sort((a, b) => b.papers - a.papers || cmp(a.id, b.id));
     return { after: statsOf(after), cut: items, ops: plan.ops, materialize: plan.materialize, skipped: [...off].sort(cmp) };
   };
 
-  return { prop: { before: statsOf(before), moves, unclear: before.unclear.slice(0, 5000), select }, state: finalSt };
+  return { prop: { before: statsOf(before), moves, unclear: before.unclear.slice(0, 5000), defaultSkip: defaultOff, select }, state: finalSt };
 }

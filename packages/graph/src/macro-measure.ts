@@ -3,9 +3,9 @@
  * `valueStats` for the main value and its clarity, the blocks as `layoutBlocks` counts them), here over a taxonomy that is only simulated.
  * The macro-area proposal reads the numbers of "before" and "after" from here, so the preview is what the Map shows after Apply. Pure.
  */
-import { computeAreas, topicNodes } from './areas.js';
-import { MAX_VALUES } from './blocks.js';
-import { tagMemberships, valueStats, type PaperValues } from './families.js';
+import { areaValues, computeAreas, topicNodes } from './areas.js';
+import { blockValues } from './blocks.js';
+import { tagMemberships, valueStats, type PaperValue, type PaperValues } from './families.js';
 
 export interface MeasureNode {
   id: string;
@@ -26,13 +26,13 @@ export interface Measured {
   clearPct: number;
   coverage: number;
   largestPct: number;
-  /** Papers in the smallest block. */
+  /** Papers in the smallest block of its own ("Other" apart, unless it is the only one). */
   smallest: number;
   /** Exact counts behind the percentages. */
   covered: number;
   clear: number;
   largest: number;
-  /** Blocks under `sMin` papers, and values carried by more than `generic` of the papers. */
+  /** Main values under `sMin` papers (they sit in "Other"), and values carried by more than `generic` of the papers. */
   small: number;
   generic: number;
   /** Papers per main value (the blocks of the Map, before the values beyond the 12th biggest go to "Other"). */
@@ -47,7 +47,7 @@ export interface Measured {
  */
 export function measureFamily(nodes: readonly MeasureNode[], docs: readonly MeasureDoc[], opts: { mode?: 'topic' | 'root'; root?: string | undefined; n?: number | undefined; sMin?: number; generic?: number; skipGeneric?: ReadonlySet<string> } = {}): Measured {
   const n = Math.max(1, opts.n ?? docs.length);
-  const lists = new Map<string, Array<{ v: string; w: number }> & { pin?: string | null | undefined }>();
+  const lists = new Map<string, PaperValues & Array<PaperValue>>();
   const pinOf = (d: MeasureDoc): string | null => (d.pin && d.tags.some((t) => t.id === d.pin) ? d.pin : null);
   if (opts.mode === 'root' && opts.root !== undefined) {
     const root = opts.root;
@@ -69,7 +69,7 @@ export function measureFamily(nodes: readonly MeasureNode[], docs: readonly Meas
     for (const d of docs) {
       const l = mem.docs.get(d.id);
       if (!l) continue;
-      const list: Array<{ v: string; w: number }> & { pin?: string | null | undefined } = l.map((e) => ({ v: e.cluster, w: e.w }));
+      const list: PaperValues & Array<PaperValue> = l.map((e) => ({ v: e.cluster, w: e.w, mw: e.mw, d: e.d, n: e.n }));
       const pin = pinOf(d);
       const v = pin === null ? undefined : above(pin).find((o) => list.some((e) => e.v === o));
       if (v !== undefined) list.pin = v;
@@ -78,9 +78,8 @@ export function measureFamily(nodes: readonly MeasureNode[], docs: readonly Meas
   } else {
     const m = computeAreas(topicNodes(nodes), docs.map((d) => ({ id: d.id, tags: d.tags })));
     for (const d of docs) {
-      const sh = m.docs.get(d.id);
-      if (!sh || sh.ar.length === 0) continue;
-      const list: Array<{ v: string; w: number }> & { pin?: string | null | undefined } = sh.ar.map(([a, , q]) => ({ v: m.areas[a]!.id, w: q }));
+      const list = areaValues(m, d.id) as (PaperValues & Array<PaperValue>) | null;
+      if (!list) continue;
       const pin = pinOf(d);
       const v = pin === null ? undefined : (m.tagShare(pin)?.ar ?? []).map(([a]) => m.areas[a]!.id).find((o) => list.some((e) => e.v === o));
       if (v !== undefined) list.pin = v;
@@ -89,10 +88,10 @@ export function measureFamily(nodes: readonly MeasureNode[], docs: readonly Meas
   }
   const order = [...lists.keys()];
   const st = valueStats(order.map((id) => lists.get(id)!));
-  // The blocks as `layoutBlocks` makes them: one per main value, the values beyond the biggest `MAX_VALUES` together as "Other".
-  const ranked = [...st.main].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
-  const sizes = ranked.slice(0, MAX_VALUES).map(([, c]) => c);
-  const rest = ranked.slice(MAX_VALUES).reduce((s, [, c]) => s + c, 0);
+  // The blocks as `layoutBlocks` makes them (`blockValues`): one per main value with at least 2 papers, up to 12; the rest together as "Other".
+  const kept = blockValues(st.main).map((v) => st.main.get(v) as number);
+  const sizes = [...kept];
+  const rest = [...st.main.values()].reduce((s2, c) => s2 + c, 0) - kept.reduce((s2, c) => s2 + c, 0);
   if (rest > 0) sizes.push(rest);
   const largest = Math.max(0, ...sizes);
   const sMin = opts.sMin ?? 2;
@@ -105,11 +104,11 @@ export function measureFamily(nodes: readonly MeasureNode[], docs: readonly Meas
     clearPct: Math.round((st.withValue > 0 ? st.clear / st.withValue : 0) * 100),
     coverage: Math.round((st.withValue / n) * 100),
     largestPct: Math.round((largest / n) * 100),
-    smallest: sizes.length > 0 ? Math.min(...sizes) : 0,
+    smallest: kept.length > 0 ? Math.min(...kept) : (sizes[0] ?? 0),
     covered: st.withValue,
     clear: st.clear,
     largest,
-    small: sizes.filter((c) => c < sMin).length,
+    small: [...st.main.values()].filter((c) => c < sMin).length,
     generic,
     main: st.main,
     unclear: st.unclear.map((i) => order[i] as string),

@@ -244,42 +244,10 @@ export function matchPack(input: PackMatchInput): PackMatchResult {
     }
   }
 
-  // A concept that two tags claim: all stay as they are only when the claiming tags are sure duplicates of each other (R1, R2, R3, R6);
-  // otherwise only the tag that names the concept by its label (the best rule) stays sure, together with its sure duplicates, and the
-  // others are probable at most: two different tags that reach a combined concept through its aliases are not each other (D-563).
-  const byConcept = new Map<string, Cand[]>();
-  for (const c of kept) (byConcept.get(c.conceptId) ?? byConcept.set(c.conceptId, []).get(c.conceptId) ?? []).push(c);
-  const RULE_ORDER = ['form', 'alias', 'plural', 'acronym-in-name'];
-  const ruleRank = (r: string): number => (RULE_ORDER.includes(r) ? RULE_ORDER.indexOf(r) : RULE_ORDER.length);
-  const list: Cand[] = [];
-  for (const group of byConcept.values()) {
-    if (group.length === 1) {
-      list.push(group[0] as Cand);
-      continue;
-    }
-    const group0 = group.map((c) => userById.get(c.nodeId) as PackNodeIn);
-    const sets = group0.map((_, i) => i);
-    const root = (i: number): number => (sets[i] === i ? i : (sets[i] = root(sets[i] as number)));
-    const two = group0.map((u) => reviewNode(u.id, u.label, u.aliases));
-    for (const p of namePairs(buildIndex({ nodes: two, docs: [] }), two, () => false)) {
-      if (p.confidence !== 'sure' || !SURE_RULES.has(p.rule)) continue;
-      sets[root(two.findIndex((n) => n.id === p.a))] = root(two.findIndex((n) => n.id === p.b));
-    }
-    if (new Set(group0.map((_, i) => root(i))).size === 1) {
-      list.push(...group);
-      continue;
-    }
-    conflicts++;
-    const concept = concepts.get((group[0] as Cand).conceptId) as PackConceptIn;
-    const score = group0.map((u) => {
-      const [best] = meet(reviewNode(u.id, u.label, []), conceptNode(concept, 'labels')).sort((x, y) => RANK[asked(x)] - RANK[asked(y)] || ruleRank(x.rule) - ruleRank(y.rule));
-      return best === undefined ? Infinity : RANK[asked(best)] * 10 + ruleRank(best.rule);
-    });
-    const top = Math.min(...score);
-    const winners = score.flatMap((s, i) => (s === top && top !== Infinity ? [i] : []));
-    const winnerRoot = winners.length === 1 ? root(winners[0] as number) : -1;
-    group.forEach((c, i) => list.push(root(i) === winnerRoot ? c : { ...c, confidence: worse(c.confidence, 'likely') }));
-  }
+  // A concept that two tags claim (D-571): every tag that reaches it through a sure match (its label, its Italian label or a true variant
+  // listed as alias, D-560) is a duplicate of the others, so all stay as they are and merge together in the automatic application. What stays
+  // below sure was already decided per tag above (alias-to-alias chain, narrower alias, own-label preference).
+  const list: Cand[] = kept;
   list.sort((a, b) => RANK[a.confidence] - RANK[b.confidence] || (a.nodeId < b.nodeId ? -1 : a.nodeId > b.nodeId ? 1 : a.conceptId < b.conceptId ? -1 : 1));
   const shown = list.slice(0, MAX_ROWS);
   const matches: PackMatch[] = shown.map((c) => ({ nodeId: c.nodeId, conceptId: c.conceptId, rule: c.rule, confidence: c.confidence, path: conceptPath(concepts, families, c.conceptId) }));

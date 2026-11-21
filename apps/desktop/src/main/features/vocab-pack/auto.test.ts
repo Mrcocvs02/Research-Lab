@@ -148,6 +148,33 @@ describe('when the pack applies itself', () => {
     expect(p.matches.every((m) => m.confidence !== 'sure')).toBe(true);
   });
 
+  it('merges a tag and its short name that reach one concept, as part of the same single change (D-571)', async () => {
+    await library([...KNOWN, ['eta2', 'Eta', ['inbox']]]);
+    await store.documents.put(doc(6, ['eta2']));
+    const r = await autoApply(s);
+    expect(r).not.toBeNull();
+    const tax = await nodes();
+    // Two tags, one concept: "Eta" and "Eta model" are one tag now (the more used one; the papers follow), and it is the only linked one.
+    const eta = [...tax.values()].filter((n) => n.pack === 'test-pack/topic.eta-model');
+    expect(eta).toHaveLength(1);
+    expect(tax.has('eta') && tax.has('eta2')).toBe(false);
+    expect([eta[0]!.label, ...eta[0]!.aliases]).toEqual(expect.arrayContaining(['Eta', 'Eta model']));
+    expect((await readState(store.dataDir)).changeIds).toEqual([r!.changeId]);
+  });
+
+  it('the parts of a combined concept are different concepts: two tags on two parts are linked to two concepts, never merged (D-571)', async () => {
+    await library([...KNOWN, ['lam', 'Lambda methods', ['inbox']], ['mu', 'Mu methods', ['inbox']]]);
+    await store.documents.put(doc(6, ['lam', 'mu']));
+    expect(await autoApply(s)).not.toBeNull();
+    const tax = await nodes();
+    expect(tax.get('lam')?.pack).toBe('test-pack/topic.lambda-methods');
+    expect(tax.get('mu')?.pack).toBe('test-pack/topic.mu-methods');
+    // Both sit under the combined concept, which became a tag because papers use them.
+    const combined = tax.get('lam')!.parents[0]!;
+    expect(tax.get(combined)).toMatchObject({ pack: 'test-pack/topic.lambda-and-mu' });
+    expect(tax.get('mu')?.parents).toEqual([combined]);
+  });
+
   it('never twice, and the review can still take more of the pack', async () => {
     await library(KNOWN);
     expect(await autoApply(s)).not.toBeNull();

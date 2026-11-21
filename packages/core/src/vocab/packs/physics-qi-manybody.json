@@ -16,10 +16,7 @@
      "labelIt": "Informazione e calcolo quantistico",
      "aliases": [
       "quantum information science",
-      "QIS",
-      "quantum information",
-      "quantum computing",
-      "quantum computation"
+      "QIS"
      ],
      "arxiv": [
       "quant-ph"
@@ -199,10 +196,7 @@
     {
      "id": "topic.quantum-state-tomography-and-learning",
      "label": "Quantum state tomography and learning",
-     "aliases": [
-      "quantum tomography",
-      "quantum state tomography"
-     ],
+     "aliases": [],
      "parent": "topic.quantum-information-and-computation"
     },
     {
@@ -230,10 +224,7 @@
     {
      "id": "topic.quantum-cryptography-and-communication",
      "label": "Quantum cryptography and communication",
-     "aliases": [
-      "quantum cryptography",
-      "quantum communication"
-     ],
+     "aliases": [],
      "parent": "topic.quantum-information-and-computation"
     },
     {
@@ -324,10 +315,7 @@
     {
      "id": "topic.order-parameters-and-symmetry-breaking",
      "label": "Order parameters and symmetry breaking",
-     "aliases": [
-      "order parameter",
-      "symmetry breaking"
-     ],
+     "aliases": [],
      "parent": "topic.ground-state-properties"
     },
     {
@@ -349,8 +337,6 @@
      "id": "topic.spinons-and-fractionalization",
      "label": "Spinons and fractionalization",
      "aliases": [
-      "spinon",
-      "spinons",
       "fractionalized excitations"
      ],
      "parent": "topic.excitations"
@@ -447,28 +433,20 @@
     {
      "id": "topic.floquet-systems-and-time-crystals",
      "label": "Floquet systems and time crystals",
-     "aliases": [
-      "time crystals",
-      "Floquet systems"
-     ],
+     "aliases": [],
      "parent": "topic.nonequilibrium-quantum-dynamics"
     },
     {
      "id": "topic.quantum-chaos-and-scrambling",
      "label": "Quantum chaos and scrambling",
-     "aliases": [
-      "scrambling",
-      "quantum chaos",
-      "information scrambling"
-     ],
+     "aliases": [],
      "parent": "topic.nonequilibrium-quantum-dynamics"
     },
     {
      "id": "topic.quantum-hydrodynamics-and-transport",
      "label": "Quantum hydrodynamics and transport",
      "aliases": [
-      "many-body transport",
-      "quantum hydrodynamics"
+      "many-body transport"
      ],
      "parent": "topic.nonequilibrium-quantum-dynamics"
     },
@@ -652,11 +630,7 @@
     {
      "id": "topic.mesoscopic-and-nanoscale-physics",
      "label": "Mesoscopic and nanoscale physics",
-     "aliases": [
-      "mesoscopic physics",
-      "nanoscale physics",
-      "mesoscopic systems"
-     ],
+     "aliases": [],
      "parent": "topic.condensed-matter-physics",
      "arxiv": [
       "cond-mat.mes-hall"
@@ -752,11 +726,7 @@
     {
      "id": "topic.soft-and-active-matter",
      "label": "Soft and active matter",
-     "aliases": [
-      "soft condensed matter",
-      "active matter",
-      "soft matter"
-     ],
+     "aliases": [],
      "parent": "topic.condensed-matter-physics",
      "arxiv": [
       "cond-mat.soft"
@@ -869,11 +839,7 @@
     {
      "id": "topic.stripes-and-charge-order",
      "label": "Stripes and charge order",
-     "aliases": [
-      "stripe order",
-      "charge order",
-      "stripes"
-     ],
+     "aliases": [],
      "parent": "topic.strongly-correlated-systems"
     },
     {
@@ -887,21 +853,13 @@
     {
      "id": "topic.non-fermi-liquids-and-strange-metals",
      "label": "Non-Fermi liquids and strange metals",
-     "aliases": [
-      "non-Fermi liquid",
-      "strange metal",
-      "strange metals"
-     ],
+     "aliases": [],
      "parent": "topic.strongly-correlated-systems"
     },
     {
      "id": "topic.heavy-fermions-and-kondo-physics",
      "label": "Heavy fermions and Kondo physics",
-     "aliases": [
-      "heavy-fermion systems",
-      "Kondo effect",
-      "Kondo physics"
-     ],
+     "aliases": [],
      "parent": "topic.strongly-correlated-systems"
     },
     {
@@ -990,10 +948,7 @@
     {
      "id": "topic.topological-insulators-and-semimetals",
      "label": "Topological insulators and semimetals",
-     "aliases": [
-      "topological insulators",
-      "topological semimetals"
-     ],
+     "aliases": [],
      "parent": "topic.topological-phases-and-order"
     },
     {
@@ -1049,10 +1004,7 @@
     {
      "id": "topic.phase-transitions-and-critical-phenomena",
      "label": "Phase transitions and critical phenomena",
-     "aliases": [
-      "critical phenomena",
-      "phase transitions"
-     ],
+     "aliases": [],
      "parent": "topic.statistical-physics"
     },
     {
@@ -1144,11 +1096,7 @@
     {
      "id": "topic.replica-and-cavity-methods",
      "label": "Replica and cavity methods",
-     "aliases": [
-      "replica method",
-      "cavity method",
-      "replica trick"
-     ],
+     "aliases": [],
      "parent": "topic.statistical-physics"
     },
     {
@@ -1273,19 +1221,13 @@
     {
      "id": "topic.quantum-channels-and-capacities",
      "label": "Quantum channels and capacities",
-     "aliases": [
-      "quantum channel",
-      "channel capacity"
-     ],
+     "aliases": [],
      "parent": "topic.information-theory"
     },
     {
      "id": "topic.fisher-information-and-metrology",
      "label": "Fisher information and metrology",
-     "aliases": [
-      "quantum metrology",
-      "Fisher information"
-     ],
+     "aliases": [],
      "parent": "topic.information-theory"
     },
     {
@@ -1347,10 +1289,7 @@
      "id": "topic.quantum-simulation-and-quantum-hardware",
      "label": "Quantum simulation and quantum hardware",
      "labelIt": "Simulazione quantistica e hardware quantistico",
-     "aliases": [
-      "quantum simulation",
-      "quantum simulators"
-     ]
+     "aliases": []
     },
     {
      "id": "topic.analog-quantum-simulation",
@@ -1359,7 +1298,7 @@
       "analogue quantum simulation",
       "analog quantum simulators"
      ],
-     "parent": "topic.quantum-simulation-and-quantum-hardware"
+     "parent": "topic.quantum-simulation"
     },
     {
      "id": "topic.digital-quantum-simulation",
@@ -1368,7 +1307,7 @@
       "digital quantum simulators",
       "gate-based quantum simulation"
      ],
-     "parent": "topic.quantum-simulation-and-quantum-hardware"
+     "parent": "topic.quantum-simulation"
     },
     {
      "id": "topic.nisq-devices",
@@ -1377,15 +1316,12 @@
       "NISQ",
       "noisy intermediate-scale quantum"
      ],
-     "parent": "topic.quantum-simulation-and-quantum-hardware"
+     "parent": "topic.quantum-hardware"
     },
     {
      "id": "topic.quantum-benchmarking-and-certification",
      "label": "Quantum benchmarking and certification",
-     "aliases": [
-      "quantum benchmarking",
-      "quantum certification"
-     ],
+     "aliases": [],
      "parent": "topic.quantum-simulation-and-quantum-hardware"
     },
     {
@@ -1410,7 +1346,7 @@
      "aliases": [
       "quantum annealers"
      ],
-     "parent": "topic.quantum-simulation-and-quantum-hardware"
+     "parent": "topic.quantum-hardware"
     },
     {
      "id": "topic.quantum-control",
@@ -1427,12 +1363,7 @@
     {
      "id": "topic.cavity-and-circuit-qed",
      "label": "Cavity and circuit QED",
-     "aliases": [
-      "cavity quantum electrodynamics",
-      "cavity QED",
-      "circuit QED",
-      "circuit quantum electrodynamics"
-     ],
+     "aliases": [],
      "parent": "topic.quantum-simulation-and-quantum-hardware"
     },
     {
@@ -1501,12 +1432,7 @@
      "id": "topic.machine-learning-and-ai",
      "label": "Machine learning and AI",
      "labelIt": "Apprendimento automatico e intelligenza artificiale",
-     "aliases": [
-      "artificial intelligence",
-      "AI",
-      "machine learning",
-      "ML"
-     ],
+     "aliases": [],
      "arxiv": [
       "cs.LG",
       "stat.ML",
@@ -1594,8 +1520,6 @@
      "id": "topic.transformers-and-attention",
      "label": "Transformers and attention",
      "aliases": [
-      "transformer",
-      "transformers",
       "self-attention"
      ],
      "parent": "topic.deep-learning"
@@ -1603,12 +1527,7 @@
     {
      "id": "topic.convolutional-and-graph-neural-networks",
      "label": "Convolutional and graph neural networks",
-     "aliases": [
-      "CNN",
-      "convolutional neural networks",
-      "GNN",
-      "graph neural networks"
-     ],
+     "aliases": [],
      "parent": "topic.deep-learning"
     },
     {
@@ -1732,11 +1651,7 @@
     {
      "id": "topic.interpretability-and-uncertainty",
      "label": "Interpretability and uncertainty",
-     "aliases": [
-      "explainable AI",
-      "XAI",
-      "uncertainty quantification"
-     ],
+     "aliases": [],
      "parent": "topic.machine-learning-and-ai"
     },
     {
@@ -1784,9 +1699,7 @@
      "label": "Lie groups and representation theory",
      "aliases": [
       "group theory in physics",
-      "representation theory",
-      "Lie algebras",
-      "Lie groups"
+      "Lie algebras"
      ],
      "parent": "topic.mathematical-physics"
     },
@@ -1865,9 +1778,7 @@
     {
      "id": "topic.spectral-theory-and-pde-methods",
      "label": "Spectral theory and PDE methods",
-     "aliases": [
-      "spectral theory"
-     ],
+     "aliases": [],
      "parent": "topic.mathematical-physics"
     },
     {
@@ -1921,8 +1832,7 @@
      "label": "Topology and algebraic topology",
      "labelIt": "Topologia e topologia algebrica",
      "aliases": [
-      "topology",
-      "algebraic topology"
+      "topology"
      ],
      "parent": "topic.mathematics",
      "arxiv": [
@@ -1934,11 +1844,7 @@
      "id": "topic.algebra-and-group-theory",
      "label": "Algebra and group theory",
      "labelIt": "Algebra e teoria dei gruppi",
-     "aliases": [
-      "algebra",
-      "group theory",
-      "abstract algebra"
-     ],
+     "aliases": [],
      "parent": "topic.mathematics",
      "arxiv": [
       "math.RA",
@@ -1950,7 +1856,6 @@
      "label": "Analysis and functional analysis",
      "labelIt": "Analisi e analisi funzionale",
      "aliases": [
-      "functional analysis",
       "mathematical analysis"
      ],
      "parent": "topic.mathematics",
@@ -1963,11 +1868,7 @@
      "id": "topic.probability-and-statistics",
      "label": "Probability and statistics",
      "labelIt": "Probabilità e statistica",
-     "aliases": [
-      "probability theory",
-      "probability",
-      "statistics"
-     ],
+     "aliases": [],
      "parent": "topic.mathematics",
      "arxiv": [
       "math.PR",
@@ -1978,10 +1879,7 @@
      "id": "topic.combinatorics-and-graph-theory",
      "label": "Combinatorics and graph theory",
      "labelIt": "Combinatoria e teoria dei grafi",
-     "aliases": [
-      "combinatorics",
-      "graph theory"
-     ],
+     "aliases": [],
      "parent": "topic.mathematics",
      "arxiv": [
       "math.CO"
@@ -2024,32 +1922,21 @@
      "id": "topic.research-ethics-and-dual-use",
      "label": "Research ethics and dual use",
      "labelIt": "Etica della ricerca e doppio uso",
-     "aliases": [
-      "research ethics",
-      "dual use"
-     ],
+     "aliases": [],
      "parent": "topic.science-society-and-research-practice"
     },
     {
      "id": "topic.reproducibility-and-research-integrity",
      "label": "Reproducibility and research integrity",
      "labelIt": "Riproducibilità e integrità della ricerca",
-     "aliases": [
-      "reproducibility",
-      "research integrity"
-     ],
+     "aliases": [],
      "parent": "topic.science-society-and-research-practice"
     },
     {
      "id": "topic.research-policy-and-administration",
      "label": "Research policy and administration",
      "labelIt": "Politica e amministrazione della ricerca",
-     "aliases": [
-      "administrative",
-      "bureaucracy",
-      "research administration",
-      "science policy"
-     ],
+     "aliases": [],
      "parent": "topic.science-society-and-research-practice",
      "arxiv": [
       "physics.soc-ph"
@@ -2059,10 +1946,7 @@
      "id": "topic.history-and-philosophy-of-physics",
      "label": "History and philosophy of physics",
      "labelIt": "Storia e filosofia della fisica",
-     "aliases": [
-      "history of physics",
-      "philosophy of physics"
-     ],
+     "aliases": [],
      "parent": "topic.science-society-and-research-practice",
      "arxiv": [
       "physics.hist-ph"
@@ -2079,6 +1963,525 @@
      "arxiv": [
       "physics.ed-ph"
      ]
+    },
+    {
+     "id": "topic.quantum-information",
+     "label": "Quantum information",
+     "labelIt": "Informazione quantistica",
+     "aliases": [],
+     "parent": "topic.quantum-information-and-computation"
+    },
+    {
+     "id": "topic.quantum-computing",
+     "label": "Quantum computing",
+     "labelIt": "Calcolo quantistico",
+     "aliases": [
+      "quantum computation"
+     ],
+     "parent": "topic.quantum-information-and-computation"
+    },
+    {
+     "id": "topic.quantum-state-tomography",
+     "label": "Quantum state tomography",
+     "labelIt": "Tomografia di stati quantistici",
+     "aliases": [
+      "quantum tomography"
+     ],
+     "parent": "topic.quantum-state-tomography-and-learning"
+    },
+    {
+     "id": "topic.quantum-cryptography",
+     "label": "Quantum cryptography",
+     "labelIt": "Crittografia quantistica",
+     "aliases": [],
+     "parent": "topic.quantum-cryptography-and-communication"
+    },
+    {
+     "id": "topic.quantum-communication",
+     "label": "Quantum communication",
+     "labelIt": "Comunicazione quantistica",
+     "aliases": [],
+     "parent": "topic.quantum-cryptography-and-communication"
+    },
+    {
+     "id": "topic.order-parameters",
+     "label": "Order parameters",
+     "labelIt": "Parametri d'ordine",
+     "aliases": [
+      "order parameter"
+     ],
+     "parent": "topic.ground-state-properties"
+    },
+    {
+     "id": "topic.symmetry-breaking",
+     "label": "Symmetry breaking",
+     "labelIt": "Rottura di simmetria",
+     "aliases": [],
+     "parent": "topic.ground-state-properties"
+    },
+    {
+     "id": "topic.spinons",
+     "label": "Spinons",
+     "labelIt": "Spinoni",
+     "aliases": [
+      "spinon"
+     ],
+     "parent": "topic.excitations"
+    },
+    {
+     "id": "topic.floquet-systems",
+     "label": "Floquet systems",
+     "labelIt": "Sistemi di Floquet",
+     "aliases": [],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.time-crystals",
+     "label": "Time crystals",
+     "labelIt": "Cristalli temporali",
+     "aliases": [],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.quantum-chaos",
+     "label": "Quantum chaos",
+     "labelIt": "Caos quantistico",
+     "aliases": [],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.scrambling",
+     "label": "Scrambling",
+     "labelIt": "Scrambling",
+     "aliases": [
+      "information scrambling"
+     ],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.quantum-hydrodynamics",
+     "label": "Quantum hydrodynamics",
+     "labelIt": "Idrodinamica quantistica",
+     "aliases": [],
+     "parent": "topic.nonequilibrium-quantum-dynamics"
+    },
+    {
+     "id": "topic.mesoscopic-physics",
+     "label": "Mesoscopic physics",
+     "labelIt": "Fisica mesoscopica",
+     "aliases": [
+      "mesoscopic systems"
+     ],
+     "parent": "topic.mesoscopic-and-nanoscale-physics"
+    },
+    {
+     "id": "topic.nanoscale-physics",
+     "label": "Nanoscale physics",
+     "labelIt": "Fisica su scala nanometrica",
+     "aliases": [],
+     "parent": "topic.mesoscopic-and-nanoscale-physics"
+    },
+    {
+     "id": "topic.soft-matter",
+     "label": "Soft matter",
+     "labelIt": "Materia soffice",
+     "aliases": [
+      "soft condensed matter"
+     ],
+     "parent": "topic.soft-and-active-matter"
+    },
+    {
+     "id": "topic.active-matter",
+     "label": "Active matter",
+     "labelIt": "Materia attiva",
+     "aliases": [],
+     "parent": "topic.soft-and-active-matter"
+    },
+    {
+     "id": "topic.stripe-order",
+     "label": "Stripe order",
+     "labelIt": "Ordine a strisce",
+     "aliases": [
+      "stripes"
+     ],
+     "parent": "topic.stripes-and-charge-order"
+    },
+    {
+     "id": "topic.charge-order",
+     "label": "Charge order",
+     "labelIt": "Ordine di carica",
+     "aliases": [],
+     "parent": "topic.stripes-and-charge-order"
+    },
+    {
+     "id": "topic.non-fermi-liquids",
+     "label": "Non-Fermi liquids",
+     "labelIt": "Liquidi non di Fermi",
+     "aliases": [
+      "non-Fermi liquid"
+     ],
+     "parent": "topic.non-fermi-liquids-and-strange-metals"
+    },
+    {
+     "id": "topic.strange-metals",
+     "label": "Strange metals",
+     "labelIt": "Metalli strani",
+     "aliases": [
+      "strange metal"
+     ],
+     "parent": "topic.non-fermi-liquids-and-strange-metals"
+    },
+    {
+     "id": "topic.heavy-fermions",
+     "label": "Heavy fermions",
+     "labelIt": "Fermioni pesanti",
+     "aliases": [
+      "heavy-fermion systems"
+     ],
+     "parent": "topic.heavy-fermions-and-kondo-physics"
+    },
+    {
+     "id": "topic.kondo-physics",
+     "label": "Kondo physics",
+     "labelIt": "Fisica di Kondo",
+     "aliases": [
+      "Kondo effect"
+     ],
+     "parent": "topic.heavy-fermions-and-kondo-physics"
+    },
+    {
+     "id": "topic.topological-insulators",
+     "label": "Topological insulators",
+     "labelIt": "Isolanti topologici",
+     "aliases": [],
+     "parent": "topic.topological-insulators-and-semimetals"
+    },
+    {
+     "id": "topic.topological-semimetals",
+     "label": "Topological semimetals",
+     "labelIt": "Semimetalli topologici",
+     "aliases": [],
+     "parent": "topic.topological-insulators-and-semimetals"
+    },
+    {
+     "id": "topic.phase-transitions",
+     "label": "Phase transitions",
+     "labelIt": "Transizioni di fase",
+     "aliases": [],
+     "parent": "topic.phase-transitions-and-critical-phenomena"
+    },
+    {
+     "id": "topic.critical-phenomena",
+     "label": "Critical phenomena",
+     "labelIt": "Fenomeni critici",
+     "aliases": [],
+     "parent": "topic.phase-transitions-and-critical-phenomena"
+    },
+    {
+     "id": "topic.replica-method",
+     "label": "Replica method",
+     "labelIt": "Metodo delle repliche",
+     "aliases": [
+      "replica trick"
+     ],
+     "parent": "topic.replica-and-cavity-methods"
+    },
+    {
+     "id": "topic.cavity-method",
+     "label": "Cavity method",
+     "labelIt": "Metodo della cavità",
+     "aliases": [],
+     "parent": "topic.replica-and-cavity-methods"
+    },
+    {
+     "id": "topic.quantum-channels",
+     "label": "Quantum channels",
+     "labelIt": "Canali quantistici",
+     "aliases": [
+      "quantum channel"
+     ],
+     "parent": "topic.quantum-channels-and-capacities"
+    },
+    {
+     "id": "topic.channel-capacities",
+     "label": "Channel capacities",
+     "labelIt": "Capacità di canale",
+     "aliases": [
+      "channel capacity"
+     ],
+     "parent": "topic.quantum-channels-and-capacities"
+    },
+    {
+     "id": "topic.fisher-information",
+     "label": "Fisher information",
+     "labelIt": "Informazione di Fisher",
+     "aliases": [],
+     "parent": "topic.fisher-information-and-metrology"
+    },
+    {
+     "id": "topic.quantum-metrology",
+     "label": "Quantum metrology",
+     "labelIt": "Metrologia quantistica",
+     "aliases": [],
+     "parent": "topic.fisher-information-and-metrology"
+    },
+    {
+     "id": "topic.quantum-simulation",
+     "label": "Quantum simulation",
+     "labelIt": "Simulazione quantistica",
+     "aliases": [
+      "quantum simulators"
+     ],
+     "parent": "topic.quantum-simulation-and-quantum-hardware"
+    },
+    {
+     "id": "topic.quantum-hardware",
+     "label": "Quantum hardware",
+     "labelIt": "Hardware quantistico",
+     "aliases": [],
+     "parent": "topic.quantum-simulation-and-quantum-hardware"
+    },
+    {
+     "id": "topic.quantum-benchmarking",
+     "label": "Quantum benchmarking",
+     "labelIt": "Benchmarking quantistico",
+     "aliases": [],
+     "parent": "topic.quantum-benchmarking-and-certification"
+    },
+    {
+     "id": "topic.quantum-certification",
+     "label": "Quantum certification",
+     "labelIt": "Certificazione quantistica",
+     "aliases": [],
+     "parent": "topic.quantum-benchmarking-and-certification"
+    },
+    {
+     "id": "topic.cavity-qed",
+     "label": "Cavity QED",
+     "labelIt": "QED in cavità",
+     "aliases": [
+      "cavity quantum electrodynamics"
+     ],
+     "parent": "topic.cavity-and-circuit-qed"
+    },
+    {
+     "id": "topic.circuit-qed",
+     "label": "Circuit QED",
+     "labelIt": "QED a circuiti",
+     "aliases": [
+      "circuit quantum electrodynamics"
+     ],
+     "parent": "topic.cavity-and-circuit-qed"
+    },
+    {
+     "id": "topic.machine-learning",
+     "label": "Machine learning",
+     "labelIt": "Apprendimento automatico",
+     "aliases": [
+      "ML"
+     ],
+     "parent": "topic.machine-learning-and-ai"
+    },
+    {
+     "id": "topic.artificial-intelligence",
+     "label": "Artificial intelligence",
+     "labelIt": "Intelligenza artificiale",
+     "aliases": [
+      "AI"
+     ],
+     "parent": "topic.machine-learning-and-ai"
+    },
+    {
+     "id": "topic.transformers",
+     "label": "Transformers",
+     "labelIt": "Transformer",
+     "aliases": [
+      "transformer"
+     ],
+     "parent": "topic.deep-learning"
+    },
+    {
+     "id": "topic.convolutional-neural-networks",
+     "label": "Convolutional neural networks",
+     "labelIt": "Reti neurali convoluzionali",
+     "aliases": [
+      "CNN"
+     ],
+     "parent": "topic.deep-learning"
+    },
+    {
+     "id": "topic.graph-neural-networks",
+     "label": "Graph neural networks",
+     "labelIt": "Reti neurali su grafi",
+     "aliases": [
+      "GNN"
+     ],
+     "parent": "topic.deep-learning"
+    },
+    {
+     "id": "topic.interpretability",
+     "label": "Interpretability",
+     "labelIt": "Interpretabilità",
+     "aliases": [
+      "explainable AI",
+      "XAI"
+     ],
+     "parent": "topic.interpretability-and-uncertainty"
+    },
+    {
+     "id": "topic.uncertainty-quantification",
+     "label": "Uncertainty quantification",
+     "labelIt": "Quantificazione dell'incertezza",
+     "aliases": [],
+     "parent": "topic.interpretability-and-uncertainty"
+    },
+    {
+     "id": "topic.lie-groups",
+     "label": "Lie groups",
+     "labelIt": "Gruppi di Lie",
+     "aliases": [],
+     "parent": "topic.lie-groups-and-representation-theory"
+    },
+    {
+     "id": "topic.representation-theory",
+     "label": "Representation theory",
+     "labelIt": "Teoria delle rappresentazioni",
+     "aliases": [],
+     "parent": "topic.lie-groups-and-representation-theory"
+    },
+    {
+     "id": "topic.spectral-theory",
+     "label": "Spectral theory",
+     "labelIt": "Teoria spettrale",
+     "aliases": [],
+     "parent": "topic.spectral-theory-and-pde-methods"
+    },
+    {
+     "id": "topic.algebraic-topology",
+     "label": "Algebraic topology",
+     "labelIt": "Topologia algebrica",
+     "aliases": [],
+     "parent": "topic.topology-and-algebraic-topology"
+    },
+    {
+     "id": "topic.algebra",
+     "label": "Algebra",
+     "labelIt": "Algebra",
+     "aliases": [
+      "abstract algebra"
+     ],
+     "parent": "topic.algebra-and-group-theory"
+    },
+    {
+     "id": "topic.group-theory",
+     "label": "Group theory",
+     "labelIt": "Teoria dei gruppi",
+     "aliases": [],
+     "parent": "topic.algebra-and-group-theory"
+    },
+    {
+     "id": "topic.functional-analysis",
+     "label": "Functional analysis",
+     "labelIt": "Analisi funzionale",
+     "aliases": [],
+     "parent": "topic.analysis-and-functional-analysis"
+    },
+    {
+     "id": "topic.probability",
+     "label": "Probability",
+     "labelIt": "Probabilità",
+     "aliases": [
+      "probability theory"
+     ],
+     "parent": "topic.probability-and-statistics"
+    },
+    {
+     "id": "topic.statistics",
+     "label": "Statistics",
+     "labelIt": "Statistica",
+     "aliases": [],
+     "parent": "topic.probability-and-statistics"
+    },
+    {
+     "id": "topic.combinatorics",
+     "label": "Combinatorics",
+     "labelIt": "Combinatoria",
+     "aliases": [],
+     "parent": "topic.combinatorics-and-graph-theory"
+    },
+    {
+     "id": "topic.graph-theory",
+     "label": "Graph theory",
+     "labelIt": "Teoria dei grafi",
+     "aliases": [],
+     "parent": "topic.combinatorics-and-graph-theory"
+    },
+    {
+     "id": "topic.research-ethics",
+     "label": "Research ethics",
+     "labelIt": "Etica della ricerca",
+     "aliases": [],
+     "parent": "topic.research-ethics-and-dual-use"
+    },
+    {
+     "id": "topic.dual-use",
+     "label": "Dual use",
+     "labelIt": "Doppio uso",
+     "aliases": [],
+     "parent": "topic.research-ethics-and-dual-use"
+    },
+    {
+     "id": "topic.reproducibility",
+     "label": "Reproducibility",
+     "labelIt": "Riproducibilità",
+     "aliases": [],
+     "parent": "topic.reproducibility-and-research-integrity"
+    },
+    {
+     "id": "topic.research-integrity",
+     "label": "Research integrity",
+     "labelIt": "Integrità della ricerca",
+     "aliases": [],
+     "parent": "topic.reproducibility-and-research-integrity"
+    },
+    {
+     "id": "topic.research-policy",
+     "label": "Research policy",
+     "labelIt": "Politica della ricerca",
+     "aliases": [
+      "science policy"
+     ],
+     "parent": "topic.research-policy-and-administration"
+    },
+    {
+     "id": "topic.research-administration",
+     "label": "Research administration",
+     "labelIt": "Amministrazione della ricerca",
+     "aliases": [
+      "administrative"
+     ],
+     "parent": "topic.research-policy-and-administration"
+    },
+    {
+     "id": "topic.bureaucracy",
+     "label": "Bureaucracy",
+     "labelIt": "Burocrazia",
+     "aliases": [],
+     "parent": "topic.research-policy-and-administration"
+    },
+    {
+     "id": "topic.history-of-physics",
+     "label": "History of physics",
+     "labelIt": "Storia della fisica",
+     "aliases": [],
+     "parent": "topic.history-and-philosophy-of-physics"
+    },
+    {
+     "id": "topic.philosophy-of-physics",
+     "label": "Philosophy of physics",
+     "labelIt": "Filosofia della fisica",
+     "aliases": [],
+     "parent": "topic.history-and-philosophy-of-physics"
     }
    ]
   },
@@ -2222,10 +2625,7 @@
     {
      "id": "method.simple-update-and-full-update",
      "label": "Simple update and full update",
-     "aliases": [
-      "simple update",
-      "full update"
-     ],
+     "aliases": [],
      "parent": "method.peps"
     },
     {
@@ -2705,12 +3105,7 @@
      "id": "method.diagrammatic-and-green-function-methods",
      "label": "Diagrammatic and Green function methods",
      "labelIt": "Metodi diagrammatici",
-     "aliases": [
-      "diagrammatic methods",
-      "diagrammatic expansion",
-      "Green function methods",
-      "Green's function methods"
-     ]
+     "aliases": []
     },
     {
      "id": "method.analytical-methods",
@@ -3030,10 +3425,7 @@
     {
      "id": "method.clifford-and-stabilizer-simulation",
      "label": "Clifford and stabilizer simulation",
-     "aliases": [
-      "Clifford simulation",
-      "stabilizer simulation"
-     ],
+     "aliases": [],
      "parent": "method.classical-simulation-of-quantum-systems"
     },
     {
@@ -3061,10 +3453,7 @@
     {
      "id": "method.bootstrap-and-jackknife",
      "label": "Bootstrap and jackknife",
-     "aliases": [
-      "bootstrap",
-      "jackknife"
-     ],
+     "aliases": [],
      "parent": "method.statistical-and-data-analysis-methods"
     },
     {
@@ -3076,6 +3465,66 @@
       "intrinsic dimensionality"
      ],
      "parent": "method.statistical-and-data-analysis-methods"
+    },
+    {
+     "id": "method.simple-update",
+     "label": "Simple update",
+     "labelIt": "Simple update",
+     "aliases": [],
+     "parent": "method.peps"
+    },
+    {
+     "id": "method.full-update",
+     "label": "Full update",
+     "labelIt": "Full update",
+     "aliases": [],
+     "parent": "method.peps"
+    },
+    {
+     "id": "method.diagrammatic-methods",
+     "label": "Diagrammatic methods",
+     "labelIt": "Metodi diagrammatici",
+     "aliases": [
+      "diagrammatic expansion"
+     ],
+     "parent": "method.diagrammatic-and-green-function-methods"
+    },
+    {
+     "id": "method.green-function-methods",
+     "label": "Green function methods",
+     "labelIt": "Metodi delle funzioni di Green",
+     "aliases": [
+      "Green's function methods"
+     ],
+     "parent": "method.diagrammatic-and-green-function-methods"
+    },
+    {
+     "id": "method.clifford-simulation",
+     "label": "Clifford simulation",
+     "labelIt": "Simulazione di Clifford",
+     "aliases": [],
+     "parent": "method.clifford-and-stabilizer-simulation"
+    },
+    {
+     "id": "method.stabilizer-simulation",
+     "label": "Stabilizer simulation",
+     "labelIt": "Simulazione stabilizer",
+     "aliases": [],
+     "parent": "method.clifford-and-stabilizer-simulation"
+    },
+    {
+     "id": "method.bootstrap",
+     "label": "Bootstrap",
+     "labelIt": "Bootstrap",
+     "aliases": [],
+     "parent": "method.bootstrap-and-jackknife"
+    },
+    {
+     "id": "method.jackknife",
+     "label": "Jackknife",
+     "labelIt": "Jackknife",
+     "aliases": [],
+     "parent": "method.bootstrap-and-jackknife"
     }
    ]
   },
@@ -3127,11 +3576,7 @@
     {
      "id": "system.extended-and-multiband-hubbard-models",
      "label": "Extended and multiband Hubbard models",
-     "aliases": [
-      "extended Hubbard model",
-      "multiband Hubbard model",
-      "multi-orbital Hubbard model"
-     ],
+     "aliases": [],
      "parent": "system.lattice-fermion-models"
     },
     {
@@ -3156,9 +3601,6 @@
      "id": "system.anderson-impurity-and-kondo-models",
      "label": "Anderson impurity and Kondo models",
      "aliases": [
-      "Anderson impurity model",
-      "SIAM",
-      "Kondo model",
       "impurity models"
      ],
      "parent": "system.lattice-fermion-models"
@@ -3227,12 +3669,7 @@
     {
      "id": "system.electron-gas-and-luttinger-liquids",
      "label": "Electron gas and Luttinger liquids",
-     "aliases": [
-      "homogeneous electron gas",
-      "jellium",
-      "Luttinger liquid",
-      "Tomonaga-Luttinger liquid"
-     ],
+     "aliases": [],
      "parent": "system.lattice-fermion-models"
     },
     {
@@ -3363,11 +3800,7 @@
     {
      "id": "system.aklt-and-spin-1-chains",
      "label": "AKLT and spin-1 chains",
-     "aliases": [
-      "AKLT",
-      "AKLT model",
-      "Haldane chain"
-     ],
+     "aliases": [],
      "parent": "system.quantum-spin-models"
     },
     {
@@ -3645,10 +4078,7 @@
     {
      "id": "system.anderson-and-quasiperiodic-models",
      "label": "Anderson and quasiperiodic models",
-     "aliases": [
-      "Anderson model",
-      "quasiperiodic models"
-     ],
+     "aliases": [],
      "parent": "system.random-and-disordered-models"
     },
     {
@@ -3738,9 +4168,7 @@
     {
      "id": "system.spin-qubits-and-defects",
      "label": "Spin qubits and defects",
-     "aliases": [
-      "spin qubits"
-     ],
+     "aliases": [],
      "parent": "system.quantum-simulation-platforms"
     },
     {
@@ -3804,6 +4232,99 @@
      "label": "Kitaev and frustrated magnet candidates",
      "aliases": [],
      "parent": "system.quantum-materials"
+    },
+    {
+     "id": "system.extended-hubbard-model",
+     "label": "Extended Hubbard model",
+     "labelIt": "Modello di Hubbard esteso",
+     "aliases": [],
+     "parent": "system.extended-and-multiband-hubbard-models"
+    },
+    {
+     "id": "system.multiband-hubbard-model",
+     "label": "Multiband Hubbard model",
+     "labelIt": "Modello di Hubbard multibanda",
+     "aliases": [
+      "multi-orbital Hubbard model"
+     ],
+     "parent": "system.extended-and-multiband-hubbard-models"
+    },
+    {
+     "id": "system.anderson-impurity-model",
+     "label": "Anderson impurity model",
+     "labelIt": "Modello di impurezza di Anderson",
+     "aliases": [
+      "SIAM"
+     ],
+     "parent": "system.anderson-impurity-and-kondo-models"
+    },
+    {
+     "id": "system.kondo-model",
+     "label": "Kondo model",
+     "labelIt": "Modello di Kondo",
+     "aliases": [],
+     "parent": "system.anderson-impurity-and-kondo-models"
+    },
+    {
+     "id": "system.electron-gas",
+     "label": "Electron gas",
+     "labelIt": "Gas di elettroni",
+     "aliases": [
+      "homogeneous electron gas",
+      "jellium"
+     ],
+     "parent": "system.electron-gas-and-luttinger-liquids"
+    },
+    {
+     "id": "system.luttinger-liquids",
+     "label": "Luttinger liquids",
+     "labelIt": "Liquidi di Luttinger",
+     "aliases": [
+      "Luttinger liquid",
+      "Tomonaga-Luttinger liquid"
+     ],
+     "parent": "system.electron-gas-and-luttinger-liquids"
+    },
+    {
+     "id": "system.aklt-model",
+     "label": "AKLT model",
+     "labelIt": "Modello AKLT",
+     "aliases": [
+      "AKLT"
+     ],
+     "parent": "system.aklt-and-spin-1-chains"
+    },
+    {
+     "id": "system.spin-1-chains",
+     "label": "Spin-1 chains",
+     "labelIt": "Catene di spin 1",
+     "aliases": [
+      "Haldane chain"
+     ],
+     "parent": "system.aklt-and-spin-1-chains"
+    },
+    {
+     "id": "system.anderson-model",
+     "label": "Anderson model",
+     "labelIt": "Modello di Anderson",
+     "aliases": [],
+     "parent": "system.anderson-and-quasiperiodic-models"
+    },
+    {
+     "id": "system.quasiperiodic-models",
+     "label": "Quasiperiodic models",
+     "labelIt": "Modelli quasiperiodici",
+     "aliases": [
+      "quasiperiodic model"
+     ],
+     "parent": "system.anderson-and-quasiperiodic-models"
+    },
+    {
+     "id": "system.spin-qubits",
+     "label": "Spin qubits",
+     "labelIt": "Qubit di spin",
+     "aliases": [],
+     "parent": "system.spin-qubits-and-defects"
     }
    ]
   },

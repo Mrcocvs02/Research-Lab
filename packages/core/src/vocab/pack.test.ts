@@ -133,8 +133,33 @@ describe.each(files)('pack %s', (file) => {
     expect(society).toMatchObject({ label: 'Science, society and research practice', labelIt: 'Scienza, società e pratica della ricerca', arxiv: ['physics.soc-ph', 'physics.ed-ph', 'physics.hist-ph'] });
     expect(society.parent).toBeUndefined();
     expect(children(society.id)).toEqual(['Science communication', 'Research ethics and dual use', 'Reproducibility and research integrity', 'Research policy and administration', 'History and philosophy of physics', 'Physics education']);
-    const policy = topic.find((c) => c.id === 'topic.research-policy-and-administration')!;
-    expect(policy.aliases).toEqual(expect.arrayContaining(['administrative', 'bureaucracy']));
+    // "administrative" and "bureaucracy" are different things: two children of the policy concept, never one concept (D-571).
+    const owner = (term: string) => topic.find((c) => [c.label, ...c.aliases].some((t) => normalizePackTerm(t) === normalizePackTerm(term)));
+    expect(owner('administrative')).toMatchObject({ id: 'topic.research-administration', parent: 'topic.research-policy-and-administration' });
+    expect(owner('bureaucracy')).toMatchObject({ id: 'topic.bureaucracy', parent: 'topic.research-policy-and-administration' });
+  });
+  it('gives the parts of a combined concept their own child concepts instead of aliases (D-571)', () => {
+    const concepts = pack.families.flatMap((f) => f.concepts);
+    const owner = (term: string) => concepts.find((c) => [c.label, ...c.aliases].some((t) => normalizePackTerm(t) === normalizePackTerm(term)));
+    const parts: Array<[string, string, string]> = [
+      ['machine learning', 'topic.machine-learning', 'topic.machine-learning-and-ai'],
+      ['ML', 'topic.machine-learning', 'topic.machine-learning-and-ai'],
+      ['artificial intelligence', 'topic.artificial-intelligence', 'topic.machine-learning-and-ai'],
+      ['AI', 'topic.artificial-intelligence', 'topic.machine-learning-and-ai'],
+      ['quantum information', 'topic.quantum-information', 'topic.quantum-information-and-computation'],
+      ['quantum computing', 'topic.quantum-computing', 'topic.quantum-information-and-computation'],
+      ['quantum computation', 'topic.quantum-computing', 'topic.quantum-information-and-computation'],
+      ['quantum simulation', 'topic.quantum-simulation', 'topic.quantum-simulation-and-quantum-hardware'],
+      ['phase transitions', 'topic.phase-transitions', 'topic.phase-transitions-and-critical-phenomena'],
+      ['critical phenomena', 'topic.critical-phenomena', 'topic.phase-transitions-and-critical-phenomena'],
+    ];
+    for (const [term, id, parent] of parts) {
+      expect(owner(term)?.id, term).toBe(id);
+      expect(owner(term)?.parent, term).toBe(parent);
+    }
+    // The combined concept keeps none of its parts as an alias.
+    const combined = concepts.find((c) => c.id === 'topic.machine-learning-and-ai')!;
+    expect(combined.aliases).toEqual([]);
   });
   it('keeps the topic hierarchy within bounds', () => {
     const topic = pack.families.find((f) => f.id === 'topic')!;

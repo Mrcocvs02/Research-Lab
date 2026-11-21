@@ -38,6 +38,7 @@
     "showInLibrary": "Show in the Library",
     "macroMore": "Suggest macro-areas…",
     "macroPill": "{{family}} groups {{pct}}% of the papers clearly",
+    "macroPillPack": "Some of your areas are not yet under the macro-areas of the field",
     "macroPropose": "Suggest macro-areas",
     "macroApplied_one": "Macro-areas changed ({{count}} move)",
     "macroApplied_other": "Macro-areas changed ({{count}} moves)",

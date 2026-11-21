@@ -38,6 +38,7 @@
     "showInLibrary": "Mostra nella Libreria",
     "macroMore": "Proponi macro-aree…",
     "macroPill": "{{family}} raggruppa chiaramente il {{pct}} % dei lavori",
+    "macroPillPack": "Alcune delle tue aree non sono ancora sotto le macro-aree del campo",
     "macroPropose": "Proponi macro-aree",
     "macroApplied_one": "Macro-aree cambiate ({{count}} mossa)",
     "macroApplied_other": "Macro-aree cambiate ({{count}} mosse)",

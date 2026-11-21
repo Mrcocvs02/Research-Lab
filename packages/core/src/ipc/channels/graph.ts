@@ -136,7 +136,7 @@ export const graphChannels = defineChannels('graph', {
       aspect: z.number().min(0.2).max(10).optional(),
     }),
     response: z.object({
-      families: z.array(z.object({ id: z.string().max(200), label: z.string().max(200), count: z.number().int().nonnegative(), eligible: z.boolean().optional(), reason: familyReason.optional() })),
+      families: z.array(z.object({ id: z.string().max(200), label: z.string().max(200), count: z.number().int().nonnegative(), eligible: z.boolean().optional(), reason: familyReason.optional(), pack: z.boolean().optional() })),
       areas,
       items: z.array(z.object({ id: documentIdSchema, cell: z.array(z.number()).length(2).optional(), block: z.string().max(200).optional(), others: z.array(z.string().max(200)).max(2).optional(), ...A, ...ST })).max(GRAPH_LIMITS.mapPoints),
       /** With a family: whether it passes the test of the blocks, and the numbers behind it. */

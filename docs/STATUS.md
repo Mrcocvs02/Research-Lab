@@ -2,9 +2,9 @@
 
 > Passaggio di consegne: vedi `docs/HANDOFF.md`.
 
-- **Fase:** 8 completa, tag `phase-8` creato. Tag pubblicati: `phase-0`..`phase-3`, `phase-6`, `phase-7`, `phase-8`; `phase-4` e `phase-5` senza tag. Versioni 1.0, 1.1.0 (tag `v1.1.0`) e 1.2.0 (tag `v1.2.0`) rilasciate; versione 1.3.0 impostata (commit `1c75187`), tag `v1.3.0` pubblicato.
-- **Onda:** onda 15 (2026-11-20/21, D-516..D-562, design §20 di `docs/design/ARCHITETTURA-UI.md`) fatta e unita su `main`; onda 15b (2026-11-21, D-563..D-574, dopo la 1.3.0) unita su `main`, non rilasciata. Onda 14 (D-492..D-510) e lavoro dopo la 1.1.0 (D-511..D-514) sotto. Nessun lavoro di ondata in corso.
-- **HEAD:** vedi `git log`. Ultimo commit di codice: `f30cc5d` (merge `mo10`, onda 15b). Ultima versione rilasciata: 1.3.0 (commit di versione `1c75187`, tag `v1.3.0`). La documentazione dell'onda 15b è sul ramo `docs17`, non ancora unita.
+- **Fase:** 8 completa, tag `phase-8` creato. Tag pubblicati: `phase-0`..`phase-3`, `phase-6`, `phase-7`, `phase-8`; `phase-4` e `phase-5` senza tag. Versioni 1.0, 1.1.0 (tag `v1.1.0`) e 1.2.0 (tag `v1.2.0`) rilasciate; 1.3.0 (tag `v1.3.0`) rilasciata; versione **1.4.0** impostata (commit `ed375eb`), tag `v1.4.0` pubblicato.
+- **Onda:** onda 15 (2026-11-20/21, D-516..D-562, design §20 di `docs/design/ARCHITETTURA-UI.md`) fatta e unita su `main`; onda 15b (2026-11-21, D-563..D-576) unita su `main` e rilasciata con la 1.4.0. Onda 14 (D-492..D-510) e lavoro dopo la 1.1.0 (D-511..D-514) sotto. Nessun lavoro di ondata in corso.
+- **HEAD:** vedi `git log`. Ultimo commit di codice: `ed375eb` (Set version 1.4.0). Ultima versione rilasciata: 1.4.0 (tag `v1.4.0`); installer `apps/desktop/release/ResearchLab-Setup-1.4.0.exe` (125 MB, non provato con installazione).
 
 - **Fatto** (onda 14):
   - Sorprendimi salta i collegamenti già noti; Discover riduce i classici, visibili con "Includi classici" (D-492).
@@ -71,3 +71,9 @@
   4. Versione 1.4.0, installer e tag `v1.4.0`.
   5. Rimuovere i vecchi worktree in `C:\dev\rl-wt` (mai una junction `node_modules`).
 - Regole operative ricordate dall'utente: costo in token prima del tempo; agenti al massimo 2; test bomba vietati (D-476); tetti in KiB non vincolanti ma app leggera (D-487); AI di test con tetto $0,10 (approvato); niente Co-Authored-By.
+
+- **Fatto per la 1.4.0** (2026-11-21, D-575, D-576):
+  - D-575: con il vocabolario del campo ogni macro-area ha il suo blocco anche con un solo lavoro (prima finiva in «Other»).
+  - D-576: la stima dei lavori AI conta il prompt di sistema dell'Agent SDK (20 000 token per chiamata): prima era 4,5 volte sotto il costo reale, ora è prudente (stima $0,0128, costo $0,0062).
+  - Tagging AI dei 5 articoli senza tag su copia della libreria reale (solo tag, Haiku, `pipeline: 'direct'`, stima prima, tetto $0,10): spesa totale $0,025 in 3 giri; copertura Topic 81 % → 100 %; il libro di geometria/topologia in Mathematics, «Network science: Ising» in Statistical physics, il programma del gruppo in Machine learning and AI (per contenuto); copia cancellata.
+  - Test su `main` prima della 1.4.0: unitari 3257/3257 (25 saltati); pesanti unitari 76/76; e2e pesanti 2/2; e2e completi 100 verdi, 10 saltati, 2 corretti e poi verdi (`pdf-annot` migrazione dipendeva dai tempi della scrittura al consenso, spec reso indipendente; `packaged-app` richiedeva la build nuova); `packaged-app` verde sulla build 1.4.0 (build di prova e controllo di rilascio). `qa-budget` passato nel giro completo.

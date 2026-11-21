@@ -16,6 +16,8 @@ export interface GenericActivity {
   /** 0..1 when known. */
   progress?: number;
   action?: { label: string; run(): void };
+  /** A second action next to `action` (the Undo of the field vocabulary notice). */
+  alt?: { label: string; run(): void };
   /** Shown as a small x when present; removes the row. */
   dismiss?: () => void;
 }

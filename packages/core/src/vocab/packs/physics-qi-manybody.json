@@ -1883,6 +1883,202 @@
      "label": "Berry phase",
      "aliases": [],
      "parent": "topic.geometry-of-quantum-states"
+    },
+    {
+     "id": "topic.mathematics",
+     "label": "Mathematics",
+     "labelIt": "Matematica",
+     "aliases": [
+      "maths",
+      "math"
+     ],
+     "arxiv": [
+      "math"
+     ]
+    },
+    {
+     "id": "topic.differential-geometry",
+     "label": "Differential geometry",
+     "labelIt": "Geometria differenziale",
+     "aliases": [],
+     "parent": "topic.mathematics",
+     "arxiv": [
+      "math.DG"
+     ]
+    },
+    {
+     "id": "topic.fiber-bundles-and-gauge-theory",
+     "label": "Fiber bundles and gauge theory",
+     "labelIt": "Fibrati e teoria di gauge",
+     "aliases": [
+      "fiber bundles",
+      "fibre bundles"
+     ],
+     "parent": "topic.differential-geometry"
+    },
+    {
+     "id": "topic.topology-and-algebraic-topology",
+     "label": "Topology and algebraic topology",
+     "labelIt": "Topologia e topologia algebrica",
+     "aliases": [
+      "topology",
+      "algebraic topology"
+     ],
+     "parent": "topic.mathematics",
+     "arxiv": [
+      "math.AT",
+      "math.GT"
+     ]
+    },
+    {
+     "id": "topic.algebra-and-group-theory",
+     "label": "Algebra and group theory",
+     "labelIt": "Algebra e teoria dei gruppi",
+     "aliases": [
+      "algebra",
+      "group theory",
+      "abstract algebra"
+     ],
+     "parent": "topic.mathematics",
+     "arxiv": [
+      "math.RA",
+      "math.GR"
+     ]
+    },
+    {
+     "id": "topic.analysis-and-functional-analysis",
+     "label": "Analysis and functional analysis",
+     "labelIt": "Analisi e analisi funzionale",
+     "aliases": [
+      "functional analysis",
+      "mathematical analysis"
+     ],
+     "parent": "topic.mathematics",
+     "arxiv": [
+      "math.CA",
+      "math.FA"
+     ]
+    },
+    {
+     "id": "topic.probability-and-statistics",
+     "label": "Probability and statistics",
+     "labelIt": "Probabilità e statistica",
+     "aliases": [
+      "probability theory",
+      "probability",
+      "statistics"
+     ],
+     "parent": "topic.mathematics",
+     "arxiv": [
+      "math.PR",
+      "math.ST"
+     ]
+    },
+    {
+     "id": "topic.combinatorics-and-graph-theory",
+     "label": "Combinatorics and graph theory",
+     "labelIt": "Combinatoria e teoria dei grafi",
+     "aliases": [
+      "combinatorics",
+      "graph theory"
+     ],
+     "parent": "topic.mathematics",
+     "arxiv": [
+      "math.CO"
+     ]
+    },
+    {
+     "id": "topic.numerical-analysis",
+     "label": "Numerical analysis",
+     "labelIt": "Analisi numerica",
+     "aliases": [],
+     "parent": "topic.mathematics",
+     "arxiv": [
+      "math.NA"
+     ]
+    },
+    {
+     "id": "topic.science-society-and-research-practice",
+     "label": "Science, society and research practice",
+     "labelIt": "Scienza, società e pratica della ricerca",
+     "aliases": [
+      "science and society"
+     ],
+     "arxiv": [
+      "physics.soc-ph",
+      "physics.ed-ph",
+      "physics.hist-ph"
+     ]
+    },
+    {
+     "id": "topic.science-communication",
+     "label": "Science communication",
+     "labelIt": "Comunicazione scientifica",
+     "aliases": [
+      "scientific communication",
+      "science outreach"
+     ],
+     "parent": "topic.science-society-and-research-practice"
+    },
+    {
+     "id": "topic.research-ethics-and-dual-use",
+     "label": "Research ethics and dual use",
+     "labelIt": "Etica della ricerca e doppio uso",
+     "aliases": [
+      "research ethics",
+      "dual use"
+     ],
+     "parent": "topic.science-society-and-research-practice"
+    },
+    {
+     "id": "topic.reproducibility-and-research-integrity",
+     "label": "Reproducibility and research integrity",
+     "labelIt": "Riproducibilità e integrità della ricerca",
+     "aliases": [
+      "reproducibility",
+      "research integrity"
+     ],
+     "parent": "topic.science-society-and-research-practice"
+    },
+    {
+     "id": "topic.research-policy-and-administration",
+     "label": "Research policy and administration",
+     "labelIt": "Politica e amministrazione della ricerca",
+     "aliases": [
+      "administrative",
+      "bureaucracy",
+      "research administration",
+      "science policy"
+     ],
+     "parent": "topic.science-society-and-research-practice",
+     "arxiv": [
+      "physics.soc-ph"
+     ]
+    },
+    {
+     "id": "topic.history-and-philosophy-of-physics",
+     "label": "History and philosophy of physics",
+     "labelIt": "Storia e filosofia della fisica",
+     "aliases": [
+      "history of physics",
+      "philosophy of physics"
+     ],
+     "parent": "topic.science-society-and-research-practice",
+     "arxiv": [
+      "physics.hist-ph"
+     ]
+    },
+    {
+     "id": "topic.physics-education",
+     "label": "Physics education",
+     "labelIt": "Didattica della fisica",
+     "aliases": [
+      "physics teaching"
+     ],
+     "parent": "topic.science-society-and-research-practice",
+     "arxiv": [
+      "physics.ed-ph"
+     ]
     }
    ]
   },

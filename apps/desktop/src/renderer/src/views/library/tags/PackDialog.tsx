@@ -47,8 +47,8 @@ export function PackDialog({ onClose }: { onClose(): void }) {
       async (l) => {
         if (!live) return;
         setList(l);
-        if (l.active) return;
-        for (const p of l.packs) {
+        // A pack in use is looked at again only for what is left of it to review (the likely and the maybe, D-565).
+        for (const p of l.active ? l.packs.filter((x) => x.id === l.active?.packId) : l.packs) {
           const pv = await rl.invoke('vocabPack:preview', { packId: p.id }).catch(() => null);
           if (live && pv) setPreviews((cur) => ({ ...cur, [p.id]: pv }));
         }
@@ -125,9 +125,23 @@ export function PackDialog({ onClose }: { onClose(): void }) {
       <div className="dialog-body" style={{ display: 'grid', gap: 'var(--space-3)', maxHeight: '70vh', overflow: 'auto' }}>
         {error ? <ErrorNote>{errorMessage(error, t)}</ErrorNote> : null}
         {!list && !error && <p className="hint">{t('pack.loading')}</p>}
-        {list && list.active && (
+        {list && list.active && !pack && (
           <section data-testid="pack-active">
             <p>{t('pack.active', { name: safeText(name(list.packs.find((p) => p.id === list.active?.packId) ?? { id: '', version: 0, label: list.active.packId, families: [] })) })}</p>
+            {(() => {
+              const left = previews[list.active.packId]?.matches.length ?? 0;
+              const info = list.packs.find((p) => p.id === list.active?.packId);
+              return left > 0 && info ? (
+                <p>
+                  <span className="hint" data-testid="pack-review-left">
+                    {t('pack.review.left', { count: left })}
+                  </span>{' '}
+                  <Button size="sm" onClick={() => start(info)} data-testid="pack-review">
+                    {t('pack.review.open')}
+                  </Button>
+                </p>
+              ) : null;
+            })()}
             {leaving ? (
               <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                 <Button onClick={() => void disable(false)} busy={busy} data-testid="pack-disable-keep">

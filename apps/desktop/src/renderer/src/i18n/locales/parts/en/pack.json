@@ -57,6 +57,11 @@
       "open": "Turn off…",
       "keep": "Stop using it",
       "undo": "Turn off and undo the links"
+    },
+    "review": {
+      "left_one": "{{count}} more tag may be in the vocabulary: review it.",
+      "left_other": "{{count}} more tags may be in the vocabulary: review them.",
+      "open": "Review"
     }
   },
   "macro": {

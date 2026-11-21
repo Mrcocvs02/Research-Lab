@@ -20,9 +20,9 @@ const SUGGEST_SHARE = 0.2;
 const SUGGEST_MIN = 5;
 const MAX_REJECTED = 5000;
 
-const languageOf = async (s: MainServices): Promise<'it' | 'en'> => ((await s.settings.get()).uiLanguage === 'en' ? 'en' : 'it');
+export const languageOf = async (s: MainServices): Promise<'it' | 'en'> => ((await s.settings.get()).uiLanguage === 'en' ? 'en' : 'it');
 
-async function inputOf(rt: Rt, loaded: LoadedPack, state: VocabPackState, chosen?: Record<string, string>): Promise<PackMatchInput> {
+export async function inputOf(rt: Rt, loaded: LoadedPack, state: VocabPackState, chosen?: Record<string, string>): Promise<PackMatchInput> {
   const tax = await rt.store.readTaxonomy();
   const docs = (await rt.store.documents.list()).filter((d) => !d.missing);
   return {
@@ -75,7 +75,8 @@ export async function enable(
   const loaded = await loadPack(req.packId);
   const dataDir = rt.store.dataDir;
   const before = await readState(dataDir);
-  if (before.packId !== '') throw invalid('A field vocabulary is already in use', { reason: 'already-active', packId: before.packId });
+  // A pack already in use may be applied again to take more of its matches (the review of the likely ones, D-565); another one may not.
+  if (before.packId !== '' && before.packId !== req.packId) throw invalid('A field vocabulary is already in use', { reason: 'already-active', packId: before.packId });
   const lang = await languageOf(s);
   const tax = await rt.store.readTaxonomy();
   const byId = new Map(tax.nodes.map((n) => [n.id, n]));
@@ -84,11 +85,21 @@ export async function enable(
   // Family pairing: a root of the library (one that exists) or `later`.
   const families: Record<string, string> = {};
   for (const f of loaded.families) {
-    const v = req.families[f.id] ?? 'later';
+    let v = req.families[f.id] ?? 'later';
+    // The pairing already made stays unless this call names a root.
+    if (v === 'later' && before.packId !== '') v = byId.get(before.families[f.id] ?? '')?.parents.length === 0 ? (before.families[f.id] as string) : 'later';
     if (v !== 'later' && !(byId.get(v)?.parents.length === 0 && byId.get(v)?.family !== undefined && byId.get(v)?.family !== 'keywords')) throw invalid('A family is paired with something that is not a family root', { family: f.id });
     families[f.id] = v;
   }
-  const state: VocabPackState = { ...before, packId: loaded.pack.id, packVersion: loaded.pack.version, enabledAt: new Date().toISOString(), families, changeIds: [] };
+  const again = before.packId !== '';
+  const state: VocabPackState = {
+    ...before,
+    packId: loaded.pack.id,
+    packVersion: loaded.pack.version,
+    enabledAt: again ? before.enabledAt : new Date().toISOString(),
+    families,
+    changeIds: [...before.changeIds],
+  };
 
   const ops: TaxonomyOp[] = [];
   const conceptOfNode = new Map<string, string>();
@@ -146,7 +157,7 @@ export async function enable(
     const r = await rt.organizer.applyTaxonomy(ops, tax.revision, { summary: `Field vocabulary: ${conceptOfNode.size} tags linked` });
     await settle(s, rt, r, [{ kind: 'taxonomy' }]);
     changeId = r.changeId;
-    state.changeIds = [r.changeId];
+    state.changeIds = [...state.changeIds, r.changeId].slice(-200);
   }
   const seen = new Set(state.rejected.map(([a, b]) => `${a}\u0000${b}`));
   for (const [n, c] of req.reject) if (n !== undefined && c !== undefined && !seen.has(`${n}\u0000${c}`)) state.rejected.push([n, c]);
@@ -180,7 +191,8 @@ export async function disable(s: MainServices, req: { undo: boolean }): Promise<
       }
     }
   }
-  if (stopped === undefined) await writeState(rt.store.dataDir, { ...emptyState(), suggested: true });
+  // Turned off: the pack never applies itself again to this library (D-565).
+  if (stopped === undefined) await writeState(rt.store.dataDir, { ...emptyState(), suggested: true, dismissed: true });
   else await writeState(rt.store.dataDir, { ...st, changeIds: left });
   return { undone, ...(stopped !== undefined ? { stopped } : {}) };
 }

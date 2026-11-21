@@ -5,7 +5,8 @@ export { PACK_MAX_DEPTH, normalizePackTerm, packConceptSchema, packFamilySchema,
 /** `<dataDir>/vocab-pack.json` (D-516): the pack in use and what the user decided about it. */
 export const vocabPackStateSchema = z.object({
   schemaVersion: z.literal(1),
-  packId: z.string().min(1).max(80),
+  /** Empty when no pack is in use (the file then only remembers that the suggestion was seen, or that the pack was turned off). */
+  packId: z.string().max(80),
   packVersion: z.number().int().nonnegative(),
   enabledAt: z.string().max(40),
   /** Pack family id -> id of the root of the library, or `later` (created when its first concept becomes a tag). */
@@ -17,6 +18,10 @@ export const vocabPackStateSchema = z.object({
   changeIds: z.array(z.string().max(80)).max(200),
   /** The suggestion was shown and dismissed or taken. */
   suggested: z.boolean().optional(),
+  /** The pack was turned off (or its automatic application undone) by the user: it never applies by itself again (D-565). */
+  dismissed: z.boolean().optional(),
+  /** The last automatic application (D-565): how many tags it recognised, when, and its change group. */
+  auto: z.object({ n: z.number().int().nonnegative(), at: z.string().max(40), changeId: z.string().max(80) }).optional(),
 });
 export type VocabPackState = z.infer<typeof vocabPackStateSchema>;
 

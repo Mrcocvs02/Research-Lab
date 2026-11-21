@@ -94,7 +94,9 @@ describe('turning the pack on and off', () => {
     expect(alpha?.label).toBe('Alpha theory');
     expect(alpha?.aliases).toContain('Teoria alfa');
     expect((await readState(store.dataDir)).packId).toBe('test-pack');
-    await expect(enable(s, { packId: 'test-pack', families: {}, accept: none, reject: [] })).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
+    // The pack in use can be applied again (the review of the likely matches, D-565): nothing new, the change group stays one.
+    expect(await enable(s, { packId: 'test-pack', families: {}, accept: none, reject: [] })).toMatchObject({ changeId: null, linked: 0 });
+    expect((await readState(store.dataDir)).changeIds).toEqual([r.changeId]);
 
     const off = await disable(s, { undo: true });
     expect(off).toEqual({ undone: 1 });

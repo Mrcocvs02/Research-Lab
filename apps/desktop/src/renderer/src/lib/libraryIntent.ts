@@ -11,11 +11,11 @@ export interface LibraryIntent {
   docIds?: string[];
   /** Open the vocabulary with the guided cleanup ("Tidy the tags" from the Map, D-508). */
   cleanup?: boolean;
-  /** Open the tag manager directly (palette, shortcut, sidebar, facet): the tree, "To review" or the guided cleanup. */
+  /** Open the tag manager directly (palette, shortcut, sidebar, facet): the tree, "To review", the guided cleanup or the field vocabulary dialog. */
   manage?: TagPlace;
 }
 
-export type TagPlace = 'manage' | 'review' | 'cleanup';
+export type TagPlace = 'manage' | 'review' | 'cleanup' | 'pack';
 /** Sent when the Library is already on screen (a mailbox read at mount does not reach it). */
 export const TAG_MANAGER_EVENT = 'rl:tag-manager';
 

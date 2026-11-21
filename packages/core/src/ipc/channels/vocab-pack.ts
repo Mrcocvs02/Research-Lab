@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { itemIdSchema } from '../../common.js';
-import { defineChannels } from '../registry.js';
+import { defineChannels, defineEvents } from '../registry.js';
 
 /**
  * The field vocabulary (pack, D-516 .. D-519). The packs are JSON resources read by main on demand (never bundled as JS) and the
@@ -75,6 +75,9 @@ export interface PackSearchItem {
 
 const matchAccept = z.object({ nodeId: itemIdSchema, conceptId: z.string().min(1).max(120), useFieldName: z.boolean().optional() });
 const placeAccept = z.object({ nodeId: itemIdSchema, parentId: itemIdSchema.nullable() });
+
+/** The field vocabulary was applied by itself (D-565): the Activity panel and a toast say so, with Undo and Review. */
+export const vocabPackEvents = defineEvents('vocabPack', { autoApplied: z.object({ n: z.number().int().nonnegative(), changeId: z.string().max(80), at: z.string().max(40) }) });
 
 export const vocabPackChannels = defineChannels('vocabPack', {
   /** The packs the app ships, the active one of the library and whether to suggest one (once; `dismiss` marks the suggestion as seen). Local. */

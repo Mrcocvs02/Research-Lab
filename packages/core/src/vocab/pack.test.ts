@@ -120,11 +120,27 @@ describe.each(files)('pack %s', (file) => {
     const metadata = /\b(preprint|arxiv|published|journal)\b/i;
     for (const c of concepts) for (const t of [c.label, ...c.aliases]) expect(metadata.test(t), t).toBe(false);
   });
+  it('has the two fixed macro-areas of D-566 at the top of Topic, with true aliases, and the non-research tags go under the second (D-567)', () => {
+    const topic = pack.families.find((f) => f.id === 'topic')!.concepts;
+    const children = (id: string) => topic.filter((c) => c.parent === id).map((c) => c.label);
+    const math = topic.find((c) => c.id === 'topic.mathematics')!;
+    expect(math).toMatchObject({ label: 'Mathematics', labelIt: 'Matematica' });
+    expect(math.parent).toBeUndefined();
+    expect(children(math.id)).toEqual(expect.arrayContaining(['Differential geometry', 'Topology and algebraic topology', 'Algebra and group theory', 'Analysis and functional analysis', 'Probability and statistics', 'Combinatorics and graph theory', 'Numerical analysis']));
+    expect(topic.find((c) => c.id === 'topic.fiber-bundles-and-gauge-theory')?.parent).toBe('topic.differential-geometry');
+    expect(topic.find((c) => c.id === 'topic.differential-geometry')?.arxiv).toEqual(['math.DG']);
+    const society = topic.find((c) => c.id === 'topic.science-society-and-research-practice')!;
+    expect(society).toMatchObject({ label: 'Science, society and research practice', labelIt: 'Scienza, società e pratica della ricerca', arxiv: ['physics.soc-ph', 'physics.ed-ph', 'physics.hist-ph'] });
+    expect(society.parent).toBeUndefined();
+    expect(children(society.id)).toEqual(['Science communication', 'Research ethics and dual use', 'Reproducibility and research integrity', 'Research policy and administration', 'History and philosophy of physics', 'Physics education']);
+    const policy = topic.find((c) => c.id === 'topic.research-policy-and-administration')!;
+    expect(policy.aliases).toEqual(expect.arrayContaining(['administrative', 'bureaucracy']));
+  });
   it('keeps the topic hierarchy within bounds', () => {
     const topic = pack.families.find((f) => f.id === 'topic')!;
     const roots = topic.concepts.filter((c) => !c.parent);
     expect(roots.length).toBeGreaterThanOrEqual(8);
-    expect(roots.length).toBeLessThanOrEqual(12);
+    expect(roots.length).toBeLessThanOrEqual(14);
     expect(topic.concepts.length).toBeGreaterThanOrEqual(150);
     expect(topic.concepts.length).toBeLessThanOrEqual(300);
     expect(PACK_MAX_DEPTH).toBe(3);

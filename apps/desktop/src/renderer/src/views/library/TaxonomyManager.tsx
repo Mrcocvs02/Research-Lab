@@ -476,7 +476,7 @@ function NewFamilyForm({ onDone }: { onDone(createdId: string | null): void }) {
 }
 
 /** The vocabulary: health strip, the tree (families, "To sort", Keywords) and "To review" in tabs, the node editor, and the guided cleanup. */
-export function TaxonomyManager({ onBack, start = 'manage' }: { onBack(): void; /** Where to open: the tree, "To review" or the guided cleanup (Map, palette, shortcut, sidebar). */ start?: 'manage' | 'review' | 'cleanup' }) {
+export function TaxonomyManager({ onBack, start = 'manage' }: { onBack(): void; /** Where to open: the tree, "To review" or the guided cleanup (Map, palette, shortcut, sidebar). */ start?: 'manage' | 'review' | 'cleanup' | 'pack' }) {
   const { t, i18n } = useTranslation();
   const { model, loaded, error, apply, view } = useTaxonomy();
   const { fail } = useNotify();
@@ -493,7 +493,7 @@ export function TaxonomyManager({ onBack, start = 'manage' }: { onBack(): void; 
   const [cleanup, setCleanup] = useState<{ step: number | null } | null>(start === 'cleanup' ? { step: null } : null);
   const queryId = useId();
   const { data: review } = useTagReview();
-  const [packOpen, setPackOpen] = useState(false);
+  const [packOpen, setPackOpen] = useState(start === 'pack');
   // A field vocabulary that fits the library is suggested once (D-516): a quiet row, never turned on by itself.
   const [packSuggest, setPackSuggest] = useState<{ id: string; name: string } | null>(null);
   useEffect(() => {

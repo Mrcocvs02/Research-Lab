@@ -129,3 +129,47 @@ describe('the main area of a paper (D-569)', () => {
     expect(mainValue(list, 'gone')).toBe('z');
   });
 });
+
+describe('the areas under a Topic family root (D-572)', () => {
+  const topic: AreaNode = { ...n('topic'), family: 'many' };
+  // Level 1: `ma` (covers 90 % of the papers; children `ma1`, `ma2`), `mb` (child `mb1`). `side` is a root outside any family.
+  const t = [topic, n('ma', ['topic']), n('mb', ['topic']), n('ma1', ['ma']), n('ma2', ['ma']), n('mb1', ['mb']), n('mc', ['topic']), n('side')];
+  const docs = [
+    ...Array.from({ length: 8 }, (_, i) => d(`a${i}`, ['ma1', 1])),
+    d('x', ['ma2', 1]),
+    d('b', ['mb1', 1]),
+  ];
+
+  it('the areas are the level-1 children that cover a paper, never the sub-areas of a wide one', () => {
+    const m = computeAreas(t, docs);
+    // `ma` covers 9 papers out of 10: without the family root it would give way to ma1 and ma2 (D-483).
+    expect(m.areas.map((a) => a.id)).toEqual(['ma', 'mb']);
+    expect(m.areas.find((a) => a.id === 'ma')!.branches.map((b) => b.id)).toEqual(['ma1', 'ma2']);
+    // A level-1 value with no paper is no area, and the family root is none either.
+    expect(m.areas.some((a) => a.id === 'mc' || a.id === 'topic')).toBe(false);
+  });
+
+  it('a paper with tags of two level-1 values gets its main area by the weight rule, with branches as sub-areas', () => {
+    const m = computeAreas(t, [...docs, d('p', ['ma1', 0.4], ['mb1', 0.9])]);
+    const list = areaValues(m, 'p')!;
+    expect(list.map((e) => e.v).sort()).toEqual(['ma', 'mb']);
+    expect(mainValue(list)).toBe('mb');
+    const sh = m.docs.get('p')!;
+    const top = m.areas[sh.ar[0]![0]]!;
+    expect(top.id).toBe('mb');
+    expect(top.branches[sh.ar[0]![1]]!.id).toBe('mb1');
+  });
+
+  it('roots outside any family are loose: they colour a paper only when it reaches no level-1 value', () => {
+    const m = computeAreas(t, [...docs, d('s', ['side', 1]), d('u', ['side', 1], ['mb1', 1])]);
+    expect(m.docs.get('u')!.ar.map((x) => m.areas[x[0]]!.id)).toEqual(['mb']);
+    expect(m.docs.get('s')!.ar.map((x) => m.areas[x[0]]!.id)).toEqual(['side']);
+  });
+
+  it('without a Topic family root the old descent still applies', () => {
+    const plain = t.map((x) => (x.id === 'topic' ? n('topic') : x)).filter((x) => x.id !== 'side');
+    const m = computeAreas(plain, docs);
+    // `topic` covers every paper, so it gives way to ma and mb; `ma` (90 %) gives way once more to ma1 and ma2.
+    expect(m.areas.map((a) => a.id).sort()).toEqual(['ma1', 'ma2', 'mb']);
+  });
+});

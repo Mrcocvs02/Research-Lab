@@ -220,10 +220,17 @@ test('migration: existing highlights are written into the PDFs one file at a tim
     await openSettings(window, 'library');
     await window.getByTestId('annotations-write').click();
     await expect.poll(async () => (await ipcData<{ annotations: { writeToPdfConfirmedAt: string | null; writeToPdf: boolean } }>(window, 'library:getConfig', {})).annotations.writeToPdfConfirmedAt !== null, { timeout: 30_000 }).toBe(true);
-    await window.getByTestId('annotations-migrate').click();
-    await expect(window.getByTestId('annotations-migrate-dialog')).toContainText('2 files');
-    await window.getByTestId('annotations-migrate-confirm').click();
-    await expect(window.getByTestId('annotations-job')).toHaveAttribute('data-state', 'done', { timeout: 120_000 });
+    // The consent also writes, at once, the documents whose highlights were waiting (D-349): how many are left for the migration depends on
+    // how fast that went, so the dialog is checked against the plan once the writes settle; at the end both files hold their highlights.
+    await expect.poll(async () => (await Promise.all(files.map((f) => pdfState(window, f.docId)))).every((st) => st.state !== 'writing'), { timeout: 60_000 }).toBe(true);
+    const migrationPlan = await ipcData<{ files: number; written: number }>(window, 'annotations:migrationPlan', {});
+    expect(migrationPlan.files + migrationPlan.written).toBe(2);
+    if (migrationPlan.files > 0) {
+      await window.getByTestId('annotations-migrate').click();
+      await expect(window.getByTestId('annotations-migrate-dialog')).toContainText(`${migrationPlan.files} file`);
+      await window.getByTestId('annotations-migrate-confirm').click();
+      await expect(window.getByTestId('annotations-job')).toHaveAttribute('data-state', 'done', { timeout: 120_000 });
+    }
     for (const [i, f] of files.entries()) {
       const now = await readFile(f.abs);
       expect(now.length).toBeGreaterThan(originals[i]!.length);

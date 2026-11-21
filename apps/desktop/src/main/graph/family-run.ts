@@ -238,7 +238,7 @@ async function familyAreas(s: MainServices, view: LibraryView, scope: Scope, fam
 }
 
 /** The blocks of a family: its values as blocks, every paper of the scope in a cell (papers with no value in the last block). */
-async function blocksOf(s: MainServices, v: Values, recs: DocumentRecord[], aspect: number): Promise<ReturnType<typeof layoutBlocks>> {
+async function blocksOf(s: MainServices, v: Values, recs: DocumentRecord[], aspect: number, minBlock?: number): Promise<ReturnType<typeof layoutBlocks>> {
   const lm = await loadModel(s, await s.runtime.require());
   const pos = (id: string): { x?: number; y?: number } => {
     const i = lm?.index.get(id);
@@ -251,7 +251,7 @@ async function blocksOf(s: MainServices, v: Values, recs: DocumentRecord[], aspe
       return { id: r.id, value: main, sub: main === null ? null : v.sub(r.id, main), others: list.filter((e) => e.v !== main).sort((a, b) => b.w - a.w || (a.v < b.v ? -1 : 1)).map((e) => e.v), ...pos(r.id) };
     })
     .sort((a, b) => (a.id < b.id ? -1 : 1));
-  return layoutBlocks({ docs, labels: v.labels, aspect, otherLabel: 'Other', noneLabel: 'No value' });
+  return layoutBlocks({ docs, labels: v.labels, aspect, otherLabel: 'Other', noneLabel: 'No value', minBlock });
 }
 
 /** `graph:family`: the list of families and, when one is asked for, its clusters, the shares of the documents, and the blocks when it passes the test. */
@@ -271,7 +271,8 @@ export async function runFamily(s: MainServices, req: { family?: string | undefi
   if (!req.family) return { families, items: [] };
   const m = await familyAreas(s, view, req.scope, req.family);
   const offer = families.find((f) => f.id === req.family);
-  const laid = await blocksOf(s, await valuesOf(s, view, req.scope, req.family, recs), recs, req.aspect ?? 1.6);
+  // The macro-areas of a field vocabulary are its fixed structure: one with a single paper keeps its block (Mathematics for one book).
+  const laid = await blocksOf(s, await valuesOf(s, view, req.scope, req.family, recs), recs, req.aspect ?? 1.6, offer?.pack ? 1 : undefined);
   // In blocks every paper of the scope has its cell (one with no value, or added after the model was built, sits in the last block).
   const ids = req.docIds ?? (laid && m.docs.size > 0 ? recs.map((r) => r.id) : [...m.docs.keys()]);
   const items: Item[] = [];

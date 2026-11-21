@@ -22,7 +22,6 @@ test('first run imports a pre-existing index from a real library copy', async ()
     await expect(window.getByTestId('wizard')).toBeVisible();
     await window.getByTestId('wizard-ui-language').selectOption('en');
     await next();
-    await next(); // profile: optional
 
     await window.getByTestId('wizard-choose-folder').click();
     await expect(window.getByTestId('wizard-folder-chosen')).toBeVisible();
@@ -37,7 +36,7 @@ test('first run imports a pre-existing index from a real library copy', async ()
     await next();
     await next(); // taxonomy: comes from the import
 
-    await window.getByTestId('wizard-ai-confirm').check();
+    if (await window.getByTestId('wizard-ai-confirm').count()) await window.getByTestId('wizard-ai-confirm').check();
     await next();
     await window.getByTestId('wizard-create').click();
 

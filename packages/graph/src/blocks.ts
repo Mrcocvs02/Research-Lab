@@ -34,6 +34,8 @@ export interface BlockInput {
   aspect: number;
   otherLabel?: string | undefined;
   noneLabel?: string | undefined;
+  /** Papers a value needs for a block of its own (default `MIN_BLOCK`); 1 for the macro-areas of a field vocabulary, a fixed structure that is never hidden in "Other". */
+  minBlock?: number | undefined;
 }
 export interface Block {
   id: string;
@@ -56,8 +58,8 @@ export interface BlockLayout {
 const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** The values that get a block of their own, biggest first: at most `MAX_VALUES`, each with at least `MIN_BLOCK` papers (`count` = papers per main value). The one definition for the Map and for the preview of the macro-areas. */
-export function blockValues(count: ReadonlyMap<string, number>): string[] {
-  return [...count.keys()].filter((v) => count.get(v)! >= MIN_BLOCK).sort((a, b) => count.get(b)! - count.get(a)! || cmp(a, b)).slice(0, MAX_VALUES);
+export function blockValues(count: ReadonlyMap<string, number>, min = MIN_BLOCK): string[] {
+  return [...count.keys()].filter((v) => count.get(v)! >= min).sort((a, b) => count.get(b)! - count.get(a)! || cmp(a, b)).slice(0, MAX_VALUES);
 }
 
 /** Papers ordered along the main axis of their positions (2D PCA, the sign fixed so that the axis points right, or up when vertical). */
@@ -104,7 +106,7 @@ const COLUMN_FACTORS = [1, 1.5, 2, 3] as const;
 export function layoutBlocks(input: BlockInput): BlockLayout {
   const count = new Map<string, number>();
   for (const d of input.docs) if (d.value !== null) count.set(d.value, (count.get(d.value) ?? 0) + 1);
-  const ranked = blockValues(count);
+  const ranked = blockValues(count, input.minBlock);
   const keep = new Set(ranked);
   const members = new Map<string, BlockDoc[]>();
   const blockOf = new Map<string, { block: string; others: string[] }>();

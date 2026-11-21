@@ -164,20 +164,20 @@ export function matchPack(input: PackMatchInput): PackMatchResult {
   const asked = (p: { confidence: Confidence; rule: string }): Confidence => (p.confidence === 'sure' ? 'sure' : p.rule === 'spelling' ? 'likely' : p.confidence);
   const worse = (a: Confidence, b: Confidence): Confidence => (RANK[a] >= RANK[b] ? a : b);
   const userById = new Map(users.map((n) => [n.id, n]));
+  const meet = (a: ReviewNode, b: ReviewNode): Pair[] => {
+    const two = [a, b];
+    return namePairs(buildIndex({ nodes: two, docs: [] }), two, () => false);
+  };
+  const conceptNode = (c: PackConceptIn, names: 'all' | 'labels'): ReviewNode =>
+    reviewNode(CONCEPT, c.label, [...(c.labelIt ? [c.labelIt] : []), ...(names === 'all' ? c.aliases : [])]);
   // A match that only an alias of the concept makes (neither its label nor its Italian label) is judged against that alias as a variant:
   // sure only by the rules of form, plural, sigla in the name and alias in collision (R1, R2, R3, R6), and never when the alias has more
   // meaningful words than the label (a narrower term, unless it is the label's own sigla spelled out): at most probable (D-560).
-  const viaAlias = (nodeId: string, c: PackConceptIn | undefined, base: Confidence): Confidence => {
-    const user = userById.get(nodeId);
-    if (!user || !c) return base;
-    const meet = (other: ReviewNode): Pair[] => {
-      const two = [reviewNode(user.id, user.label, user.aliases), other];
-      return namePairs(buildIndex({ nodes: two, docs: [] }), two, () => false);
-    };
-    if (meet(reviewNode(CONCEPT, c.label, c.labelIt ? [c.labelIt] : [])).length > 0) return base;
+  const viaAlias = (user: ReviewNode, c: PackConceptIn, base: Confidence): Confidence => {
+    if (meet(user, conceptNode(c, 'labels')).length > 0) return base;
     let best: Confidence | undefined;
     for (const alias of c.aliases) {
-      const [p] = meet(reviewNode(CONCEPT, alias, [])).sort((x, y) => RANK[asked(x)] - RANK[asked(y)]);
+      const [p] = meet(user, reviewNode(CONCEPT, alias, [])).sort((x, y) => RANK[asked(x)] - RANK[asked(y)]);
       if (!p) continue;
       let conf = asked(p);
       if (conf === 'sure' && !SURE_RULES.has(p.rule)) conf = 'likely';
@@ -190,42 +190,99 @@ export function matchPack(input: PackMatchInput): PackMatchResult {
   // A match that only an alias of the user's tag makes (its label alone does not meet the concept) is sure only when that alias has at least
   // as many meaningful words as the label (acronym in brackets apart): a tag that is narrower than the concept ("X Y (S)" carrying the
   // alias "Y") is not the concept, whatever rule made the alias meet it (D-562).
-  const viaUserAlias = (nodeId: string, c: PackConceptIn | undefined, base: Confidence): Confidence => {
-    const user = userById.get(nodeId);
-    if (base !== 'sure' || !user || !c || user.aliases.length === 0) return base;
-    const names = [c.label, ...(c.labelIt ? [c.labelIt] : []), ...c.aliases];
-    const meets = (form: string): boolean => {
-      const two = [reviewNode(user.id, form, []), reviewNode(CONCEPT, names[0] as string, names.slice(1))];
-      return namePairs(buildIndex({ nodes: two, docs: [] }), two, () => false).length > 0;
-    };
+  const viaUserAlias = (user: ReviewNode, c: PackConceptIn, base: Confidence): Confidence => {
+    if (base !== 'sure' || user.aliases.length === 0) return base;
+    const whole = conceptNode(c, 'all');
+    const meets = (form: string): boolean => meet(reviewNode(user.id, form, []), whole).length > 0;
     if (meets(user.label)) return base;
     const words = meaningfulCount(splitAcronymName(user.label)?.name ?? user.label);
     return user.aliases.some((a) => meets(a) && meaningfulCount(splitAcronymName(a)?.name ?? a) >= words) ? base : worse(base, 'likely');
   };
+  // A match made only between an alias of the user's tag and an alias of the concept (neither the tag's label nor the concept's label or
+  // Italian label takes part) is a chain of two variants, not a name: at most probable (D-563).
+  const aliasToAlias = (user: ReviewNode, c: PackConceptIn): boolean =>
+    user.aliases.length > 0 && c.aliases.length > 0 && meet(reviewNode(user.id, user.label, []), conceptNode(c, 'all')).length === 0 && meet(user, conceptNode(c, 'labels')).length === 0;
+  const judge = (user: ReviewNode, c: PackConceptIn, base: Confidence): Confidence => {
+    const conf = viaUserAlias(user, c, viaAlias(user, c, base));
+    return aliasToAlias(user, c) ? worse(conf, 'likely') : conf;
+  };
 
-  type Cand = { nodeId: string; conceptId: string; rule: string; confidence: Confidence };
+  type Cand = { nodeId: string; conceptId: string; rule: string; confidence: Confidence; own: boolean };
   const cands = new Map<string, Cand>();
   for (const p of pairs) {
     const [nodeId, concept] = isConcept(p.a) ? [p.b, p.a] : [p.a, p.b];
     const conceptId = concept.slice(1);
-    if (apart.has(pairKey(nodeId, conceptId))) continue;
-    const confidence = viaUserAlias(nodeId, concepts.get(conceptId), viaAlias(nodeId, concepts.get(conceptId), asked(p)));
+    const user = userById.get(nodeId);
+    const c = concepts.get(conceptId);
+    if (apart.has(pairKey(nodeId, conceptId)) || !user || !c) continue;
+    const full = reviewNode(user.id, user.label, user.aliases);
+    const confidence = judge(full, c, asked(p));
     const k = pairKey(nodeId, conceptId);
     const old = cands.get(k);
-    if (!old || RANK[confidence] < RANK[old.confidence]) cands.set(k, { nodeId, conceptId, rule: p.rule, confidence });
+    if (!old || RANK[confidence] < RANK[old.confidence]) cands.set(k, { nodeId, conceptId, rule: p.rule, confidence, own: false });
   }
-  // A tag that fits two concepts, or a concept that two tags claim: the choice is the user's ("maybe").
-  const perNode = new Map<string, number>();
-  const perConcept = new Map<string, number>();
-  for (const c of cands.values()) {
-    perNode.set(c.nodeId, (perNode.get(c.nodeId) ?? 0) + 1);
-    perConcept.set(c.conceptId, (perConcept.get(c.conceptId) ?? 0) + 1);
+  // The tag's own label, alone, meets the concept (through any of its names) at sure confidence.
+  for (const cd of cands.values()) {
+    const user = userById.get(cd.nodeId) as PackNodeIn;
+    const [best] = meet(reviewNode(user.id, user.label, []), conceptNode(concepts.get(cd.conceptId) as PackConceptIn, 'all')).sort((x, y) => RANK[asked(x)] - RANK[asked(y)]);
+    cd.own = cd.confidence === 'sure' && best !== undefined && judge(reviewNode(user.id, user.label, []), concepts.get(cd.conceptId) as PackConceptIn, asked(best)) === 'sure';
   }
-  const conflicts = [...perNode.values()].filter((n) => n > 1).length + [...perConcept.values()].filter((n) => n > 1).length;
-  const list = [...cands.values()].map((c) => ((perNode.get(c.nodeId) ?? 0) > 1 || (perConcept.get(c.conceptId) ?? 0) > 1 ? { ...c, confidence: 'maybe' as Confidence } : c));
+
+  // A tag that fits two concepts (D-563): when exactly one is reached through the tag's own label at sure confidence it stays sure and the
+  // others (reached through the tag's aliases, or less surely) are not conflicts; a label that sure-meets two concepts, or no label at
+  // all among several candidates, leaves the choice to the user ("maybe").
+  let conflicts = 0;
+  const byNode = new Map<string, Cand[]>();
+  for (const c of cands.values()) (byNode.get(c.nodeId) ?? byNode.set(c.nodeId, []).get(c.nodeId) ?? []).push(c);
+  const kept: Cand[] = [];
+  for (const list of byNode.values()) {
+    const own = list.filter((c) => c.own);
+    if (list.length === 1 || own.length === 1) kept.push(own.length === 1 ? (own[0] as Cand) : (list[0] as Cand));
+    else {
+      conflicts++;
+      for (const c of list) kept.push({ ...c, confidence: 'maybe' });
+    }
+  }
+
+  // A concept that two tags claim: all stay as they are only when the claiming tags are sure duplicates of each other (R1, R2, R3, R6);
+  // otherwise only the tag that names the concept by its label (the best rule) stays sure, together with its sure duplicates, and the
+  // others are probable at most: two different tags that reach a combined concept through its aliases are not each other (D-563).
+  const byConcept = new Map<string, Cand[]>();
+  for (const c of kept) (byConcept.get(c.conceptId) ?? byConcept.set(c.conceptId, []).get(c.conceptId) ?? []).push(c);
+  const RULE_ORDER = ['form', 'alias', 'plural', 'acronym-in-name'];
+  const ruleRank = (r: string): number => (RULE_ORDER.includes(r) ? RULE_ORDER.indexOf(r) : RULE_ORDER.length);
+  const list: Cand[] = [];
+  for (const group of byConcept.values()) {
+    if (group.length === 1) {
+      list.push(group[0] as Cand);
+      continue;
+    }
+    const group0 = group.map((c) => userById.get(c.nodeId) as PackNodeIn);
+    const sets = group0.map((_, i) => i);
+    const root = (i: number): number => (sets[i] === i ? i : (sets[i] = root(sets[i] as number)));
+    const two = group0.map((u) => reviewNode(u.id, u.label, u.aliases));
+    for (const p of namePairs(buildIndex({ nodes: two, docs: [] }), two, () => false)) {
+      if (p.confidence !== 'sure' || !SURE_RULES.has(p.rule)) continue;
+      sets[root(two.findIndex((n) => n.id === p.a))] = root(two.findIndex((n) => n.id === p.b));
+    }
+    if (new Set(group0.map((_, i) => root(i))).size === 1) {
+      list.push(...group);
+      continue;
+    }
+    conflicts++;
+    const concept = concepts.get((group[0] as Cand).conceptId) as PackConceptIn;
+    const score = group0.map((u) => {
+      const [best] = meet(reviewNode(u.id, u.label, []), conceptNode(concept, 'labels')).sort((x, y) => RANK[asked(x)] - RANK[asked(y)] || ruleRank(x.rule) - ruleRank(y.rule));
+      return best === undefined ? Infinity : RANK[asked(best)] * 10 + ruleRank(best.rule);
+    });
+    const top = Math.min(...score);
+    const winners = score.flatMap((s, i) => (s === top && top !== Infinity ? [i] : []));
+    const winnerRoot = winners.length === 1 ? root(winners[0] as number) : -1;
+    group.forEach((c, i) => list.push(root(i) === winnerRoot ? c : { ...c, confidence: worse(c.confidence, 'likely') }));
+  }
   list.sort((a, b) => RANK[a.confidence] - RANK[b.confidence] || (a.nodeId < b.nodeId ? -1 : a.nodeId > b.nodeId ? 1 : a.conceptId < b.conceptId ? -1 : 1));
   const shown = list.slice(0, MAX_ROWS);
-  const matches: PackMatch[] = shown.map((c) => ({ ...c, path: conceptPath(concepts, families, c.conceptId) }));
+  const matches: PackMatch[] = shown.map((c) => ({ nodeId: c.nodeId, conceptId: c.conceptId, rule: c.rule, confidence: c.confidence, path: conceptPath(concepts, families, c.conceptId) }));
 
   // Tags the pack stands for, linked or probably the same: drive the numbers and the pairing of the families.
   const standsFor = new Map<string, string>(linkedConcept);

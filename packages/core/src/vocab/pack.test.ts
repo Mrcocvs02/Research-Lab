@@ -85,6 +85,41 @@ describe.each(files)('pack %s', (file) => {
     expect(concepts.find((c) => c.id === 'topic.boltzmann-machines')?.aliases).toEqual([]);
     expect(concepts.find((c) => c.id === 'paperType.numerical-study')?.aliases).not.toContain('computational study');
   });
+  it('covers the common general terms as variants of a standard concept, never as person, journal or metadata words (D-563)', () => {
+    const concepts = pack.families.flatMap((f) => f.concepts);
+    const owner = new Map<string, string>();
+    for (const c of concepts) for (const t of [c.label, ...c.aliases]) owner.set(normalizePackTerm(t), c.id);
+    const expected: Array<[string, string]> = [
+      ['many-body', 'topic.quantum-many-body-physics'],
+      ['quantum many-body', 'topic.quantum-many-body-physics'],
+      ['strongly correlated', 'topic.strongly-correlated-systems'],
+      ['unsupervised machine learning', 'method.unsupervised-learning'],
+      ['unsupervised ML', 'method.unsupervised-learning'],
+      ['quench', 'topic.quantum-quenches'],
+      ['thermalization', 'topic.thermalization'],
+      ['ergodicity', 'topic.ergodicity-and-its-breaking'],
+      ['ergodic', 'topic.ergodicity-and-its-breaking'],
+      ['non-ergodicity', 'topic.ergodicity-and-its-breaking'],
+      ['ergodicity breaking', 'topic.ergodicity-and-its-breaking'],
+      ['intrinsic dimension', 'method.intrinsic-dimension-estimation'],
+      ['intrinsic dimensionality', 'method.intrinsic-dimension-estimation'],
+      ['intrinsic dimension estimation', 'method.intrinsic-dimension-estimation'],
+      ['algorithmic complexity', 'topic.kolmogorov-complexity'],
+      ['algorithmic information', 'topic.algorithmic-information-theory'],
+      ['Lempel-Ziv complexity', 'topic.lempel-ziv-complexity'],
+      ['multifractality', 'topic.multifractality'],
+      ['nonstabilizerness', 'topic.nonstabilizerness'],
+      ['non-stabilizerness', 'topic.nonstabilizerness'],
+      ['magic', 'topic.nonstabilizerness'],
+      ['scale-free networks', 'topic.scale-free-networks'],
+      ['information-theoretic methods', 'topic.information-theory'],
+      ['measurement snapshots', 'method.measurement-snapshots'],
+      ['projective measurements snapshots', 'method.measurement-snapshots'],
+    ];
+    for (const [term, id] of expected) expect(owner.get(normalizePackTerm(term)), term).toBe(id);
+    const metadata = /\b(preprint|arxiv|published|journal)\b/i;
+    for (const c of concepts) for (const t of [c.label, ...c.aliases]) expect(metadata.test(t), t).toBe(false);
+  });
   it('keeps the topic hierarchy within bounds', () => {
     const topic = pack.families.find((f) => f.id === 'topic')!;
     const roots = topic.concepts.filter((c) => !c.parent);

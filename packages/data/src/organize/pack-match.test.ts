@@ -139,9 +139,25 @@ describe('matching the tags of a library with the concepts of a pack (D-517)', (
   it('a match made only between an alias of the tag and an alias of the concept is probable at most (D-563)', () => {
     const chain = run([node('c', 'Rho methods', { aliases: ['sigma simulation'] })]);
     expect(pairOf(chain, 'c')).toMatchObject([{ conceptId: 'method.sigma-study', confidence: 'likely' }]);
-    // The tag's label meeting an alias of the concept, or the concept's label meeting an alias of the tag, is still sure.
+    // The tag's label meeting an alias of the concept is still sure; the concept's label met only by an alias of the tag is probable (D-573).
     expect(run([node('d', 'Sigma simulation')]).matches).toMatchObject([{ conceptId: 'method.sigma-study', confidence: 'sure' }]);
-    expect(run([node('e', 'Rho methods', { aliases: ['Sigma study'] })]).matches).toMatchObject([{ conceptId: 'method.sigma-study', confidence: 'sure' }]);
+    expect(run([node('e', 'Rho methods', { aliases: ['Sigma study'] })]).matches).toMatchObject([{ conceptId: 'method.sigma-study', confidence: 'likely' }]);
+  });
+
+  it('a match made only through an alias of the tag is probable, never sure, and never makes a duplicate (D-573)', () => {
+    // Tag A: its label is unrelated, its junk alias is the label of the concept; tag B: its label is an alias of the same concept.
+    const r = run([node('a', 'Wave networks (WN)', { aliases: ['snapshots', 'Epsilon maps'] }), node('b', 'Epsilon mapping')]);
+    expect(r.matches.map((m) => [m.nodeId, m.conceptId, m.confidence])).toEqual([
+      ['b', 'topic.epsilon-maps', 'sure'],
+      ['a', 'topic.epsilon-maps', 'likely'],
+    ]);
+    // Whatever the rule: the Italian label, a plural or the exact form of the concept, met only through an alias.
+    for (const alias of ['Epsilon maps', 'Epsilon map', 'Mappe epsilon']) {
+      expect(pairOf(run([node('a', 'Unrelated', { aliases: [alias] })]), 'a')).toMatchObject([{ conceptId: 'topic.epsilon-maps', confidence: 'likely' }]);
+    }
+    // A label "Name (ACR)" is the tag's own label: its acronym is still sure.
+    expect(pairOf(run([node('c', 'Some alpha thing (AT)', { aliases: ['junk'] })]), 'c')).toMatchObject([{ conceptId: 'topic.alpha-theory', confidence: 'sure' }]);
+    expect(pairOf(run([node('d', 'Alpha theory (AT)', { aliases: ['junk'] })]), 'd')).toMatchObject([{ conceptId: 'topic.alpha-theory', confidence: 'sure' }]);
   });
 
   it('never merges what the field tells apart: the tag is listed, not matched', () => {

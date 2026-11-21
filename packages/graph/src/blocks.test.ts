@@ -114,4 +114,11 @@ describe('blocks on a wide canvas (D-509)', () => {
     expect(out.blockOf.get(docs[29]!.id)!.block).toBe(OTHER_BLOCK);
     expect(blockValues(new Map([['a', 5], ['b', 1], ['c', 2]]))).toEqual(['a', 'c']);
   });
+
+  it('with minBlock 1 (the macro-areas of a field vocabulary) a value with one paper keeps its own block', () => {
+    const docs = mk(30, (i) => (i < 14 ? 'a' : i < 26 ? 'b' : i === 26 ? 'c' : i === 27 ? 'd' : i === 28 ? 'd' : 'e'));
+    const out = layoutBlocks({ docs, labels: labels(['a', 'b', 'c', 'd', 'e']), aspect: 1.6, minBlock: 1 });
+    expect(out.blocks.map((b) => [b.id, b.count])).toEqual([['a', 14], ['b', 12], ['d', 2], ['c', 1], ['e', 1]]);
+    expect(blockValues(new Map([['a', 5], ['b', 1], ['c', 2]]), 1)).toEqual(['a', 'c', 'b']);
+  });
 });

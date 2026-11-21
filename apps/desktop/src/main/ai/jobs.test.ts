@@ -100,7 +100,8 @@ describe('jobs:estimate', () => {
     expect(e.skipped).toBe(1);
     expect(e.preview.allowed).toEqual([hex(1)]);
     expect(e.preview.refused).toEqual([{ docId: hex(3), reason: 'folder-not-enabled' }]);
-    expect(e.preview.approxInputTokens).toBeGreaterThan(0);
+    // The Agent SDK's own system prompt is billed on every call: at least 20k tokens per document sent.
+    expect(e.preview.approxInputTokens).toBeGreaterThanOrEqual(20_000);
     // With `regenerate`, proposed and rejected values are proposed again.
     expect(ok(await call('jobs:estimate', req({ regenerate: true }))).toSend).toBe(2);
   });

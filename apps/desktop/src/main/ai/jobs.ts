@@ -25,6 +25,8 @@ const CHAPTER_SUMMARY_CHARS = 2000;
 const GENERATED_NOTE_CHARS = 6000;
 /** Output tokens of one call of the pipeline (the same default the other estimates use). */
 const OUT_TOKENS_PER_CALL = 1000;
+/** Input tokens the Agent SDK adds to every call (its system prompt, billed as a cache write); measured, rounded up. */
+const SDK_CALL_TOKENS = 20_000;
 
 /**
  * What the analysis pipeline sends for ONE document, mirroring `analysis/pipeline.ts`: the note step (stronger model: one call, or
@@ -159,6 +161,16 @@ async function plan(s: MainServices, ctx: AiCtx, req: JobRequest) {
     preview.needsConfirmation = preview.needsConfirmation || (e.usd !== null && e.usd > cap.confirmBatchAboveUsd);
     preview.overCap = cap.monthlyUsd !== null && base.monthUsd + (e.usd ?? 0) > cap.monthlyUsd;
     calls = e.calls;
+  }
+  // The Agent SDK bills its own system prompt on every call (written to the cache each time), on top of what we send: without it the
+  // estimate of a direct tag job was 4.5 times too low (2026-11-21: 5 calls on Haiku counted $0.0028, cost $0.0126).
+  if (ctx.cfg.ai.provider === 'claude-agent-sdk' && calls > 0) {
+    const extra = estimateCostFromModels(ctx.cfg.ai.models, { model: preview.model, promptChars: calls * SDK_CALL_TOKENS * 4, expectedOutputTokens: 0 });
+    const usd = preview.estimatedUsd === null || extra.usd === null ? null : preview.estimatedUsd + extra.usd;
+    const cap = ctx.cfg.ai.usageCap;
+    preview = { ...preview, approxInputTokens: preview.approxInputTokens + extra.inputTokens, estimatedUsd: usd };
+    preview.needsConfirmation = preview.needsConfirmation || (usd !== null && usd > cap.confirmBatchAboveUsd);
+    preview.overCap = cap.monthlyUsd !== null && base.monthUsd + (usd ?? 0) > cap.monthlyUsd;
   }
   return { todo, skipped, calls, preview: preview as Preview };
 }
